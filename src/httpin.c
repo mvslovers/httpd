@@ -1,0 +1,182 @@
+/* HTTPIN.C
+** Get request headers from client.
+** Transitions to next state as needed.
+*/
+#define HTTP_PRIVATE
+#include "httpd.h"
+
+int http_in(HTTPC *httpc)
+{
+    int         rc      = 0;
+    UCHAR       *buf    = httpc->buf;
+    unsigned    len     = CBUFSIZE-1;
+    UCHAR       *p;
+
+    // wtof("%s: Enter", __func__);
+    
+    /* read the request string "method uri version" */
+    rc = http_gets(httpc, buf, len);
+    if (rc < 0) goto failed;
+
+    /* "GET path/to/resource HTTP/1.0\n" */
+
+    /* remove newline character from request */
+    p = strchr(buf, '\n');
+    if (p) *p = 0;
+
+    // wtof("%s: \"%s\"", __func__, buf);
+
+    /* save the original request string */
+    if (http_set_env(httpc, "HTTP_REQUEST", buf)) goto failed;
+
+    /* parse request "method uri version" */
+    p = strtok(buf, " ");
+    if (!p) goto failed;
+    if (http_set_env(httpc, "REQUEST_METHOD", p)) goto failed;
+
+    p = strtok(NULL, " ");
+    if (!p) goto failed;
+    if (http_set_env(httpc, "REQUEST_URI", p)) goto failed;
+
+    p = strtok(NULL, " ");
+    if (!p) goto failed;
+    if (http_set_env(httpc, "REQUEST_VERSION", p)) goto failed;
+
+    /* create "HTTP_..." environment variables from HTTP headers */
+    do {
+        /* get HTTP header string */
+        rc = http_gets(httpc, buf, len);
+        if (rc < 0) goto failed;
+
+        /* check for end of HTTP headers */
+        if (buf[0]=='\n') break;
+
+        /* remove newline character */
+        p = strrchr(buf, '\n');
+        if (p) *p = 0;
+
+        // wtof("%s: \"%s\"", __func__, buf);
+
+        /* find keyword delimiter */
+        p = strchr(buf, ':');
+        if (!p) continue;
+
+        /* replace delimiter with 0 byte */
+        *p++ = 0;
+        
+        /* skip any spaces */
+        while(*p==' ') p++;
+
+        /* create "HTTP_..." environment variable */
+        if (http_set_http_env(httpc, buf, p)) goto failed;
+    } while(rc > 0);
+
+    /* next step will parse and do any additional processing */
+    rc = 0;
+    httpc->state = CSTATE_PARSE;
+    goto quit;
+
+failed:
+    // wtof("%s: failed", __func__);
+    
+    /* most likely a bad request, reset the connection */
+    httpc->state = CSTATE_RESET;
+
+quit:
+    // wtof("%s: exit rc=%d", __func__, rc);
+    return rc;
+}
+
+#if 0   /* old code */
+
+/* http_in() - client state CSTATE_IN
+** Read socket data into our clients buffer until we encounter
+** a header sperator sequence, LF+LF or CRLF+CRLF.
+** Once we detect the header seperator sequence we transtion to the
+** next client state (CSTATE_PARSE).
+*/
+extern int
+http_in(HTTPC *httpc)
+{
+    int     rc      = 0;
+    HTTPD 	*httpd	= httpc->httpd;
+    UCHAR   *buf    = &httpc->buf[httpc->len];  /* put data here */
+    int     len     = CBUFSIZE-httpc->len;      /* space available in buffer */
+    double  timeout;
+    double  now;
+#if 0
+    http_enter("httpin(), len=%d\n", len);
+#endif
+
+	// wtof("%s: httpd=%p", __func__, httpd);
+	// wtof("%s: httpd->cfg_client_timeout=%u", __func__, httpd->cfg_client_timeout);
+	// wtof("%s: httpd->client=%02X", __func__, httpd->client);
+	if (!httpd->cfg_client_timeout) {
+		timeout = 10.0;	// default value
+	}
+	else {
+		timeout = (httpd->cfg_client_timeout * 1.0);
+	}
+ 	if (timeout < 1.0) timeout = 1.0;	// let's keep is reasonable
+ 	// wtof("%s: timeout=%g", __func__, timeout);
+
+    len--;  /* leave room for 0 byte */
+    if (len <= 0) {
+        /* no room in buffer */
+        httpc->state = CSTATE_CLOSE;
+        goto quit;
+    }
+
+    /* try to read some data from client */
+#if 0
+    http_dbgf("calling recv(%d,%08X,%d,0)\n", httpc->socket, buf, len);
+#endif
+    rc = recv(httpc->socket, buf, len, 0);
+#if 0
+    http_dbgf("recv() rc=%d\n", rc);
+#endif
+    if (rc<0) {
+        /* client closed connection */
+        rc = 0;
+        /* check for EWOULDBLOCK */
+        if (errno == EWOULDBLOCK) goto check;
+        httpc->state = CSTATE_CLOSE;
+        goto quit;
+    }
+
+    httpc->len += rc;   /* update length of data in buffer */
+
+    if (strstr(httpc->buf, "\x0A\x0A") OR           /* ASCII LF LF */
+        strstr(httpc->buf, "\x0D\x0A\x0D\x0A")) {   /* ASCII CRLF CRLF */
+        /* we have a complete request in ASCII */
+        httpc->state = CSTATE_PARSE;
+        goto quit;
+    }
+
+check:
+    /* check for inactive/broken client */
+    httpsecs(&now);
+    if ((now - httpc->start) > timeout) {	/* if more than timeout seconds 		*/
+        char *fmt = "client %08X on socket %d timed out after %g seconds\n";
+
+		if (httpc->len > 0) {
+			if (httpd->client & HTTPD_CLIENT_INMSG) {
+				wtof(fmt, httpc, httpc->socket, timeout);
+			}
+			if (httpd->client & HTTPD_CLIENT_INDUMP) {
+				wtodumpf(httpc->buf, httpc->len, "Receive Buffer");
+			}
+        
+			http_dbgf(fmt, httpc, httpc->socket, timeout);
+		}
+        httpc->state = CSTATE_CLOSE;
+    }
+
+quit:
+#if 0
+    http_exit("httpin(), rc=%d\n", rc);
+#endif
+    return rc;
+}
+
+#endif  /* old code */

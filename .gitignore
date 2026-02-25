@@ -1,0 +1,21 @@
+# Generated files
+*.s
+*.o
+*.d
+
+# Build artifacts
+*.jcl
+.build-warnings
+
+# IDE
+*.geany
+compile_commands.json
+
+# Environment
+.env
+
+# Claude Code
+CLAUDE.md
+
+# OS
+.DS_Store

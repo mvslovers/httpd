@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <title id="title">JES2 DD List</title>
+   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.css">
+   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/dataTables.bootstrap4.min.css">
+   <style>
+    #grad1 {
+     background-image: linear-gradient(120deg, #88DDFF, #FFFFFF);
+     background-color:lightcyan;
+    }
+    #job tbody th, #job tbody td {
+     padding: 4px 8px;
+    }
+    .sysout tbody th, #sysout tbody td {
+     padding: 4px 8px;
+    }
+   </style>
+<!--
+   <script type="text/javascript" language="javascript" src="https://code.jquery.com/jquery-3.3.1.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/1.10.19/js/dataTables.bootstrap4.min.js"></script>
+-->
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/js/jquery.dataTables.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/js/bootstrap.min.js"></script>
+
+   <script class="init">
+   var getUrlParameter = function getUrlParameter(sParam) {
+       var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+           sURLVariables = sPageURL.split('&'),
+           sParameterName,
+           i;
+
+       for (i = 0; i < sURLVariables.length; i++) {
+           sParameterName = sURLVariables[i].split('=');
+
+           if (sParameterName[0] === sParam) {
+               return sParameterName[1] === undefined ? true : sParameterName[1];
+           }
+       }
+   };
+
+   var jobid = getUrlParameter('jobid');
+   var url   = '/jes/ddlist?jobid=' + jobid;
+
+   var t = '';
+   function ddRow(item,index) {
+      t = t + '<tr>' +
+               '<td><a href="/jes/print?jobid=' + jobid + '&dsid=' + item.dsid + '">' + item.ddname + '</a></td>' +
+               '<td>' + item.stepname + '</td>' +
+               '<td>' + item.procstep + '</td>' +
+               '<td>' + item.dsid + '</td>' +
+               '<td>' + item.dsname + '</td>' +
+               '<td>' + item.class + '</td>' +
+               '<td>' + item.recfm + '</td>' +
+               '<td>' + item.lrecl + '</td>' +
+               '<td>' + item.records + '</td>' +
+              '</tr>';
+   }
+
+   $(document).ready(function() {
+    document.getElementById("title").textContent = jobid + " DD List";
+    document.getElementById("heading").textContent = jobid + " DD List";
+
+    $('#job').DataTable( {
+     "ajax": url,
+     "stateSave": true,
+     "columns": [
+      { "data": "jobname" },
+      { "data": "jobid" },
+      { "data": "dd" ,
+        "render": function(data,type,row,meta) {
+            var dd = row.dd;
+            jobid = row.jobid;
+            t = '<table class="sysout">' +
+                '<thead>' +
+                '<th>DD Name</th>' +
+                '<th>Step Name</th>' +
+                '<th>Proc Name</th>' +
+                '<th>DSID</td>' +
+                '<th>Dataset Name</th>' +
+                '<th>Cls</th>' +
+                '<th>Recfm</th>' +
+                '<th>Lrecl</th>' +
+                '<th>Records</th>' +
+                '</thead>' +
+                '<tbody>';
+
+            dd.forEach(ddRow);
+
+            t = t + '</tbody></table>';
+            return t;
+        }
+      }
+     ]
+    } );
+   } );
+  </script>
+ </head>
+ <body id="grad1">
+  <div class="container-fluid">
+  <center><h1 id="heading">JES2 DD List</h1></center>
+  <table id="job" class="table table-bordered table-hover table-condensed" style="width:100%">
+   <thead>
+    <tr>
+     <th>Job Name</th>
+     <th>Job ID</th>
+     <th>Spooled Datasets List</th>
+    </tr>
+   </thead>
+   <tbody></tbody>
+  </table>
+  </div>
+ </body>
+</html>
+

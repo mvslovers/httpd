@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <title>JES2 Status</title>
+<!--
+   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.css">
+   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/dataTables.bootstrap4.min.css">
+-->
+   <link rel="stylesheet" type="text/css" href="/css/bootstrap.css">
+   <link rel="stylesheet" type="text/css" href="/css/dataTables.bootstrap4.min.css">
+   <style>
+    #grad1 {
+     background-image: linear-gradient(120deg, #88DDFF, #FFFFFF);
+     background-color:lightcyan;
+    }
+    #status tbody th, #status tbody td {
+     padding: 4px 8px;
+    }
+    .dropdown-menu {
+     background-color: #e9ecef;
+    }
+   </style>
+<!--
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/js/jquery.dataTables.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+   <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/js/bootstrap.min.js"></script>
+-->
+   <script type="text/javascript" language="javascript" src="/js/jquery.min.js"></script>
+   <script type="text/javascript" language="javascript" src="/js/jquery.dataTables.min.js"></script>
+   <script type="text/javascript" language="javascript" src="/js/popper.min.js"></script>
+   <script type="text/javascript" language="javascript" src="/js/bootstrap.min.js"></script>
+
+   <script class="init">
+   var getUrlParameter = function getUrlParameter(sParam) {
+       var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+           sURLVariables = sPageURL.split('&'),
+           sParameterName,
+           i;
+
+       for (i = 0; i < sURLVariables.length; i++) {
+           sParameterName = sURLVariables[i].split('=');
+
+           if (sParameterName[0] === sParam) {
+               return sParameterName[1] === undefined ? true : sParameterName[1];
+           }
+       }
+   };
+
+   // create the url for retrieving jes status data
+   var url       = '/jes/status';
+   var job       = getUrlParameter('jobname');  // ?jobname=...
+   if (!job) job = getUrlParameter('job');      // ?job=...
+   if (!job) job = getUrlParameter('j');        // ?j=...
+   if (job)  url = url + '?job=' + job;         // add query string for desired job
+
+   var mytable;
+
+   function cbmenu(e) {
+      // the contextmenu for a checkbox in the table body was clicked
+      var jobids = "";
+      var cb     = $('.cb');     // get array of the row checkbox's
+      var count  = 0;
+      $.each(cb, function (index,value) {
+          if (value.checked) {
+              if (jobids!='') jobids = jobids + ',';
+              jobids = jobids + value.value;
+              count = count + 1;
+          }
+      });
+
+      if (jobids=='') return true;  // show default context menu
+
+      var m     = $('#cb-menu');
+      m.find('#c1jobid').val(jobids);
+      m.find('#c1').text('Purge ' + count + ' selected jobs');
+      m.on("click", function() {
+        $('#cb-menu').removeClass("show").hide();
+      });
+
+      // now we position the context menu and make it appear
+      var top = e.pageY - 60;
+      var left = e.pageX - 90;
+
+      if (top < 0) top = 0;
+      if (left < 0) left = 0;
+
+      $("#cb-menu").css({
+          display: "block",
+          top: top,
+          left: left
+      }).addClass("show");
+      return false; // and we're done
+   }
+
+   // this function handles the 'contextmenu' for table rows
+   function mymenu(e) {
+      var t   = e.target;
+      if (t.localName == 'input') {
+          // The clicked column in our input checkbox
+          return cbmenu(e);
+      }
+
+      // when a row is clicked we get the row data as our row variable
+      var row   = mytable.row( this ).data();
+      var thisjob = row.jobname;
+      var thisid  = row.jobid;
+
+      // we have to replace "special" characters in the job name
+      thisjob = thisjob.replace(/%/g, "%25");
+      thisjob = thisjob.replace(/&/g, "%26");
+      thisjob = thisjob.replace(/#/g, "%23");
+
+      // we rebuild the context menu <a> tags using the row data
+      var q     = '?job=' + thisjob + '&jobid=' + thisid;
+      var j     = row.jobname + ' ' + row.jobid;
+      var m     = $('#context-menu');
+      m.find('#m0').text(row.jobname + ' ' + row.jobid);
+      m.find('#m1').replaceWith('<a id="m1" class="dropdown-item" href="/jesdd.html' + q + '">Display DD List</a>');
+      m.find('#m2').replaceWith('<a id="m2" class="dropdown-item" href="/jes/print' + q + '&download=true">Download To File</a>');
+      m.find('#m3').replaceWith('<a id="m3" class="dropdown-item" href="/jes/print' + q + '">View In Browser</a>');
+      m.find('#m4jobname').val(row.jobname);
+      m.find('#m4jobid').val(row.jobid);
+      m.find('#m4').text('Cancel ' + j);
+      m.find('#m5jobname').val(row.jobname);
+      m.find('#m5jobid').val(row.jobid);
+      m.find('#m5').text('Purge ' + j);
+      m.on("click", function() {
+        $('#context-menu').removeClass("show").hide();
+      });
+
+      // now we position the context menu and make it appear
+      var top = e.pageY - 60;
+      var left = e.pageX - 90;
+
+      if (top < 0) top = 0;
+      if (left < 0) left = 0;
+/*
+      if (e.type == 'contextmenu') {
+          top = e.pageY - 230;
+          if (top < 0) top = 0;
+      }
+*/
+      $("#context-menu").css({
+          display: "block",
+          top: top,
+          left: left
+      }).addClass("show");
+
+      return false; //blocks default Web browser right click menu
+   }
+
+   $(document).ready(function() {
+     mytable = $('#status').DataTable( {
+     "lengthMenu": [ 10, 25, 35, 50, 75, 100 ],
+     "pageLength": 35,
+     "ajax": url,
+     "stateSave": true,
+     "initComplete": function(settings, json) {
+/*
+        // the table has been initialized, now add the row click function
+        $('#status tbody').on('click', 'tr', mymenu);
+*/
+        // do the same for the context menu (right click)
+        $('#status tbody').on('contextmenu', 'tr', mymenu);
+
+        // add a click handler for the <body> tag to hide the context menu
+        $('body').on("click", function() {
+            $("#context-menu").removeClass("show").hide();
+        });
+     },
+     "columnDefs": [
+      {
+        "targets": 0,
+        "className": "dt-right",
+        "width": "20px"
+      }
+     ],
+     "columns": [
+      { "data": null,
+          "orderable": false,
+          "render": function(data, type, row, meta) {
+              if (row.end_stamp == "0" && row.start_stamp == "0") 
+                 return '<input class="cb" type="checkbox" name="jobid" value="' + row.jobid + '">';
+              if (row.end_stamp == "0") 
+                 return ' ';
+              return '<input class="cb" type="checkbox" name="jobid" value="' + row.jobid + '">';
+          }
+      },
+      { "data": null,
+          "render": function(data, type, row, meta) {
+              var q = '?job=' + row.jobname + '&jobid=' + row.jobid;
+              if (row.end_stamp == "0" && row.start_stamp == "0")
+                  return '<a href="/jes/print' + q + '"><strong>' + row.jobname + '</strong></a>';
+              if (row.end_stamp == "0") 
+                 return row.jobname;
+              return '<a href="/jes/print' + q + '"><strong>' + row.jobname + '</strong></a>';
+          }
+      },
+      { "data": "jobid" },
+      { "data": "owner" },
+      { "data": "class" },
+      { "data": "priority" },
+      { "data": {
+          "_": "start_display",
+          "sort": "start_stamp"}},
+      { "data": {
+          "_": "end_display",
+          "sort": "end_stamp"}}
+     ],
+     "order": [[ 2, 'asc' ]]
+    } );
+
+    // get the jobname (if any) from the url query string for our prefix form
+    var jobname = getUrlParameter('jobname');
+    if (!jobname) jobname = getUrlParameter('job');      // ?job=...
+    if (!jobname) jobname = getUrlParameter('j');        // ?j=...
+    $('#prefixform').find('#prefix').val(jobname);
+
+    // reset the the checkbox in the table header
+    var a = $('#allcheck');
+    $.each(a, function (index,value) {
+        value.checked = false;
+    });
+
+   } );
+
+   function prefix_submit(f) {
+     // get the jobname value from the prefixform
+     var j = document.forms["prefixform"]["jobname"].value;
+
+     // if it doesn't have a wildcard character then add '*'
+     if (j.indexOf('*') < 0) {
+        f.find('#prefix').val(j + '*');
+     }
+     // now submit the form as requested
+     f.submit();
+   }
+
+   function all_click(a) {
+      // the checkbox in the table heading was clicked
+      var checked = a.checked;  // get the checked state
+      var cb    = $('.cb');     // get array of the row checkbox's
+      $.each(cb, function (index,value) {
+          value.checked = checked;  // set each row checkbox to match
+      });
+      return false; // and we're done
+   }
+
+  </script>
+
+ </head>
+ <body id="grad1">
+  <div class="container-fluid">
+    <form id="prefixform" method="get" action="/jesst.html">
+     <input id="prefix" type="text" name="jobname" value="" />
+     <button onclick="prefix_submit($('#prefixform'));">Prefix</button>
+    </form>
+  <center><h1>JES2 Status</h1></center>
+  <table id="status" class="table table-striped table-hover" style="width:100%">
+   <thead>
+    <tr>
+     <th class="no-sort"><input id="allcheck" type="checkbox" name="allonoff" value="" onclick="all_click(this);"></input></th>
+     <th>Jobname</th>
+     <th>Jobid</th>
+     <th>Owner</th>
+     <th>Class</th>
+     <th>Priority</th>
+     <th>Start Timestamp</th>
+     <th>End Timestamp</th>
+    </tr>
+   </thead>
+   <tbody></tbody>
+  </table>
+  </div>
+
+  <div id="context-menu" class="dropdown-menu">
+    <h5 id="m0" class="dropdown-item">Jobname Jobid</h5>
+    <a id="m1" class="dropdown-item" href="#">Action</a>
+    <a id="m2" class="dropdown-item" href="#">Another action</a>
+    <a id="m3" class="dropdown-item" href="#">Something else here</a>
+    <p class="dropdown-item"></p>
+    <form id="m4form" method="post" action="/jes/cancel">
+     <input id="m4jobname" type="hidden" name="jobname" value="value" />
+     <input id="m4jobid" type="hidden" name="jobid" value="value" />
+     <a id="m4" class="dropdown-item" onclick="document.getElementById('m4form').submit();">click here</a>
+    </form>
+    <form id="m5form" method="post" action="/jes/purge">
+     <input id="m5jobname" type="hidden" name="jobname" value="value" />
+     <input id="m5jobid" type="hidden" name="jobid" value="value" />
+     <a id="m5" class="dropdown-item" onclick="document.getElementById('m5form').submit();">click here</a>
+    </form>
+  </div>
+
+  <div id="cb-menu" class="dropdown-menu">
+    <h5>Checked Items Menu</h5>
+    <form id="c1form" method="post" action="/jes/purgeall">
+     <input id="c1jobid" type="hidden" name="jobid" value="value" />
+     <a id="c1" class="dropdown-item" onclick="document.getElementById('c1form').submit();">click here</a>
+    </form>
+  </div>
+ </body>
+</html>
+
