@@ -1,0 +1,163 @@
+#!/bin/bash
+# mvslink - Link-edit HTTPD load modules on MVS
+set -euo pipefail
+
+# --- Load .env (working directory first, then script's repo root) ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -f "$PWD/.env" ]]; then
+  source "$PWD/.env"
+elif [[ -f "$ROOT_DIR/.env" ]]; then
+  source "$ROOT_DIR/.env"
+fi
+
+# --- Validate required settings ---
+: "${MVS_HOST:?MVS_HOST not set (check .env)}"
+: "${MVS_PORT:?MVS_PORT not set (check .env)}"
+: "${MVS_USER:?MVS_USER not set (check .env)}"
+: "${MVS_PASS:?MVS_PASS not set (check .env)}"
+: "${HTTPD_SYSLMOD:?HTTPD_SYSLMOD not set (check .env)}"
+: "${HTTPD_LOADLIB:?HTTPD_LOADLIB not set (check .env)}"
+: "${CRENT_NCALIB:?CRENT_NCALIB not set (check .env)}"
+: "${UFS_NCALIB:?UFS_NCALIB not set (check .env)}"
+: "${LUA_NCALIB:?LUA_NCALIB not set (check .env)}"
+: "${MQTT_NCALIB:?MQTT_NCALIB not set (check .env)}"
+
+JOBCLASS="${MVS_JOBCLASS:-A}"
+MSGCLASS="${MVS_MSGCLASS:-H}"
+ENTRY="${HTTPD_LINK_ENTRY:-@@CRT0}"
+BASE_URL="http://${MVS_HOST}:${MVS_PORT}/zosmf/restjobs/jobs"
+
+# --- All known load modules ---
+ALL_MODULES="ABEND0C1 HELLO HTTPD HTTPDM HTTPDMTT HTTPDSL HTTPDSRV HTTPJES2 HTTPLUA HTTPREXX HTTPSAY HTTPTEST"
+
+# --- Modules that require LUA370.NCALIB (explicit INCLUDE) ---
+LUA_MODULES=" HTTPD HTTPLUA "
+
+# --- LUA370 library members (all 31, excluding LUA and LUAC standalone programs) ---
+LUA_MEMBERS="LAPI LAUXLIB LBASELIB LCODE LCOROLIB LDBLIB LDEBUG LDO LDUMP LFUNC LGC LINIT LIOLIB LLEX LMATHLIB LMEM LOADLIB LOBJECT LOPCODES LOSLIB LPARSER LSTATE LSTRING LSTRLIB LTABLE LTABLIB LTM LUNDUMP LUTF8LIB LVM LZIO"
+
+# --- Argument parsing ---
+if [[ $# -eq 0 ]]; then
+  echo "mvslink: usage: mvslink MODULE [MODULE ...] | --all" >&2
+  echo "" >&2
+  echo "  Available modules: $ALL_MODULES" >&2
+  echo "  --all     link all modules" >&2
+  exit 1
+fi
+
+if [[ "$1" == "--all" ]]; then
+  MODULES=($ALL_MODULES)
+else
+  MODULES=("$@")
+fi
+
+# --- Link one module ---
+link_module() {
+  local MOD="$1"
+  local JOBNAME="LKD$(echo "$MOD" | cut -c1-5)"
+  JOBNAME="${JOBNAME:0:8}"
+
+  # Build INCLUDE statements
+  local INCLUDES="  INCLUDE SYSLIB(@@CRT1)"
+  INCLUDES+=$'\n'"  INCLUDE SYSLIB(${MOD})"
+
+  # Add LUA370 DD and INCLUDEs if needed
+  local LUA_DD=""
+  if [[ "$LUA_MODULES" == *" $MOD "* ]]; then
+    LUA_DD="//LUA370   DD DISP=SHR,DSN=${LUA_NCALIB}"
+    for m in $LUA_MEMBERS; do
+      INCLUDES+=$'\n'"  INCLUDE LUA370(${m})"
+    done
+  fi
+
+  # Generate JCL
+  local TEMPFILE
+  TEMPFILE=$(mktemp)
+  trap 'rm -f "$TEMPFILE"' RETURN
+
+  cat > "$TEMPFILE" <<ENDJCL
+//${JOBNAME} JOB CLASS=${JOBCLASS},REGION=0K,MSGCLASS=${MSGCLASS},
+//            MSGLEVEL=(1,1),NOTIFY=DUMMY
+//*
+//LINK     EXEC PGM=IEWL,PARM='LIST,MAP,XREF,RENT,SIZE=(512000,131072)'
+//SYSPRINT DD SYSOUT=*
+//SYSLIB   DD DISP=SHR,DSN=${CRENT_NCALIB},DCB=BLKSIZE=32760
+//         DD DISP=SHR,DSN=${UFS_NCALIB}
+//         DD DISP=SHR,DSN=${MQTT_NCALIB}
+//         DD DISP=SHR,DSN=${HTTPD_SYSLMOD}
+${LUA_DD}
+//SYSLMOD  DD DISP=SHR,DSN=${HTTPD_LOADLIB}
+//SYSUT1   DD UNIT=SYSALLDA,SPACE=(CYL,(2,1))
+//SYSLIN   DD DDNAME=SYSIN
+//SYSIN    DD *
+${INCLUDES}
+  ENTRY ${ENTRY}
+  NAME ${MOD}(R)
+/*
+//*
+ENDJCL
+
+  # Strip CR
+  sed 's/\r$//' "$TEMPFILE" > "${TEMPFILE}.tmp" && mv "${TEMPFILE}.tmp" "$TEMPFILE"
+
+  # Submit
+  local RESULT
+  RESULT=$(curl -s -S --connect-timeout 10 --max-time 60 -X PUT \
+    -u "${MVS_USER}:${MVS_PASS}" \
+    -H "Content-Type: text/plain" \
+    -H "X-IBM-Intrdr-Mode: TEXT" \
+    -H "X-IBM-Intrdr-Lrecl: 80" \
+    -H "X-IBM-Intrdr-Recfm: F" \
+    --data-binary @"$TEMPFILE" \
+    "$BASE_URL" 2>&1) || {
+    echo "mvslink: $MOD — connection failed" >&2
+    return 1
+  }
+
+  local JOBID
+  JOBID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('jobid',''))" 2>/dev/null) || true
+  local RETCODE
+  RETCODE=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('retcode',''))" 2>/dev/null) || true
+
+  if [[ -z "$JOBID" ]]; then
+    echo "mvslink: $MOD — submit failed" >&2
+    echo "$RESULT" >&2
+    return 1
+  fi
+
+  # Poll for completion
+  while [[ -z "$RETCODE" || "$RETCODE" == "None" || "$RETCODE" == "null" ]]; do
+    sleep 2
+    local STATUS
+    STATUS=$(curl -s --connect-timeout 10 --max-time 30 \
+      -u "${MVS_USER}:${MVS_PASS}" "$BASE_URL/$JOBNAME/$JOBID" 2>&1)
+    RETCODE=$(echo "$STATUS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('retcode',''))" 2>/dev/null) || true
+  done
+
+  # Evaluate return code
+  local RC_NUM
+  RC_NUM=$(echo "$RETCODE" | grep -oE '[0-9]+' | head -1)
+  RC_NUM=$((10#${RC_NUM:-9999}))
+
+  if [[ "$RC_NUM" -gt 4 ]]; then
+    echo "mvslink: $MOD ($JOBID) FAILED $RETCODE" >&2
+    return 1
+  fi
+
+  echo "mvslink: $MOD ($JOBID) $RETCODE"
+  return 0
+}
+
+# --- Main ---
+ERRORS=0
+for MOD in "${MODULES[@]}"; do
+  link_module "$MOD" || ERRORS=$((ERRORS + 1))
+done
+
+if [[ "$ERRORS" -gt 0 ]]; then
+  echo "mvslink: $ERRORS module(s) failed" >&2
+  exit 1
+fi
+
+exit 0
