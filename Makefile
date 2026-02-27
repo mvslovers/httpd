@@ -13,7 +13,6 @@ C_FILES := src/abend0c1.c \
            src/dbgs.c \
            src/dbgtime.c \
            src/dbgw.c \
-           src/dummy.c \
            src/ebc2asc.c \
            src/ftpcdsc.c \
            src/ftpcgets.c \
