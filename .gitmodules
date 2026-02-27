@@ -1,3 +1,12 @@
 [submodule "contrib/crent370_sdk"]
 	path = contrib/crent370_sdk
 	url = https://github.com/mvslovers/crent370_sdk.git
+[submodule "contrib/ufs370_sdk"]
+	path = contrib/ufs370_sdk
+	url = https://github.com/mvslovers/ufs370_sdk.git
+[submodule "contrib/lua370_sdk"]
+	path = contrib/lua370_sdk
+	url = https://github.com/mvslovers/lua370_sdk.git
+[submodule "contrib/mqtt370_sdk"]
+	path = contrib/mqtt370_sdk
+	url = https://github.com/mvslovers/mqtt370_sdk.git
