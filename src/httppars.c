@@ -215,7 +215,7 @@ http_set_post_env(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 {
     char        newname[256];
 
-    sprintf(newname, "POST_%s", name);
+    snprintf(newname, sizeof(newname), "POST_%s", name);
 
     return http_set_env(httpc, newname, value);
 }

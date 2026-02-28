@@ -8,7 +8,7 @@ httpsqen(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 {
     char        newname[256];
     
-    sprintf(newname, "QUERY_%s", name);
+    snprintf(newname, sizeof(newname), "QUERY_%s", name);
 
     return http_set_env(httpc, newname, value);
 }
