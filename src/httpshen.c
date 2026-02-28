@@ -11,7 +11,7 @@ httpshen(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 {
     char        newname[256];
     
-    sprintf(newname, "HTTP_%s", name);
+    snprintf(newname, sizeof(newname), "HTTP_%s", name);
 
     if (http_cmp(name, "Cookie")==0) {
 		return parse_cookies(httpc, value);
@@ -51,7 +51,7 @@ set_cookie(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 {
     char        newname[256];
     
-    sprintf(newname, "HTTP_Cookie-%s", name);
+    snprintf(newname, sizeof(newname), "HTTP_Cookie-%s", name);
 
     return http_set_env(httpc, newname, value);
 }
