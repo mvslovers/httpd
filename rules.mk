@@ -2,7 +2,7 @@
 S_FILES := $(C_FILES:.c=.s)
 O_FILES := $(C_FILES:.c=.o) $(A_FILES:.asm=.o)
 
-all: $(S_FILES) $(O_FILES)
+all: $(S_FILES) $(O_FILES) $(SUBDIRS)
 	@if [ -s "$(BUILD_WARNINGS)" ]; then \
 	  echo ""; \
 	  echo "=== Assembly Warnings ==="; \
@@ -35,3 +35,4 @@ all: $(S_FILES) $(O_FILES)
 clean:
 	@rm -f $(S_FILES) $(O_FILES) *.jcl
 	@rm -f $(BUILD_WARNINGS)
+	@for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done

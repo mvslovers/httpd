@@ -1,7 +1,9 @@
 /* HTTPD.C
 ** HTTP Server
 */
-#define HTTPD_VERSION	"3.3.0"
+#ifndef HTTPD_VERSION
+#define HTTPD_VERSION	"0.0.0-unknown"
+#endif
 #define HTTP_VERSION	HTTPD_VERSION
 
 #include "httpd.h"

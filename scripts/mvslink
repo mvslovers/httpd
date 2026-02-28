@@ -1,5 +1,8 @@
 #!/bin/bash
 # mvslink - Link-edit HTTPD load modules on MVS
+#
+# Based on Mike Rayborn's original link JCLs.
+# Each module has its own SYSLIB/NCALIB DD layout matching the original.
 set -euo pipefail
 
 # --- Load .env (working directory first, then script's repo root) ---
@@ -25,19 +28,12 @@ fi
 
 JOBCLASS="${MVS_JOBCLASS:-A}"
 MSGCLASS="${MVS_MSGCLASS:-H}"
-ENTRY="${HTTPD_LINK_ENTRY:-@@CRT0}"
 BASE_URL="http://${MVS_HOST}:${MVS_PORT}/zosmf/restjobs/jobs"
 
 # --- All known load modules ---
 ALL_MODULES="ABEND0C1 HELLO HTTPD HTTPDM HTTPDMTT HTTPDSL HTTPDSRV HTTPJES2 HTTPLUA HTTPLUAX HTTPREXX HTTPSAY HTTPTEST"
 
-# --- Modules that require LUA370.NCALIB (explicit INCLUDE) ---
-LUA_MODULES=" HTTPD HTTPLUAX "
-
-# --- Modules with no main() — use module name as ENTRY, skip @@CRT1 ---
-NOENTRY_MODULES=" HTTPLUAX "
-
-# --- LUA370 library members (all 31, excluding LUA and LUAC standalone programs) ---
+# --- LUA370 library members (all 31) ---
 LUA_MEMBERS="LAPI LAUXLIB LBASELIB LCODE LCOROLIB LDBLIB LDEBUG LDO LDUMP LFUNC LGC LINIT LIOLIB LLEX LMATHLIB LMEM LOADLIB LOBJECT LOPCODES LOSLIB LPARSER LSTATE LSTRING LSTRLIB LTABLE LTABLIB LTM LUNDUMP LUTF8LIB LVM LZIO"
 
 # --- Argument parsing ---
@@ -55,32 +51,156 @@ else
   MODULES=("$@")
 fi
 
+# --- Per-module JCL generation ---
+#
+# Each module gets its own SYSLIB concatenation and NCALIB DD layout,
+# matching Rayborn's original link JCLs.
+#
+# Pattern for most CGI modules:
+#   SYSLIB: CRENT370 + HTTPD.NCALIB (auto-resolution)
+#   NCALIB: HTTPD.NCALIB (explicit INCLUDEs)
+#   INCLUDE SYSLIB(@@CRT1), INCLUDE NCALIB(CGISTART), INCLUDE NCALIB(mod)
+#
+# HTTPD (main server) is special: HTTPD.NCALIB first in SYSLIB,
+#   plus UFS/MQTT, and Lua members explicitly included.
+#
+# HTTPLUAX: no @@CRT1, no CGISTART, entry is module name,
+#   NCALIB includes LUA370.NCALIB for Lua members.
+#
+# HTTPSAY: uses @@CRTM instead of @@CRT1, no CGISTART.
+
+gen_syslib() {
+  local MOD="$1"
+  case "$MOD" in
+    HTTPD)
+      # Main server: HTTPD first, then UFS, CRENT, MQTT
+      echo "//SYSLIB   DD DISP=SHR,DSN=${HTTPD_SYSLMOD},DCB=BLKSIZE=32760"
+      echo "//         DD DISP=SHR,DSN=${UFS_NCALIB}"
+      echo "//         DD DISP=SHR,DSN=${CRENT_NCALIB}"
+      echo "//         DD DISP=SHR,DSN=${MQTT_NCALIB}"
+      ;;
+    HTTPLUA)
+      # Lua CGI: needs UFS + MQTT for auto-resolution
+      echo "//SYSLIB   DD DISP=SHR,DSN=${CRENT_NCALIB},DCB=BLKSIZE=32760"
+      echo "//         DD DISP=SHR,DSN=${UFS_NCALIB}"
+      echo "//         DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      echo "//         DD DISP=SHR,DSN=${MQTT_NCALIB}"
+      ;;
+    HTTPLUAX)
+      # Lua extension: CRENT + UFS + HTTPD
+      echo "//SYSLIB   DD DISP=SHR,DSN=${CRENT_NCALIB},DCB=BLKSIZE=32760"
+      echo "//         DD DISP=SHR,DSN=${UFS_NCALIB}"
+      echo "//         DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      ;;
+    *)
+      # All other CGI modules: CRENT first, then HTTPD
+      echo "//SYSLIB   DD DISP=SHR,DSN=${CRENT_NCALIB},DCB=BLKSIZE=32760"
+      echo "//         DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      ;;
+  esac
+}
+
+gen_ncalib() {
+  local MOD="$1"
+  case "$MOD" in
+    HTTPD)
+      # Main server: HTTPD + LUA + MQTT
+      echo "//NCALIB   DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      echo "//         DD DISP=SHR,DSN=${LUA_NCALIB}"
+      echo "//         DD DISP=SHR,DSN=${MQTT_NCALIB}"
+      ;;
+    HTTPLUA)
+      # Lua CGI: HTTPD + MQTT
+      echo "//NCALIB   DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      echo "//         DD DISP=SHR,DSN=${MQTT_NCALIB}"
+      ;;
+    HTTPLUAX)
+      # Lua extension: HTTPD + LUA
+      echo "//NCALIB   DD DISP=SHR,DSN=${HTTPD_SYSLMOD},DCB=BLKSIZE=32760"
+      echo "//         DD DISP=SHR,DSN=${LUA_NCALIB}"
+      ;;
+    *)
+      # All other modules: just HTTPD
+      echo "//NCALIB   DD DISP=SHR,DSN=${HTTPD_SYSLMOD}"
+      ;;
+  esac
+}
+
+gen_includes() {
+  local MOD="$1"
+  case "$MOD" in
+    HTTPD)
+      # Main server: @@CRT1, HTTPSTRT, HTTPD, all Lua members, SETCODE AC(1)
+      echo "  INCLUDE SYSLIB(@@CRT1)"
+      echo "  INCLUDE NCALIB(HTTPSTRT)"
+      echo "  INCLUDE NCALIB(HTTPD)"
+      for m in $LUA_MEMBERS; do
+        echo "  INCLUDE NCALIB(${m})"
+      done
+      echo "  SETCODE AC(1)"
+      ;;
+    HTTPLUAX)
+      # Lua extension: no CRT, just module + all Lua members
+      echo "  INCLUDE NCALIB(HTTPLUAX)"
+      for m in $LUA_MEMBERS; do
+        echo "  INCLUDE NCALIB(${m})"
+      done
+      ;;
+    HTTPSAY)
+      # BREXX helper: uses @@CRTM, no CGISTART
+      echo "  INCLUDE SYSLIB(@@CRTM)"
+      echo "  INCLUDE NCALIB(HTTPSAY)"
+      ;;
+    *)
+      # Standard CGI module: @@CRT1 + CGISTART + module
+      echo "  INCLUDE SYSLIB(@@CRT1)"
+      echo "  INCLUDE NCALIB(CGISTART)"
+      echo "  INCLUDE NCALIB(${MOD})"
+      ;;
+  esac
+}
+
+gen_entry() {
+  local MOD="$1"
+  case "$MOD" in
+    HTTPLUAX)
+      echo "HTTPLUAX"
+      ;;
+    *)
+      echo "@@CRT0"
+      ;;
+  esac
+}
+
+gen_size() {
+  local MOD="$1"
+  case "$MOD" in
+    HTTPD|HTTPLUAX)
+      # Large modules need bigger SIZE
+      echo "SIZE=(4000K,40K),"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
 # --- Link one module ---
 link_module() {
   local MOD="$1"
   local JOBNAME="LKD$(echo "$MOD" | cut -c1-5)"
   JOBNAME="${JOBNAME:0:8}"
 
-  # Build INCLUDE statements
-  local INCLUDES=""
-  local MOD_ENTRY="${ENTRY}"
-  if [[ "$NOENTRY_MODULES" == *" $MOD "* ]]; then
-    # No main() — use module name as entry, skip CRT startup
-    MOD_ENTRY="${MOD}"
-    INCLUDES="  INCLUDE SYSLIB(${MOD})"
-  else
-    INCLUDES="  INCLUDE SYSLIB(@@CRT1)"
-    INCLUDES+=$'\n'"  INCLUDE SYSLIB(${MOD})"
-  fi
-
-  # Add LUA370 DD and INCLUDEs if needed
-  local LUA_DD=""
-  if [[ "$LUA_MODULES" == *" $MOD "* ]]; then
-    LUA_DD="//LUA370   DD DISP=SHR,DSN=${LUA_NCALIB}"
-    for m in $LUA_MEMBERS; do
-      INCLUDES+=$'\n'"  INCLUDE LUA370(${m})"
-    done
-  fi
+  local SIZE
+  SIZE=$(gen_size "$MOD")
+  local MOD_ENTRY
+  MOD_ENTRY=$(gen_entry "$MOD")
+  local SYSLIB
+  SYSLIB=$(gen_syslib "$MOD")
+  local NCALIB
+  NCALIB=$(gen_ncalib "$MOD")
+  local INCLUDES
+  INCLUDES=$(gen_includes "$MOD")
 
   # Generate JCL
   local TEMPFILE
@@ -91,15 +211,12 @@ link_module() {
 //${JOBNAME} JOB CLASS=${JOBCLASS},REGION=0K,MSGCLASS=${MSGCLASS},
 //            MSGLEVEL=(1,1),NOTIFY=DUMMY
 //*
-//LINK     EXEC PGM=IEWL,PARM='LIST,MAP,XREF,RENT,SIZE=(512000,131072)'
+//LINK     EXEC PGM=IEWL,PARM='${SIZE}LIST,MAP,XREF,RENT'
 //SYSPRINT DD SYSOUT=*
-//SYSLIB   DD DISP=SHR,DSN=${CRENT_NCALIB},DCB=BLKSIZE=32760
-//         DD DISP=SHR,DSN=${UFS_NCALIB}
-//         DD DISP=SHR,DSN=${MQTT_NCALIB}
-//         DD DISP=SHR,DSN=${HTTPD_SYSLMOD}
-${LUA_DD}
+${SYSLIB}
 //SYSLMOD  DD DISP=SHR,DSN=${HTTPD_LOADLIB}
 //SYSUT1   DD UNIT=SYSALLDA,SPACE=(CYL,(2,1))
+${NCALIB}
 //SYSLIN   DD DDNAME=SYSIN
 //SYSIN    DD *
 ${INCLUDES}

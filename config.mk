@@ -14,8 +14,11 @@ export PATH := $(ROOT_DIR)scripts:$(PATH)
 CC       := c2asm370
 CFLAGS   := -fverbose-asm -S -O1
 
+# Version (override on command line or in .env)
+HTTPD_VERSION ?= 3.3.1-dev
+
 # Defines and include paths
-DEFS     := -DLUA_USE_C89 -DLUA_USE_JUMPTABLE=0
+DEFS     := -DLUA_USE_C89 -DLUA_USE_JUMPTABLE=0 -DHTTPD_VERSION=\"$(HTTPD_VERSION)\"
 INC_DIR  := $(ROOT_DIR)include
 INC1     := $(ROOT_DIR)credentials/include
 INC2     := $(ROOT_DIR)contrib/crent370_sdk/inc

@@ -137,7 +137,17 @@ C_FILES := src/abend0c1.c \
 # Assembler source files
 A_FILES :=
 
+SUBDIRS := credentials
+
 include rules.mk
+
+$(SUBDIRS):
+	@$(MAKE) -C $@
+.PHONY: $(SUBDIRS)
+
+link: all
+	@$(ROOT_DIR)scripts/mvslink $(if $(MODULES),$(MODULES),--all)
+.PHONY: link
 
 # Generate compile_commands.json for clangd
 compiledb:
