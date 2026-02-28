@@ -17,5 +17,8 @@ compile_commands.json
 # Claude Code
 CLAUDE.md
 
+# Cache
+.cache/
+
 # OS
 .DS_Store
