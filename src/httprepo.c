@@ -46,6 +46,7 @@ FmtStats(HTTPC *httpc, char *buf, int size)
     HTTPD               *httpd  = grt->grtapp1;
     const char          *fmt    = STATS_FMT;
     unsigned            pos     = 0;
+    unsigned            remain;
     int                 addrlen;
     struct sockaddr_in  *in;
     unsigned            not;
@@ -139,6 +140,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
                 len = p ? strlen(p) : 0;
 
                 if (p) {
+                    remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                    if (len > remain) len = remain;
                     memcpy(&buf[pos], p, len);
                     pos += len;
                 }
@@ -152,14 +155,16 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             break;
 
         case 'B':   /* B: Bytes sent. */
-            pos += sprintf( &buf[pos], "%u", httpc->sent );
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+            pos += snprintf( &buf[pos], remain, "%u", httpc->sent );
             break;
 
         case 'b':   /* b: Bytes sent. In CLF format
                     ** i.e. a '-' rather than a 0 when no bytes are sent.
                     */
             if (httpc->sent) {
-                pos += sprintf( &buf[pos], "%u", httpc->sent );
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                pos += snprintf( &buf[pos], remain, "%u", httpc->sent );
             }
             else {
                 buf[pos++] = '-';
@@ -180,6 +185,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             p = http_get_env(httpc, key);
             if (p) {
                 len = strlen(p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -194,6 +201,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             if (p) {
                 p++;
                 len = strlen(p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -212,6 +221,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             len = p ? strlen(p) : 0;
 
             if (p) {
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -221,8 +232,11 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             break;
 #endif
         case 'H':   /* H:   The request protocol */
-            memcpy(&buf[pos], "HTTP", 4);
-            pos += 4;
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+            if (4 <= remain) {
+                memcpy(&buf[pos], "HTTP", 4);
+                pos += 4;
+            }
             break;
 
         case 'i':   /* i:  The contents of {key}: header line(s) in the request
@@ -243,6 +257,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             p = http_get_env(httpc, "REQUEST_METHOD");
             if (p) {
                 len = strlen(p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -260,12 +276,14 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             break;
 
         case 'O':
-            pos += sprintf(&buf[pos], "%u", httpc->sent);
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+            pos += snprintf(&buf[pos], remain, "%u", httpc->sent);
             break;
 
         case 'p':   /* p: The canonical Port of the server serving the request
                     */
-            pos += sprintf(&buf[pos], "%d", httpd->port );
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+            pos += snprintf(&buf[pos], remain, "%d", httpd->port );
             break;
 
         case 'P':   /* P: The process ID of the child that serviced the request.
@@ -279,7 +297,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
                     */
             p = http_get_env(httpc, "QUERY_STRING");
             if (p) {
-                pos += sprintf(&buf[pos], "?%s", p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                pos += snprintf(&buf[pos], remain, "?%s", p);
             }
             break;
 
@@ -288,6 +307,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             if (p) {
                 len = 0;
                 while(*p && !iscntrl(p[len])) len++;
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -301,7 +322,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
                     **    --- %...>s for the last.
                     */
             if (httpc->resp) {
-                pos += sprintf( &buf[pos], "%d", httpc->resp );
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                pos += snprintf( &buf[pos], remain, "%d", httpc->resp );
             }
             else {
                 buf[pos++] = '-';
@@ -311,18 +333,20 @@ FmtStats(HTTPC *httpc, char *buf, int size)
         case 't':   /* t: Time, in common log format time format
                     ** {format}t:  The time, in the form given by format
                     */
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
             if (key[0]) {
                 time64_t t = time64(NULL);
-                pos += strftime(&buf[pos], size - pos, key, localtime64(&t));
+                pos += strftime(&buf[pos], remain, key, localtime64(&t));
             }
             else {
-                http_date_rfc1123(time64(NULL), &buf[pos], size - pos);
+                http_date_rfc1123(time64(NULL), &buf[pos], remain);
                 pos += strlen(&buf[pos]);
             }
             break;
 
         case 'T':   /* T: The time taken to serve the request, in seconds. */
-            pos += sprintf(&buf[pos], "%f", httpc->end - httpc->start);
+            remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+            pos += snprintf(&buf[pos], remain, "%f", httpc->end - httpc->start);
             break;
 
         case 'u':   /* u: Remote user (from auth;
@@ -331,6 +355,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             p = http_get_env(httpc, "REMOTE_USER");
             if (p) {
                 len = strlen(p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -345,7 +371,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
             p = http_get_env(httpc, "REQUEST_PATH");
             if (p) {
                 len = strlen(p);
-
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -357,11 +384,14 @@ FmtStats(HTTPC *httpc, char *buf, int size)
         case 'v':   /* v: The canonical ServerName of the server
                     **    serving the request.
                     */
-        case 'V':   // V: The server name according to the
-                    //    UseCanonicalName setting.
+        case 'V':   /* V: The server name according to the
+                    **    UseCanonicalName setting.
+                    */
             p = http_get_env(httpc, "SERVER_NAME");
             if (p) {
                 len = strlen(p);
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                if (len > remain) len = remain;
                 memcpy(&buf[pos], p, len);
                 pos += len;
             }
@@ -373,7 +403,8 @@ FmtStats(HTTPC *httpc, char *buf, int size)
         default:
             buf[pos++] = '%';
             if (key[0]) {
-                pos += sprintf(&buf[pos], "{%s}", key );
+                remain = (pos < (unsigned)size) ? (unsigned)size - pos : 0;
+                pos += snprintf(&buf[pos], remain, "{%s}", key );
             }
             buf[pos++] = *fmt;
             break;

@@ -11,7 +11,9 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
     int     len;
     UCHAR   buf[5120];
 
-    len = vsprintf(buf, fmt, args);
+    len = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (len >= (int)sizeof(buf))
+        len = sizeof(buf) - 1;
     if (len < 0) {
         rc = -1;
     }
