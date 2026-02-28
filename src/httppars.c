@@ -46,7 +46,8 @@ httppars(HTTPC *httpc)
         if (http_set_env(httpc, "QUERY_STRING", p+1)) goto failed;
 
         /* parse the query string */
-        strcat(buf, "&");   /* append a final "&" to buffer */
+        if (strlen(buf) < CBUFSIZE - 2)
+            strcat(buf, "&");   /* append a final "&" to buffer */
         *p++ = 0;           /* "?" -> 0 byte */
         buf = p;            /* start of query variables */
         for (p=strchr(buf,'&'); p; buf=&buf[pos], p=strchr(buf,'&')) {
@@ -159,7 +160,8 @@ postdata:
     if (http_set_env(httpc, "POST_STRING", buf)) goto failed;
 
     /* parse string into "POST_..." variables */
-    strcat(buf, "&");   /* append a final "&" to buffer */
+    if (strlen(buf) < CBUFSIZE - 2)
+        strcat(buf, "&");   /* append a final "&" to buffer */
     for (p=strchr(buf,'&'); p; buf=&buf[pos], p=strchr(buf,'&')) {
         *p++ = 0;
         pos = (int)(p - buf);
