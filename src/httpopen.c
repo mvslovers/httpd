@@ -20,6 +20,9 @@ http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
 
     if (!path) goto quit;
 
+    /* reject path traversal attempts */
+    if (strstr(path, "..")) goto quit;
+
     len = strlen(path);
     if (len >= sizeof(buf)) len = sizeof(buf)-1;
 
