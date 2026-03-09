@@ -1,0 +1,157 @@
+[project]
+name = "httpd"
+version = "3.3.1-dev"
+type = "application"
+
+[build]
+cflags = [
+	"-O1",
+	"-DLUA_USE_C89",
+	"-DLUA_USE_JUMPTABLE=0",
+	"-I./include",
+	"-I./credentials/include",
+]
+
+[build.sources]
+c_dirs = ["src/", "credentials/src/"]
+
+[mvs.build.datasets.source]
+suffix   = "SOURCE"
+dsorg    = "PO"
+recfm    = "FB"
+lrecl    = 80
+blksize  = 19040
+space    = ["TRK", 600, 100, 200]
+
+[mvs.build.datasets.punch]
+suffix   = "OBJECT"
+dsorg    = "PO"
+recfm    = "FB"
+lrecl    = 80
+blksize  = 19040
+space    = ["TRK", 100, 50, 200]
+
+[mvs.build.datasets.ncalib]
+suffix   = "NCALIB"
+dsorg    = "PO"
+recfm    = "U"
+lrecl    = 0
+blksize  = 19069
+space    = ["TRK", 100, 50, 200]
+
+[mvs.build.datasets.syslmod]
+suffix   = "LOAD"
+dsorg    = "PO"
+recfm    = "U"
+lrecl    = 0
+blksize  = 19069
+space    = ["TRK", 20, 10, 30]
+
+[dependencies]
+"mvslovers/crent370" = ">=1.0.4"
+"mvslovers/ufs370"   = ">=1.0.1"
+"mvslovers/lua370"   = ">=1.0.0"
+"mvslovers/mqtt370"  = ">=1.0.1"
+
+# --- Load Modules ------------------------------------------------
+
+# Main HTTPD server
+[[link.module]]
+name    = "HTTPD"
+entry   = "@@CRT0"
+options = ["SIZE=(4000K,40K)", "LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "HTTPSTRT", "HTTPD"]
+setcode = "AC(1)"
+
+[link.module.dep_includes]
+"mvslovers/lua370" = "*"
+
+# Lua extension module (custom entry point, no CRT)
+[[link.module]]
+name    = "HTTPLUAX"
+entry   = "HTTPLUAX"
+options = ["SIZE=(4000K,40K)", "LIST", "MAP", "XREF", "RENT"]
+include = ["HTTPLUAX"]
+
+[link.module.dep_includes]
+"mvslovers/lua370" = "*"
+
+# Lua CGI handler
+[[link.module]]
+name    = "HTTPLUA"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPLUA"]
+
+# BREXX say helper (@@CRTM instead of @@CRT1)
+[[link.module]]
+name    = "HTTPSAY"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRTM", "HTTPSAY"]
+
+# JES2 CGI handler
+[[link.module]]
+name    = "HTTPJES2"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPJES2"]
+
+# REXX CGI handler
+[[link.module]]
+name    = "HTTPREXX"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPREXX"]
+
+# Test CGI module
+[[link.module]]
+name    = "HTTPTEST"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPTEST"]
+
+# Hello world CGI
+[[link.module]]
+name    = "HELLO"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HELLO"]
+
+# Abend test CGI
+[[link.module]]
+name    = "ABEND0C1"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "ABEND0C1"]
+
+# SSI handler modules
+[[link.module]]
+name    = "HTTPDM"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPDM"]
+
+[[link.module]]
+name    = "HTTPDMTT"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPDMTT"]
+
+[[link.module]]
+name    = "HTTPDSL"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPDSL"]
+
+[[link.module]]
+name    = "HTTPDSRV"
+entry   = "@@CRT0"
+options = ["LIST", "MAP", "XREF", "RENT"]
+include = ["@@CRT1", "CGISTART", "HTTPDSRV"]
+
+[release]
+version_files = ["VERSION"]
+
+[artifacts]
+mvs = true

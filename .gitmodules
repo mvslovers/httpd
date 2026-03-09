@@ -10,3 +10,6 @@
 [submodule "contrib/mqtt370_sdk"]
 	path = contrib/mqtt370_sdk
 	url = https://github.com/mvslovers/mqtt370_sdk.git
+[submodule "mbt"]
+	path = mbt
+	url = https://github.com/mvslovers/mbt.git
