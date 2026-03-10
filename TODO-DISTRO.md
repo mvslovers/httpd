@@ -4,6 +4,9 @@ This document captures the analysis and planned work for two related features:
 publishing CGI SDK headers and producing a full application distribution
 (matching the 3.3.0 release format).
 
+It also documents required changes to the mbt type taxonomy that are a
+prerequisite for clean implementation.
+
 ---
 
 ## Background: 3.3.0 Release Structure
@@ -47,60 +50,103 @@ itself the result of a `TRANSMIT` of one MVS dataset. Installation:
 
 ---
 
+## Prerequisite: mbt Type Taxonomy Cleanup
+
+Before implementing distribution support, the mbt project type taxonomy needs
+to be cleaned up and given clear, distinct semantics.
+
+### Current state (verified in mbt source)
+
+| Type | LINK_TYPES | Default artifact datasets | package.toml | Special logic |
+|------|-----------|--------------------------|--------------|---------------|
+| `library` | No | `ncalib`, `maclib` | Yes | — |
+| `runtime` | No | `ncalib`, `maclib` | Yes | **none — identical to library** |
+| `module` | Yes | `syslmod` | Yes | **none — identical to application** |
+| `application` | Yes | `syslmod` | Yes | — |
+
+`runtime` is a dead alias for `library`. `module` is a dead alias for
+`application`. No code path distinguishes them.
+
+### Target taxonomy
+
+| Type | Purpose | Release artifact | package.toml |
+|------|---------|-----------------|--------------|
+| `library` | C library; provides NCALIB + headers for build-time linking | `headers.tar.gz` + `mvs.tar.gz` (NCALIB) | Always — lists both artifacts + provided datasets |
+| `module` | Standalone program(s); end-user installable | `mvs.tar.gz` (LOAD/syslmod) | Never |
+| `application` | Full application distribution; optionally exposes SDK headers | Distribution zip + optional `headers.tar.gz` | Only if `[artifacts] headers = true` — lists headers artifact only, no MVS artifact |
+
+**`runtime` is removed** — use `library`.
+
+### Rationale
+
+- `module` is never a build-time dependency for anything. No `package.toml` needed.
+  Examples: lua370-app, mqtt370-broker, mqtt370-cli, mvsmf, ufs370-app.
+- `application` (httpd) can be a headers-only dependency for CGI developers.
+  Its loadlib is an end-user installation artifact, not a build dependency — so
+  the `package.toml` must never reference the MVS artifact.
+- `[artifacts] mvs = true` becomes implicit (no flag needed): `library` always
+  ships NCALIB, `module` always ships LOAD, `application` ships what the
+  distribution step produces. The flag is removed.
+
+### Required mbt changes
+
+- Remove `runtime` from `VALID_TYPES`; reject it with a clear error pointing
+  to `library`
+- Give `module` its own behavior: skip `package.toml` generation entirely
+- Give `application` conditional `package.toml`: only when
+  `[artifacts] headers = true`; content = headers artifact only
+- Remove the `[artifacts] mvs = true` flag; make it implicit per type
+- Projects to update: lua370-app, mvsmf, mqtt370-broker, mqtt370-cli →
+  change `type = "application"` to `type = "module"`
+
+---
+
 ## Problem 1: CGI SDK Headers
 
 ### Current situation
 
 - httpd headers live in `include/`: `httpd.h`, `httppub.h`, `httpluax.h`,
-  `cib.h`, `dbg.h`, `errors.h`, `ftpd.h`, `httpds.h`, `httppub.h`, `safp.h`
+  `cib.h`, `dbg.h`, `errors.h`, `ftpd.h`, `httpds.h`, `safp.h`
 - Previously published separately as the
   [httpd_cgi_sdk](https://github.com/mvslovers/httpd_cgi_sdk) repo
-  (also included re-exports of lua.h, ufs.h, mqtt headers, cred.h)
-- mbt currently publishes `headers.tar.gz` only for `type = "library"`;
-  httpd is `type = "application"` so headers are not exported
+- mbt does not publish headers for `type = "application"`
 
 ### What we want
 
-A `httpd-<version>-headers.tar.gz` release artifact containing the headers
-that CGI developers need, so they can declare:
+A `httpd-<version>-headers.tar.gz` release artifact so CGI developers can
+declare:
 
 ```toml
 [dependencies]
 "mvslovers/httpd" = ">=3.3.1"
 ```
 
-and get the CGI SDK headers via `make bootstrap` (same as any library dep).
-
-Transitive headers (lua.h, ufs.h, mqtt headers) are already shipped by those
-packages. The SDK only needs httpd's own public headers.
+and receive the CGI SDK headers via `make bootstrap`. Transitive headers
+(lua.h, ufs.h, mqtt headers) are already provided by those packages.
 
 ### Required mbt changes
 
-- Allow `[artifacts] headers = true` in `project.toml` for `application` type
-  (currently blocked/ignored)
-- Optionally: `[sdk] include_dirs = ["include/"]` to control which directories
-  are packed — fall back to `include/` by default
-- Release workflow (`mvsrelease.py` / `release.yml`) must pack and upload
-  `headers.tar.gz` for applications when the flag is set
-- `make bootstrap` in dependent projects must be able to consume headers
-  from an application dependency (currently only library/module types are
-  expected to provide headers)
+- When `type = "application"` and `[artifacts] headers = true`: pack
+  `include/` into `headers.tar.gz` and upload it to the GitHub release
+- Generate `package.toml` listing only the headers artifact (no MVS entry)
+- `make bootstrap` in dependent projects must handle `application`-type deps:
+  download + unpack headers, skip MVS step (no NCALIB to RECEIVE)
 
-### httpd project.toml additions needed
+### httpd project.toml change
 
 ```toml
 [artifacts]
-mvs     = true
 headers = true   # publish include/ as CGI SDK headers
+                 # (mvs = true is implicit for application type)
 ```
 
 ---
 
 ## Problem 2: Full Application Distribution
 
-### Current mbt behavior (application type)
+### Current mbt behavior
 
-mbt currently produces:
+For any non-library type mbt currently produces:
 - `<project>-<version>-mvs.tar.gz` — XMIT of the LOAD (syslmod) dataset only
 
 ### What we want
@@ -108,11 +154,11 @@ mbt currently produces:
 A full distribution zip mirroring the 3.3.0 structure:
 
 ```
-HTTPD<ver>.zip
-├── HTTPD<ver>.XMIT        ← nested XMIT with LINKLIB + content datasets
+HTTPD<VER>.zip
+├── HTTPD<VER>.XMIT        ← nested XMIT with LINKLIB + content datasets
 ├── INSTALL.JCL            ← generated installation JCL
-├── httpd.jcl              ← from scripts/ or templates/
-├── httpd.proc             ← from scripts/ or templates/
+├── httpd.jcl              ← from scripts/
+├── httpd.proc             ← from scripts/
 ├── readme.txt / changelog
 ├── css/, js/              ← from static/css/, static/js/
 ├── docs/                  ← from doc/
@@ -121,59 +167,64 @@ HTTPD<ver>.zip
 
 ### Content datasets
 
-Beyond the load library, httpd ships several content datasets that need to be
-uploaded from the repo and transmitted:
-
-| Dataset suffix | Source in repo | MVS dataset |
-|---------------|----------------|-------------|
+| Dataset suffix | Source in repo | Target MVS dataset |
+|---------------|----------------|--------------------|
 | LINKLIB | build output (syslmod) | HTTPD.LINKLIB |
 | HTML | `static/html/` | HTTPD.HTML |
 | ICON | `static/icon/` | HTTPD.ICON |
-| LUA | `static/lua/` (or `lua/`) | HTTPD.LUA |
+| LUA | `static/lua/` | HTTPD.LUA |
 | BREXX | `static/brexx/` | HTTPD.BREXX |
 | UFSDISK0 | built UFS image | HTTPD.UFSDISK0 |
 
+### Note: distribution bundling of external tools
+
+The distribution may need to include binaries from other `module`-type
+projects (e.g. ufs370-app tools alongside the httpd load modules). This is
+distinct from build-time dependencies — it is a distribution-time composition.
+A new `[[distribution.include]]` concept in project.toml would handle this,
+resolved at `make dist` time, not `make bootstrap` time.
+
 ### Required mbt changes (high-level)
 
-1. **Content dataset support** in `project.toml`
-   - A new section (e.g. `[[mvs.content.dataset]]`) to declare non-build
-     datasets that get uploaded from repo directories and included in the
-     distribution XMIT
-   - Each content dataset has: source dir in repo, MVS dataset name, DCB attrs
+1. **Content dataset declarations** in `project.toml`
+   - New `[[mvs.content.dataset]]` section: source dir, target dataset name,
+     DCB attributes
+   - `make upload-content` step: upload PDS members from repo directories
 
-2. **Nested XMIT build step** (`make package`)
-   - TRANSMIT each dataset (LINKLIB + content datasets) individually
-   - RECEIVE each into a member of a staging PDS
-   - TRANSMIT the staging PDS as the final outer XMIT
+2. **Nested XMIT assembly** (extended `make package`)
+   - TRANSMIT LINKLIB + each content dataset individually
+   - RECEIVE each into a member of a staging PDS on MVS
+   - TRANSMIT the staging PDS as the outer XMIT
 
 3. **INSTALL.JCL generation**
-   - Template-based, driven by the content dataset list in project.toml
-   - Target dataset names configurable (install naming section)
+   - Template-driven, based on content dataset list in project.toml
+   - Target dataset names from `[mvs.install]` section
 
-4. **Distribution zip assembly** (`make dist` or extended `make package`)
-   - Collects: outer XMIT, INSTALL.JCL, static files from repo, docs, JCL templates
-   - Produces: `HTTPD<VER>.zip` matching the 3.3.0 structure
+4. **Distribution zip assembly** (`make dist`)
+   - Collects: outer XMIT, INSTALL.JCL, static files from repo, docs, JCL
+   - Produces: `HTTPD<VER>.zip`
 
-5. **UFS image** — separate concern, likely a dedicated build step outside mbt scope
+5. **UFS image** — separate concern, out of mbt scope for now
 
-### Dependency on open mbt issues
+### Open mbt issues this depends on
 
-- Issue #21 (unit/volume support in datasets) — needed to place content
-  datasets on the correct volume during the nested-XMIT build
-- Issue #18 (absolute dataset names in install) — needed for HTTPD.LINKLIB,
-  HTTPD.HTML etc. (fixed names, not HLQ-qualified)
+- Issue #21 (unit/volume support) — for content dataset allocation
+- Issue #18 (absolute dataset names in install) — for HTTPD.LINKLIB, HTTPD.HTML etc.
 
 ---
 
 ## Phasing
 
-| Phase | Scope | Effort |
-|-------|-------|--------|
-| 1 | **CGI SDK headers** — `[artifacts] headers = true` for application type in mbt | Small (1–2 days) |
-| 2 | **Static file bundling** — `make dist` packs XMIT + static files + docs into zip, without content datasets | Small–Medium |
-| 3 | **Content datasets** — upload + TRANSMIT HTML/LUA/ICON/BREXX datasets | Medium |
-| 4 | **Nested XMIT + INSTALL.JCL** — full distribution XMIT with generated install JCL | Large |
-| 5 | **UFS image build** | Separate project / out of scope for mbt |
+| Phase | Scope | Where | Effort |
+|-------|-------|-------|--------|
+| 0 | **Type taxonomy cleanup** — remove `runtime`, define `module` vs `application` semantics, remove `[artifacts] mvs` flag | mbt | Small |
+| 1 | **CGI SDK headers** — `[artifacts] headers = true` for `application` type; generate headers-only `package.toml` | mbt + httpd | Small |
+| 2 | **Static file bundling** — `make dist` packs LOAD XMIT + static files + docs into zip (no content datasets yet) | mbt + httpd | Small–Medium |
+| 3 | **Content datasets** — `[[mvs.content.dataset]]`, upload + TRANSMIT HTML/LUA/ICON/BREXX | mbt + httpd | Medium |
+| 4 | **Nested XMIT + INSTALL.JCL** — full nested XMIT with generated install JCL | mbt + httpd | Large |
+| 5 | **Distribution bundling** — pull in external module binaries at dist time | mbt | Medium |
+| 6 | **UFS image build** | separate | — |
 
-Phase 1 is independent and unblocks CGI SDK consumers immediately.
-Phases 2–4 are sequential and build on each other.
+Phase 0 is a prerequisite and a good cleanup independent of httpd.
+Phase 1 directly unblocks CGI SDK consumers.
+Phases 2–4 are sequential and deliver the full distribution incrementally.
