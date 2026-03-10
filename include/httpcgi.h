@@ -293,11 +293,14 @@ struct httpx {
 };
 
 /* ------------------------------------------------------------------ */
-/* Accessor: get the HTTPX function vector from an opaque HTTPD ptr    */
-/* Implemented in httpcgi.c, linked from httpd NCALIB.                 */
+/* Accessor: get the HTTPX function vector from an HTTPD pointer.      */
+/*                                                                     */
+/* httpx is always at offset 0x08 in struct httpd — this is an ABI    */
+/* commitment.  Using a macro avoids any link-time dependency on       */
+/* httpd's NCALIB.                                                     */
 /* ------------------------------------------------------------------ */
 
-extern HTTPX *http_get_httpx(HTTPD *httpd)                  asm("HTTPCGIX");
+#define http_get_httpx(h)  (*(HTTPX **)((char *)(h) + 8))
 
 /* ------------------------------------------------------------------ */
 /* Macro layer — all http_* calls go through the httpx vector.         */
