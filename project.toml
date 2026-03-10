@@ -154,4 +154,6 @@ include = ["@@CRT1", "CGISTART", "HTTPDSRV"]
 version_files = ["VERSION"]
 
 [artifacts]
+headers = true
+header_files = ["httpcgi.h", "dbg.h", "errors.h"]
 mvs = true
