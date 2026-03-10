@@ -133,7 +133,7 @@ Verified in: `mbt/scripts/mbt/project.py` (`VALID_TYPES`, `LINK_TYPES`),
 
 ## Phase 1 — httpd Header Refactor (prerequisite for Phase 2)
 
-**Status:** Not started. Required before publishing CGI SDK headers.
+**Status:** **Done** (merged to `httpd` main, PRs #18 + #19).
 **Repo:** `httpd`
 **Related:** Root CLAUDE.md roadmap item #15
 
@@ -180,17 +180,35 @@ errors.h     ← optional but useful
 Transitive deps (lua.h, ufs.h, mqtt headers, cred headers) come from their
 own packages when a CGI module explicitly depends on those projects.
 
-### Work
+### Work (completed)
 
-1. Extract `struct httpcgi`, `struct httpc`, `struct httpx`, `HTTPV`,
-   CGI callback typedefs, and env-var helper prototypes from `httpd.h`
-   into a new `include/httpcgi.h` with minimal includes (stddef.h, stdio.h)
-2. Replace duplicated definitions in `httpd.h` with `#include "httpcgi.h"`
-3. Fix all `httppub.h` consumers — change `#error` guard to accept
-   `httpcgi.h` as sufficient alternative to `httpd.h`
-4. Verify all `src/` files still compile with `-DLUA_USE_C89`
-5. Verify a minimal CGI module compiles with only `httpcgi.h` and no
-   `-DLUA_USE_C89` flag
+1. ✅ `include/httpcgi.h` created with full HTTPCGI, HTTPC, HTTPX, HTTPV
+   definitions; HTTPD is opaque (`typedef struct httpd HTTPD;`).
+   Accessor macro: `#define http_get_httpx(h) (*(HTTPX **)((char *)(h) + 8))`
+   (ABI commitment: httpx pointer at fixed offset 0x08 in HTTPD struct).
+2. ✅ `#include <socket.h>` added for `struct in_addr` (needed by `http_ntoa`
+   function pointer — struct used by value, cannot be incomplete type).
+3. ✅ `HTTPD_EYE "*HTTPD*"` constant added.
+4. ✅ `dbg.h` and `errors.h` co-exported alongside `httpcgi.h` (needed deps).
+5. httpd internal files (`httpd.h`, `httppub.h`, all `src/`) are **unchanged**
+   — they continue to use the full `httpd.h` kitchen-sink header as before.
+   The refactor is additive: `httpcgi.h` is a new minimal public surface.
+
+### First consumer: mvsmf (in progress)
+
+mvsmf is being migrated from `httpd.h` → `httpcgi.h` on branch
+`feature/httpcgi-migration`. Changes so far:
+
+- All `.c` files: `#include "httpd.h"` → `#include "httpcgi.h"`
+- `project.toml`: `cflags = []` (was `-DLUA_USE_C89` etc.), `type = "module"`
+- Explicit crent370 includes added where previously transitive via `httpd.h`:
+  `cgxstart.c` (+clibgrt/ppa/ary/env), `mvsmf.c` (+clibgrt/ppa/crt/wto),
+  `logmw.c` (+clibary/wto), `router.c` (+clibwto)
+- `jobsapi.c`: removed unused `#include <ufs/types.h>`
+- `router.h`: `#define httpx` updated to use `http_get_httpx(session->httpd)`
+- `cgxstart.c`: `#define httpx` updated to use `http_get_httpx(httpd)`
+
+**Status:** build in progress — assembler errors TBD.
 
 ---
 
@@ -362,7 +380,7 @@ a dedicated step outside the standard mbt pipeline. Deferred.
 | Phase | Scope | Repos | Depends on | Effort |
 |-------|-------|-------|-----------|--------|
 | 0 | mbt type taxonomy: remove `runtime`, define `module` vs `application`, drop `[artifacts] mvs` flag | mbt + all projects | — | Small |
-| 1 | httpd header refactor: extract `httpcgi.h` | httpd | — | Small–Medium |
+| 1 | httpd header refactor: extract `httpcgi.h` | httpd | — | ✅ Done |
 | 2 | CGI SDK headers artifact: `[artifacts] headers = true` for application | mbt + httpd | 0 + 1 | Small |
 | 3 | Static file bundling: `make dist` produces basic zip | mbt + httpd | 0 | Small–Medium |
 | 4 | Content datasets + nested XMIT + INSTALL.JCL | mbt + httpd | 3 | Large |

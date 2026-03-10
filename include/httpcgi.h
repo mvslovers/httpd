@@ -48,7 +48,7 @@ typedef struct ufs      UFS;        /* UFS filesystem       — opaque    */
 typedef struct ufsfile  UFSFILE;    /* UFS file handle      — opaque    */
 typedef struct mqtc     MQTC;       /* MQTT client          — opaque    */
 typedef struct cib      CIB;        /* Console info block   — opaque    */
-struct in_addr;                     /* Network address      — opaque    */
+#include <socket.h>                 /* struct in_addr                   */
 
 /* ------------------------------------------------------------------ */
 /* Types with full definitions required by CGI modules                 */
@@ -291,6 +291,9 @@ struct httpx {
                             const char *application_message);
                                     /* 10C publish MQTT topic           */
 };
+
+/* Eye-catcher for HTTPD pointer identification (ABI constant) */
+#define HTTPD_EYE   "*HTTPD*"
 
 /* ------------------------------------------------------------------ */
 /* Accessor: get the HTTPX function vector from an HTTPD pointer.      */
