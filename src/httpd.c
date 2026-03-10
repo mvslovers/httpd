@@ -1,10 +1,10 @@
 /* HTTPD.C
 ** HTTP Server
 */
-#ifndef HTTPD_VERSION
-#define HTTPD_VERSION	"0.0.0-unknown"
+#ifndef VERSION
+#define VERSION	"0.0.0-unknown"
 #endif
-#define HTTP_VERSION	HTTPD_VERSION
+#define HTTP_VERSION	VERSION
 
 #include "httpd.h"
 #include "clibgrt.h"
@@ -91,7 +91,7 @@ initialize(int argc, char **argv)
     httpd->luax		= &httpluax;
     
     /* Server version */
-    httpd->version	= HTTPD_VERSION;
+    httpd->version	= VERSION;
 
 	/* Get configuration from member/dataset/NULL */
 	rc = http_config(httpd, config);
@@ -1407,7 +1407,7 @@ main(int argc, char **argv)
 
     /* If this message has a leading '+' then we're not APF authorized yet. */
     /* in any case, we want to get the server version into the log in case we have problems */
-    wtof("HTTPD000I HTTPD Server %s starting", HTTPD_VERSION);
+    wtof("HTTPD000I HTTPD Server %s starting", VERSION);
 
     grt->grtapp1    = &server;
     httpd           = grt->grtapp1;
