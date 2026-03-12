@@ -48,10 +48,10 @@ blksize = 15040
 space = ["TRK", 150, 50, 30]
 
 [dependencies]
-"mvslovers/crent370" = ">=1.0.4"
-"mvslovers/ufs370" = ">=1.0.2"
-"mvslovers/lua370" = ">=1.0.1"
-"mvslovers/mqtt370" = ">=1.0.2"
+"mvslovers/crent370" = ">=1.0.6"
+"mvslovers/ufs370" = ">=1.0.3"
+"mvslovers/lua370" = ">=1.0.2"
+"mvslovers/mqtt370" = ">=1.0.3"
 
 # --- Load Modules ------------------------------------------------
 
@@ -154,6 +154,6 @@ include = ["@@CRT1", "CGISTART", "HTTPDSRV"]
 version_files = ["VERSION"]
 
 [artifacts]
-headers      = true
+headers = true
 header_files = ["httpcgi.h", "dbg.h", "errors.h"]
-loads        = true
+loads = true
