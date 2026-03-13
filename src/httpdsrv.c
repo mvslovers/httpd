@@ -27,12 +27,14 @@ static int display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys);
 static int display_cgi_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *cgi, unsigned n);
 static int display_worker_row(HTTPD *httpd, HTTPC *httpc, CTHDWORK *worker, unsigned n);
 static int display_queue_data(HTTPD *httpd, HTTPC *httpc, CTHDQUE *q);
+#if 0 /* ufs370 internal types -- not available with libufs stub */
 static int display_ufsdisk(HTTPD *httpd, HTTPC *httpc, UFSDISK *disk, unsigned n);
 static int display_ufsdisk_table(HTTPD *httpd, HTTPC *httpc, UFSDISK *disk);
 static int display_ufspager_table(HTTPD *httpd, HTTPC *httpc, UFSPAGER *pager, unsigned n);
 static int display_ufsio_table(HTTPD *httpd, HTTPC *httpc, UFSIO *io, unsigned n);
 static int display_ufsvdisk(HTTPD *httpd, HTTPC *httpc, UFSVDISK *vdisk, unsigned n);
 static int display_ufsvdisk_table(HTTPD *httpd, HTTPC *httpc, UFSVDISK *vdisk);
+#endif
 
 static int display_memory(HTTPD *httpd, HTTPC *httpc, const char *title, void *memory, int length, int chunk);
 static int try_memory(HTTPD *httpd, HTTPC *httpc, const char *title, void *memory, int length, int chunk);
@@ -98,6 +100,7 @@ int main(int argc, char **argv)
         goto quit;
     }
 
+#if 0 /* ufs370 internal display -- not available with libufs stub */
     if (http_cmpn(target, "UFSDISKS", len)==0) {
         display_ufsdisks(httpd, httpc);
         goto quit;
@@ -122,6 +125,7 @@ int main(int argc, char **argv)
         display_ufsvdisks(httpd, httpc);
         goto quit;
     }
+#endif
 
     if (http_cmpn(target, "WORKERS", len)==0) {
         display_workers(httpd, httpc);
@@ -581,12 +585,12 @@ display_fs(HTTPD *httpd, HTTPC *httpc)
 
     /* convert string to memory pointer */
     memory = (char *) strtoul(memory, NULL, 16);
-    if (memcmp(memory, UFSSYS_EYE, 8)==0) {
+    if (memcmp(memory, "LIBUFSSY", 8)==0) {
         sys = (UFSSYS*) strtoul(memory, NULL, 16);
         display_ufssys(httpd, httpc, sys);
         goto quit;
     }
-    if (memcmp(memory, UFSEYE, 8)==0) {
+    if (memcmp(memory, "LIBUFSUF", 8)==0) {
         ufs = (UFS*) strtoul(memory, NULL, 16);
         display_ufs(httpd, httpc, ufs);
         goto quit;
@@ -605,128 +609,44 @@ static int
 display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys)
 {
     int         rc      = 0;
-    UCHAR       *u;
-    unsigned    n, count;
 
     if (!sys) {
         /* default to HTTPD ufssys handle */
         sys = httpd->ufssys;
     }
-       
+
     if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
 
     http_printf(httpc, "<h2>UFS System Handle %p</h2>\n", sys);
 
     display_memory(httpd, httpc, "UFSSYS", sys, sizeof(UFSSYS), 16);
-    
+
     http_printf(httpc, "<table>\n");
 
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><th>Offset</th>"
         "<th>Data Name</th>"
         "<th>Description</th>"
         "<th>Contents</th></tr>\n");
 
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>sys->eye</td>"
         "<td>Eye Catcher</td>"
-        "<td>\"%-8.8s\"</td></tr>\n", 
+        "<td>\"%-8.8s\"</td></tr>\n",
         O(eye), sys->eye);
 
-    count = array_count(&sys->disks);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=UFSDISKS&m=%p\">sys->disks</a></td>"
-        "<td>Array Of %u Disk Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(disks), sys->disks, count, sys->disks);
-
-    count = array_count(&sys->pagers);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=UFSPAGERS&m=%p\">sys->pagers</a></td>"
-        "<td>Array Of %u Pager Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(pagers), sys->pagers, count, sys->pagers);
-
-    count = array_count(&sys->io);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=UFSIO&m=%p\">sys->io</a></td>"
-        "<td>Array Of %u I/O Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(io), sys->io, count, sys->io);
-
-    count = array_count(&sys->vdisks);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=UFSVDISKS&m=%p\">sys->vdisks</a></td>"
-        "<td>Array Of %u Virtual Disk Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(vdisks), sys->vdisks, count, sys->vdisks);
-
-    count = array_count(&sys->devs);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->devs</td>"
-        "<td>Array Of %u Device Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(devs), count, sys->devs);
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->next_dvnum</td>"
-        "<td>Next Device Number To Assign</td>"
-        "<td>%u</td></tr>\n", 
-        O(next_dvnum), sys->next_dvnum);
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->fsroot</td>"
-        "<td>File System Root Inode \"/\"</td>"
-        "<td>%p</td></tr>\n", 
-        O(fsroot), sys->fsroot);
-
-    count = array_count(&sys->names);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->names</td>"
-        "<td>Array Of %u Name Handles</td>"
-        "<td>%p</td></tr>\n", 
-        O(names), count, sys->names);
-    
-    count = array_count(&sys->cwds);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->cwds</td>"
-        "<td>Array Of %u Current Working Directories</td>"
-        "<td>%p</td></tr>\n", 
-        O(cwds), count, sys->cwds);
-    
-    count = array_count(&sys->files);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->files</td>"
-        "<td>Array Of %u Opened File Descriptors</td>"
-        "<td>%p</td></tr>\n", 
-        O(files), count, sys->files);
-    
-    count = array_count(&sys->mountpoint);
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>sys->mountpoint</td>"
-        "<td>Array Of %u Directories With Mounted Vdisk</td>"
-        "<td>%p</td></tr>\n", 
-        O(mountpoint), count, sys->mountpoint);
-    
+    http_printf(httpc,
+        "<tr><td colspan=\"4\">"
+        "Disk and inode state is owned by the UFSD STC."
+        "</td></tr>\n");
 
 done:
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);
-	
+
 quit:
-	return 0;
+    return 0;
 }
 
 #if 0
@@ -747,6 +667,8 @@ struct ufs_sys {
     UFSMIN      **mountpoint;           /* 30 array directories with mounted vdisk */
 };                                      /* 40 (64 bytes)                        */
 #endif
+
+#if 0 /* ufs370 internal display -- not available with libufs stub */
 
 #ifdef O
 #undef O
@@ -1315,7 +1237,9 @@ quit:
     return 0;
 }
 
+#endif /* ufs370 internal display */
 
+#if 0 /* ufs370 internal display -- not available with libufs stub */
 #ifdef O
 #undef O
 #endif
@@ -1486,6 +1410,7 @@ quit:
 	return 0;
 }
 
+#endif /* ufs370 internal display */
 
 #ifdef O
 #undef O
