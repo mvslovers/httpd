@@ -65,6 +65,7 @@ setcode = "AC(1)"
 
 [link.module.dep_includes]
 "mvslovers/lua370" = "*"
+"mvslovers/ufsd" = "*"
 
 # Lua extension module (custom entry point, no CRT)
 [[link.module]]
@@ -82,6 +83,9 @@ name = "HTTPLUA"
 entry = "@@CRT0"
 options = ["LIST", "MAP", "XREF", "RENT"]
 include = ["@@CRT1", "HTTPLUA"]
+
+[link.module.dep_includes]
+"mvslovers/ufsd" = "*"
 
 # BREXX say helper (@@CRTM instead of @@CRT1)
 [[link.module]]

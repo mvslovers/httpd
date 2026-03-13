@@ -114,6 +114,7 @@ do_open:
     if (ftpc->ufs) {
         UFSDDESC *desc = ufs_diropen(ftpc->ufs, cwd, NULL);
         UFSDLIST *list;
+        struct tm *tm;
         char     fmtdate[26];
 
         if (desc) {
@@ -123,10 +124,15 @@ do_open:
                     ftpcprtf(ftpc, "%s%s\r\n", list->name, list->attr[0]=='d' ? "/" : "");
                 }
                 else {
-                    /* libufs UFSDLIST has no mtime or nlink */
-                    strcpy(fmtdate, "1970 Jan 01 00:00");
+                    tm = mlocaltime64(&list->mtime);
+                    if (tm) {
+                        strftime(fmtdate, sizeof(fmtdate), "%Y %b %d %H:%M", tm);
+                    }
+                    else {
+                        strcpy(fmtdate, "1970 Jan 01 00:00");
+                    }
                     ftpcprtf(ftpc, "%s %3u %-8.8s %-8.8s %6u %s %s\r\n",
-                             list->attr, 1, list->owner, list->group,
+                             list->attr, list->nlink, list->owner, list->group,
                              list->filesize, fmtdate, list->name);
                 }
             }

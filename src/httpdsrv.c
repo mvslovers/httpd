@@ -1,5 +1,6 @@
 /* HTTPDSRV.C - CGI Program, Display Server */
 #include "httpd.h"
+#include "osdcb.h"      /* DCB -- was transitively included via ufs.h */
 
 #define httpx   (httpd->httpx)
 
