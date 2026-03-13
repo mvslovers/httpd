@@ -22,7 +22,7 @@ ftpslist(FTPC *ftpc, int brief)
     if (ftpc->flags & FTPC_FLAG_CWDDS) goto do_open;
     if (ftpc->flags & FTPC_FLAG_CWDPDS) goto do_open;
 
-    cwd = ftpc->ufs->cwd->path;
+    cwd = ftpc->ufs->cwd.path;
 
 do_open:
     /* lets first try to open the data connection */
@@ -124,7 +124,7 @@ do_open:
                     ftpcprtf(ftpc, "%s%s\r\n", list->name, list->attr[0]=='d' ? "/" : "");
                 }
                 else {
-                    tm = mlocaltime64((const utime64_t*)&list->mtime);
+                    tm = mlocaltime64(&list->mtime);
                     if (tm) {
                         strftime(fmtdate, sizeof(fmtdate), "%Y %b %d %H:%M", tm);
                     }

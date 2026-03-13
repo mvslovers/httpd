@@ -4,6 +4,7 @@
 #include "clibary.h"
 #include "clibstr.h"
 #include "osdcb.h"
+#include "osjfcb.h"         /* JFCB struct                  */
 #include "clibdscb.h"       /* DSCB structs and prototypes  */
 
 static int cwd_error(FTPC *ftpc, char *p);
@@ -75,7 +76,7 @@ static int cwd_path(FTPC *ftpc, char *path)
     if (rc==0) {
         ftpc->flags &= ~FTPC_FLAG_CWDDS;
         ftpc->flags &= ~FTPC_FLAG_CWDPDS;
-        ftpcmsg(ftpc, "250 Working directory is '%s'", ftpc->ufs->cwd->path);
+        ftpcmsg(ftpc, "250 Working directory is '%s'", ftpc->ufs->cwd.path);
     }
     else {
         ftpcmsg(ftpc, "550 Invalid path name '%s'", path);
@@ -257,13 +258,13 @@ do_path:
             while(*p=='\'') p++;
             strtok(p, "\'");
         }
-        /* wtof("%s cwd=\"%s\"", __func__, ftpc->ufs->cwd->path); */
+        /* wtof("%s cwd=\"%s\"", __func__, ftpc->ufs->cwd.path); */
         rc = ufs_chgdir(ftpc->ufs, p);
         /* wtof("%s ufs_chgdir(\"%s\"), rc=%d", __func__, p, rc); */
         if (rc==0) {
             ftpc->flags &= ~FTPC_FLAG_CWDDS;
             ftpc->flags &= ~FTPC_FLAG_CWDPDS;
-            ftpcmsg(ftpc, "250 Working directory is '%s'", ftpc->ufs->cwd->path);
+            ftpcmsg(ftpc, "250 Working directory is '%s'", ftpc->ufs->cwd.path);
         }
         else {
             ftpcmsg(ftpc, "550 Invalid path name '%s'", p);

@@ -34,7 +34,7 @@
 #include "clibtry.h"                /* try(), tryrc()               */
 
 /* ufs headers */
-#include "ufs.h"                    /* Unix "like" File System      */
+#include "libufs.h"                 /* UFS client stubs via UFSD STC */
 
 /* our headers */
 #include "socket.h"                 /* sockets via DYN75            */

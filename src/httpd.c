@@ -319,20 +319,6 @@ terminate(void)
     }
 
     if (httpd->ufssys) {
-        UFSSYS  *sys = httpd->ufssys;
-        char    topic[40];
-
-        count = array_count(&sys->disks);
-        for(n=0; n < count; n++) {
-            UFSDISK *disk = sys->disks[n];
-
-            if (!disk) continue;
-        
-            /* Delete from MQTT Broker */
-            sprintf(topic, "ufs/disk%u", n);
-            http_pubf(httpd, topic, ""); 
-        }
-
         wtof("HTTPD047I Terminating File System");
         ufs_sys_term();
         httpd->ufssys = NULL;
@@ -681,7 +667,7 @@ socket_thread(void *arg1, void *arg2)
             httpc->port   = a->sin_port;
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
-            if (httpd->ufssys) {
+            if (httpd->ufs) {
                 /* create UFS handle */
                 httpc->ufs = ufsnew();
                 crt->crtufs = httpc->ufs;

@@ -511,67 +511,40 @@ quit:
 	return rc;
 }
 
-static int 
+static int
 process_httpd_ufs(lua_State *L, HTTPD *httpd)
 {
 	CLIBCRT 			*crt = __crtget();
 	int					rc	 = 0;
 	int					i;
-    UFSSYS              *sys;
-    UFS					*ufs;
-    UFSDISK             *disk;
-    unsigned            count;
-    unsigned            n;
-    char                topic[40];
+    UFS                *ufs;
 
 	lua_getfield(L,-1,"ufs");
 	i = (int) lua_tointeger(L, -1);
-	// wtof("%s: ufs=%d", __func__, i);
 	lua_pop(L,1);
 
 	if (i<=0) goto quit;
-	
+
+    /* Stub system handle — signals UFS availability to FTPD */
     httpd->ufssys = ufs_sys_new();
     if (!httpd->ufssys) {
         wtof("HTTPD044W Unable to initialize file system");
         goto quit;
     }
 
-    sys = httpd->ufssys;
-    if (!sys->fsroot) {
-        wtof("HTTPD045W No file system root, disconnecting file system");
+    if (httpd->ftpd) httpd->ftpd->sys = httpd->ufssys;
+
+    /* Open server-level UFS session to UFSD STC */
+    httpd->ufs = ufs = ufsnew();
+    if (!ufs) {
+        wtof("HTTPD044W Unable to open UFSD session");
         ufs_sys_term();
         httpd->ufssys = NULL;
         goto quit;
     }
 
-    if (httpd->ftpd) httpd->ftpd->sys = sys;
+    wtof("HTTPD046I UFS session opened via UFSD subsystem");
 
-	/* log the ddname for the UFS disk files */
-    count = array_count(&sys->disks);
-	for(n=0; n < count; n++) {
-		disk = sys->disks[n];
-		if (!disk) continue;
-        
-		wtof("HTTPD046I Disk#%u File System on DD %s %s",
-			n, disk->ddname, disk->readonly ? "READONLY (DISP=SHR)": "READ/WRITE");
-
-        /* Publich to MQTT Broker */
-        sprintf(topic, "ufs/disk%u", n);
-
-        http_pubf(httpd, topic, 
-            "{ \"ddname\" : \"%s\" "
-            ", \"dataset\" : \"%s\" "
-            ", \"blksize\" : %u "
-            ", \"dcb\" : \"%06X\" "
-            ", \"mode\" : \"%s\" "
-            "}",
-            disk->ddname, disk->dsname, disk->blksize, disk->dcb,
-            disk->readonly ? "READONLY": "READ/WRITE");
-    }
-    
-    /* Initialize a UFS handle for server use */
-    httpd->ufs = ufs = ufsnew();
     if (crt) crt->crtufs = ufs;
 
 quit:
