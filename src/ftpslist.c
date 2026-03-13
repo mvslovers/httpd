@@ -22,7 +22,7 @@ ftpslist(FTPC *ftpc, int brief)
     if (ftpc->flags & FTPC_FLAG_CWDDS) goto do_open;
     if (ftpc->flags & FTPC_FLAG_CWDPDS) goto do_open;
 
-    cwd = ftpc->ufs->cwd->path;
+    cwd = ftpc->ufs->cwd.path;
 
 do_open:
     /* lets first try to open the data connection */

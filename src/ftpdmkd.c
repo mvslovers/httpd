@@ -167,7 +167,7 @@ ftpdmkd(FTPC *ftpc)
     if (ftpc->flags & FTPC_FLAG_CWDPDS) goto do_dataset;
 
     /* file system it is */
-    cwd = ftpc->ufs->cwd->path;
+    cwd = ftpc->ufs->cwd.path;
 
     if (p) {
         /* skip quotes */

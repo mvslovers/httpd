@@ -86,7 +86,7 @@ ftpfqn(FTPC *ftpc, const char *in, char *out)
 		if (ftpc->ufs && ftpc->ufs->cwd) {
 			char *dir;
 			
-			strcpy(out, ftpc->ufs->cwd->path);
+			strcpy(out, ftpc->ufs->cwd.path);
 			dir = strrchr(out+1, '/');
 			if (dir) {
 				/* truncate path by one level */
@@ -147,7 +147,7 @@ ftpfqn(FTPC *ftpc, const char *in, char *out)
 
 	if (ftpc->ufs) {
 		if (ftpc->ufs->cwd) {
-			sprintf(out, "%s/%s", ftpc->ufs->cwd->path, buf);
+			sprintf(out, "%s/%s", ftpc->ufs->cwd.path, buf);
 		}
 		else {
 			sprintf(out, "%s/%s", ftpc->cwd, buf);
