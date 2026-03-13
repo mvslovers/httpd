@@ -23,7 +23,7 @@
 #include "clibthrd.h"               /* basic threads                */
 #include "clibthdi.h"               /* thread management            */
 #include "racf.h"                   /* security environment         */
-#include "ufs.h"                    /* Unix File System             */
+#include "libufs.h"                 /* UFS client stubs via UFSD STC */
 
 typedef struct ftpd     FTPD;       /* FTP Daemon (server)          */
 typedef struct ftpc     FTPC;       /* FTP Client                   */
