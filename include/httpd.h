@@ -150,7 +150,8 @@ struct httpd {
 #define HTTPD_CGICTX_MVSMF  0       /* ... MVSMF CGI context index  */
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */
 #define HTTPD_CGICTX_MAX    255     /* ... maximum number of cgictx */
-};                                  /* A0 (160 bytes)               */
+    char        docroot[128];       /* A0 UFS document root prefix  */
+};                                  /* 120                          */
 
 /* Telemetry */
 struct httpt {
