@@ -19,10 +19,7 @@ CLAUDE.md
 
 # Build system (mbt)
 .mbt/
-contrib/crent370-*/
-contrib/ufs370-*/
-contrib/lua370-*/
-contrib/mqtt370-*/
+contrib/
 dist/
 *.xmit
 
