@@ -547,6 +547,24 @@ process_httpd_ufs(lua_State *L, HTTPD *httpd)
 
     if (crt) crt->crtufs = ufs;
 
+    /* Read document root prefix (optional) */
+    lua_getfield(L, -1, "docroot");
+    {
+        const char *dr = lua_tostring(L, -1);
+        if (dr && dr[0] == '/') {
+            int drlen = strlen(dr);
+            /* strip trailing slash */
+            if (drlen > 1 && dr[drlen - 1] == '/')
+                drlen--;
+            if (drlen >= (int)sizeof(httpd->docroot))
+                drlen = (int)sizeof(httpd->docroot) - 1;
+            memcpy(httpd->docroot, dr, drlen);
+            httpd->docroot[drlen] = '\0';
+            wtof("HTTPD047I Document root: %s", httpd->docroot);
+        }
+    }
+    lua_pop(L, 1);
+
 quit:
 	return rc;
 }
@@ -1094,6 +1112,9 @@ setHttpdDefaults(lua_State *L)
 	
 	lua_pushstring(L, "1");
 	lua_setfield(L,-2,"ufs");		// table.ufs="1"
+
+	lua_pushstring(L, "");
+	lua_setfield(L,-2,"docroot");	// table.docroot=""
 	
 	lua_pushstring(L, "HTTPD.CGILUA");
 	lua_setfield(L,-2,"cgilua_dataset");	// table.cgilua_dataset="HTTPD.CGILUA"

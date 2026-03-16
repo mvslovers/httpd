@@ -98,11 +98,16 @@ http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
 
 
     if (httpc->ufs) {
-        httpc->ufp = ufs_fopen(httpc->ufs, buf, mode);
-		// wtof("%s: ufs_fopen(%p, \"%s\", \"%s\") httpc->ufp=%p", 
-		// 	__func__, httpc->ufs, buf, mode, httpc->ufp);
+        UCHAR ufspath[256];
+        const char *dr = httpc->httpd->docroot;
+        if (dr[0] && http_cmpn(buf, "/DD:", 4) != 0) {
+            /* prepend document root to UFS path */
+            snprintf((char *)ufspath, sizeof(ufspath), "%s%s", dr, buf);
+            httpc->ufp = ufs_fopen(httpc->ufs, ufspath, mode);
+        } else {
+            httpc->ufp = ufs_fopen(httpc->ufs, buf, mode);
+        }
         if (httpc->ufp) {
-            /* wtof("%s opened \"%s\" UFS", __func__, buf); */
             goto quit;  /* success, return NULL to caller */
         }
     }
