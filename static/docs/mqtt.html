@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>HTTPD Documentation</title>
+ <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div class="shadowbox">
+<h1>HTTPD Documentation	</h1>
+<h2>MQTT Message Queuing Telemetry Transport</h2>
+<h3>This is a new feature starting with the HTTPD 3.2.0 release.</h3>
+<p>
+When MQTT is enabled (mqtt.start="1" in the HTTPD configuration) the HTTPD
+server will connect to a MQTT broker and then publish topics to various
+components of the HTTPD server. 
+<br/>See mqtt.start in the <a href="config.html">config.html</a> document.
+</p>
+<p>
+The default MQTT broker (mqtt.broker_host="test.mosquitto.org") can be
+used if you don't have your own MQTT broker. You can install a free
+MQTT broker by visting 
+<a href="https://mosquitto.org/download/">https://mosquitto.org/download/</a>
+and selecting the correct version for your operating system.
+</p>
+<p>
+If you install your own MQTT Broker then you'll need to adjust the mqtt
+setting in the HTTPD server configuration to use your broker host name and
+port number.
+<br/>See mqtt settings in the <a href="config.html">config.html</a> document.
+</p>
+<p>
+<b><i>Note: if you use the default broker "test.mosquitto.org" be sure 
+to set a topic prefix (mqtt.prefix="your/prefix/here") to aid in your testing.
+</i></b>
+</p>
+<p>
+<b><i>Note: the "test.mosquitto.org" broker is very busy at times and may not
+be able to process all topics posted by the HTTPD server. It may also
+ignore the retain flag in the published topics as well as discarding
+topics as it sees fit to do so. Fun for testing, but not reliable.
+</i></b>
+</p>
+<p>
+You may want to use <a href="https://mqtt-explorer.com/">MQTT Explorer</a> 
+to view topics published by the HTTPD server.
+<img src="mqtt-explorer.png" width="720" height="500"/>
+</p>
+<h3>MQTT Implementation</h3>
+<p>
+The HTTPD server makes use of MQTT370 functions. MQTT370 is a set of
+wrapper functions all starting with "mqtt370_" that translate the EBCDIC
+character string we use on MVS into ASCII strings and then calls the
+"mqtt_" lower level functions to send/recv messages with the MQTT Broker.
+</p>
+<p>
+In the HTTPD server we use a mqtt thread to perform the send/recv of messages
+with the MQTT broker. See "thread/mqtt" in the next section below.
+</p>
+<p>
+Most of the topics published by the HTTPD server use the MQTT_PUBLISH_QOS_0 
+and MQTT_PUBLISH_RETAIN flags in the publish call. 
+</p>
+<p>
+The MQTT_PUBLISH_QOS_0 flag tells the MQTT broker that confirmation from
+the MQTT broker is not required. Think of it as send and forget from
+the HTTPD servers viewpoint.
+</p>
+<p>
+The MQTT_PUBLISH_RETAIN flag tells the MQTT broker that the topic should
+be retained until it is explicitly deleted. This allows a subscriber
+of HTTPD topics to receive those topics at a later date or time.
+</p>
+<p>
+Most topics published by the HTTPD server are also cached and could be
+used to refresh the current topic state if needed for some later enhancement.
+Generally speaking we see less than 4K bytes being used to cache the
+topics we publish.
+</p>
+<p>
+Most of the HTTPD topics will be deleted when the HTTPD server is
+terminated by the MVS STOP command "/p httpd".
+</p>
+<h3>MQTT Console Messages</h3>
+<p>These MQTT console messages are the ones you'll likely see when MQTT is working as expected.
+ <dl>
+  <dt>HTTPD421I MQTT Broker: %s Port: %s</dt>
+   <dd>Connection to MQTT broker established for the specified broker_host and broker_port.</dd>
+  <dt>HTTPD426I MQTT Topic Prefix: %s</dt>
+   <dd>The Topic prefix is displayed as a reminder.</dd>
+  <dt>HTTPD429I Terminating MQTT</dt>
+   <dd>The MQTT threads are being terminated.</dd>
+ </dl>
+</p>
+<p>
+These MQTT console messages are the ones you might see if MQTT is disabled 
+or fails to start.
+ <dl>
+  <dt>HTTPD420I MQTT mqtt.start not enabled in config</dt>
+   <dd>The MQTT Client will is not enabled. This is the default behavior.</dd>
+  <dt>HTTPD421E MQTT Failed to open socket. Broker: %s Port: %s</dt>
+   <dd>The HTTPD server was unable to open the MQTT Broker using the broker_host and broker_port values.</dd>
+  <dt>HTTPD422E MQTT Unable to allocate client handle</dt>
+   <dd>Bad news! We're likely out of memory!</dd>
+  <dt>HTTPD423W MQTT Unable to set reconnect values</dt>
+   <dd>Also bad news! We're likely out of memory!</dd>
+  <dt>HTTPD424E MQTT Unable to connect with MQTT broker</dt>
+   <dd>We have an open socket connection with the MQTT broker but we're unable to complete the connection with the MQTT Broker.</dd>
+  <dt>HTTPD425E MQTT Unable to start MQTT Subtask</dt>
+   <dd>Something has gone very wrong. Maybe we're out of memory!</dd>
+ </dl>
+</p>
+<h3>MQTT Topics Published by HTTPD</h3>
+<p>
+ <dl>
+  <dt>start</dt>
+   <dd>The date and time when the HTTPD server was started.</dd>
+  <dt>state</dt>
+   <dd>The current execution state of the HTTPD server 
+        (start, ready, quiesce, shutdown).</dd>
+  <dt>version</dt>
+   <dd>The software version of the HTTPD server.</dd>
+  <dt>timezone</dt>
+   <dd>The time zone of the HTTPD server.</dd>
+  <dt>login</dt>
+   <dd>The login requirements for this server.
+        (none, cgi, get, head, post, all)</dd>
+  <dt>stats</dt>
+   <dd>The response statistics for the HTTPD server.</dd>
+  <dt>stats/load</dt>
+   <dd>JSON values when the response statistics was loaded."</dd>
+  <dt>stats/save</dt>
+   <dd>JSON values when the response statistics was saved.</dd>
+  <dt>ufs</dt>
+   <dd>The Unix "like" File System used by the HTTPD server.</dd>
+  <dt>ufs/disk#</dt>
+   <dd>JSON values for each disk (0-9) being used by the HTTPD server.</dd>
+  <dt>thread</dt>
+   <dd>Thread (subtask) running under control of the HTTPD server.</dd>
+  <dt>thread/listener</dt>
+   <dd>JSON values for the TCPIP socket listener thread.</dd>
+  <dt>thread/listener/http</dt>
+   <dd>JSON values for the HTTP protocol.</dd>
+  <dt>thread/listener/ftp</dt>
+   <dd>JSON values for the FTP procotol.</dd>
+  <dt>thread/main</dt>
+   <dd>JSON values for the HTTP main thread.</dd>
+  <dt>thread/mqtt</dt>
+   <dd>JSON values for the MQTT Client that does send/recv for published topics.</dd>
+  <dt>thread/mqtt/broker</dt>
+   <dd>JSON values for the MQTT Broker used bt the MQTT Client.</dd>
+  <dt>thread/telemetry</dt>
+   <dd>JSON values for the Telemetry thread.</dd>
+  <dt>thread/telemetry/cache</dt>
+   <dd>JSON values for the Telemetry cache of topics published by the HTTPD server.</dd>
+  <dt>thread/worker</dt>
+   <dd>JSON values for the thread manager.</dd>
+  <dt>thread/worker/#</dt>
+   <dd>JSON values for each worker thread running under the control of the thread manager.</dd>
+  <dt>ready</dt>
+   <dd>The date and time when the HTTPD server was ready.</dd>
+  <dt>quiesce</dt>
+   <dd>The date and time when the HTTPD server was quiesced.</dd>
+  <dt>shutdown</dt>
+   <dd>The date and time when the HTTPD server was shutdown.</dd>
+ </dl>
+
+</p>
+</div>
+</body>
+</html>

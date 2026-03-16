@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>HTTPD Documentation</title>
+ <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div class="shadowbox">
+<h1>HTTPD Documentation	</h1>
+<h2>Unix "like" File System</h2>
+<p>
+One of the most profoundly missing features of legacy MVS is the absense 
+of a Unix or Windows "like" file system. While modern day z/OS has
+Unix System Services (USS), no such thing existed when MVS was born 
+which was way before the Internet was even a dream.
+</p>
+<p>This created a bit of a problem when developing HTTPD as web servers
+by design work on the notion of a path driven file system, or Universal 
+Resource Locator (URL). For very basic document retrieval we can, and do, 
+fake it using one or more Partition Data Sets (PDS).
+However this limits our HTTPD server to a very flat model with no real depth
+as PDS can not be nested inside another PDS (not in any pracical sense).</p>
+<p>In some of my prior life as a developer I had run into this problem before,
+so I had an idea to emulate a Unix "like" File System (UFS) inside of the
+HTTPD address space. For the most part UFS behaves like you would expect
+in that you can store and retrieve directories and files. The directories 
+and files are placed into a preallocated and formatted sequential dataset
+that acts as a logical disk. But the drawback to this is UFS only exist
+within the HTTPD address space. You can't access it from TSO or any other
+address space. That would require UFS to be implemented as a MVS system
+service and probably in its own address space.</p>
+<p>So how do I update the UFS? This is where FTP comes into the picture. 
+We have a FTPD server embedded inside of HTTPD which can be used to 
+maintain the UFS contents. By default the FTPD server is enabled in the 
+HTTPD configuration on port 8021. You can use a FTP client of your choice. 
+I recommend <a href="https://filezilla-project.org/download.php?type=client">FileZilla</a> 
+which is free software that provides a graphical view of local and 
+remote files. The remote files in this case would be those in the UFS part
+of HTTPD/FTPD server.</p>
+<p>Since the UFS is a completly emulated file system and specific to the
+HTTPD address space, the HTTPD server treats the entire UFS "disk" as being
+available for the HTTPD server "root". This means that all of the UFS is
+accessable to HTTPD and FTPD servers. The UFS root "/" is the HTTPD and FTPD
+server root "/".</p>
+<h3>Limitations</h3>
+<p>This implementation of UFS limits directory and file names to 59 characters
+plus a zero byte (60 characters total).
+Let's face it, nobody wants to type really long file names. And this is far better
+than the 8 character limit we have for PDS member names. It is a compromise between
+too little and too much.</p>
+<p>Path names (directory and file names combined) are limited to 256 characters
+including a zero byte at the end of that path name.</p>
+<p>Up to 10 physical disk (datasets) can be allocated and mounted. Only the first
+disk (dataset) UFSDISK0 is mounted by default as the file system root "/".</p>
+<h3>Warning</h3>
+<p>The dataset HTTPD.UFSDISK0 is replaced for each release of HTTPD. You should
+make sure to keep a local or remote copy of any changes you make to 
+directories or files in the UFS root disk. 
+<a href="https://filezilla-project.org/download.php?type=client">FileZilla</a> is your friend.</p>
+<h3>UFS Physical Disk (Datasets)</h3>
+<p>A single UFSDISK0 dataset is provided when HTTPD
+is first installed. This is the "root" disk for UFS. Up to 9 other UFS disk
+can be added and mounted in UFS.</p>
+<p>When the UFS is first initialized it will look for UFSDISK0 through UFSDISK9
+DD allocations in the HTTPD address space. Only the first disk (UFSDISK0) is
+automatically mounted by default as "/" the file system root.</p>
+<h3>Formatting UFS Disk</h3>
+<p>Before a dataset can be used as a UFS disk it must be formatted using the
+FORMAT program from the HTTPD.LINKLIB dataset. If you don't have a FORMAT
+program then you likely need to install the latest HTTPD release (3.1.1 or later).
+Sample FORMAT Job:
+<pre>
+    //FORMAT   JOB CLASS=A,REGION=0K,MSGCLASS=A 
+    //* FORMAT PARM:                                               
+    //* -Blksize NNNN  SIZE OF DATASET DISK BLOCKS (1024 DEFAULT)  
+    //* -Ddname NAME   NAME OF DD TO FORMAT (DISKFILE DEFAULT)     
+    //* -Inodes NN.N   PERCENTAGE OF INDEX NODES (10.0 DEFAULT)    
+    //* -Quiet         PRODUCE LESS MESSAGES                       
+    //* -Verbose       PRODUCE MORE MESSAGES                       
+    //*                                                            
+    //* EXAMPLE: PGM=FORMAT,PARM='-D DISKFILE -B 4096 -I 5.5'      
+    //*                                                            
+    //FORMAT EXEC PGM=FORMAT,PARM='-B 4096'                        
+    //STEPLIB  DD DISP=SHR,DSN=HTTPD.LINKLIB                     
+    //SYSTERM  DD SYSOUT=*              STDERR                     
+    //SYSPRINT DD SYSOUT=*              STDOUT                     
+    //SYSIN    DD DUMMY                 STDIN                      
+    //SYSABEND DD SYSOUT=*                                         
+    //SYSENV   DD *                                                
+    /*                                                             
+    //DISKFILE DD DISP=OLD,DSN=HTTPD.UFSDISK1                       
+    //                                                             
+</pre>
+A 4K block size is recommended. However you can use block sizes that 
+are multiples of 512 bytes. Just remember that many of the blocks are
+cached (use memory) when UFS is initialized, so excessively large blocks 
+will use more memory in the HTTPD address space. While small block sizes
+increase the number of physical I/O operations for larger files.
+The largest block size allowed by the FORMAT program is 8192 bytes.</p>
+<p>When FORMAT is executed to format a dataset into a UFS disk, the entire
+dataset will be over written and initialized. It is recommended that you
+allocate a single dataset extent with no secondary space. You can place 
+the dataset on any DASD device type desired (3350 through 3390) and on
+a single volume. The dataset is formatted using the BSAM access method but
+accessed/used by UFS using the BDAM access method.</p>
+<h3>Mounting Disk via "/etc/fstab"</h3>
+<p>Much like real Unix file systems, UFS uses a file system table "fstab" in the
+/etc directory on the root file system to logically mount other disk. Each
+disk is mounted to a directory name from the root file system. The contents
+of that directory (if any) are then hidden while the disk is mounted on that
+directory name. Sample "/etc/fstab" file:
+<pre>
+# Sample fstab for HTTPD server
+#
+ddname=UFSDISK1		/disk1		ufs
+</pre>
+Each line in the fstab file represents a mount to be performed or a comment
+as is indicated by '#' character. In the example above we see that the
+dataset allocated to DD UFSDISK1 is to be mounted on the "/disk1" directory
+and is of type "ufs". The "/disk1" directory must exist prior to mounting
+the disk (DD UFSDISK1). The UFSDISK1 dataset that you formatted must be 
+added to the HTTPD PROC or JCL:
+<pre>
+    //* Note: DISP=OLD Disk is READ/WRITE, DISP=SHR Disk is READ Only
+    //UFSDISK1 DD DISP=OLD,DSN=HTTPD.UFSDISK1 <== OLD=READ/WRITE,SHR=READ Only
+</pre>
+A HTTPD server restart (stop and then start of HTTPD) must be performed 
+as the fstab file in the /etc directory is read only at server startup.
+</p>
+</div>
+</body>
+</html>
+	

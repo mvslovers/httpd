@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>HTTPD Documentation</title>
+ <link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<div class="shadowbox">
+<h1>HTTPD Documentation	</h1>
+<h2>Overview</h2>
+<p>
+The HTTPD software is a HTTP protocol 1.0 server designed for the MVS
+(release 38J) operating system running on a Hercules emulator. This
+allows for both static and dynamic documents to be served from this
+legacy operating system. Think of it as modern day internet (web
+browser) meets MVS from yester year.</p>
+<p>
+Given the somewhat primitive file system found on MVS, the HTTPD
+server can deliver static documents from Partition Datasets (PDS) as
+well as an emulated Unix "like" file system (more on this later).
+The HTTPD server also supports a limited Common Gateway Interface
+(CGI) for viewing the print spool (JES2) as well as BREXX and Lua
+interpreted scripts. 
+</p>
+<p>
+Static documents served from a PDS are limited to 8 character file
+names (PDS member name). These PDS datasets are allocated to DD names
+in the HTTPD PROC (started task) or JCL (Batch Job). The DD name used
+is the file extension name. For example "index.html" would be retrieved
+from the PDS allocated to the HTML DD name.
+<pre>Example: //HTML DD DSN=your.pds.dataset,DISP=SHR</pre>
+The HTTPD server takes the "index.html" and transforms it into
+"DD:HTML(INDEX)" which means the "INDEX" member name in the dataset
+allocated to the "//HTML DD" in the HTTPD address space.
+</p>
+<p>
+Static documents served from the Unix "like" File System (UFS) can
+have names up to 60 characters in length. UFS is an emulated file
+system that looks like a Unix file system in that it has a root
+directory and one or more child directories. Each child directory
+can also have files and other directories much like Unix or even Windows
+file systems.
+</p>
+<p>
+The HTTPD server processes request for documents in this order:
+<ul>
+<li>Paths that match CGI path patterns are processed as a request for a CGI 
+resource and cause an external CGI program to be executed to process this request.
+</li><br/>
+<li>If the path was not a CGI path pattern then HTTPD tries to open the path
+as a file in the UFS.
+</li><br/>
+<li>If the path was not found in the UFS then HTTPD tries to open the path
+as a PDS member name.
+</li><br/>
+<li>If the path was not found in the appropriate PDS then the request is
+failed with a 404 response being returned to the web browser that made the request.</li>
+</ul>
+</p>
+</div>
+</body>
+</html>
