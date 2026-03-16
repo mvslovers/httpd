@@ -44,8 +44,10 @@ typedef unsigned long   ULONG;
 
 typedef struct httpd    HTTPD;      /* HTTP Daemon (server) — opaque    */
 typedef struct cred     CRED;       /* Credentials          — opaque    */
+#ifndef LIBUFS_H
 typedef struct ufs      UFS;        /* UFS filesystem       — opaque    */
 typedef struct ufsfile  UFSFILE;    /* UFS file handle      — opaque    */
+#endif
 typedef struct mqtc     MQTC;       /* MQTT client          — opaque    */
 typedef struct cib      CIB;        /* Console info block   — opaque    */
 #include <socket.h>                 /* struct in_addr                   */
