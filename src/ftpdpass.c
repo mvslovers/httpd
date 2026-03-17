@@ -40,8 +40,12 @@ ftpdpass(FTPC *ftpc)
     ftpc->flags     = 0;
 
     if (ftpc->ufs) {
+        char group[9];
         /* wtof("%s setting acee %08X", __func__, ftpc->acee); */
         ufs_set_acee(ftpc->ufs, ftpc->acee);
+        memcpyp(group, sizeof(group),
+                &acee->aceegrp[1], acee->aceegrp[0], 0);
+        ufs_setuser(ftpc->ufs, ftpc->cwd, group);
         /* try to change dir to user name */
         /* wtof("%s ufs_chgdir(%s)", __func__, ftpc->cwd); */
         if (ufs_chgdir(ftpc->ufs, ftpc->cwd)!=0) {

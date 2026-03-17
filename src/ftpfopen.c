@@ -52,7 +52,8 @@ ftp_ufs_open(FTPC *ftpc, const char *fn, const char *fm, void **ret)
         ftpc->fflags    = FTPC_FFLAG_UFS;       /* fp is a UFS file */
     }
     else {
-        wtof("ftpfopen: ufs_fopen(\"%s\",\"%s\") failed", fn, fm);
+        wtof("ftpfopen: ufs_fopen(\"%s\",\"%s\") failed rc=%d",
+             fn, fm, ufs_last_rc(ftpc->ufs));
     }
 
 quit:
