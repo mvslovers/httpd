@@ -538,7 +538,7 @@ process_httpd_ufs(lua_State *L, HTTPD *httpd)
     httpd->ufs = ufs = ufsnew();
     if (!ufs) {
         wtof("HTTPD044W Unable to open UFSD session");
-        ufs_sys_term();
+        ufs_sys_term(&httpd->ufssys);
         httpd->ufssys = NULL;
         goto quit;
     }
