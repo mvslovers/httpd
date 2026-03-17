@@ -324,7 +324,7 @@ terminate(void)
 
     if (httpd->ufssys) {
         wtof("HTTPD047I Terminating File System");
-        ufs_sys_term();
+        ufs_sys_term(&httpd->ufssys);
         httpd->ufssys = NULL;
     }
 
