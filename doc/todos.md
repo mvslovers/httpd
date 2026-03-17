@@ -163,6 +163,32 @@ into the httpd distribution zip at `make dist` time.
 - [ ] Document FTP daemon configuration and capabilities
 - [ ] Document console commands (`/F HTTPD,...`) with examples
 
+## UFS / UFSD Integration
+
+- [ ] **Replace `httpd->ufssys` with `int httpd->ufs_enabled`**
+      The UFSSYS handle from `ufs_sys_new()` is a stub — a `calloc` +
+      eyecatcher used purely as a boolean "UFS is available" flag.
+      Replace with a plain `int ufs_enabled` in the HTTPD struct and
+      change `ftpd->sys` to `int ftpd->ufs_enabled` accordingly.
+      All checks like `if (httpd->ufssys)` become `if (httpd->ufs_enabled)`.
+      Priority: none — purely cosmetic cleanup.
+
+- [ ] **Memory leak in `ufs_sys_term()`**
+      `ufs_sys_new()` allocates a UFSSYS via `calloc()`, but
+      `ufs_sys_term()` is a no-op and never frees it. Either
+      `ufs_sys_term()` should accept a `UFSSYS**` and free it, or
+      the caller (`terminate()` in httpd.c) should `free()` the handle
+      after `ufs_sys_term()`. Not critical at STC shutdown (address space
+      goes away), but should be fixed for correctness.
+
+- [ ] **Per-connection UFSD sessions instead of global session**
+      Currently HTTPD opens one server-level UFS session (`httpd->ufs`)
+      at startup, and each HTTP client gets its own session via `ufsnew()`
+      in `socket_thread()`. Evaluate whether per-connection sessions are
+      worth the overhead vs. sharing the server session with per-request
+      `ufs_setuser()` calls for identity switching. Consider implications
+      for concurrent access, permission checks, and session state (cwd).
+
 ## Future Work
 
 - [ ] Hot-reload for CGI modules (currently requires STC restart)

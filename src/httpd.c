@@ -318,6 +318,10 @@ terminate(void)
         array_free(&httpd->httpcgi);
     }
 
+    if (httpd->ufs) {
+        ufsfree(&httpd->ufs);
+    }
+
     if (httpd->ufssys) {
         wtof("HTTPD047I Terminating File System");
         ufs_sys_term();
