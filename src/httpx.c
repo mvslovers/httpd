@@ -73,6 +73,10 @@ static HTTPX vect = {
     http_add_cgi,               /* 104 http_add_cgi()               */
     http_process_cgi,           /* 108 http_process_cgi()           */
     mqtc_pub,                   /* 10C mqtc_pub()                   */
+    http_xlate,                 /* 110 http_xlate()                 */
+    &http_cp037,                /* 114 CP037 codepage pair          */
+    &http_cp1047,               /* 118 IBM-1047 codepage pair       */
+    &http_legacy,               /* 11C legacy hybrid codepage pair  */
 };
 
 HTTPX *httpx = &vect;

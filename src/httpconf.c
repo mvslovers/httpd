@@ -876,6 +876,11 @@ process_httpd_settings(lua_State *L, HTTPD *httpd)
 	int			i;
 	const char  *p;
 
+	lua_getfield(L,-1,"codepage");
+	p = lua_tostring(L, -1);
+	http_xlate_init(p);
+	lua_pop(L,1);
+
 	lua_getfield(L,-1,"maxtask");
 	i = (int) lua_tointeger(L, -1);
 	if (i>0) {
@@ -1127,6 +1132,9 @@ setHttpdDefaults(lua_State *L)
     
     lua_pushstring(L, "255");
     lua_setfield(L,-2,"cgi_context_pointers");  // table.cgi_context_pointers="255"
+
+	lua_pushstring(L, "IBM1047");
+	lua_setfield(L,-2,"codepage");	// table.codepage="IBM1047"
 
 	lua_setglobal(L, "httpd");	// httpd = table
 

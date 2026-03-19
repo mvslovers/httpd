@@ -159,5 +159,5 @@ version_files = ["VERSION"]
 
 [artifacts]
 headers = true
-header_files = ["httpcgi.h", "dbg.h", "errors.h"]
+header_files = ["httpcgi.h", "httpxlat.h", "dbg.h", "errors.h"]
 loads = true
