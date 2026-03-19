@@ -25,11 +25,14 @@
 */
 
 /* ------------------------------------------------------------------ */
-/* IBM Code Page 037 (CECP US/Canada)                                 */
+/* IBM Code Page 037 (CECP US/Canada) — HTTP-safe variant             */
 /*                                                                    */
-/* Symmetric NL/LF mapping:                                           */
-/*   ASCII LF  (0x0A) <-> EBCDIC LF  (0x25) — roundtrip clean        */
-/*   ASCII NEL (0x85) <-> EBCDIC NEL (0x15) — roundtrip clean         */
+/* atoe: ASCII LF  (0x0A) -> EBCDIC LF  (0x25) — standard CP037      */
+/* etoa: EBCDIC NEL (0x15) -> ASCII LF  (0x0A) — HTTP override        */
+/*                                                                    */
+/* Pure CP037 maps NEL (0x15) -> 0x85 (Latin-1 NEL), but the C        */
+/* compiler generates 0x15 for '\n'.  HTTP requires CR+LF (0x0D 0x0A) */
+/* so the etoa table must map 0x15 -> 0x0A for HTTP to work.          */
 /* ------------------------------------------------------------------ */
 
 static const unsigned char cp037_atoe[256] = {
@@ -82,7 +85,8 @@ static const unsigned char cp037_atoe[256] = {
 static const unsigned char cp037_etoa[256] = {
     /* 0x00-0x07 */ 0x00, 0x01, 0x02, 0x03, 0x9C, 0x09, 0x86, 0x7F,
     /* 0x08-0x0F */ 0x97, 0x8D, 0x8E, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    /* 0x10-0x17 */ 0x10, 0x11, 0x12, 0x13, 0x9D, 0x85, 0x08, 0x87,
+    /* 0x10-0x17  NB: [0x15] = 0x0A (NEL->LF for HTTP)                */
+                   0x10, 0x11, 0x12, 0x13, 0x9D, 0x0A, 0x08, 0x87,
     /* 0x18-0x1F */ 0x18, 0x19, 0x92, 0x8F, 0x1C, 0x1D, 0x1E, 0x1F,
     /* 0x20-0x27 */ 0x80, 0x81, 0x82, 0x83, 0x84, 0x0A, 0x17, 0x1B,
     /* 0x28-0x2F */ 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x05, 0x06, 0x07,

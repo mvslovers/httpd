@@ -149,7 +149,8 @@ mvsMF can then delete `src/xlate.c` and `include/xlate.h`.
 
 ## Key Design Decisions
 
-1. **CP037 as default** — Symmetric NL/LF roundtrip. No data corruption.
+1. **CP037 as default** — HTTP-safe variant: NEL (0x15) maps to LF (0x0A) in
+   etoa direction because the C compiler generates 0x15 for `'\n'`.
 2. **Legacy tables preserved exactly** — Including the httpetoa.c switch
    behavior baked into legacy_etoa[0x15]=0x0A. No existing behavior lost.
 3. **HTTPX backward compatible** — http_etoa/http_atoe stay at offsets
@@ -162,9 +163,10 @@ mvsMF can then delete `src/xlate.c` and `include/xlate.h`.
 
 ## Roundtrip Verification (Critical Characters)
 
-### CP037 (default)
+### CP037 (default, HTTP-safe variant)
 ```
 ASCII LF  (0x0A) -> atoe -> 0x25 -> etoa -> 0x0A  OK
+EBCDIC NEL(0x15)                  -> etoa -> 0x0A  HTTP override (pure CP037 = 0x85)
 ASCII |   (0x7C) -> atoe -> 0x4F -> etoa -> 0x7C  OK
 ASCII [   (0x5B) -> atoe -> 0xAD -> etoa -> 0x5B  OK
 ASCII ]   (0x5D) -> atoe -> 0xBD -> etoa -> 0x5D  OK
