@@ -14,8 +14,6 @@ compile_commands.json
 # Environment
 .env
 
-# Claude Code
-CLAUDE.md
 
 # Build system (mbt)
 .mbt/
@@ -28,3 +26,4 @@ dist/
 
 # OS
 .DS_Store
+*:Zone.Identifier
