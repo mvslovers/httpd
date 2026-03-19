@@ -96,8 +96,8 @@ http_config(HTTPD *httpd, const char *member)
 		}
 	}
 	
-	/* Initialize codepage translation tables (default: CP037) */
-	http_xlate_init("CP037");
+	/* Initialize codepage translation tables */
+	http_xlate_init("IBM1047");
 
 	/* Process the configuration */
 	rc = process_configuration(L, httpd);
