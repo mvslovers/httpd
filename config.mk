@@ -15,7 +15,7 @@ CC       := c2asm370
 CFLAGS   := -fverbose-asm -S -O1
 
 # Version (override on command line or in .env)
-HTTPD_VERSION ?= 3.3.1-dev
+HTTPD_VERSION ?= 4.0.0-dev
 
 # Defines and include paths
 DEFS     := -DLUA_USE_C89 -DLUA_USE_JUMPTABLE=0 -DHTTPD_VERSION=\"$(HTTPD_VERSION)\"
