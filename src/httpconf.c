@@ -96,6 +96,9 @@ http_config(HTTPD *httpd, const char *member)
 		}
 	}
 	
+	/* Initialize codepage translation tables (default: CP037) */
+	http_xlate_init("CP037");
+
 	/* Process the configuration */
 	rc = process_configuration(L, httpd);
 

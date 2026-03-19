@@ -44,6 +44,7 @@
 #include "ftpd.h"                   /* FTP daemon and client        */
 #include "cred.h"					/* Credentials					*/
 #include "mqtc370.h"                /* MQTT Client                  */
+#include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 
 #define HTTPLUAX (httpd->luax) 		/* use this pointer				*/
 #include "httpluax.h"				/* Lua function vector struct	*/
@@ -424,7 +425,11 @@ struct httpx {
                                     /* 108 process CGI request      */
     int         (*mqtc_pub)(MQTC *mqtc, unsigned qos, unsigned retain, const char* topic_name, const char* application_message);
                                     /* 10C publish topic            */
-
+    unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
+                                    /* 110 translate with explicit table */
+    HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
+    HTTPCP      *xlate_1047;        /* 118 IBM-1047 codepage pair       */
+    HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -483,6 +488,7 @@ extern int http_link(HTTPC *, const char *)                             asm("HTT
 extern HTTPCGI *http_find_cgi(HTTPD *httpd, const char *path)           asm("HTTPFCGI");
 extern HTTPCGI *http_add_cgi(HTTPD *httpd, const char *pgm, const char *path, int login) asm("HTTPACGI");
 extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTTPPCGI");
+extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -709,6 +715,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define mqtc_pub(mqtc,qos,retain,topic,message) \
     ((httpx->mqtc_pub)((mqtc),(qos),(retain),(topic),(message)))
+
+#define http_xlate(buf,len,tbl) \
+    ((httpx->http_xlate)((buf),(len),(tbl)))
 
 #endif  /* ifndef HTTPX_H */
 

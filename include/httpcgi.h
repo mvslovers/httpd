@@ -28,6 +28,7 @@
 
 #include "dbg.h"        /* debug helpers            */
 #include "errors.h"     /* errno values             */
+#include "httpxlat.h"   /* ASCII/EBCDIC translation */
 
 /* ------------------------------------------------------------------ */
 /* Basic typedefs (no dependency)                                      */
@@ -292,6 +293,11 @@ struct httpx {
                             const char *topic_name,
                             const char *application_message);
                                     /* 10C publish MQTT topic           */
+    unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
+                                    /* 110 translate with explicit table */
+    HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
+    HTTPCP      *xlate_1047;        /* 118 IBM-1047 codepage pair       */
+    HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -512,5 +518,8 @@ struct httpx {
 
 #define mqtc_pub(mqtc,qos,retain,topic,message) \
     ((httpx->mqtc_pub)((mqtc),(qos),(retain),(topic),(message)))
+
+#define http_xlate(buf,len,tbl) \
+    ((httpx->http_xlate)((buf),(len),(tbl)))
 
 #endif /* HTTPCGI_H */
