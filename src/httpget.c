@@ -76,7 +76,7 @@ httpget(HTTPC *httpc)
         __asm__("DC\tH'0'");
     }
 
-    if (httpc->ufs) {
+    if (http_get_ufs(httpc)) {
         /* try to open path asis */
         mime = http_mime(path);
         fp = http_open(httpc, path, mime);

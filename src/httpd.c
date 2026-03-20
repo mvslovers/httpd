@@ -318,12 +318,9 @@ terminate(void)
         array_free(&httpd->httpcgi);
     }
 
-    if (httpd->ufs) {
-        ufsfree(&httpd->ufs);
-    }
+    /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
     if (httpd->ufssys) {
-        wtof("HTTPD047I Terminating File System");
         ufs_sys_term(&httpd->ufssys);
         httpd->ufssys = NULL;
     }
@@ -671,11 +668,7 @@ socket_thread(void *arg1, void *arg2)
             httpc->port   = a->sin_port;
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
-            if (httpd->ufs) {
-                /* create UFS handle */
-                httpc->ufs = ufsnew();
-                crt->crtufs = httpc->ufs;
-            }
+            /* UFS session created lazily by http_get_ufs() */
 
             mgr = httpd->mgr;
             if (mgr) {

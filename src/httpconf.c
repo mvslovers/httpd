@@ -514,10 +514,8 @@ quit:
 static int
 process_httpd_ufs(lua_State *L, HTTPD *httpd)
 {
-	CLIBCRT 			*crt = __crtget();
 	int					rc	 = 0;
 	int					i;
-    UFS                *ufs;
 
 	lua_getfield(L,-1,"ufs");
 	i = (int) lua_tointeger(L, -1);
@@ -525,7 +523,8 @@ process_httpd_ufs(lua_State *L, HTTPD *httpd)
 
 	if (i<=0) goto quit;
 
-    /* Stub system handle — signals UFS availability to FTPD */
+    /* Stub system handle — signals UFS availability to FTPD and
+    ** http_get_ufs().  Per-client sessions are created lazily. */
     httpd->ufssys = ufs_sys_new();
     if (!httpd->ufssys) {
         wtof("HTTPD044W Unable to initialize file system");
@@ -533,19 +532,6 @@ process_httpd_ufs(lua_State *L, HTTPD *httpd)
     }
 
     if (httpd->ftpd) httpd->ftpd->sys = httpd->ufssys;
-
-    /* Open server-level UFS session to UFSD STC */
-    httpd->ufs = ufs = ufsnew();
-    if (!ufs) {
-        wtof("HTTPD044W Unable to open UFSD session");
-        ufs_sys_term(&httpd->ufssys);
-        httpd->ufssys = NULL;
-        goto quit;
-    }
-
-    wtof("HTTPD046I UFS session opened via UFSD subsystem");
-
-    if (crt) crt->crtufs = ufs;
 
     /* Read document root prefix (optional) */
     lua_getfield(L, -1, "docroot");
