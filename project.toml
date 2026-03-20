@@ -48,7 +48,7 @@ blksize = 15040
 space = ["TRK", 150, 50, 30]
 
 [dependencies]
-"mvslovers/crent370" = ">=1.0.6"
+"mvslovers/crent370" = ">=1.0.7"
 "mvslovers/ufsd" = "=1.0.0-dev"
 "mvslovers/lua370" = ">=1.0.2"
 "mvslovers/mqtt370" = ">=1.0.3"
