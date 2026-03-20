@@ -318,9 +318,7 @@ terminate(void)
         array_free(&httpd->httpcgi);
     }
 
-    if (httpd->ufs) {
-        ufsfree(&httpd->ufs);
-    }
+    /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
     if (httpd->ufssys) {
         wtof("HTTPD047I Terminating File System");
