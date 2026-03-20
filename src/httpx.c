@@ -77,6 +77,7 @@ static HTTPX vect = {
     &http_cp037,                /* 114 CP037 codepage pair          */
     &http_cp1047,               /* 118 IBM-1047 codepage pair       */
     &http_legacy,               /* 11C legacy hybrid codepage pair  */
+    http_get_ufs,               /* 120 http_get_ufs()               */
 };
 
 HTTPX *httpx = &vect;

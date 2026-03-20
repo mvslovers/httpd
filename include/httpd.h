@@ -430,6 +430,8 @@ struct httpx {
     HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
     HTTPCP      *xlate_1047;        /* 118 IBM-1047 codepage pair       */
     HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
+    UFS *       (*http_get_ufs)(HTTPC *);
+                                    /* 120 get/create UFS handle    */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -489,6 +491,7 @@ extern HTTPCGI *http_find_cgi(HTTPD *httpd, const char *path)           asm("HTT
 extern HTTPCGI *http_add_cgi(HTTPD *httpd, const char *pgm, const char *path, int login) asm("HTTPACGI");
 extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTTPPCGI");
 extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
+extern UFS *http_get_ufs(HTTPC *)                                          asm("HTTPGUFS");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -718,6 +721,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))
+
+#define http_get_ufs(httpc) \
+    ((httpx->http_get_ufs)((httpc)))
 
 #endif  /* ifndef HTTPX_H */
 

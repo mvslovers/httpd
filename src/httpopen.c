@@ -97,18 +97,21 @@ http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
 	}
 
 
-    if (httpc->ufs) {
-        UCHAR ufspath[256];
-        const char *dr = httpc->httpd->docroot;
-        if (dr[0] && http_cmpn(buf, "/DD:", 4) != 0) {
-            /* prepend document root to UFS path */
-            snprintf((char *)ufspath, sizeof(ufspath), "%s%s", dr, buf);
-            httpc->ufp = ufs_fopen(httpc->ufs, ufspath, mode);
-        } else {
-            httpc->ufp = ufs_fopen(httpc->ufs, buf, mode);
-        }
-        if (httpc->ufp) {
-            goto quit;  /* success, return NULL to caller */
+    {
+        UFS *ufs = http_get_ufs(httpc);
+        if (ufs) {
+            UCHAR ufspath[256];
+            const char *dr = httpc->httpd->docroot;
+            if (dr[0] && http_cmpn(buf, "/DD:", 4) != 0) {
+                /* prepend document root to UFS path */
+                snprintf((char *)ufspath, sizeof(ufspath), "%s%s", dr, buf);
+                httpc->ufp = ufs_fopen(ufs, ufspath, mode);
+            } else {
+                httpc->ufp = ufs_fopen(ufs, buf, mode);
+            }
+            if (httpc->ufp) {
+                goto quit;  /* success, return NULL to caller */
+            }
         }
     }
 

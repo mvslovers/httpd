@@ -298,6 +298,8 @@ struct httpx {
     HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
     HTTPCP      *xlate_1047;        /* 118 IBM-1047 codepage pair       */
     HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
+    UFS *       (*http_get_ufs)(HTTPC *);
+                                    /* 120 get/create UFS handle        */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -521,5 +523,8 @@ struct httpx {
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))
+
+#define http_get_ufs(httpc) \
+    ((httpx->http_get_ufs)((httpc)))
 
 #endif /* HTTPCGI_H */

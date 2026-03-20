@@ -671,11 +671,7 @@ socket_thread(void *arg1, void *arg2)
             httpc->port   = a->sin_port;
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
-            if (httpd->ufs) {
-                /* create UFS handle */
-                httpc->ufs = ufsnew();
-                crt->crtufs = httpc->ufs;
-            }
+            /* UFS session created lazily by http_get_ufs() */
 
             mgr = httpd->mgr;
             if (mgr) {

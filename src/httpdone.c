@@ -16,6 +16,11 @@ httpdone(HTTPC *httpc)
         httpc->fp = NULL;
     }
 
+    if (httpc->ufp) {
+        /* close UFS file handle */
+        ufs_fclose(&httpc->ufp);
+    }
+
     httpsecs(&httpc->end);
 
 quit:

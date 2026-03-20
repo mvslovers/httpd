@@ -35,6 +35,11 @@ httprese(HTTPC *httpc)
     httpc->end = 0.0;
     memset(httpc->buf, 0, CBUFSIZE);
 
+    /* clear ACEE on UFS session between requests */
+    if (httpc->ufs) {
+        ufs_set_acee(httpc->ufs, NULL);
+    }
+
     /* if this is was HTTP1.1 or higher client then we
     ** *could* transition to CSTATE_IN.  We'll leave that
     ** for another time.
