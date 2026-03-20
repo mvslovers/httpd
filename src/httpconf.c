@@ -533,8 +533,6 @@ process_httpd_ufs(lua_State *L, HTTPD *httpd)
 
     if (httpd->ftpd) httpd->ftpd->sys = httpd->ufssys;
 
-    wtof("HTTPD046I UFS available via UFSD subsystem");
-
     /* Read document root prefix (optional) */
     lua_getfield(L, -1, "docroot");
     {

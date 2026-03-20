@@ -321,7 +321,6 @@ terminate(void)
     /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
     if (httpd->ufssys) {
-        wtof("HTTPD047I Terminating File System");
         ufs_sys_term(&httpd->ufssys);
         httpd->ufssys = NULL;
     }
