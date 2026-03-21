@@ -145,17 +145,21 @@ static const unsigned char cp037_etoa[256] = {
 /* ------------------------------------------------------------------ */
 /* IBM Code Page 1047 (Latin-1 / Open Systems)                        */
 /*                                                                    */
-/* Asymmetric NL/LF mapping (the well-known 1047 problem):            */
-/*   ASCII LF  (0x0A) -> EBCDIC LF  (0x25)                           */
-/*   EBCDIC NEL(0x15) -> ASCII  LF  (0x0A)  <- NB: NOT symmetric     */
-/*   EBCDIC LF (0x25) -> ASCII  NEL (0x85)  <- NB: NOT symmetric     */
+/* NL/LF mapping — modified from pure IBM-1047:                       */
+/*   ASCII LF  (0x0A) -> EBCDIC NEL (0x15)  <- override for ecosystem */
+/*   EBCDIC NEL(0x15) -> ASCII  LF  (0x0A)  <- symmetric roundtrip   */
+/*   EBCDIC LF (0x25) -> ASCII  NEL (0x85)  <- unchanged             */
 /*                                                                    */
-/* Tables from mvsMF (verified, in production).                       */
+/* Pure IBM-1047 maps ASCII LF to EBCDIC LF (0x25), but the          */
+/* mvslovers ecosystem uses NEL (0x15) as newline: c2asm370 '\n',     */
+/* crent370 printf, and all UFS files written by C programs emit      */
+/* 0x15. This override makes atoe consistent with that convention.    */
+/* z/OS USS applies the same override internally.                     */
 /* ------------------------------------------------------------------ */
 
 static const unsigned char ibm1047_atoe[256] = {
     /* 0x00-0x07 */ 0x00, 0x01, 0x02, 0x03, 0x37, 0x2D, 0x2E, 0x2F,
-    /* 0x08-0x0F */ 0x16, 0x05, 0x25, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+    /* 0x08-0x0F */ 0x16, 0x05, 0x15, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
     /* 0x10-0x17 */ 0x10, 0x11, 0x12, 0x13, 0x3C, 0x3D, 0x32, 0x26,
     /* 0x18-0x1F */ 0x18, 0x19, 0x3F, 0x27, 0x1C, 0x1D, 0x1E, 0x1F,
     /* 0x20-0x27  sp !  "  #  $  %  &  '  */
