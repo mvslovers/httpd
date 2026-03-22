@@ -64,10 +64,15 @@ http_send_file(HTTPC *httpc, int binary)
             if (len>0) {
                 /* we read some data */
                 if (!binary) {
-                    /* convert to ASCII */
-                    /* wtodumpf(&httpc->buf[httpc->len], len, "%s before", __func__); */
-                    http_etoa(&httpc->buf[httpc->len], len);
-                    /* wtodumpf(&httpc->buf[httpc->len], len, "%s after", __func__); */
+                    /* convert EBCDIC to ASCII */
+                    if (httpc->ufp) {
+                        /* UFS files are stored in IBM-1047 */
+                        http_xlate(&httpc->buf[httpc->len], len,
+                                   httpx->xlate_1047->etoa);
+                    } else {
+                        /* MVS datasets use server-default codepage */
+                        http_etoa(&httpc->buf[httpc->len], len);
+                    }
                 }
                 httpc->len += len;
             }
@@ -672,7 +677,9 @@ ssi_buffer(HTTPC *httpc, const char *buf, int len)
 		avail = CBUFSIZE - httpc->len;
 		if (len < avail) {
 			memcpy(&httpc->buf[httpc->len], buf, len);
-			http_etoa(&httpc->buf[httpc->len], len);
+			/* SSI files are served from UFS (IBM-1047) */
+			http_xlate(&httpc->buf[httpc->len], len,
+			           httpx->xlate_1047->etoa);
 			httpc->len += len;
 		}
 	}
