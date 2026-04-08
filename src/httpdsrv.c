@@ -412,14 +412,14 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>\"%s\"</td></tr>\n", 
         O(version), httpd->version);
     
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->config</td>"
-        "<td>Lua Configuration State</td>"
-        "<td>%p</td></tr>\n", 
-        O(config), httpd->config);
-    
-    http_printf(httpc, 
+        "<td>httpd->unused_60</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_60), httpd->unused_60);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->cfg_maxtask</td>"
         "<td>Config Max Task</td>"

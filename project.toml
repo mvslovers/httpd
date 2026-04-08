@@ -48,7 +48,7 @@ blksize = 15040
 space = ["TRK", 150, 50, 30]
 
 [dependencies]
-"mvslovers/crent370" = ">=1.0.7"
+"mvslovers/crent370" = ">=1.0.8"
 "mvslovers/ufsd" = "=1.0.0-dev"
 "mvslovers/lua370" = ">=1.0.2"
 "mvslovers/mqtt370" = ">=1.0.3"
@@ -60,7 +60,7 @@ space = ["TRK", 150, 50, 30]
 name = "HTTPD"
 entry = "@@CRT0"
 options = ["SIZE=(4000K,40K)", "LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "HTTPSTRT", "HTTPD"]
+include = ["@@CRT1", "HTTPSTRT", "HTTPD", "HTTPPRM"]
 setcode = "AC(1)"
 
 [link.module.dep_includes]
