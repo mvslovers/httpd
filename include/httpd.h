@@ -126,7 +126,7 @@ struct httpd {
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
     LUAX		*luax;				/* 58 Lua function vector		*/
     const char  *version;			/* 5C HTTPD Version				*/
-    lua_State   *config;			/* 60 Lua configuration state	*/
+    void        *unused_60;         /* 60 (was: lua_State *config)  */
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
     UCHAR		cfg_mintask;		/* 65 config min task			*/
     UCHAR		cfg_client_timeout;	/* 66 client timeout seconds	*/
@@ -135,7 +135,10 @@ struct httpd {
     UCHAR		cfg_st_hour_max;	/* 69 statistics hour_records	*/
     UCHAR		cfg_st_min_max;		/* 6A statistics min records	*/
     UCHAR       cfg_cgictx;         /* 6B # CGI context pointers    */
-    UCHAR		cfg_st_unused[4];	/* 6C unused / available		*/
+    UCHAR       ufs_enabled;        /* 6C UFS filesystem enabled    */
+    UCHAR       dbg_enabled;        /* 6D debug output enabled      */
+    UCHAR       bind_tries;         /* 6E socket bind retry count   */
+    UCHAR       bind_sleep;         /* 6F socket bind retry delay   */
 	HTTPSTAT	**st_month;			/* 70 statistics month array	*/
     HTTPSTAT	**st_day;			/* 74 statistics day array 		*/
     HTTPSTAT	**st_hour;			/* 78 statistics hour array		*/
@@ -152,7 +155,10 @@ struct httpd {
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */
 #define HTTPD_CGICTX_MAX    255     /* ... maximum number of cgictx */
     char        docroot[128];       /* A0 UFS document root prefix  */
-};                                  /* 120                          */
+    UCHAR       listen_queue;       /* 120 listen backlog           */
+    UCHAR       unused_121[3];      /* 121 alignment padding        */
+    char        codepage[16];       /* 124 codepage name            */
+};                                  /* 134                          */
 
 /* Telemetry */
 struct httpt {

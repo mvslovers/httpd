@@ -1,0 +1,30 @@
+//HTTPD    PROC M=HTTPPRM0,
+//            D='SYS2.PARMLIB'
+//*
+//* HTTPD - HTTP Server STC Procedure
+//*
+//* Installation:
+//*   Copy to SYS2.PROCLIB(HTTPD)
+//*   Copy config member to SYS2.PARMLIB(HTTPPRM0)
+//*
+//* Starting:    /S HTTPD
+//*              /S HTTPD,M=HTTPPRM1     (alternate config member)
+//*              /S HTTPD,D='MY.PARMLIB'  (alternate parmlib dataset)
+//* Commands:    /F HTTPD,DISPLAY CONFIG
+//*              /F HTTPD,DISPLAY STATS
+//*              /F HTTPD,HELP
+//*              /F HTTPD,SHUTDOWN
+//* Stopping:    /P HTTPD
+//*
+//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440
+//STEPLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
+//SYSUDUMP DD  SYSOUT=*
+//HTTPDERR DD  SYSOUT=*
+//HTTPDOUT DD  SYSOUT=*
+//HTTPDIN  DD  DUMMY
+//SNAP     DD  SYSOUT=*
+//HTTPDBG  DD  SYSOUT=*
+//HTTPSTAT DD  SYSOUT=*
+//HTTPPRM  DD  DSN=&D(&M),DISP=SHR,FREE=CLOSE
+//HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
+//HASPACE1 DD  DISP=SHR,DSN=SYS1.HASPACE,UNIT=3350,VOL=SER=SPOOL1
