@@ -7,31 +7,27 @@
 # Lines starting with # or * are comments.
 #
 # --- Network ---
-PORT=8080
-BIND_TRIES=10
-BIND_SLEEP=10
-LISTEN_QUEUE=5
+# PORT=8080
+# BIND_TRIES=10
+# BIND_SLEEP=10
+# LISTEN_QUEUE=5
 #
 # --- Worker threads ---
-MINTASK=3
-MAXTASK=9
-CLIENT_TIMEOUT=10
+# MINTASK=3
+# MAXTASK=9
+# CLIENT_TIMEOUT=10
 #
 # --- Security ---
-LOGIN=NONE
+# LOGIN=NONE
 #
 # --- Timezone ---
 # TZOFFSET=+01:00
 #
-# --- Codepage ---
-# CODEPAGE=CP037
-#
 # --- UFS Filesystem ---
-UFS=1
-DOCROOT=/www
+# DOCROOT=/www
 #
 # --- Debug ---
-DEBUG=0
+# DEBUG=1
 #
 # --- CGI Modules ---
 # Format: CGI=PROGRAM /url/path
@@ -40,17 +36,12 @@ DEBUG=0
 #
 # CGI=MVSMF /zosmf/*
 # CGI=HTTPDSRV /.dsrv
+# CGI=HTTPDM /.dm
+# CGI=HTTPDMTT /.dmtt
 # CGI=HTTPDSL /dsl/*
 # CGI=HTTPJES2 /jes/*
 # CGI=HTTPLUA /lua/*
 # CGI=HTTPREXX /rexx/*
-# CGI=HTTPDM /.dm
-# CGI=HTTPDMTT /.dmtt
-#
-# --- Lua CGI Settings ---
-# CGILUA_DATASET=HTTPD.CGILUA
-# CGILUA_PATH=
-# CGILUA_CPATH=
 #
 # --- Statistics ---
 # CLIENT_STATS=1
@@ -59,4 +50,3 @@ DEBUG=0
 # CLIENT_STATS_HOUR_MAX=48
 # CLIENT_STATS_MINUTE_MAX=120
 # CLIENT_STATS_DATASET=
-#
