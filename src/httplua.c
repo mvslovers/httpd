@@ -1067,7 +1067,9 @@ quit:
   return err;
 }
 
+/* TSK-104: HTTPLUA moves to external project, httpd->luax dependency goes away */
 static int http_lua_publish(lua_State *L) {
+  HTTPD *httpd = cgihttpd(); /* needed for HTTPLUAX macro expansion */
   lua_pushinteger(L, 4);
   lua_pushstring(L, "publish: not available");
   return 2;

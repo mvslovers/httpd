@@ -8,7 +8,6 @@ httpd048(HTTPD *httpd)
 
 	if (!(httpd->login & HTTPD_LOGIN_ALL)) {
 		wtof("HTTPD048I Login not required for any request");
-        http_pubf(httpd, "login", "none");
 		goto quit;
 	}
 
@@ -30,7 +29,6 @@ httpd048(HTTPD *httpd)
 		}
 	}
 	wtof("HTTPD048I Login required for (%s) request", buf);
-    http_pubf(httpd, "login", "%s", buf);
 
 quit:
 	return rc;
