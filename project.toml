@@ -107,27 +107,6 @@ entry = "@@CRT0"
 options = ["LIST", "MAP", "XREF", "RENT"]
 include = ["@@CRT1", "CGISTART", "HTTPREXX"]
 
-# Test CGI module
-[[link.module]]
-name = "HTTPTEST"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPTEST"]
-
-# Hello world CGI
-[[link.module]]
-name = "HELLO"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HELLO"]
-
-# Abend test CGI
-[[link.module]]
-name = "ABEND0C1"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "ABEND0C1"]
-
 # SSI handler modules
 [[link.module]]
 name = "HTTPDM"

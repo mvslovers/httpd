@@ -46,7 +46,6 @@ DEBUG=0
 # CGI=HTTPREXX /rexx/*
 # CGI=HTTPDM /.dm
 # CGI=HTTPDMTT /.dmtt
-# CGI=HELLO /hello
 #
 # --- Lua CGI Settings ---
 # CGILUA_DATASET=HTTPD.CGILUA
