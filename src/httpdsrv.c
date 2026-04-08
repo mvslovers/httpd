@@ -12,7 +12,6 @@ static int display_httpd(HTTPD *httpd, HTTPC *httpc);
 static int display_cgi(HTTPD *httpd, HTTPC *httpc);
 static int display_file(HTTPD *httpd, HTTPC *httpc);
 static int display_fs(HTTPD *httpd, HTTPC *httpc);
-static int display_ftpd(HTTPD *httpd, HTTPC *httpc);
 static int display_mgr(HTTPD *httpd, HTTPC *httpc);
 static int display_task(HTTPD *httpd, HTTPC *httpc);
 static int display_ufsdisks(HTTPD *httpd, HTTPC *httpc);
@@ -78,11 +77,6 @@ int main(int argc, char **argv)
 
     if (http_cmpn(target, "FS", len)==0) {
         display_fs(httpd, httpc);
-        goto quit;
-    }
-
-    if (http_cmpn(target, "FTPD", len)==0) {
-        display_ftpd(httpd, httpc);
         goto quit;
     }
 
@@ -384,14 +378,7 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%-24.24s</td></tr>\n", 
         O(uptime), ctime64(&httpd->uptime));
 
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=FTPD\">httpd->ftpd</a></td>"
-        "<td>Embedded FTP Server Handle</td>"
-        "<td>%p</td></tr>\n", 
-        O(ftpd), httpd->ftpd);
-    
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td><a href=\"?target=FS\">httpd->ufssys</a></td>"
         "<td>UFS System Handle</td>"
@@ -1474,165 +1461,6 @@ struct ufs {
 #ifdef O
 #undef O
 #endif
-#define O(a) ((unsigned)&(ftpd->a) - (unsigned)ftpd)
-
-static int
-display_ftpd(HTTPD *httpd, HTTPC *httpc)
-{
-    int         rc      = 0;
-    FTPD        *ftpd   = httpd->ftpd;
-    unsigned    n, count;
-    UCHAR       *u;
-
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
-
-    http_printf(httpc, "<h2>FTPD Handle %p</h2>\n", ftpd);
-
-#if 0
-    http_printf(httpc, 
-        "<embed type=\"text/html\" src=\"/.dm?t=FTPD&m=%p&l=%u\" width=\"800\" height=\"230\">\n",
-        ftpd, sizeof(FTPD));
-#endif
-    display_memory(httpd, httpc, "FTPD", ftpd, sizeof(FTPD), 16);
-    
-    http_printf(httpc, "<table>\n");
-
-    http_printf(httpc, 
-        "<tr><th>Offset</th>"
-        "<th>Data Name</th>"
-        "<th>Description</th>"
-        "<th>Contents</th></tr>\n");
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>ftpd->eye</td>"
-        "<td>Eye Catcher</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(eye), ftpd->eye);
-
-    if (ftpd->ftpd_thread) {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td><a href=\"?target=TASK&m=%p\">ftpd->ftpd_thread</a></td>"
-            "<td>Subtask Thread Handle</td>"
-            "<td>%p</td></tr>\n", 
-            O(ftpd_thread), ftpd->ftpd_thread, ftpd->ftpd_thread);
-    }
-    else {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td>ftpd->ftpd_thread</td>"
-            "<td>Subtask Thread Handle</td>"
-            "<td>%p</td></tr>\n", 
-            O(ftpd_thread), ftpd->ftpd_thread);
-    }
-
-    count = array_count(&ftpd->ftpc);
-    if (count) {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td><a href=\"?target=FTPC&m=%p\">ftpd->ftpc</a></td>"
-            "<td>FTP Clients Array</td>"
-            "<td>%p</td></tr>\n", 
-            O(ftpc), ftpd->ftpc, ftpd->ftpc);
-    }
-    else {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td>ftpd->ftpc</td>"
-            "<td>FTP Clients Array</td>"
-            "<td>%p</td></tr>\n", 
-            O(ftpc), ftpd->ftpc);
-    }
-
-    u = (unsigned char*)&ftpd->addr;
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>ftpd->addr</td>"
-        "<td>FTPD Listen Address</td>"
-        "<td>%u.%u.%u.%u</td></tr>\n", 
-        O(addr), u[0], u[1], u[2], u[3]);
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>ftpd->port</td>"
-        "<td>FTPD Listen Port</td>"
-        "<td>%d</td></tr>\n", 
-        O(port), ftpd->port);
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>ftpd->listen</td>"
-        "<td>FTPD Listen Socket</td>"
-        "<td>%d</td></tr>\n", 
-        O(listen), ftpd->listen);
-
-    if (ftpd->stats) {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td><a href=\"?target=FILE&m=%p\">ftpd->stats</a></td>"
-            "<td>FTP Statistics File</td>"
-            "<td>%p</td></tr>\n", 
-            O(stats), ftpd->stats, ftpd->stats);
-    }
-    else {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td>ftpd->stats</td>"
-            "<td>FTPD Statistics File</td>"
-            "<td>%p</td></tr>\n", 
-            O(stats), ftpd->stats);
-    }
-
-    if (ftpd->dbg) {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td><a href=\"?target=FILE&m=%p\">ftpd->dbg</a></td>"
-            "<td>FTP Debug File</td>"
-            "<td>%p</td></tr>\n", 
-            O(dbg), ftpd->dbg, ftpd->dbg);
-    }
-    else {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td>ftpd->dbg</td>"
-            "<td>FTPD Debug File</td>"
-            "<td>%p</td></tr>\n", 
-            O(dbg), ftpd->dbg);
-    }
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>ftpd->flags</td>"
-        "<td>FTPD Processing Flags</td>"
-        "<td>%02X", 
-        O(flags), ftpd->flags);
-    if (ftpd->flags & FTPD_FLAG_INIT)       http_printf(httpc, " INIT");
-    if (ftpd->flags & FTPD_FLAG_LISTENER)   http_printf(httpc, " LISTENER");
-    if (ftpd->flags & FTPD_FLAG_READY)      http_printf(httpc, " READY");
-    if (ftpd->flags & FTPD_FLAG_QUIESCE)    http_printf(httpc, " QUIESCE");
-    if (ftpd->flags & FTPD_FLAG_SHUTDOWN)   http_printf(httpc, " SHUTDOWN");
-    http_printf(httpc, "</td></tr>\n");
-
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=UFSSYS&m=%p\">ftpd->sys</a></td>"
-        "<td>Unix \"like\" File System Handle</td>"
-        "<td>%p</td></tr>\n", 
-        O(sys), ftpd->sys, ftpd->sys);
-
-done:
-    http_printf(httpc, "</table>\n");
-    send_last(httpd, httpc);
-	
-quit:
-	return 0;
-}
-
-
-#ifdef O
-#undef O
-#endif
 #define O(a) ((unsigned)&(cgi->a) - (unsigned)cgi)
 
 static int
@@ -2353,7 +2181,6 @@ static int
 display_queue_data(HTTPD *httpd, HTTPC *httpc, CTHDQUE *q)
 {
     HTTPC       *h          = q->data;
-    FTPC        *ftpc       = q->data;
     struct sockaddr addr;
     struct sockaddr_in *in  = (struct sockaddr_in*)&addr;
     int         addrlen;
@@ -2429,34 +2256,6 @@ display_queue_data(HTTPD *httpd, HTTPC *httpc, CTHDQUE *q)
         ntoa(in->sin_addr.s_addr, ip);
         http_printf(httpc, "REMOTE          %s:%d\n", ip, in->sin_port);
         http_printf(httpc, "</pre>\n");
-        goto quit;
-    }
-
-    if (strcmp(ftpc->eye, FTPC_EYE)==0) {
-        ACEE *acee = ftpc->acee;
-
-        if (acee) {
-            memcpyp(user, sizeof(user), &acee->aceeuser[1], acee->aceeuser[0], 0);
-            memcpyp(group, sizeof(group), &acee->aceegrp[1], acee->aceegrp[0], 0);
-        }
-
-        addrlen = sizeof(addr);
-        getsockname(ftpc->client_socket, &addr, &addrlen);
-        ntoa(in->sin_addr.s_addr, ip);
-
-        http_printf(httpc, "<pre>\n");
-        http_printf(httpc, "PROTOCOL        FTP\n");
-        http_printf(httpc, "USER            %-9.9s\n", user);
-        http_printf(httpc, "GROUP           %s\n", group);
-        http_printf(httpc, "SOCKET          %d\n", ftpc->client_socket);
-        http_printf(httpc, "LOCAL           %s:%d\n", ip, in->sin_port);
-
-        addrlen = sizeof(addr);
-        getpeername(ftpc->client_socket, &addr, &addrlen);
-        ntoa(in->sin_addr.s_addr, ip);
-        http_printf(httpc, "REMOTE          %s:%d\n", ip, in->sin_port);
-        http_printf(httpc, "</pre>\n");
-
         goto quit;
     }
 
@@ -2634,9 +2433,6 @@ display_help(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, "<dt>?target=FS</dt>\n");
     http_printf(httpc, "<dd>Display the HTTPD ... Unix \"like\" File System Handle.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=FTPD</dt>\n");
-    http_printf(httpc, "<dd>Display the HTTPD ... FTPD Handle.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=HELP</dt>\n");
     http_printf(httpc, "<dd>Display this help text.</dd><br/>\n");

@@ -286,12 +286,6 @@ d_port(char *buf)
     int         rc      = 0;
 
     wtof("HTTPD102I HTTPD server listening on port %d", httpd->port);
-    if (httpd->ftpd) {
-        FTPD *ftpd = httpd->ftpd;
-        if (ftpd->port) {
-            wtof("HTTPD102I FTPD  server listening on port %d", ftpd->port);
-        }
-    }
 
 quit:
     return rc;
@@ -564,7 +558,6 @@ d_queue(CTHDWORK *work)
     CTHDQUE *q = work->queue;
     if (q->data) {
         HTTPC       *httpc = q->data;
-        FTPC        *ftpc  = q->data;
         struct sockaddr addr;
         struct sockaddr_in *in = (struct sockaddr_in*)&addr;
         int         addrlen;
@@ -593,23 +586,6 @@ d_queue(CTHDWORK *work)
             ntoa(in->sin_addr.s_addr, ip);
             wtof("HTTPD120I ..SOCKET %8d  ....PORT %8d  ......IP %s",
                 httpc->socket, in->sin_port, ip);
-        }
-        else if (strcmp(ftpc->eye, FTPC_EYE)==0) {
-            ACEE *acee = ftpc->acee;
-
-            if (acee) {
-                memcpyp(user, sizeof(user), &acee->aceeuser[1], acee->aceeuser[0], 0);
-                memcpyp(group, sizeof(group), &acee->aceegrp[1], acee->aceegrp[0], 0);
-            }
-            ntoa(ftpc->client_addr, ip);
-            wtof("HTTPD118I PROTOCOL FTP       ....USER %-9.9s ...GROUP %s", user, group);
-            wtof("HTTPD119I ..REMOTE CLIENT    ....PORT %8d  ......IP %s",
-                 ftpc->client_port, ip);
-            addrlen = sizeof(addr);
-            getpeername(ftpc->client_socket, &addr, &addrlen);
-            ntoa(in->sin_addr.s_addr, ip);
-            wtof("HTTPD120I ..SOCKET %8d  ....PORT %8d  ......IP %s",
-                ftpc->client_socket, in->sin_port, ip);
         }
     }
     return 0;
@@ -683,10 +659,6 @@ d_thread(char *buf)
         d_cthdtask(httpd->socket_thread);
         wtof("HTTPD119I ..SOCKET %8d  ....PORT %8d  (HTTP Protocol)",
             httpd->listen, httpd->port);
-        if (httpd->ftpd) {
-            wtof("HTTPD119I ..SOCKET %8d  ....PORT %8d  (FTP Protocol)",
-                 httpd->ftpd->listen, httpd->ftpd->port);
-        }
         wtof(HTTPD199I);
     }
 
