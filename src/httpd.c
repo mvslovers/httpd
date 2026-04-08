@@ -248,19 +248,12 @@ terminate(void)
 {
     CLIBGRT *grt        = __grtget();
     HTTPD   *httpd      = grt->grtapp1;
-    FTPD    *ftpd       = httpd->ftpd;
     HTTPC   *httpc;
     int     i;
     unsigned count;
     unsigned n;
 
     http_enter("terminate()\n");
-
-    if (ftpd) {
-        ftpdterm(&ftpd);
-        httpd->ftpd = 0;
-        http_pubf(httpd, "thread/listener/ftp", "");
-    }
 
     httpd->flag |= HTTPD_FLAG_QUIESCE;
     httpd->flag |= HTTPD_FLAG_SHUTDOWN;
@@ -409,12 +402,10 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-    FTPD        *ftpd   = httpd->ftpd;
     int         maxsock = 0;
     unsigned    count   = array_count(&httpd->httpc);
     unsigned    n;
     HTTPC       *httpc;
-    FTPC        *ftpc;
 #if 0
     http_enter("build_fd_set()\n");
 #endif
@@ -442,37 +433,6 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
         if (excp)   FD_SET(httpc->socket, excp);
     }
 
-    if (ftpd && ftpd->listen >= 0) {
-        /* include the FTPD listener socket */
-        if (read && ftpd->listen) {
-            FD_SET(ftpd->listen, read);
-            if (ftpd->listen > maxsock) maxsock = ftpd->listen;
-        }
-#if 0   /* clients are processed only in the worker threads */
-        /* include any FTPD client sockets */
-        count = array_count(&ftpd->ftpc);
-        for(n=0; n < count; n++) {
-            ftpc = ftpd->ftpc[n];
-            if (!ftpc) continue;           /* no client handle? */
-
-            if (ftpc->client_socket >= 0) {
-                /* the clients control channel socket */
-                if (ftpc->client_socket > maxsock) maxsock = ftpc->client_socket;
-                if (read)   FD_SET(ftpc->client_socket, read);
-                if (write)  FD_SET(ftpc->client_socket, write);
-                if (excp)   FD_SET(ftpc->client_socket, excp);
-            }
-            if (ftpc->data_socket >= 0) {
-                /* the clients data channel socket */
-                if (ftpc->data_socket > maxsock) maxsock = ftpc->data_socket;
-                if (read)   FD_SET(ftpc->data_socket, read);
-                if (write)  FD_SET(ftpc->data_socket, write);
-                if (excp)   FD_SET(ftpc->data_socket, excp);
-            }
-        }
-#endif
-    }
-
 quit:
     if (maxsock) maxsock++;
 #if 0
@@ -486,9 +446,6 @@ process_clients(fd_set *read, fd_set *write, fd_set *excp)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-#if 0
-    FTPD        *ftpd   = httpd->ftpd;
-#endif
     int         rc      = http_process_clients();
     int         lockrc;
     unsigned    count;
@@ -524,13 +481,6 @@ httpd_locked:
     }
     if (lockrc==0) unlock(httpd, 0);
 
-#if 0 /* clients are processed only in the worker threads */
-    if (!ftpd) goto quit;
-
-    /* process ftp clients (does its own locking */
-    rc = ftpd_process_clients();
-#endif
-
 quit:
     return 0;
 }
@@ -541,7 +491,6 @@ socket_thread(void *arg1, void *arg2)
 	CLIBCRT     *crt    = __crtget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-    FTPD        *ftpd   = httpd->ftpd;
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
     unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
@@ -551,7 +500,6 @@ socket_thread(void *arg1, void *arg2)
     int         sock;
     int         len;
     HTTPC       *httpc;
-    FTPC        *ftpc;
     timeval     wait;
     int         maxsock;
     unsigned    count;
@@ -689,65 +637,6 @@ socket_thread(void *arg1, void *arg2)
             }
         } /* if (FD_ISSET(httpd->listen, &read)) */
 
-        if (ftpd) {
-            /* check for new connections */
-            if (FD_ISSET(ftpd->listen, &read)) {
-                /* new client wants to connect */
-                len = sizeof(addr);
-                sock = accept(ftpd->listen, &addr, &len);
-                if (sock<0) {
-                    wtof("FTPD0052E accept() failed, rc=%d, error=%d\n",
-                        sock, errno);
-                    http_dbgf("accept() failed, rc=%d, error=%d\n", sock, errno);
-                    goto quit;
-                }
-
-                http_dbgf("new connection on socket=%d\n", sock);
-                /* wtof("%s new connection on socket=%d", __func__, sock); */
-
-#if 0 /* we want the FTP control socket to block */
-                len = 1;    /* set non-blocking I/O */
-                if (ioctlsocket(sock, FIONBIO, &len)) {
-                    wtof("FTPD0053E Unable to set non-blocking I/O for socket %d\n",
-                        sock);
-                    http_dbgf("Unable to set non-blocking I/O for socket %d\n",
-                        sock);
-                }
-#endif
-                /* we've accepted a connection */
-                ftpc = calloc(1, sizeof(FTPC));
-                if (!ftpc) {
-                    wtof("FTPD0999E Out of memory!");
-                    goto quit;
-                }
-                strcpy(ftpc->eye, FTPC_EYE);
-                ftpc->ftpd          = ftpd;
-                ftpc->client_socket = sock;
-                ftpc->client_addr   = a->sin_addr.s_addr;
-                ftpc->client_port   = a->sin_port;
-                ftpc->data_socket   = -1;
-                ftpc->state         = FTPSTATE_INITIAL;
-                ftpdsecs(&ftpc->start);
-
-                mgr = httpd->mgr;
-                if (mgr) {
-                    /* we have a thread manager */
-                    if (mgr->state == CTHDMGR_STATE_QUIESCE ||
-                        mgr->state == CTHDMGR_STATE_STOPPED) {
-                        /* manager is not available */
-                        ftpcterm(&ftpc);
-                    }
-                    else {
-                        /* queue client to thread manager work queue */
-                        cthread_queue_add(mgr, ftpc);
-                    }
-                }
-                else {
-                    /* add new client to array of clients */
-                    array_add(&ftpd->ftpc, ftpc);
-                }
-            }   /* if (FD_ISSET(ftpd->listen, &read)) */
-        }   /* if (ftpd) */
     } /* while(task) */
 
 quit:
@@ -1111,7 +1000,6 @@ worker_thread(void *udata, CTHDWORK *work)
     CLIBCRT     *crt    = __crtget();           /* A(CLIBCRT) from TCBUSER  */
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-    FTPD        *ftpd   = httpd->ftpd;
     HTTPT       *httpt  = httpd->httpt;         /* Telemtry handle */
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
@@ -1121,7 +1009,6 @@ worker_thread(void *udata, CTHDWORK *work)
     int         rc      = 0;
     char        *data   = NULL;
     HTTPC       *httpc  = NULL;
-    FTPC        *ftpc   = NULL;
     char        *timebuf;
     char        topic[40];
     unsigned    n, count;
@@ -1166,7 +1053,6 @@ worker_thread(void *udata, CTHDWORK *work)
         if (rc == CTHDWORK_POST_REQUEST) {
             /* process request */
             httpc = (HTTPC*)data;
-            ftpc  = (FTPC*)data;
             if (httpc && strcmp(httpc->eye, HTTPC_EYE)==0) {
                 while(httpc->state != CSTATE_CLOSE) {
                     http_process_client(httpc);
@@ -1175,13 +1061,6 @@ worker_thread(void *udata, CTHDWORK *work)
                 http_dbgf("closing client(%08X) socket(%d)\n",
                     httpc, httpc->socket);
                 http_close(httpc);
-            }
-            else if (ftpc && strcmp(ftpc->eye, FTPC_EYE)==0) {
-                while(ftpc->state != FTPSTATE_TERMINATE) {
-                    ftpd_process_client(ftpc);
-                    if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
-                }
-                ftpcterm(&ftpc);
             }
             else {
                 wtodumpf(data, 16, "%s unknown request", __func__);

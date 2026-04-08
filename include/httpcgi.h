@@ -34,10 +34,7 @@
 /* Basic typedefs (no dependency)                                      */
 /* ------------------------------------------------------------------ */
 
-typedef unsigned char   UCHAR;
-typedef unsigned short  USHRT;
-typedef unsigned int    UINT;
-typedef unsigned long   ULONG;
+#include "types.h"
 
 /* ------------------------------------------------------------------ */
 /* Forward declarations — CGI modules hold pointers, never dereference */

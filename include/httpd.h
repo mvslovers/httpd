@@ -41,7 +41,7 @@
 #include "dbg.h"                    /* debugging goodies            */
 #include "errors.h"                 /* the missing errno values     */
 #include "racf.h"                   /* security environment         */
-#include "ftpd.h"                   /* FTP daemon and client        */
+#include "types.h"                  /* UCHAR, USHRT, UINT, ULONG    */
 #include "cred.h"					/* Credentials					*/
 #include "mqtc370.h"                /* MQTT Client                  */
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
@@ -62,14 +62,6 @@ typedef enum   cstate   CSTATE;     /* HTTP Client state            */
 typedef enum   rdw      RDW;        /* RDW option                   */
 
 #include "httppub.h"                /* HTTP Telemetry Publisher     */
-
-#if 0   /* declared in FTPD.H */
-typedef unsigned char   UCHAR;
-typedef unsigned short  USHRT;
-typedef unsigned int    UINT;
-typedef unsigned long   ULONG;
-typedef unsigned long long U64;
-#endif
 
 #ifndef OR
 #define OR ??!??!                   /* logical OR trigraph          */
@@ -122,7 +114,7 @@ struct httpd {
     char        rname[12];          /* 38 resource name             */
     HTTPCGI     **httpcgi;          /* 44 CGI path and programs     */
 	time64_t 	uptime;				/* 48 Server startup time		*/
-    FTPD        *ftpd;              /* 50 FTP daemon                */
+    void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
     LUAX		*luax;				/* 58 Lua function vector		*/
     const char  *version;			/* 5C HTTPD Version				*/
