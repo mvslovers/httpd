@@ -11,7 +11,6 @@
 #include "clibsock.h"
 
 static int socket_thread(void *arg1, void *arg2);
-static int telemetry_thread(void *arg1, void *arg2);
 static int worker_thread(void *udata, CTHDWORK *work);
 
 unsigned __stklen = 64*1024;
@@ -108,20 +107,6 @@ initialize(int argc, char **argv)
 		wtof("HTTPD415I Loading stats from %s", httpd->st_dataset);
 		httpstat_load(httpd, httpd->st_dataset);
 	}
-
-    if (httpd->httpt) {
-        HTTPT   *httpt = httpd->httpt;
-        
-        /* create telemetry thread */
-        if ((httpt->flag & HTTPT_FLAG_START) && (httpt->telemetry > 0)) {
-            httpt->telemetry_thread = cthread_create_ex(telemetry_thread,
-                httpd, httpt, 32*1024);
-            if (!httpt->telemetry_thread) {
-                wtof("HTTPD033E Unable to telemetry thread\n");
-                goto quit;
-            }
-        }
-    }
 
     /* create socket thread */
     httpd->socket_thread = cthread_create_ex(socket_thread,
@@ -281,12 +266,10 @@ terminate(void)
         http_dbgf("closing socket(%d)\n", httpd->listen);
         closesocket(httpd->listen);
         httpd->listen = 0;
-        http_pubf(httpd, "thread/listener/http", "");
     }
 
     /* terminate the worker threads */
     cthread_manager_term(&httpd->mgr);
-    http_pubf(httpd, "thread/worker", "");
 
     if (httpd->httpc) {
         for(httpc=httpd->httpc[0]; httpc; httpc=httpd->httpc[0]) {
@@ -322,72 +305,6 @@ terminate(void)
 		wtof("HTTPD416I Saving stats to %s", httpd->st_dataset);
 		httpstat_save(httpd, httpd->st_dataset);
 	}
-
-    /* Publish to MQTT Broker */
-    http_pubf(httpd, "state", "shutdown");
-    http_pub_datetime(httpd, "shutdown");
-    
-    if (httpd->httpt) {     /* HTTPD Telemetry (MQTT) */
-        HTTPT *httpt = httpd->httpt;
-
-        if (httpt->telemetry_thread) {
-            CTHDTASK *task = httpt->telemetry_thread;
-
-            /* wake up the telemetry thread */
-       		cthread_post(&httpt->telemetry_ecb, 0);
-
-            for(i=0; (i < 10) && (!(task->termecb & 0x40000000)); i++) {
-                if (i) {
-                    wtof("HTTPD040I Waiting for telemetry thread to terminate (%d)", i);
-                }
-                /* we need to wait 1 second */
-                __asm__("STIMER WAIT,BINTVL==F'100'   1 seconds");
-            }
-
-            if(!(task->termecb & 0x40000000)) {
-                wtof("HTTPD041I Force detaching telemetry thread\n");
-            }
-            cthread_delete(&httpt->telemetry_thread);
-            http_pubf_nocache(httpd, "thread/telemetry/cache", "");
-        }
-
-        if (httpt->mqtc) {
-            wtof("HTTPD429I Terminating MQTT");
-
-            mqtc_close_client(httpt->mqtc);
-
-            cthread_yield();
-    
-            mqtc_free_client(&httpt->mqtc);
-        }
-
-        if (httpt->broker_host) free(httpt->broker_host);
-        if (httpt->broker_port) free(httpt->broker_port);
-        if (httpt->prefix) free(httpt->prefix);
-        if (httpt->smfid) free(httpt->smfid);
-        if (httpt->jobname) free(httpt->jobname);
-
-        if (httpt->httptc) {
-            /* free the telemetry cache array */
-            count = array_count(&httpt->httptc);
-            
-            for(n=count; n > 0; n--) {
-                HTTPTC *httptc = array_del(&httpt->httptc, n);
-                
-                if (!httptc) continue;
-
-                /* free the telemetry cache record */
-                if (httptc->data) free(httptc->data);
-                if (httptc->topic) free(httptc->topic);
-                free(httptc);
-            }
-            
-            array_free(&httpt->httptc);
-        }
-        
-        free(httpt);
-        httpd->httpt = NULL;
-    }
 
     /* just in case we missed something */
     close_fd_set();
@@ -506,26 +423,11 @@ socket_thread(void *arg1, void *arg2)
     fd_set      read;
     struct sockaddr_in addr;
     struct sockaddr_in *a = (struct sockaddr_in *)&addr;
-    char        *timebuf;
 
     http_enter("socket_thread()\n");
 
     wtof("HTTPD061I STARTING socket thread    TCB(%06X) TASK(%06X) STACKSIZE(%u)",
         tcb, task, task->stacksize);
-
-    /* Publish to MQTT Broker */
-    timebuf = http_get_timebuf();
-    if (timebuf) {
-        lock(timebuf, LOCK_EXC);
-        http_pubf(httpd, "thread/listener", 
-            "{ \"datetime\" : \"%s\" "
-            ", \"tcb\" : \"%06X\" "
-            ", \"task\" : \"%06X\" "
-            ", \"stacksize\" : %u "
-            "}",
-            http_get_datetime(httpd), tcb, task, task->stacksize);
-        unlock(timebuf, LOCK_EXC);
-    }
 
     /* if something goes all wrong, capture it! */
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
@@ -643,356 +545,10 @@ quit:
 	wtof("HTTPD060I SHUTDOWN socket thread    TCB(%06X) TASK(%06X) STACKSIZE(%u)",
 		tcb, task, task->stacksize);
 
-    /* Publish to MQTT Broker */
-    http_pubf(httpd, "thread/listener", "");
-
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
     http_exit("socket_thread()\n");
     return 0;
 }
-
-typedef struct static_process_telemetry_ping {
-    time64_t    ping_time;
-} SPTP;
-static SPTP  *static_process_telemetry_ping;
-
-static int
-http_process_telemetry_ping(HTTPD *httpd)
-{
-    int         rc      = 0;
-    SPTP        *sptp   = __wsaget(&static_process_telemetry_ping, sizeof(SPTP));
-    HTTPT       *httpt  = httpd->httpt;
-    MQTC        *mqtc;
-    time64_t    now;
-    char        timebuf[26];
-    unsigned    n;
-    unsigned    count;
-    unsigned    bytes   = 0;
-
-    if (!httpt) goto quit;
-    if (!httpt->mqtc) goto quit;
-
-    time64(&now);
-
-    if (__64_cmp(&sptp->ping_time, &now)== __64_LARGER) goto quit;
-
-    if(!__64_is_zero(&sptp->ping_time)) {
-        /* send PING request */
-        rc = mqtc_send_ping(httpt->mqtc);
-    }
-
-    /* update next PING time */
-    __64_add_u32(&now, 60, &sptp->ping_time);
-
-quit:
-    return rc;
-}
-
-
-
-
-typedef struct static_process_telemetry_cache {
-    unsigned    records;
-    unsigned    bytes;
-} SPTC;
-static SPTC  *static_process_telemetry_cache;
-
-static int
-http_process_telemetry_cache(HTTPD *httpd)
-{
-    int         rc      = 0;
-    int         lockrc  = 8;
-    SPTC        *sptc   = __wsaget(&static_process_telemetry_cache, sizeof(SPTC));
-    HTTPT       *httpt  = httpd->httpt;
-    HTTPTC      *httptc;
-    MQTC        *mqtc;
-    time64_t    last;
-    char        timebuf[26];
-    unsigned    n;
-    unsigned    count;
-    unsigned    bytes   = 0;
-
-    if (!httpt) goto quit;
-    if (!httpt->mqtc) goto quit;
-
-    __64_init(&last);
-
-    lockrc = lock(&httpt->httptc, LOCK_SHR);
-
-    count = array_count(&httpt->httptc);
-    for(n=0; n < count; n++) {
-        httptc = httpt->httptc[n];
-        
-        if (!httptc) continue;
-        bytes += sizeof(HTTPTC);
-        bytes += (httptc->topic_len + 1 + 7) & 0xFFFFFFF8;
-        bytes += (httptc->data_len  + 1 + 7) & 0xFFFFFFF8;
-        
-        if (__64_cmp(&httptc->last, &last) == __64_LARGER) {
-            last = httptc->last;
-        }
-    }
-
-    if (sptc->records == count && sptc->bytes == bytes) {
-        /* and the same record count and byte count */
-        goto quit;
-    }
-    
-    sptc->records = count;
-    sptc->bytes = bytes;
-
-    if (__64_is_zero(&last)) time64(&last);
-
-    /* don't cache this topic */
-    http_pubf_nocache(httpd, "thread/telemetry/cache", 
-        "{ \"datetime\" : \"%s\" "
-        ", \"records\" : %u "
-        ", \"bytes\" : %u "
-        "}",
-        http_fmt_datetime(httpd, &last, timebuf),
-        count,
-        bytes);
-
-
-quit:
-    if (lockrc==0) unlock(&httpt->httptc, LOCK_SHR);
-    return rc;
-}
-
-typedef struct static_process_telemetry {
-    __64        dispatched;
-    unsigned    worker_count;
-} SPT;
-static SPT  *static_process_telemetry;
-
-static int
-http_process_telemetry(HTTPD *httpd, CTHDMGR *mgr)
-{
-    int         rc      = 0;
-    SPT         *spt    = __wsaget(&static_process_telemetry, sizeof(SPT));
-    HTTPT       *httpt  = httpd->httpt;
-    MQTC        *mqtc;
-    time64_t    now;
-    char        *timebuf = http_get_timebuf();
-    CTHDTASK    *task;
-    CTHDWORK    *work;
-    unsigned    n;
-    unsigned    worker_count;
-    unsigned    queue_count;
-    const char  *state;
-
-    if (!httpt) goto quit;
-    if (!httpt->mqtc) goto quit;
-
-
-    /* get current time */
-    time64(&now);
-
-    task            = mgr->task;
-    worker_count    = array_count(&mgr->worker);
-    queue_count     = array_count(&mgr->queue);
-
-    if (__64_cmp(&spt->dispatched, &mgr->dispatched) == __64_EQUAL) {
-        /* the dispatch count hasn't changed */
-        if (spt->worker_count == worker_count) {
-            /* and the same number of workers */
-            goto quit;
-        }
-    }
-    
-    spt->dispatched = mgr->dispatched;
-    spt->worker_count = worker_count;
-
-    switch(mgr->state) {
-        case CTHDMGR_STATE_INIT:    state = "INIT"; break;
-        case CTHDMGR_STATE_RUNNING: state = "RUNNING"; break;
-        case CTHDMGR_STATE_QUIESCE: state = "QUIESCE"; break;
-        case CTHDMGR_STATE_STOPPED: state = "STOPPED"; break;
-        case CTHDMGR_STATE_WAITING: state = "WAITING"; break;
-        default:                    state = "UNKNOWN"; break;
-    }
-
-    if (timebuf) {
-        lock(timebuf, LOCK_EXC);
-        http_pubf(httpd, "thread/worker", 
-            "{ \"datetime\" : \"%s\" "
-            ", \"dispatched\" : %llu "
-            ", \"state\" : \"%s\" "
-            ", \"mgr\" : \"%06X\" "
-            ", \"task\" : \"%06X\" "
-            ", \"tcb\" : \"%06X\" "
-            ", \"mintask\" : %u "
-            ", \"maxtask\" : %u "
-            ", \"stacksize\" : %u "
-            ", \"workers\" : %u "
-            ", \"queued\" : %u "
-            "}",
-            http_get_datetime(httpd), 
-            mgr->dispatched,
-            state,
-            mgr, 
-            task, 
-            task->tcb, 
-            mgr->mintask,
-            mgr->maxtask,
-            task->stacksize,
-            worker_count,
-            queue_count);
-        unlock(timebuf, LOCK_EXC);
-    }
-    
-    for(n=0; n < worker_count; n++) {
-        char    topic[40];
-        
-        work = mgr->worker[n];
-
-        sprintf(topic, "thread/worker/%u", n+1);
-        
-        if (!work) goto discard;            /* no worker            */
-
-        task = work->task;
-        if (!task) goto discard;            /* no task              */
-        if (!task->tcb) goto discard;       /* no tcb               */
-        if (task->termecb) goto discard;    /* tcb terminated       */
-
-        switch(work->state) {
-            case CTHDWORK_STATE_INIT:       state = "INIT";     break;
-            case CTHDWORK_STATE_RUNNING:    state = "RUNNING";  break;
-            case CTHDWORK_STATE_WAITING:    state = "WAITING";  break;
-            case CTHDWORK_STATE_DISPATCH:   state = "DISPATCH"; break;
-            case CTHDWORK_STATE_SHUTDOWN:   state = "SHUTDOWN"; break;
-            case CTHDWORK_STATE_STOPPED:    state = "STOPPED";  break;
-            default:                        state = "UNKNOWN";  break;
-        }
-
-        lock(timebuf, LOCK_EXC);
-        http_pubf(httpd, topic, 
-            "{ \"datetime\" : \"%s\" "
-            ", \"dispatched\" : %llu "
-            ", \"state\" : \"%s\" "
-            ", \"task\" : \"%06X\" "
-            ", \"tcb\" : \"%06X\" "
-            ", \"stacksize\" : %u "
-            "}",
-            http_fmt_datetime(httpd, &work->start_time, timebuf),
-            work->dispatched,
-            state,
-            task, 
-            task->tcb, 
-            task->stacksize);
-        unlock(timebuf, LOCK_EXC);
-
-        continue;
-
-discard:
-        http_pubf(httpd, topic, "");
-        continue;  /* tcb has ended        */
-    }
-    
-quit:
-    return rc;
-}
-
-static int
-telemetry_thread(void *udata1, void *udata2)
-{
-    HTTPD       *httpd  = udata1;                   /* Server handle */
-    HTTPT       *httpt  = httpd->httpt;             /* Telemetry handle */
-    unsigned    *psa    = (unsigned *)0;
-    unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
-    CTHDTASK    *task   = cthread_self();
-    CTHDMGR     *mgr;
-    int         rc      = 0;
-    char        *timebuf;
-
-    wtof("HTTPD061I STARTING telemetry thread TCB(%06X) TASK(%06X) STACKSIZE(%u)", 
-        tcb, task, task->stacksize);
-
-    /* Publish to MQTT Broker */
-    timebuf = http_get_timebuf();
-    if (timebuf) {
-        lock(timebuf, LOCK_EXC);
-
-        if (httpt && httpt->mqtc && httpt->mqtc->task) {
-            MQTC        *mqtc       = httpt->mqtc;
-            CTHDTASK    *subtask    = mqtc->task;
-            CTHDTASK    *self       = httpd->self;
-            unsigned    addr, port;
-            
-            http_pubf(httpd, "thread/main",
-                "{ \"datetime\" : \"%s\" "
-                ", \"tcb\" : \"%06X\" "
-                ", \"task\" : \"%06X\" "
-                ", \"stacksize\" : %u "
-                "}",
-                http_get_datetime(httpd), self->tcb, self, self->stacksize);
-
-            http_pubf(httpd, "thread/mqtt", 
-                "{ \"datetime\" : \"%s\" "
-                ", \"tcb\" : \"%06X\" "
-                ", \"task\" : \"%06X\" "
-                ", \"stacksize\" : %u "
-                "}",
-                http_get_datetime(httpd), subtask->tcb, subtask, subtask->stacksize);
-
-            http_pubf(httpd, "thread/mqtt/broker",
-                "{ \"host\" : \"%s\" "
-                ", \"port\" : \"%s\" "
-                ", \"socket\" : %d "
-                "}",
-                mqtc->broker_host, mqtc->broker_port, mqtc->sock);
-        }
-
-        
-        http_pubf(httpd, "thread/telemetry", 
-            "{ \"datetime\" : \"%s\" "
-            ", \"tcb\" : \"%06X\" "
-            ", \"task\" : \"%06X\" "
-            ", \"stacksize\" : %u "
-            "}",
-            http_get_datetime(httpd), tcb, task, task->stacksize);
-        unlock(timebuf, LOCK_EXC);
-    }
-
-    /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
-
-    while(httpd) {
-        unsigned    wait;
-
-        httpt = httpd->httpt;              /* Telemetry handle */
-        if (!httpt) break;
-
-        wait = httpt->telemetry * 100;        
-        
-        /* wait for ecb post or timer expire */
-        cthread_timed_wait(&httpt->telemetry_ecb, wait, 0);
-
-        if (httpd->flag & HTTPD_FLAG_SHUTDOWN) break;
-
-        /* terminate() may shutdown the thread manager before us */
-        mgr = httpd->mgr;
-        if (!mgr) break;
-        
-        http_process_telemetry(httpd, mgr);
-        http_process_telemetry_cache(httpd);
-        http_process_telemetry_ping(httpd);
-    }
-
-    abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
-
-	wtof("HTTPD060I SHUTDOWN telemetry thread TCB(%06X) TASK(%06X) STACKSIZE(%u)",
-		tcb, task, task->stacksize);
-
-    http_pubf(httpd, "thread/telemetry", "");
-    http_pubf(httpd, "thread/mqtt/broker", "");
-    http_pubf(httpd, "thread/mqtt", "");
-    http_pubf(httpd, "thread/main", "");
-    
-    return 0;
-}
-
 
 static int
 worker_thread(void *udata, CTHDWORK *work)
@@ -1000,7 +556,6 @@ worker_thread(void *udata, CTHDWORK *work)
     CLIBCRT     *crt    = __crtget();           /* A(CLIBCRT) from TCBUSER  */
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-    HTTPT       *httpt  = httpd->httpt;         /* Telemtry handle */
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
     unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
@@ -1009,9 +564,6 @@ worker_thread(void *udata, CTHDWORK *work)
     int         rc      = 0;
     char        *data   = NULL;
     HTTPC       *httpc  = NULL;
-    char        *timebuf;
-    char        topic[40];
-    unsigned    n, count;
 
     http_enter("worker_thread()\n");
 
@@ -1020,29 +572,6 @@ worker_thread(void *udata, CTHDWORK *work)
 
     wtof("HTTPD061I STARTING worker(%06X)   TCB(%06X) TASK(%06X) STACKSIZE(%u)",
         work, tcb, task, task->stacksize);
-
-    if (httpt && httpt->telemetry_thread) {
-        cthread_post(&httpt->telemetry_ecb, 0);
-    }
-
-#if 0
-    /* Publish to MQTT Broker */
-    sprintf(topic, "thread/worker(%06X)", work);
-
-    timebuf = http_get_timebuf();
-    if (timebuf) {
-        lock(timebuf, LOCK_EXC);
-        http_pubf(httpd, topic, 
-            "{ \"datetime\" : \"%s\" "
-            ", \"tcb\" : \"%06X\" "
-            ", \"task\" : \"%06X\" "
-            ", \"mgr\" : \"%06X\" "
-            ", \"crt\" : \"%06X\" "
-            "}",
-            http_get_datetime(httpd), tcb, task, mgr, crt);
-        unlock(timebuf, LOCK_EXC);
-    }
-#endif
 
     while(task) {
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
@@ -1074,22 +603,6 @@ worker_thread(void *udata, CTHDWORK *work)
 quit:
 	wtof("HTTPD060I SHUTDOWN worker(%06X)   TCB(%06X) TASK(%06X) STACKSIZE(%u)",
 		work, tcb, task, task->stacksize);
-
-#if 0
-    /* Delete topic from MQTT Broker */
-    http_pubf(httpd, topic, "");
-#endif
-
-    count = array_count(&mgr->worker);
-    for(n=0; n < count; n++) {
-        CTHDWORK *w = mgr->worker[n];
-        
-        if (w == work) {
-            sprintf(topic, "thread/worker/%u", n+1);
-            http_pubf(httpd, topic, "");
-            break;
-        }
-    }
 
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
 
@@ -1330,10 +843,6 @@ main(int argc, char **argv)
 
     httpd->flag |= HTTPD_FLAG_READY;
     wtof("HTTPD001I Server is READY\n");
-    
-    /* Publish to MQTT Broker */
-    http_pub_datetime(httpd, "ready");
-    http_pubf(httpd, "state", "ready");
 
     /* Note: The main thread (this thread) waits for console messages
      * like modify "/F jobname,..." and stop "/P jobname".
@@ -1370,9 +879,6 @@ main(int argc, char **argv)
 cleanup:
     httpd->flag |= HTTPD_FLAG_QUIESCE;
     wtof("HTTPD002I Server is QUIESCE\n");
-
-    http_pubf(httpd, "state", "quiesce");
-    http_pub_datetime(httpd, "quiesce");
 
     i = try(terminate,0);
     if (i) wtof("terminate failed with rc=%08X", i);
