@@ -1068,47 +1068,6 @@ quit:
 }
 
 static int http_lua_publish(lua_State *L) {
-  HTTPD *httpd = cgihttpd();
-  HTTPT *httpt;
-  MQTC *mqtc;
-  int rc;
-  const char *topic = luaL_checkstring(L, 1);
-  const char *data = luaL_optstring(L, 2, "");
-
-  if (!httpd)
-    goto quit;
-  if (!httpd->httpt)
-    goto quit;
-  if (!httpd->httpt->mqtc)
-    goto quit;
-
-  if (!topic)
-    goto quit;
-  if (!data)
-    goto quit;
-
-  httpt = httpd->httpt;
-  mqtc = httpt->mqtc;
-
-  if (mqtc->flags & MQTC_FLAG_RECONNECT) {
-    /* prevent attempts to publish while the MQTT client is in error state */
-    goto quit;
-  }
-
-  rc = mqtc_pub(mqtc, 0, 1, topic, data);
-
-  /* check for errors */
-  if (rc) {
-    lua_pushinteger(L, 8);
-    lua_pushfstring(L, "publish: client error: %d", rc);
-    return 2;
-  }
-
-  lua_pushinteger(L, 0);
-  lua_pushstring(L, "publish: okay");
-  return 2;
-
-quit:
   lua_pushinteger(L, 4);
   lua_pushstring(L, "publish: not available");
   return 2;
