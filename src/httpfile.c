@@ -462,47 +462,7 @@ quit:
 
 }
 
-/* ddname() convert "/index.html" -> "/DD:html(index)" */
-static UCHAR *
-ddname(const UCHAR *in, UCHAR *out, int size)
-{
-    UCHAR   *ext    = strchr(in,'.');
-    UCHAR   *mem    = strchr(in,'/');
-    int     extlen  = ext ? strlen(ext+1) : 0;
-    int     memlen  = (mem && ext) ? (int)(ext-mem) - 1 : 0;
-    int     pos     = 0;
-    int     len;
-
-    /* we need space for "/DD:_ddname_(_member_)" */
-    if (size < sizeof("/DD:_ddname_(_member_)")) goto quit;
-
-    if (extlen < 0 OR memlen < 0 OR strchr(in, ':')) {
-        /* doesn't look like a normal "file.ext" name */
-        out = NULL;
-        goto quit;
-    }
-
-    if (extlen > 8) extlen = 8; /* limit ddname to 8 characters */
-    if (memlen > 8) memlen = 8; /* limit member name to 8 characters */
-
-    strcpy(out, "/DD:");
-    pos += 4;
-
-    for(ext++;(*ext) && (extlen > 0); extlen--) {
-        out[pos++]=*ext++;
-    }
-    out[pos++] = '(';
-    for(mem++;(*mem) && (*mem!='.') && (memlen > 0); memlen--) {
-        out[pos++]=*mem++;
-    }
-    out[pos++] = ')';
-    out[pos] = 0;
-
-quit:
-    return out;
-}
-
-static int 
+static int
 ssi_include(HTTPC *httpc, char *next)
 {
 	int			isfile		= 0;
@@ -516,7 +476,6 @@ ssi_include(HTTPC *httpc, char *next)
     UCHAR   	subtype		= httpc->subtype;
     UCHAR		substate	= httpc->substate;
     UCHAR		ssi			= httpc->ssi;
-    char		buf[40];
     char		uri[UFS_PATH_MAX];
 
 	// wtof("%s: enter next=\"%s\"", __func__, next);
@@ -555,40 +514,17 @@ ssi_include(HTTPC *httpc, char *next)
 	strncpy(uri, path, sizeof(uri));
 	uri[sizeof(uri)-1] = 0;
 
-    if (httpc->ufs) {
-        /* try to open path asis */
-        mime = http_mime(path);
-        if (!mime->binary) {
-			httpc->fp = http_open(httpc, path, mime);
-			if (httpc->fp || httpc->ufp) goto okay;   /* file was opened */
-		}
+    mime = http_mime(path);
+    if (mime->binary) {
+        ssi_printf(httpc, "<!-- Oops: we can't include a binary file \"%s\" -->\n", uri);
+        goto quit;
     }
 
-	/* now we'll try to convert the path to a "/DD:EXT(MEMBER)" */
-    if (http_cmpn(path,"/DD:",4)!=0 &&
-        strchr(path,'.') && strlen(path) < 19) {
-
-        /* convert the path to a "/DD:ddname(member)" */
-        if (ddname(path, buf, sizeof(buf))) {
-            path = buf;
-
-			mime = http_mime(path);
-			if (!mime->binary) {
-				/* open the file */
-				httpc->fp = http_open(httpc, path, mime);
-			}
-		}
-	}
-
-	if (!httpc->fp && !httpc->ufp) {
-        if (mime->binary) {
-			ssi_printf(httpc, "<!-- Oops: we can't include a binary file \"%s\" -->\n", uri);
-			goto quit;
-		}
-		/* open failed for path name */
-		ssi_printf(httpc, "<!-- Oops: we didn't find \"%s\" -->\n", uri);
-		goto quit;
-	}
+    httpc->fp = http_open(httpc, path, mime);
+    if (!httpc->fp && !httpc->ufp) {
+        ssi_printf(httpc, "<!-- Oops: we didn't find \"%s\" -->\n", uri);
+        goto quit;
+    }
 
 okay:
 	// ssi_printf(httpc, "\n");
