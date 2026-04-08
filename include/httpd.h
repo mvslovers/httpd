@@ -43,7 +43,6 @@
 #include "racf.h"                   /* security environment         */
 #include "types.h"                  /* UCHAR, USHRT, UINT, ULONG    */
 #include "cred.h"					/* Credentials					*/
-#include "mqtc370.h"                /* MQTT Client                  */
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 
 #define HTTPLUAX (httpd->luax) 		/* use this pointer				*/
@@ -52,16 +51,12 @@
 typedef struct httpd    HTTPD;      /* HTTP Daemon (server)         */
 typedef struct httpc    HTTPC;      /* HTTP Client                  */
 typedef struct httpm    HTTPM;      /* HTTP Mime                    */
-typedef struct httpt    HTTPT;      /* HTTP Telemetry (MQTT)        */
-typedef struct httptc   HTTPTC;     /* HTTP Telemetry Cache         */
 typedef struct httpx    HTTPX;      /* HTTP function vector         */
 typedef struct httpv    HTTPV;      /* HTTP Variables               */
 typedef struct httpcgi  HTTPCGI;    /* HTTP CGI path and programs   */
 typedef struct httpstat HTTPSTAT;	/* HTTP Statistics record		*/
 typedef enum   cstate   CSTATE;     /* HTTP Client state            */
 typedef enum   rdw      RDW;        /* RDW option                   */
-
-#include "httppub.h"                /* HTTP Telemetry Publisher     */
 
 #ifndef OR
 #define OR ??!??!                   /* logical OR trigraph          */
@@ -140,7 +135,7 @@ struct httpd {
     UCHAR		*cgilua_path;		/* 88 CGI Lua package.path		*/
     UCHAR 		*cgilua_cpath;		/* 8C CGI Lua package.cpath		*/
     UFS			*ufs;				/* 90 Unix "like" File System   */
-    HTTPT       *httpt;             /* 94 Telemetry (MQTT)          */
+    void        *unused_94;         /* 94 (was: HTTPT *httpt)       */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */
     void        **cgictx;           /* 9C array of CGI context ptrs */
 #define HTTPD_CGICTX_MVSMF  0       /* ... MVSMF CGI context index  */
@@ -151,37 +146,6 @@ struct httpd {
     UCHAR       unused_121[3];      /* 121 alignment padding        */
     char        codepage[16];       /* 124 codepage name            */
 };                                  /* 134                          */
-
-/* Telemetry */
-struct httpt {
-    char        eye[8];             /* 00 eye catcher               */
-#define HTTPT_EYE   "*HTTPT*"       /* ...                          */
-    MQTC        *mqtc;              /* 08 MQTT370 Client Handle     */
-    unsigned    flag;               /* 0C Flags                     */
-#define HTTPT_FLAG_START 0x80000000 /* ... start client             */
-#define HTTPT_FLAG_GMT   0x40000000 /* ... datetime values GMT      */
-    char        *broker_host;       /* 10 config host name          */
-    char        *broker_port;       /* 14 config port number        */
-    char        *prefix;            /* 18 config topic prefix       */
-    char        *smfid;             /* 1C smfid string              */
-    char        *jobname;           /* 20 jobname string            */
-    unsigned    telemetry;          /* 24 telemetry interval        */
-    HTTPTC      **httptc;           /* 28 telemetry cache array     */
-    CTHDTASK    *telemetry_thread;  /* 30 telemetry thread          */
-    unsigned    telemetry_ecb;      /* 34 telemetry ecb             */
-    unsigned    unused[2];          /* 38 unused                    */
-};                                  /* 40 (64 bytes)                */
-
-/* Telemetry Cache */
-struct httptc {
-    char        eye[8];             /* 00 eye catcher               */
-#define HTTPTC_EYE  "*HTTPTC*"      /* ,,,                          */
-    time64_t    last;               /* 08 last update time          */
-    unsigned    topic_len;          /* 10 topic name length         */
-    char        *topic;             /* 14 topic name                */
-    unsigned    data_len;           /* 18 message data length       */
-    char        *data;              /* 1C message data              */
-};                                  /* 20 (32 bytes)                */
 
 /* HTTP variables */
 struct httpv {
@@ -421,8 +385,7 @@ struct httpx {
                                     /* 104 add cgi for pgm and path */
     int         (*http_process_cgi)(HTTPC *httpc, HTTPCGI *cgi);
                                     /* 108 process CGI request      */
-    int         (*mqtc_pub)(MQTC *mqtc, unsigned qos, unsigned retain, const char* topic_name, const char* application_message);
-                                    /* 10C publish topic            */
+    void        *unused_10C;        /* 10C (was: mqtc_pub)          */
     unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
                                     /* 110 translate with explicit table */
     HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
@@ -713,9 +676,6 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_process_cgi(httpc,cgi) \
     ((httpx->http_process_cgi)((httpc),(cgi)))
-
-#define mqtc_pub(mqtc,qos,retain,topic,message) \
-    ((httpx->mqtc_pub)((mqtc),(qos),(retain),(topic),(message)))
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))

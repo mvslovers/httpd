@@ -46,7 +46,6 @@ typedef struct cred     CRED;       /* Credentials          — opaque    */
 typedef struct ufs      UFS;        /* UFS filesystem       — opaque    */
 typedef struct ufsfile  UFSFILE;    /* UFS file handle      — opaque    */
 #endif
-typedef struct mqtc     MQTC;       /* MQTT client          — opaque    */
 typedef struct cib      CIB;        /* Console info block   — opaque    */
 #include <socket.h>                 /* struct in_addr                   */
 
@@ -286,10 +285,7 @@ struct httpx {
                                     /* 104 add cgi for pgm and path     */
     int         (*http_process_cgi)(HTTPC *httpc, HTTPCGI *cgi);
                                     /* 108 process CGI request          */
-    int         (*mqtc_pub)(MQTC *mqtc, unsigned qos, unsigned retain,
-                            const char *topic_name,
-                            const char *application_message);
-                                    /* 10C publish MQTT topic           */
+    void        *unused_10C;        /* 10C (was: mqtc_pub)              */
     unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
                                     /* 110 translate with explicit table */
     HTTPCP      *xlate_cp037;       /* 114 CP037 codepage pair          */
@@ -514,9 +510,6 @@ struct httpx {
 
 #define http_process_cgi(httpc,cgi) \
     ((httpx->http_process_cgi)((httpc),(cgi)))
-
-#define mqtc_pub(mqtc,qos,retain,topic,message) \
-    ((httpx->mqtc_pub)((mqtc),(qos),(retain),(topic),(message)))
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))

@@ -19,12 +19,6 @@ int httpstat_load(HTTPD *httpd, const char *dataset)
 {
 	int			rc	= 0;
 	FILE		*fp = NULL;
-    const char  *status = "FAILED";
-    const char  *timebuf;
-    unsigned    months = 0;
-    unsigned    days = 0;
-    unsigned    hours = 0;
-    unsigned    minutes = 0;
 	HTTPSTAT	*stat;
 	int 		which = -1;
 	int			len;
@@ -83,19 +77,15 @@ int httpstat_load(HTTPD *httpd, const char *dataset)
 		switch (which) {
 		case RPT_MONTHS:
 			rc = array_add(&httpd->st_month, stat);
-            months++;
 			break;
 		case RPT_DAYS:
 			rc = array_add(&httpd->st_day, stat);
-            days++;
 			break;
 		case RPT_HOURS:
 			rc = array_add(&httpd->st_hour, stat);
-            hours++;
 			break;
 		case RPT_MINS:
 			rc = array_add(&httpd->st_min, stat);
-            minutes++;
 			break;
 		}	/* switch */
 
@@ -107,24 +97,9 @@ int httpstat_load(HTTPD *httpd, const char *dataset)
 	}	/* while */
 
     rc = 0;
-    status = "SUCCESS";
 
 quit:
 	unlock(lockword, LOCK_SHR);
-
-    timebuf = http_get_timebuf();
-    if (timebuf) {
-        lock((char*)timebuf, LOCK_EXC);
-        http_pubf(httpd, "stats/load", 
-            "{ \"datetime\" : \"%s\" , \"status\" : \"%s\" , \"rc\" : %d , \"dataset\" : \"%s\" "
-            ", \"months\" : %u , \"days\" : %u , \"hours\" : %u , \"minutes\" : %u "
-            "}", 
-            http_get_datetime(httpd), status, rc, dataset, months, days, hours, minutes);
-        unlock((char*)timebuf, LOCK_EXC);
-        
-        /* delete the "stats/save" topic */
-        http_pubf(httpd, "stats/save", "");
-    }
 
 	if (fp) fclose(fp);
 
@@ -135,12 +110,6 @@ int httpstat_save(HTTPD *httpd, const char *dataset)
 {
 	int			rc	= 0;
 	FILE		*fp = NULL;
-    const char  *status = "FAILED";
-    unsigned    months = 0;
-    unsigned    days = 0;
-    unsigned    hours = 0;
-    unsigned    minutes = 0;
-    char        *timebuf;
 
 	lock(lockword, LOCK_SHR);
 
@@ -149,7 +118,7 @@ int httpstat_save(HTTPD *httpd, const char *dataset)
 		wtof("HTTPD430E Unable to open \"%s\" for output", dataset);
 		goto quit;
 	}
-	
+
 	if (httpd->st_month) {
 		rc = save_stats(fp, &httpd->st_month, "MONTH");
 		if (rc) goto quit;
@@ -167,27 +136,9 @@ int httpstat_save(HTTPD *httpd, const char *dataset)
 		if (rc) goto quit;
 	}
 
-    status = "SUCCESS";
-    
 quit:
-    months  = array_count(&httpd->st_month);
-    days    = array_count(&httpd->st_day);
-    hours   = array_count(&httpd->st_hour);
-    minutes = array_count(&httpd->st_min);
-
 	unlock(lockword, LOCK_SHR);
 
-    timebuf = http_get_timebuf();
-    if (timebuf) {
-        lock(timebuf, LOCK_EXC);
-        http_pubf(httpd, "stats/save", 
-            "{ \"datetime\" : \"%s\" , \"status\" : \"%s\" , \"rc\" : %d , \"dataset\" : \"%s\" "
-            ", \"months\" : %u , \"days\" : %u , \"hours\" : %u , \"minutes\" : %u "
-            "}", 
-            http_get_datetime(httpd), status, rc, dataset, months, days, hours, minutes);
-        unlock(timebuf, LOCK_EXC);
-    }
-    
 	if (fp) fclose(fp);
 	return rc;
 }

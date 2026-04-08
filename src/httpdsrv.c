@@ -525,14 +525,7 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%p</td></tr>\n", 
         O(ufs), httpd->ufs);
     
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->httpt</td>"
-        "<td>Telemetry (MQTT) Handle</td>"
-        "<td>%p</td></tr>\n", 
-        O(httpt), httpd->httpt);
-
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td><a href=\"?target=TASK&m=%p\">httpd->self</a></td>"
         "<td>HTTPD Main Thread Handle</td>"

@@ -51,7 +51,6 @@ space = ["TRK", 150, 50, 30]
 "mvslovers/crent370" = ">=1.0.8"
 "mvslovers/ufsd" = "=1.0.0-dev"
 "mvslovers/lua370" = ">=1.0.2"
-"mvslovers/mqtt370" = ">=1.0.3"
 
 # --- Load Modules ------------------------------------------------
 
