@@ -11,46 +11,6 @@ enum ctype {
     CTYPE_TEXT
 };
 
-/* ddname() convert "/index.html" -> "/DD:html(index)" */
-static UCHAR *
-ddname(const UCHAR *in, UCHAR *out, int size)
-{
-    UCHAR   *ext    = strchr(in,'.');
-    UCHAR   *mem    = strchr(in,'/');
-    int     extlen  = ext ? strlen(ext+1) : 0;
-    int     memlen  = (mem && ext) ? (int)(ext-mem) - 1 : 0;
-    int     pos     = 0;
-    int     len;
-
-    /* we need space for "/DD:_ddname_(_member_)" */
-    if (size < sizeof("/DD:_ddname_(_member_)")) goto quit;
-
-    if (extlen < 0 OR memlen < 0 OR strchr(in, ':')) {
-        /* doesn't look like a normal "file.ext" name */
-        out = NULL;
-        goto quit;
-    }
-
-    if (extlen > 8) extlen = 8; /* limit ddname to 8 characters */
-    if (memlen > 8) memlen = 8; /* limit member name to 8 characters */
-
-    strcpy(out, "/DD:");
-    pos += 4;
-
-    for(ext++;(*ext) && (extlen > 0); extlen--) {
-        out[pos++]=*ext++;
-    }
-    out[pos++] = '(';
-    for(mem++;(*mem) && (*mem!='.') && (memlen > 0); memlen--) {
-        out[pos++]=*mem++;
-    }
-    out[pos++] = ')';
-    out[pos] = 0;
-
-quit:
-    return out;
-}
-
 extern int
 httpget(HTTPC *httpc)
 {
@@ -76,71 +36,30 @@ httpget(HTTPC *httpc)
         __asm__("DC\tH'0'");
     }
 
-    if (http_get_ufs(httpc)) {
-        /* try to open path asis */
-        mime = http_mime(path);
-        fp = http_open(httpc, path, mime);
-		// wtof("%s: 1 http_open(%p, \"%s\", %p) fp=%p, httpc->ufp=%p", 
-		// 	__func__, httpc, path, mime, fp, httpc->ufp);
-        if (fp || httpc->ufp) goto okay;   /* file was opened */
-        
-        /* If the path is for a directory then we need to see if a 
-         * "index.html" exist in this directory and open it.
-         */
-        len = strlen(path);
-        if (path[len-1]=='/') {
-			memcpy(buf, path, len);
-			strcpy(&buf[len], "index.html");
-
-			mime = http_mime(buf);
-			fp = http_open(httpc, buf, mime);
-        
-			if (fp || httpc->ufp) goto okay;   /* file was opened */
-		}
-    }
-
-    if (http_cmpn(path,"/DD:",4)!=0 &&
-        strchr(path,'.') && strlen(path) < 19) {
-
-        /* convert the path to a "/DD:ddname(member)" */
-        if (ddname(path, buf, sizeof(buf))) {
-            path = buf;
-            http_dbgf("ddname:\"%s\"\n", path);
-        }
-    }
+    /* try to open path from UFS */
     mime = http_mime(path);
-
-    /* try to open the requested document */
     fp = http_open(httpc, path, mime);
-	// wtof("%s: 2 http_open(%p, \"%s\", %p) fp=%p, httpc->ufp=%p", 
-	// 	__func__, httpc, path, mime, fp, httpc->ufp);
-    if (!fp && !httpc->ufp && http_cmp(path,"/")==0) {
-        /* try to open default documents */
-        path = "/index.html";
-        mime = http_mime(path);
-        fp = http_open(httpc, path, mime);
-        if (!fp && !httpc->ufp) {
-            path = "/default.html";
-            mime = http_mime(path);
-            fp = http_open(httpc, path, mime);
-        }
-        if (!fp && !httpc->ufp) {
-            path = "/DD:HTML(INDEX)";
-            mime = http_mime(path);
-            fp = http_open(httpc, path, mime);
-        }
-        if (!fp && !httpc->ufp) {
-            /* try another one */
-            path = "/DD:HTML(DEFAULT)";
-            fp = http_open(httpc, path, mime);
-        }
+    if (fp || httpc->ufp) goto okay;
+
+    /* If the path is for a directory, try index.html / default.html */
+    len = strlen(path);
+    if (path[len-1]=='/') {
+        memcpy(buf, path, len);
+        strcpy(&buf[len], "index.html");
+        mime = http_mime(buf);
+        fp = http_open(httpc, buf, mime);
+        if (fp || httpc->ufp) goto okay;
+
+        strcpy(&buf[len], "default.html");
+        mime = http_mime(buf);
+        fp = http_open(httpc, buf, mime);
+        if (fp || httpc->ufp) goto okay;
     }
 
-    if (!fp && !httpc->ufp) {
-        rc = http_resp_not_found(httpc, path);
-        httpc->state = CSTATE_DONE;
-        goto quit;
-    }
+    /* file not found */
+    rc = http_resp_not_found(httpc, path);
+    httpc->state = CSTATE_DONE;
+    goto quit;
 
 okay:
     httpc->fp = fp;
@@ -153,9 +72,8 @@ okay:
     if (rc) goto die;
 #if 1
 	/* don't allow the browser to cache our html documents */
-	if (strstr(mime->type, "html") || 
-		__patmat(path, "*.html") || 
-		__patmat(path, "/DD:HTML(*)")) {
+	if (strstr(mime->type, "html") ||
+		__patmat(path, "*.html")) {
 		rc = http_printf(httpc, "Cache-Control: no-store\r\n");
 		if (rc) goto die;
 	}
