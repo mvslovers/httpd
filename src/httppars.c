@@ -87,7 +87,7 @@ httppars(HTTPC *httpc)
         if (http_set_env(httpc, "SERVER_PORT", tmp)) goto failed;
     }
 
-    if (http_set_env(httpc, "SERVER_PROTOCOL", "HTTP/1.0")) goto failed;
+    if (http_set_env(httpc, "SERVER_PROTOCOL", "HTTP/1.1")) goto failed;
     
     sprintf(tmp, "HTTPD/%s", httpc->httpd->version);
     if (http_set_env(httpc, "SERVER_SOFTWARE", tmp)) goto failed;

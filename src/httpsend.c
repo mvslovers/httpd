@@ -4,62 +4,74 @@
 */
 #include "httpd.h"
 
-extern int
-httpsend(HTTPC *httpc, const UCHAR *buf, int len)
+/* send_raw() - send raw bytes to socket without chunk framing */
+static int
+send_raw(HTTPC *httpc, const UCHAR *buf, int len)
 {
     int rc;
     int pos = 0;
 
-#if 0
-    wtof("httpsend(%08X,%08X,%d)", httpc, buf, len);
-#endif
-
-    /* send data to socket */
     for(pos=0; pos < len; pos+=rc) {
         if (pos < 0) {
             wtof("httpsend() pos underflow %d", pos);
             break;
         }
-#if 0
-        wtof("calling send(%d,%08X,%d,0)",
-            httpc->socket, &buf[pos], len-pos);
-#endif
         rc = send(httpc->socket, &buf[pos], len-pos, 0);
-#if 0
-        wtof("send() rc=%d", rc);
-#endif
         if (rc>0) {
-            /* update bytes sent count */
             httpc->sent += rc;
-#if 0
-            wtof("httpc->sent=%d", httpc->sent);
-#endif
         }
         else {
-#if 0
-            wtof("httpsend() send rc=%d, errno=%d, socket=%d", rc, errno, httpc->socket);
-#endif
             /* allow for EWOULDBLOCK */
             if (errno == EWOULDBLOCK) break;
 
             /* an error occured */
             if (httpc->state < CSTATE_DONE) {
-                /* transtion to done state */
-#if 0
-                wtof("httpsend() changing httpc->state=CSTATE_DONE");
-#endif
                 httpc->state = CSTATE_DONE;
-                goto quit;  /* return with negative rc */
+                return -1;
             }
             break;
         }
     }
 
-    rc = pos;
+    return pos;
+}
 
-quit:
-#if 0
-    wtof("httpsend() rc=%d", rc);
-#endif
+extern int
+httpsend(HTTPC *httpc, const UCHAR *buf, int len)
+{
+    int rc;
+
+    if (httpc->chunked) {
+        /* RFC 7230 chunked transfer encoding */
+        UCHAR hdr[16];
+        int hdrlen;
+
+        if (len <= 0) return 0;
+
+        /* chunk header: hex size + CRLF (convert EBCDIC to ASCII) */
+        hdrlen = sprintf((char *)hdr, "%x\r\n", len);
+        http_etoa(hdr, hdrlen);
+        rc = send_raw(httpc, hdr, hdrlen);
+        if (rc < 0) return rc;
+
+        /* chunk data (already in ASCII from caller) */
+        rc = send_raw(httpc, buf, len);
+        if (rc < 0) return rc;
+
+        /* chunk trailer: CRLF in ASCII (0x0D 0x0A) */
+        {
+            UCHAR crlf[2];
+            crlf[0] = 0x0D;
+            crlf[1] = 0x0A;
+            rc = send_raw(httpc, crlf, 2);
+        }
+        if (rc < 0) return rc;
+
+        return len;
+    }
+
+    /* non-chunked: send raw */
+    rc = send_raw(httpc, buf, len);
+
     return rc;
 }

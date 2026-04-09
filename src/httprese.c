@@ -31,6 +31,8 @@ httprese(HTTPC *httpc)
     httpc->sent = 0;
     httpc->subtype = 0;
     httpc->substate = 0;
+    httpc->chunked = 0;
+    httpc->content_length_set = 0;
     httpc->start = 0.0;
     httpc->end = 0.0;
     memset(httpc->buf, 0, CBUFSIZE);
