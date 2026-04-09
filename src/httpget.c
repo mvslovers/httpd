@@ -100,8 +100,6 @@ okay:
                 snprintf((char *)ufspath, sizeof(ufspath), "%s", open_path);
             }
             stat_rc = ufs_stat(ufs, (const char *)ufspath, &st);
-            wtof("HTTPD050I httpget ufs_stat(\"%s\") rc=%d size=%u",
-                 ufspath, stat_rc, stat_rc == 0 ? st.filesize : 0);
             if (stat_rc == 0 && st.filesize > 0) {
                 rc = http_printf(httpc, "Content-Length: %u\r\n",
                                  st.filesize);

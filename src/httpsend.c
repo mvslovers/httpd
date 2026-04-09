@@ -41,8 +41,6 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
 {
     int rc;
 
-    wtof("HTTPSEND: chunked=%d len=%d", httpc->chunked, len);
-
     if (httpc->chunked) {
         /* RFC 7230 chunked transfer encoding */
         UCHAR hdr[16];
@@ -52,7 +50,6 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
 
         /* chunk header: hex size + CRLF (convert EBCDIC to ASCII) */
         hdrlen = sprintf((char *)hdr, "%x\r\n", len);
-        wtof("HTTPSEND: hdr=[%.*s] hdrlen=%d", hdrlen, hdr, hdrlen);
         http_etoa(hdr, hdrlen);
         rc = send_raw(httpc, hdr, hdrlen);
         if (rc < 0) return rc;
