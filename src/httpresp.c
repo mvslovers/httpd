@@ -42,7 +42,15 @@ httpresp(HTTPC *httpc, int resp)
 
     httpc->resp = resp;
 
-    rc = http_printf(httpc, "HTTP/1.1 %s\r\n", p);
+    /* match response version to client request version */
+    {
+        UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
+        if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
+            rc = http_printf(httpc, "HTTP/1.1 %s\r\n", p);
+        } else {
+            rc = http_printf(httpc, "HTTP/1.0 %s\r\n", p);
+        }
+    }
     if (rc) goto quit;
 
 	now = time64(NULL);

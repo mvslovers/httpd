@@ -92,13 +92,17 @@ okay:
             UFSDLIST st;
             UCHAR ufspath[256];
             const char *dr = httpc->httpd->docroot;
+            int stat_rc;
             if (dr[0]) {
                 snprintf((char *)ufspath, sizeof(ufspath), "%s%s",
                          dr, open_path);
             } else {
                 snprintf((char *)ufspath, sizeof(ufspath), "%s", open_path);
             }
-            if (ufs_stat(ufs, (const char *)ufspath, &st) == 0) {
+            stat_rc = ufs_stat(ufs, (const char *)ufspath, &st);
+            wtof("HTTPD050I httpget ufs_stat(\"%s\") rc=%d size=%u",
+                 ufspath, stat_rc, stat_rc == 0 ? st.filesize : 0);
+            if (stat_rc == 0 && st.filesize > 0) {
                 rc = http_printf(httpc, "Content-Length: %u\r\n",
                                  st.filesize);
                 if (rc) goto die;
@@ -107,18 +111,19 @@ okay:
         }
     }
 
+    /* chunked transfer encoding only for HTTP/1.1 clients */
     if (!httpc->content_length_set) {
-        rc = http_printf(httpc, "Transfer-Encoding: chunked\r\n");
-        if (rc) goto die;
+        UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
+        if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
+            rc = http_printf(httpc, "Transfer-Encoding: chunked\r\n");
+            if (rc) goto die;
+            httpc->chunked = 1;
+        }
+        /* HTTP/1.0: no chunked, body delimited by Connection: close */
     }
 
     rc = http_printf(httpc, "\r\n");
     if (rc) goto die;
-
-    /* enable chunk framing for body data */
-    if (!httpc->content_length_set) {
-        httpc->chunked = 1;
-    }
 
     /* indicate type of document being sent */
     if (mime->binary) {
