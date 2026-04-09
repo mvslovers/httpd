@@ -112,18 +112,24 @@ okay:
     }
 
     /* chunked transfer encoding only for HTTP/1.1 clients */
-    if (!httpc->content_length_set) {
-        UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
-        if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
-            rc = http_printf(httpc, "Transfer-Encoding: chunked\r\n");
-            if (rc) goto die;
-            httpc->chunked = 1;
+    {
+        int use_chunked = 0;
+        if (!httpc->content_length_set) {
+            UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
+            if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
+                rc = http_printf(httpc, "Transfer-Encoding: chunked\r\n");
+                if (rc) goto die;
+                use_chunked = 1;
+            }
+            /* HTTP/1.0: no chunked, body delimited by Connection: close */
         }
-        /* HTTP/1.0: no chunked, body delimited by Connection: close */
-    }
 
-    rc = http_printf(httpc, "\r\n");
-    if (rc) goto die;
+        rc = http_printf(httpc, "\r\n");
+        if (rc) goto die;
+
+        /* enable chunk framing AFTER header-ending CRLF is sent */
+        httpc->chunked = use_chunked;
+    }
 
     /* indicate type of document being sent */
     if (mime->binary) {
