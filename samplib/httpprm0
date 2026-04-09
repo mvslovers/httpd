@@ -17,6 +17,10 @@
 # MAXTASK=9
 # CLIENT_TIMEOUT=10
 #
+# --- Keep-Alive ---
+# KEEPALIVE_TIMEOUT=5
+# KEEPALIVE_MAX=100
+#
 # --- Security ---
 # LOGIN=NONE
 #
