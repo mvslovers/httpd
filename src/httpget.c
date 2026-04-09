@@ -92,17 +92,14 @@ okay:
             UFSDLIST st;
             UCHAR ufspath[256];
             const char *dr = httpc->httpd->docroot;
-            int stat_rc;
             if (dr[0]) {
                 snprintf((char *)ufspath, sizeof(ufspath), "%s%s",
                          dr, open_path);
             } else {
                 snprintf((char *)ufspath, sizeof(ufspath), "%s", open_path);
             }
-            stat_rc = ufs_stat(ufs, (const char *)ufspath, &st);
-            wtof("HTTPD050I httpget ufs_stat(\"%s\") rc=%d size=%u",
-                 ufspath, stat_rc, stat_rc == 0 ? st.filesize : 0);
-            if (stat_rc == 0 && st.filesize > 0) {
+            if (ufs_stat(ufs, (const char *)ufspath, &st) == 0
+                && st.filesize > 0) {
                 rc = http_printf(httpc, "Content-Length: %u\r\n",
                                  st.filesize);
                 if (rc) goto die;
