@@ -33,8 +33,6 @@ httprese(HTTPC *httpc)
     httpc->substate = 0;
     httpc->chunked = 0;
     httpc->content_length_set = 0;
-    httpc->start = 0.0;
-    httpc->end = 0.0;
     memset(httpc->buf, 0, CBUFSIZE);
 
     /* clear ACEE on UFS session between requests */
@@ -42,11 +40,19 @@ httprese(HTTPC *httpc)
         ufs_set_acee(httpc->ufs, NULL);
     }
 
-    /* if this is was HTTP1.1 or higher client then we
-    ** *could* transition to CSTATE_IN.  We'll leave that
-    ** for another time.
-    */
-    httpc->state = CSTATE_CLOSE;
+    if (httpc->keepalive) {
+        /* keep connection open for next request */
+        httpc->request_count++;
+        httpc->keepalive = 0;
+        httpc->start = 0.0;
+        httpc->end = 0.0;
+        httpsecs(&httpc->start);
+        httpc->state = CSTATE_IN;
+    } else {
+        httpc->start = 0.0;
+        httpc->end = 0.0;
+        httpc->state = CSTATE_CLOSE;
+    }
 
     http_exit("httprese(), rc=%d\n", rc);
     return rc;

@@ -74,6 +74,8 @@ int http_in(HTTPC *httpc)
     /* HTTP/1.1 requires a Host header */
     {
         UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
+        UCHAR *conn = http_get_env(httpc, "HTTP_CONNECTION");
+
         if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
             UCHAR *host = http_get_env(httpc, "HTTP_HOST");
             if (!host || !host[0]) {
@@ -83,7 +85,20 @@ int http_in(HTTPC *httpc)
                 httpc->state = CSTATE_DONE;
                 goto quit;
             }
+            /* HTTP/1.1: default keep-alive */
+            httpc->keepalive = 1;
+            if (conn && http_cmp(conn, "close") == 0)
+                httpc->keepalive = 0;
+        } else {
+            /* HTTP/1.0: default close */
+            httpc->keepalive = 0;
+            if (conn && http_cmp(conn, "keep-alive") == 0)
+                httpc->keepalive = 1;
         }
+
+        /* enforce max requests per connection */
+        if (httpc->request_count >= httpc->httpd->cfg_keepalive_max)
+            httpc->keepalive = 0;
     }
 
     /* next step will parse and do any additional processing */
@@ -92,10 +107,13 @@ int http_in(HTTPC *httpc)
     goto quit;
 
 failed:
-    // wtof("%s: failed", __func__);
-    
-    /* most likely a bad request, reset the connection */
-    httpc->state = CSTATE_RESET;
+    if (httpc->request_count > 0) {
+        /* keep-alive: idle timeout or client disconnect — just close */
+        httpc->state = CSTATE_CLOSE;
+    } else {
+        /* first request: bad request, reset the connection */
+        httpc->state = CSTATE_RESET;
+    }
 
 quit:
     // wtof("%s: exit rc=%d", __func__, rc);

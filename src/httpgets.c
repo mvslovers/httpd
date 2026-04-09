@@ -11,8 +11,12 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
     unsigned    seconds;
     unsigned    ecb;
 
-    seconds = httpd->cfg_client_timeout;
-    if (seconds == 0) seconds = 10;
+    if (httpc->request_count > 0 && httpd->cfg_keepalive_timeout) {
+        seconds = httpd->cfg_keepalive_timeout;
+    } else {
+        seconds = httpd->cfg_client_timeout;
+        if (seconds == 0) seconds = 10;
+    }
     time64(&now);
     __64_add_u32(&now, seconds, &timeout);
         

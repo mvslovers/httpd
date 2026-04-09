@@ -145,7 +145,10 @@ struct httpd {
     UCHAR       listen_queue;       /* 120 listen backlog           */
     UCHAR       unused_121[3];      /* 121 alignment padding        */
     char        codepage[16];       /* 124 codepage name            */
-};                                  /* 134                          */
+    UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
+    UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */
+    UCHAR       unused_136[2];      /* 136 alignment padding        */
+};                                  /* 138                          */
 
 /* HTTP variables */
 struct httpv {
@@ -210,8 +213,9 @@ struct httpc {
     UCHAR		ssilevel;			/* 51 SSI processing level		*/
 #define SSI_LEVEL_MAX	10			/* ... max SSI processing levele*/
 	UCHAR		content_length_set;	/* 52 Content-Length was sent	*/
-	UCHAR		unused2;			/* 53 available					*/
-	unsigned	unused3;			/* 54 available					*/
+	UCHAR		keepalive;			/* 53 keep-alive active			*/
+	unsigned short request_count;	/* 54 requests on this conn		*/
+	unsigned short unused3;			/* 56 available					*/
 
 #define CBUFSIZE (0x1000-0x0058)    /* ... 4096-88 = 4008           */
     UCHAR       buf[CBUFSIZE];      /* 50 data buffer               */

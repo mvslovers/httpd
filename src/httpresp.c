@@ -76,8 +76,11 @@ httpresp(HTTPC *httpc, int resp)
 		if (rc) goto quit;
 	}
 
-    /* HTTP/1.1: always close for now (keep-alive planned) */
-    rc = http_printf(httpc, "Connection: close\r\n");
+    if (httpc->keepalive) {
+        rc = http_printf(httpc, "Connection: keep-alive\r\n");
+    } else {
+        rc = http_printf(httpc, "Connection: close\r\n");
+    }
     if (rc) goto quit;
 
 quit:

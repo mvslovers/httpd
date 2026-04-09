@@ -87,6 +87,8 @@ http_config(HTTPD *httpd, const char *member)
     wtof("HTTPD033I MINTASK=%d MAXTASK=%d CLIENT_TIMEOUT=%d",
          httpd->cfg_mintask, httpd->cfg_maxtask,
          httpd->cfg_client_timeout);
+    wtof("HTTPD034I KEEPALIVE_TIMEOUT=%d KEEPALIVE_MAX=%d",
+         httpd->cfg_keepalive_timeout, httpd->cfg_keepalive_max);
 
     return 0;
 }
@@ -120,6 +122,8 @@ set_defaults(HTTPD *httpd)
     httpd->docroot[0]       = '\0';
     httpd->codepage[0]      = '\0';
     httpd->dbg_enabled      = 0;
+    httpd->cfg_keepalive_timeout = 5;
+    httpd->cfg_keepalive_max     = 100;
 }
 
 /* ====================================================================
@@ -356,6 +360,18 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     }
     else if (strcmp(key, "CLIENT_STATS_DATASET") == 0) {
         if (*value) httpd->st_dataset = strdup(value);
+    }
+    else if (strcmp(key, "KEEPALIVE_TIMEOUT") == 0) {
+        i = atoi(value);
+        if (i < 1) i = 1;
+        if (i > 255) i = 255;
+        httpd->cfg_keepalive_timeout = (UCHAR)i;
+    }
+    else if (strcmp(key, "KEEPALIVE_MAX") == 0) {
+        i = atoi(value);
+        if (i < 1) i = 1;
+        if (i > 255) i = 255;
+        httpd->cfg_keepalive_max = (UCHAR)i;
     }
     else if (strcmp(key, "CGI_CONTEXT_POINTERS") == 0) {
         i = atoi(value);
