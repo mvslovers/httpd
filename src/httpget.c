@@ -16,6 +16,7 @@ httpget(HTTPC *httpc)
 {
     int         rc      = 0;
     UCHAR       *path;
+    UCHAR       *open_path = NULL;
     const HTTPM *mime;
     FILE        *fp;
     int 		len;
@@ -38,6 +39,7 @@ httpget(HTTPC *httpc)
 
     /* try to open path from UFS */
     mime = http_mime(path);
+    open_path = path;
     fp = http_open(httpc, path, mime);
     if (fp || httpc->ufp) goto okay;
 
@@ -47,11 +49,13 @@ httpget(HTTPC *httpc)
         memcpy(buf, path, len);
         strcpy(&buf[len], "index.html");
         mime = http_mime(buf);
+        open_path = buf;
         fp = http_open(httpc, buf, mime);
         if (fp || httpc->ufp) goto okay;
 
         strcpy(&buf[len], "default.html");
         mime = http_mime(buf);
+        open_path = buf;
         fp = http_open(httpc, buf, mime);
         if (fp || httpc->ufp) goto okay;
     }
@@ -80,8 +84,41 @@ okay:
 #endif
     rc = http_printf(httpc, "Content-Type: %s\r\n", mime->type);
     if (rc) goto die;
+
+    /* Content-Length for static UFS files, chunked for SSI */
+    if (!httpc->ssi && httpc->ufp) {
+        UFS *ufs = http_get_ufs(httpc);
+        if (ufs) {
+            UFSDLIST st;
+            UCHAR ufspath[256];
+            const char *dr = httpc->httpd->docroot;
+            if (dr[0]) {
+                snprintf((char *)ufspath, sizeof(ufspath), "%s%s",
+                         dr, open_path);
+            } else {
+                snprintf((char *)ufspath, sizeof(ufspath), "%s", open_path);
+            }
+            if (ufs_stat(ufs, (const char *)ufspath, &st) == 0) {
+                rc = http_printf(httpc, "Content-Length: %u\r\n",
+                                 st.filesize);
+                if (rc) goto die;
+                httpc->content_length_set = 1;
+            }
+        }
+    }
+
+    if (!httpc->content_length_set) {
+        rc = http_printf(httpc, "Transfer-Encoding: chunked\r\n");
+        if (rc) goto die;
+    }
+
     rc = http_printf(httpc, "\r\n");
     if (rc) goto die;
+
+    /* enable chunk framing for body data */
+    if (!httpc->content_length_set) {
+        httpc->chunked = 1;
+    }
 
     /* indicate type of document being sent */
     if (mime->binary) {

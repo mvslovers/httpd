@@ -71,6 +71,21 @@ int http_in(HTTPC *httpc)
         if (http_set_http_env(httpc, buf, p)) goto failed;
     } while(rc > 0);
 
+    /* HTTP/1.1 requires a Host header */
+    {
+        UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
+        if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
+            UCHAR *host = http_get_env(httpc, "HTTP_HOST");
+            if (!host || !host[0]) {
+                http_resp(httpc, 400);
+                http_printf(httpc, "Content-Type: text/plain\r\n\r\n");
+                http_printf(httpc, "400 Bad Request: Missing Host header\r\n");
+                httpc->state = CSTATE_DONE;
+                goto quit;
+            }
+        }
+    }
+
     /* next step will parse and do any additional processing */
     rc = 0;
     httpc->state = CSTATE_PARSE;

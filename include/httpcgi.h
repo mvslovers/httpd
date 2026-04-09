@@ -116,7 +116,7 @@ struct httpc {
     double      end;                /* 38 end time in seconds           */
 
     UCHAR       rdw;                /* 40 RDW option                    */
-    UCHAR       unused;             /* 41 available                     */
+    UCHAR       chunked;            /* 41 chunked transfer encoding     */
     short       resp;               /* 42 response code                 */
     CRED        *cred;              /* 44 client credential             */
     UFS         *ufs;               /* 48 UFS handle    (opaque)        */
@@ -125,7 +125,7 @@ struct httpc {
     UCHAR       ssi;                /* 50 Server Side Include enable    */
     UCHAR       ssilevel;           /* 51 SSI processing level          */
 #define SSI_LEVEL_MAX   10          /* ... max SSI processing level     */
-    UCHAR       unused1;            /* 52 available                     */
+    UCHAR       content_length_set; /* 52 Content-Length was sent        */
     UCHAR       unused2;            /* 53 available                     */
     unsigned    unused3;            /* 54 available                     */
 

@@ -42,7 +42,7 @@ httpresp(HTTPC *httpc, int resp)
 
     httpc->resp = resp;
 
-    rc = http_printf(httpc, "HTTP/1.0 %s\r\n", p);
+    rc = http_printf(httpc, "HTTP/1.1 %s\r\n", p);
     if (rc) goto quit;
 
 	now = time64(NULL);
@@ -67,6 +67,10 @@ httpresp(HTTPC *httpc, int resp)
 		rc = http_printf(httpc, "Node: %-4.4s\r\n", smfid);
 		if (rc) goto quit;
 	}
+
+    /* HTTP/1.1: always close for now (keep-alive planned) */
+    rc = http_printf(httpc, "Connection: close\r\n");
+    if (rc) goto quit;
 
 quit:
     http_exit("httpresp(), rc=%d\n", rc);
