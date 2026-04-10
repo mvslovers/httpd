@@ -103,9 +103,11 @@ initialize(int argc, char **argv)
 		goto quit;
 	}
 
-	if ((httpd->client & HTTPD_CLIENT_STATS) && httpd->st_dataset) {
-		wtof("HTTPD415I Loading stats from %s", httpd->st_dataset);
-		httpstat_load(httpd, httpd->st_dataset);
+	if (httpd->client & HTTPD_CLIENT_STATS) {
+		if (smf_active())
+			wtof("HTTPD415I SMF Type %d recording active", SMF_TYPE_HTTPD);
+		else
+			wtof("HTTPD415W SMF recording is inactive");
 	}
 
     /* create socket thread */
@@ -301,9 +303,10 @@ terminate(void)
         httpd->ufssys = NULL;
     }
 
-	if ((httpd->client & HTTPD_CLIENT_STATS) && httpd->st_dataset) {
-		wtof("HTTPD416I Saving stats to %s", httpd->st_dataset);
-		httpstat_save(httpd, httpd->st_dataset);
+	if (httpd->client & HTTPD_CLIENT_STATS) {
+		wtof("HTTPD416I Stats: %u requests, %u errors, %u bytes",
+			httpd->total_requests, httpd->total_errors,
+			httpd->total_bytes_sent);
 	}
 
     /* just in case we missed something */
@@ -518,6 +521,7 @@ socket_thread(void *arg1, void *arg2)
             httpc->port   = a->sin_port;
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
+            httpd->active_connections++;
             /* UFS session created lazily by http_get_ufs() */
 
             mgr = httpd->mgr;

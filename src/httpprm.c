@@ -62,11 +62,7 @@ http_config(HTTPD *httpd, const char *member)
         }
     }
 
-    /* try to open DD:HTTPSTAT */
-    httpd->stats = fopen("DD:HTTPSTAT", "w");
-    if (!httpd->stats) {
-        wtof("HTTPD026W Unable to open DD:HTTPSTAT, errno=%d", errno);
-    }
+    /* Stats counters initialized to zero by calloc */
 
     /* open debug file if DEBUG=1 */
     if (httpd->dbg_enabled && !httpd->dbg) {
@@ -103,10 +99,7 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_maxtask      = 9;
     httpd->cfg_mintask      = 3;
     httpd->cfg_client_timeout = 10;
-    httpd->cfg_st_month_max = 24;
-    httpd->cfg_st_day_max   = 60;
-    httpd->cfg_st_hour_max  = 48;
-    httpd->cfg_st_min_max   = 120;
+    memset(httpd->unused_67, 0, sizeof(httpd->unused_67));
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
     httpd->login            = 0;            /* NONE */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
@@ -118,7 +111,7 @@ set_defaults(HTTPD *httpd)
     httpd->cgilua_dataset   = NULL;
     httpd->cgilua_path      = NULL;
     httpd->cgilua_cpath     = NULL;
-    httpd->st_dataset       = NULL;
+    httpd->unused_80        = NULL;
     httpd->docroot[0]       = '\0';
     httpd->codepage[0]      = '\0';
     httpd->dbg_enabled      = 0;
@@ -329,37 +322,6 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     else if (strcmp(key, "CLIENT_STATS") == 0) {
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_STATS;
         else                 httpd->client &= ~HTTPD_CLIENT_STATS;
-    }
-    else if (strcmp(key, "CLIENT_STATS_MONTH_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_month_max = (UCHAR)i;
-        }
-    }
-    else if (strcmp(key, "CLIENT_STATS_DAY_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_day_max = (UCHAR)i;
-        }
-    }
-    else if (strcmp(key, "CLIENT_STATS_HOUR_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_hour_max = (UCHAR)i;
-        }
-    }
-    else if (strcmp(key, "CLIENT_STATS_MINUTE_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_min_max = (UCHAR)i;
-        }
-    }
-    else if (strcmp(key, "CLIENT_STATS_DATASET") == 0) {
-        if (*value) httpd->st_dataset = strdup(value);
     }
     else if (strcmp(key, "KEEPALIVE_TIMEOUT") == 0) {
         i = atoi(value);

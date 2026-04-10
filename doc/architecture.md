@@ -46,9 +46,9 @@ v          v              v               v                          |
 | +------------------+ +--------+                                  |
 |                                                                  |
 | +------------------+ +--------------+ +--------------------+     |
-| |  httpresp.c      | |  httpstat.c  | |  httpcred.c        |     |
-| |  Response Headers| |  Statistics  | |  httpauth.c        |     |
-| |  httpsend.c      | |  min/h/d/m   | |  Credentials/RACF  |     |
+| |  httpresp.c      | |  httprepo.c  | |  httpcred.c        |     |
+| |  Response Headers| |  SMF Type243 | |  httpauth.c        |     |
+| |  httpsend.c      | |  + Counters  | |  Credentials/RACF  |     |
 | +------------------+ +--------------+ +--------------------+     |
 +------------------------------------------------------------------+
         |                    |                      |
@@ -233,7 +233,7 @@ CSTATE_IN -----> CSTATE_PARSE -----> CSTATE_GET/HEAD/PUT/POST/DELETE
 | 4. Method | httpget.c etc. | `http_get()` etc. | Open file, determine MIME, serve response |
 | 5. Response | httpresp.c | `http_resp()` | Generate HTTP status line + headers |
 | 6. Send | httpsend.c | `http_send_*()` | Binary or text data with encoding conversion |
-| 7. Report | httprepo.c | `http_report()` | Log request, update statistics |
+| 7. Report | httprepo.c | `http_report()` | Write SMF record, update counters |
 | 8. Reset | httprese.c | `http_reset()` | Free env vars, clear buffer, prepare for next |
 
 ### Dispatch Logic (httppc.c)
@@ -382,22 +382,22 @@ Telemetry cache (HTTPTC array) stores latest values per topic.
 Lua-based configuration loaded from `PARM='CONFIG=dataset(member)'`.
 Global Lua tables: `httpd`, `ftpd`, `cgi`, `mqtc`.
 
-### Statistics (httpstat.c)
+### Statistics (httprepo.c)
 
-Per-minute/hour/day/month request statistics. Tracks response times
-(lowest, highest, average), tally counts, and response codes.
-Save/load to MVS dataset in binary format.
+SMF Type 243 records written per HTTP request via `smf_write()`.
+Simple in-memory counters (total_requests, total_errors,
+total_bytes_sent, active_connections) displayed via `/F HTTPD,D S`.
 
 ### Console Commands (httpcons.c, httpcmd.c)
 
 Operator interface via `/F HTTPD,command`:
 - `D V` — display version
 - `D T` — display threads
-- `D S [n]` — display statistics
+- `D S` — display statistics counters
 - `S MAXTASK n` — set max worker threads
 - `S MINTASK n` — set min worker threads
 - `S LOGIN [all|cgi|none]` — set login requirements
-- `S STATS ON|OFF` — control statistics collection
+- `S STATS ON|OFF [RESET]` — control SMF recording, reset counters
 
 ## Network I/O
 
@@ -515,6 +515,6 @@ Build targets:
 | Credentials | 20 | httpcred.c, httpauth.c, credentials/src/*.c (18 files) |
 | MQTT telemetry | 2 | httppubf.c, httpdmtt.c |
 | Debug | 7 | dbgdump.c, dbgenter.c, dbgexit.c, dbgf.c, dbgs.c, dbgtime.c, dbgw.c |
-| Statistics | 1 | httpstat.c |
+| Statistics/SMF | 1 | httprepo.c |
 | Utilities | 16 | hello.c, abend0c1.c, httptest.c, httpclos.c, http1123.c, httpd048.c, httpntoa.c, httpgsna.c, httpgtod.c, httpsecs.c, httprise.c, httpsbz.c, httprbz.c, httpsubt.c, httpcmp.c, httpcmpn.c |
 | String/compare | 4 | httpcmp.c, httpcmpn.c, stck2tv.c, httpdbug.c |

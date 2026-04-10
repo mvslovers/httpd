@@ -296,91 +296,13 @@ d_stats(char *buf)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-	char 		**rpt	= NULL;
-	unsigned	months	= 0;
-	unsigned	days 	= 0;
-	unsigned 	hours	= 0;
-	unsigned	mins	= 0;
-	char 		*next	= NULL;
-	unsigned	value   = strtoul(buf, &next, 10);
-	unsigned	count, n;
-	int			len;
 
-	if (!(httpd->client & HTTPD_CLIENT_STATS)) {
-		wtof("HTTPD411I Statistics recording is %s.", "OFF");
-		goto quit;
-	}
-	else {
-		if (!value || !buf[0]) {
-			wtof("HTTPD411I Statistics recording is %s.", "ON");
-			goto quit;
-		}
-	}
-	
-	// wtof("%s: enter", __func__);
-	// wtof("%s: next=%p value=%u", __func__, next, value);
-	
-	if (!value) goto quit;
-	if (!buf[0]) goto quit;
-	
-	if (next) {
-		while(isspace(*next) || ispunct(*next)) next++;
-		// wtof("%s: next=\"%s\"", __func__, next);
+	wtof("HTTPD411I SMF recording: %s",
+		(httpd->client & HTTPD_CLIENT_STATS) ? "ON" : "OFF");
+	wtof("HTTPD412I Requests: %u  Errors: %u  Bytes: %u  Active: %u",
+		httpd->total_requests, httpd->total_errors,
+		httpd->total_bytes_sent, httpd->active_connections);
 
-		len = strlen(next);
-		if (http_cmpn(next, "DAYS", len)==0) {
-			days = value;
-		}
-		else if (http_cmpn(next, "HOURS", len)==0) {
-			hours = value;
-		}
-		else if (http_cmpn(next, "MINUTES", len)==0) {
-			mins = value;
-		}
-		else if (http_cmpn(next, "MINS", len)==0) {
-			mins = value;
-		}
-		else if (http_cmpn(next, "MONTHS", len)==0) {
-			months = value;
-		}
-		else if (http_cmpn(next, "ALL", len)==0) {
-			months = (value / (30*24*60));
-			if (!months) months++;
-			days   = (value / (24*60));
-			if (!days) days++;
-			hours  = (value / 60);
-			if (!hours) hours++;
-			mins   = value;
-		}
-		else if (!next[0]) {
-			/* default to minutes */
-			mins = value;
-		}
-		else {
-			wtof("HTTPD411W Invalid parameter \"%s\", MINUTES assumed", next);
-			mins = value;
-		}
-	}
-	else {
-		/* default to minutes */
-		mins = value;
-	}
-
-	rpt = httpstat_report(httpd, months, days, hours, mins);
-	if (rpt) {
-		count = array_count(&rpt);
-		// wtof("%s: report count=%u", __func__, count);
-		for(n=0; n < count; n++) {
-			wtof("%s", rpt[n]);
-		}
-		httpstat_report_free(&rpt);
-	}
-	else {
-		wtof("HTTPD411E Statistics Report Failure");
-	}
-
-quit:
-	// wtof("%s: exit", __func__);
 	return 0;
 }
 
@@ -863,80 +785,41 @@ s_stats(char *in)
     int         rc      = 0;
     char 		*p		= NULL;
 	char		*next 	= NULL;
-	unsigned	clear 	= 0;
-	unsigned	save	= 0;
 
     /* obtain a exclusive lock on httpd */
     lock(httpd,LOCK_EXC);
 
 	if (!in) {
-		wtof("HTTPD048W Missing STATS ON|OFF [options]");
+		wtof("HTTPD048W Missing STATS ON|OFF [RESET]");
 		goto quit;
 	}
 
 	p = strtok(in, " ,");
 	if (!p) {
-		wtof("HTTPD048W Missing STATS ON|OFF [options]");
+		wtof("HTTPD048W Missing STATS ON|OFF [RESET]");
 		goto quit;
 	}
 
 	if (http_cmp(p, "ON")==0) {
 		httpd->client |= HTTPD_CLIENT_STATS;
-		wtof("HTTPD411I Statistics recording is %s.", "ON");
+		wtof("HTTPD411I SMF recording is %s", "ON");
 	}
 	else if (http_cmp(p, "OFF")==0) {
 		httpd->client &= ~HTTPD_CLIENT_STATS;
-		wtof("HTTPD411I Statistics recording is %s.", "OFF");
+		wtof("HTTPD411I SMF recording is %s", "OFF");
 	}
 	else {
 		wtof("HTTPD411E Invalid SET STATS value \"%s\"", p);
 		goto quit;
 	}
 
-	/* Check for any options */
-	for(next = strtok(NULL, " ,"); next; next = strtok(NULL, " ,")) {
-		int len = strlen(next);
-		if (!len) break;
-		if (http_cmpn(next, "CLEAR", len)==0) {
-			clear = 1;
-		}
-		else if (http_cmpn(next, "RESET", len)==0) {
-			clear = 1;
-		}
-		else if (http_cmpn(next, "FREE", len)==0) {
-			clear = 1;
-		}
-		else if (http_cmpn(next, "SAVE", len)==0) {
-			save = 1;
-		}
-		else if (next[0]) {
-			wtof("HTTPD411E Invalid SET STATS option \"%s\"", next);
-		}
-	}
-
-	if (save) {
-		if (httpd->st_dataset && httpd->st_dataset[0]) {
-			rc = httpstat_save(httpd, httpd->st_dataset);
-			if (rc) {
-				wtof("HTTPD411E Statistics save to %s failed with rc=%d", httpd->st_dataset, rc);
-			}
-			else {
-				wtof("HTTPD411I Statistics saved to %s", httpd->st_dataset);
-			}
-		}
-		else {
-			wtof("HTTPD411W Statistics NOT saved. Statistics dataset not configured.");
-		}
-	}
-
-	if (clear) {
-		if (rc==0) {
-			httpstat_clear(httpd);
-			wtof("HTTPD411I Statistics array cleared.");
-		}
-		else {
-			wtof("HTTPD411W Statistics array NOT cleared due to errors.");
-		}
+	// Check for RESET option
+	next = strtok(NULL, " ,");
+	if (next && http_cmpn(next, "RESET", strlen(next))==0) {
+		httpd->total_requests = 0;
+		httpd->total_errors = 0;
+		httpd->total_bytes_sent = 0;
+		wtof("HTTPD411I Statistics counters reset");
 	}
 
 

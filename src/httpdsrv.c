@@ -251,14 +251,7 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%d</td></tr>\n", 
         O(listen), httpd->listen);
 
-    if (httpd->stats) {
-        http_printf(httpc, 
-            "<tr><td>+%04X</td>"
-            "<td><a href=\"?target=FILE&m=%p\">httpd->stats</a></td>"
-            "<td>HTTP Statistics File Handle</td>"
-            "<td>%p</td></tr>\n", 
-            O(stats), httpd->stats, httpd->stats);
-    }
+    /* stats file handle removed in 4.0.0 — SMF recording */
 
     if (httpd->dbg) {
         http_printf(httpc, 
@@ -427,33 +420,7 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%u</td></tr>\n", 
         O(cfg_client_timeout), httpd->cfg_client_timeout);
     
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->cfg_st_month_max</td>"
-        "<td>Config Statistics Months</td>"
-        "<td>%u</td></tr>\n", 
-        O(cfg_st_month_max), httpd->cfg_st_month_max);
-    
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->cfg_st_day_max</td>"
-        "<td>Config Statistics Days</td>"
-        "<td>%u</td></tr>\n", 
-        O(cfg_st_day_max), httpd->cfg_st_day_max);
-    
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->cfg_st_hour_max</td>"
-        "<td>Config Statistics Hours</td>"
-        "<td>%u</td></tr>\n", 
-        O(cfg_st_hour_max), httpd->cfg_st_hour_max);
-    
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->cfg_st_min_max</td>"
-        "<td>Config Statistics Minutes</td>"
-        "<td>%u</td></tr>\n", 
-        O(cfg_st_min_max), httpd->cfg_st_min_max);
+    /* cfg_st_*_max removed in 4.0.0 — replaced by SMF + counters */
     
     http_printf(httpc, 
         "<tr><td>+%04X</td>"
@@ -462,40 +429,33 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%u</td></tr>\n", 
         O(cfg_cgictx), httpd->cfg_cgictx);
     
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->st_month</td>"
-        "<td>Statistics Month Array</td>"
-        "<td>%p</td></tr>\n", 
-        O(st_month), httpd->st_month);
-    
-    http_printf(httpc, 
+        "<td>httpd->total_requests</td>"
+        "<td>Total HTTP Requests</td>"
+        "<td>%u</td></tr>\n",
+        O(total_requests), httpd->total_requests);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->st_day</td>"
-        "<td>Statistics Day Array</td>"
-        "<td>%p</td></tr>\n", 
-        O(st_day), httpd->st_day);
-    
-    http_printf(httpc, 
+        "<td>httpd->total_errors</td>"
+        "<td>Total Error Responses</td>"
+        "<td>%u</td></tr>\n",
+        O(total_errors), httpd->total_errors);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->st_hour</td>"
-        "<td>Statistics Hour Array</td>"
-        "<td>%p</td></tr>\n", 
-        O(st_hour), httpd->st_hour);
-    
-    http_printf(httpc, 
+        "<td>httpd->total_bytes_sent</td>"
+        "<td>Total Bytes Sent</td>"
+        "<td>%u</td></tr>\n",
+        O(total_bytes_sent), httpd->total_bytes_sent);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->st_min</td>"
-        "<td>Statistics Minute Array</td>"
-        "<td>%p</td></tr>\n", 
-        O(st_min), httpd->st_min);
-    
-    http_printf(httpc, 
-        "<tr><td>+%04X</td>"
-        "<td>httpd->st_dataset</td>"
-        "<td>Statistics Dataset Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(st_dataset), httpd->st_dataset);
+        "<td>httpd->active_connections</td>"
+        "<td>Active Connections</td>"
+        "<td>%u</td></tr>\n",
+        O(active_connections), httpd->active_connections);
     
     http_printf(httpc, 
         "<tr><td>+%04X</td>"

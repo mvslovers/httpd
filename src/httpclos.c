@@ -23,6 +23,9 @@ httpclos(HTTPC *httpc)
     unlock(httpd,0);
 
     if (httpc) {
+        if (httpd->active_connections > 0)
+            httpd->active_connections--;
+
         /* make sure we closed the file */
         if (httpc->fp) http_done(httpc);
         if (httpc->ufp) ufs_fclose(&httpc->ufp);
