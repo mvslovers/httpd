@@ -123,6 +123,7 @@ httppars(HTTPC *httpc)
     }
 
     /* method not allowed — RFC 7231 §6.5.5 */
+    httpc->keepalive = 0; /* unread body would poison next request */
     http_resp(httpc, 405);
     http_printf(httpc, "Cache-Control: no-store\r\n");
     http_printf(httpc, "Content-Type: text/plain\r\n");
@@ -202,6 +203,12 @@ postother:
     if (http_set_env(httpc, "POST_STRING", buf)) goto failed;
 
 nodata:
+    /* if the request had a body we didn't read, disable keep-alive
+       to prevent body data from poisoning the next request */
+    if (http_get_env(httpc, "HTTP_CONTENT-LENGTH") ||
+        http_get_env(httpc, "HTTP_TRANSFER-ENCODING"))
+        httpc->keepalive = 0;
+
     /* no more expected data from client */
     memset(httpc->buf, 0, CBUFSIZE);
     httpc->len = 0;
