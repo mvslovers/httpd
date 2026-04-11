@@ -39,7 +39,7 @@ These decisions are final:
 
 These items need further discussion before implementation:
 
-- **Statistics subsystem** — Keep as-is, simplify to minimal counters, or remove? (httpstat.c, httprepo.c, 4-tier time-series arrays ~16 KB)
+- ~~**Statistics subsystem**~~ — **Done.** Replaced with SMF Type 243 records + simple counters (see #54).
 - **DSL CGI (httpdsl*.c)** — Clarify scope and naming (Dataset List, not SSI). Keep, refactor, or remove?
 - **Demo CGIs (hello.c, abend0c1.c, test.c)** — Remove from build or just disable by default?
 - **Lua CGI / REXX CGI** — Code stays, just not registered by default. lua370 remains a dependency.
@@ -137,7 +137,7 @@ httpget.c    → Static file serving with MIME detection
 httpresp.c   → HTTP response line + headers (currently HTTP/1.0)
 httpsend.c   → Binary/text data delivery
 httpdone.c   → Close files
-httprepo.c   → Log request, update statistics
+httprepo.c   → Write SMF record, update counters
 httprese.c   → Reset for next request or close (currently always closes)
 httpclos.c   → Release HTTPC, close socket
 ```
@@ -231,7 +231,7 @@ Missing `DD:HTTPDPRM` → server starts with defaults (port 8080, no CGIs).
 - **hello.c, abend0c1.c, test.c**: Demo/test CGIs
 
 **Subsystems:**
-- **httpstat.c / httprepo.c**: Statistics (977 LOC) — future TBD
+- **httprepo.c**: SMF Type 243 recording + simple counters (~90 LOC)
 - **Lua runtime**: lauxlib.c, liolib.c, loadlib.c, httpluax.c (3,297 LOC) — stays for Lua CGI
 - **FTP daemon**: ftp*.c (3,290 LOC) — confirmed for removal
 - **MQTT telemetry**: HTTPT struct, telemetry_thread — confirmed for removal

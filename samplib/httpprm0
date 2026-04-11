@@ -47,10 +47,12 @@
 # CGI=HTTPLUA /lua/*
 # CGI=HTTPREXX /rexx/*
 #
-# --- Statistics ---
-# CLIENT_STATS=1
-# CLIENT_STATS_MONTH_MAX=24
-# CLIENT_STATS_DAY_MAX=60
-# CLIENT_STATS_HOUR_MAX=48
-# CLIENT_STATS_MINUTE_MAX=120
-# CLIENT_STATS_DATASET=
+# --- SMF Recording ---
+# SMF=NONE|ERROR|AUTH|ALL [TYPE=nnn]
+#   NONE  - no SMF recording (default)
+#   ERROR - write SMF on HTTP errors (resp >= 400)
+#   AUTH  - write on auth events (401/403) and errors
+#   ALL   - every request (subtype 1) + session close (subtype 2)
+#   TYPE  - SMF record type (128-255, default 243)
+# SMF=NONE
+# SMF=ALL TYPE=200

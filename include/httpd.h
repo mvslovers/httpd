@@ -54,7 +54,8 @@ typedef struct httpm    HTTPM;      /* HTTP Mime                    */
 typedef struct httpx    HTTPX;      /* HTTP function vector         */
 typedef struct httpv    HTTPV;      /* HTTP Variables               */
 typedef struct httpcgi  HTTPCGI;    /* HTTP CGI path and programs   */
-typedef struct httpstat HTTPSTAT;	/* HTTP Statistics record		*/
+typedef struct smf_httpd_request SMF_HTTPD_REQ;     /* SMF request  */
+typedef struct smf_httpd_session SMF_HTTPD_SESS;    /* SMF session  */
 typedef enum   cstate   CSTATE;     /* HTTP Client state            */
 typedef enum   rdw      RDW;        /* RDW option                   */
 
@@ -78,7 +79,7 @@ struct httpd {
     unsigned    addr;               /* 10 our listener IP address   */
     int         port;               /* 14 our listener port         */
     int         listen;             /* 18 our listener socket       */
-    FILE        *stats;             /* 1C statistics file (log)     */
+    void        *unused_1c;         /* 1C (was: FILE *stats)        */
 
     FILE        *dbg;               /* 20 debug/trace output        */
     int         tzoffset;           /* 24 time zone offset in secs  */
@@ -117,20 +118,23 @@ struct httpd {
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
     UCHAR		cfg_mintask;		/* 65 config min task			*/
     UCHAR		cfg_client_timeout;	/* 66 client timeout seconds	*/
-    UCHAR		cfg_st_month_max;	/* 67 statistics month records	*/
-    UCHAR		cfg_st_day_max;		/* 68 statistics day records	*/
-    UCHAR		cfg_st_hour_max;	/* 69 statistics hour_records	*/
-    UCHAR		cfg_st_min_max;		/* 6A statistics min records	*/
+    UCHAR		smf_level;			/* 67 SMF recording level		*/
+#define SMF_LEVEL_NONE   0			/* ... no SMF recording			*/
+#define SMF_LEVEL_ERROR  1			/* ... only resp >= 400			*/
+#define SMF_LEVEL_AUTH   2			/* ... auth events + errors		*/
+#define SMF_LEVEL_ALL    3			/* ... every request + sessions	*/
+    UCHAR		smf_type;			/* 68 SMF record type (def 243)	*/
+    UCHAR		unused_69[2];		/* 69-6A available				*/
     UCHAR       cfg_cgictx;         /* 6B # CGI context pointers    */
     UCHAR       ufs_enabled;        /* 6C UFS filesystem enabled    */
     UCHAR       dbg_enabled;        /* 6D debug output enabled      */
     UCHAR       bind_tries;         /* 6E socket bind retry count   */
     UCHAR       bind_sleep;         /* 6F socket bind retry delay   */
-	HTTPSTAT	**st_month;			/* 70 statistics month array	*/
-    HTTPSTAT	**st_day;			/* 74 statistics day array 		*/
-    HTTPSTAT	**st_hour;			/* 78 statistics hour array		*/
-    HTTPSTAT	**st_min;			/* 7C statictics min array		*/
-    UCHAR 		*st_dataset;		/* 80 statistics load/save dsn	*/
+	unsigned	total_requests;		/* 70 total HTTP requests		*/
+    unsigned	total_errors;		/* 74 total error responses		*/
+    unsigned	total_bytes_sent;	/* 78 total bytes sent			*/
+    unsigned	active_connections;	/* 7C active client connections	*/
+    void        *unused_80;         /* 80 (was: st_dataset)         */
     UCHAR 		*cgilua_dataset;	/* 84 CGI Lua dataset			*/
     UCHAR		*cgilua_path;		/* 88 CGI Lua package.path		*/
     UCHAR 		*cgilua_cpath;		/* 8C CGI Lua package.cpath		*/
@@ -214,11 +218,12 @@ struct httpc {
 #define SSI_LEVEL_MAX	10			/* ... max SSI processing levele*/
 	UCHAR		content_length_set;	/* 52 Content-Length was sent	*/
 	UCHAR		keepalive;			/* 53 keep-alive active			*/
-	unsigned short request_count;	/* 54 requests on this conn		*/
-	unsigned short unused3;			/* 56 available					*/
+	unsigned	connect_time;		/* 54 SMF time at connect 1/100s*/
+	unsigned	total_bytes_sent;	/* 58 accum bytes all requests	*/
+	unsigned	request_count;		/* 5C requests on this conn		*/
 
-#define CBUFSIZE (0x1000-0x0058)    /* ... 4096-88 = 4008           */
-    UCHAR       buf[CBUFSIZE];      /* 50 data buffer               */
+#define CBUFSIZE (0x1000-0x0060)    /* ... 4096-96 = 4000           */
+    UCHAR       buf[CBUFSIZE];      /* 60 data buffer               */
                                     /* 1000                         */
 };                                  /* 1000 (4096 bytes)            */
 
@@ -240,21 +245,35 @@ struct httpcgi {
     char  		*pgm;               /* 10 external program name     */
 };									/* 14 (20 bytes)				*/
 
-struct httpstat {
-	UCHAR 		eye[8];				/* 00 eye catcher				*/
-#define HTTPSTAT_EYE "HTTPSTAT"		/* ...							*/
-	time64_t	first;				/* 08 first time stamp			*/
-	time64_t	last;				/* 10 last time stamp			*/
-	double		lowest;				/* 18 lowest value				*/
-	double		highest;			/* 20 highest value				*/
-	double		total;				/* 28 accumulated seconds		*/
-	unsigned	tally;				/* 30 number of adds 			*/
-	short 	 	key1;				/* 34 key number				*/
-	short		key2;				/* 36 key number				*/
-	short		resp;				/* 38 response code				*/
-	short 		unused;				/* 3A unused / available		*/
-	unsigned    unused2;			/* 3C unused / available		*/
-};									/* 40 (64 bytes)				*/
+/* SMF — HTTP records */
+#define SMF_TYPE_HTTPD_DEFAULT 243
+#define SMF_HTTPD_SUBTYPE_REQ  1	/* Request completed			*/
+#define SMF_HTTPD_SUBTYPE_SESS 2	/* Session closed				*/
+
+struct smf_httpd_request {
+    SMF_HEADER      hdr;            /* 00 Standard SMF Header (18B) */
+    char            subsys[8];      /* 12 Subsystem ID              */
+    short           subtype;        /* 1A 1 = Request completed     */
+    char            userid[8];      /* 1C RACF user (blank=none)    */
+    unsigned        client_addr;    /* 24 Client IPv4 address       */
+    unsigned        resp_code;      /* 28 HTTP status code          */
+    unsigned        bytes_sent;     /* 2C Response bytes            */
+    unsigned        duration_us;    /* 30 Request duration (us)     */
+    char            method[8];      /* 34 GET/POST/PUT/DELETE       */
+    char            uri[64];        /* 3C Request URI (truncated)   */
+};                                  /* 7C (124 bytes)               */
+
+struct smf_httpd_session {
+    SMF_HEADER      hdr;            /* 00 Standard SMF Header (18B) */
+    char            subsys[8];      /* 12 Subsystem ID              */
+    short           subtype;        /* 1A 2 = Session closed        */
+    char            userid[8];      /* 1C last RACF user            */
+    unsigned        client_addr;    /* 24 Client IPv4 address       */
+    unsigned        connect_time;   /* 28 Connect time (1/100s)     */
+    unsigned        duration_us;    /* 2C Total session duration us */
+    unsigned        request_count;  /* 30 Requests on connection    */
+    unsigned        total_bytes;    /* 34 Total bytes sent          */
+};                                  /* 38 (56 bytes)                */
 
 /* HTTP function execution vector */
 extern HTTPX    *httpx;             /* Global pointer to HTTPX      */
@@ -462,12 +481,8 @@ extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
 extern int http_debug(HTTPC *httpc, const char *options)				asm("HTTPDBUG");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
-extern int httpstat_add(HTTPD *httpd, HTTPC *httpc)						asm("HTTPSTAT");
-extern char **httpstat_report(HTTPD *httpd, unsigned months, unsigned days, unsigned hours, unsigned mins) asm("HTTPSTAR");
-extern void httpstat_report_free(char ***rpt)							asm("HTTPSTAF");
-extern void httpstat_clear(HTTPD *httpd)								asm("HTTPSTAC");
-extern int httpstat_save(HTTPD *httpd, const char *dataset)				asm("HTTPSTAS");
-extern int httpstat_load(HTTPD *httpd, const char *dataset)				asm("HTTPSTAL");
+extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");
+extern void httpsmf_session(HTTPD *httpd, HTTPC *httpc)				asm("HTTPSMFS");
 extern HTTPD *cgihttpd(void)											asm("CGIHTTPD");
 extern HTTPC *cgihttpc(void)											asm("CGIHTTPC");
 extern int http_getc(HTTPC *httpc)                                      asm("HTTPGETC");

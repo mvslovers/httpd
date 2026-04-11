@@ -23,6 +23,13 @@ httpclos(HTTPC *httpc)
     unlock(httpd,0);
 
     if (httpc) {
+        if (httpd->active_connections > 0)
+            httpd->active_connections--;
+
+        // Write SMF session record (subtype 2) on final disconnect
+        if (httpd->smf_level == SMF_LEVEL_ALL)
+            httpsmf_session(httpd, httpc);
+
         /* make sure we closed the file */
         if (httpc->fp) http_done(httpc);
         if (httpc->ufp) ufs_fclose(&httpc->ufp);

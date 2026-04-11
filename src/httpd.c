@@ -103,9 +103,14 @@ initialize(int argc, char **argv)
 		goto quit;
 	}
 
-	if ((httpd->client & HTTPD_CLIENT_STATS) && httpd->st_dataset) {
-		wtof("HTTPD415I Loading stats from %s", httpd->st_dataset);
-		httpstat_load(httpd, httpd->st_dataset);
+	if (httpd->smf_level > SMF_LEVEL_NONE) {
+		static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
+		if (smf_active())
+			wtof("HTTPD415I SMF Type %d level %s",
+				(int)httpd->smf_type, levels[httpd->smf_level]);
+		else
+			wtof("HTTPD415W SMF Type %d configured but SMF inactive",
+				(int)httpd->smf_type);
 	}
 
     /* create socket thread */
@@ -301,10 +306,9 @@ terminate(void)
         httpd->ufssys = NULL;
     }
 
-	if ((httpd->client & HTTPD_CLIENT_STATS) && httpd->st_dataset) {
-		wtof("HTTPD416I Saving stats to %s", httpd->st_dataset);
-		httpstat_save(httpd, httpd->st_dataset);
-	}
+	wtof("HTTPD416I Stats: %u requests, %u errors, %u bytes",
+		httpd->total_requests, httpd->total_errors,
+		httpd->total_bytes_sent);
 
     /* just in case we missed something */
     close_fd_set();
@@ -518,6 +522,17 @@ socket_thread(void *arg1, void *arg2)
             httpc->port   = a->sin_port;
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
+            httpd->active_connections++;
+
+            // SMF session tracking
+            {
+                time_t now = time(0);
+                struct tm *tm = localtime(&now);
+                httpc->connect_time = (unsigned)(
+                    tm->tm_hour * 360000L
+                    + tm->tm_min * 6000L
+                    + tm->tm_sec * 100L);
+            }
             /* UFS session created lazily by http_get_ufs() */
 
             mgr = httpd->mgr;

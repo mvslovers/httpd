@@ -62,11 +62,7 @@ http_config(HTTPD *httpd, const char *member)
         }
     }
 
-    /* try to open DD:HTTPSTAT */
-    httpd->stats = fopen("DD:HTTPSTAT", "w");
-    if (!httpd->stats) {
-        wtof("HTTPD026W Unable to open DD:HTTPSTAT, errno=%d", errno);
-    }
+    /* Stats counters initialized to zero by calloc */
 
     /* open debug file if DEBUG=1 */
     if (httpd->dbg_enabled && !httpd->dbg) {
@@ -103,10 +99,8 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_maxtask      = 9;
     httpd->cfg_mintask      = 3;
     httpd->cfg_client_timeout = 10;
-    httpd->cfg_st_month_max = 24;
-    httpd->cfg_st_day_max   = 60;
-    httpd->cfg_st_hour_max  = 48;
-    httpd->cfg_st_min_max   = 120;
+    httpd->smf_level        = SMF_LEVEL_NONE;
+    httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
     httpd->login            = 0;            /* NONE */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
@@ -118,7 +112,7 @@ set_defaults(HTTPD *httpd)
     httpd->cgilua_dataset   = NULL;
     httpd->cgilua_path      = NULL;
     httpd->cgilua_cpath     = NULL;
-    httpd->st_dataset       = NULL;
+    httpd->unused_80        = NULL;
     httpd->docroot[0]       = '\0';
     httpd->codepage[0]      = '\0';
     httpd->dbg_enabled      = 0;
@@ -330,36 +324,35 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_STATS;
         else                 httpd->client &= ~HTTPD_CLIENT_STATS;
     }
-    else if (strcmp(key, "CLIENT_STATS_MONTH_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_month_max = (UCHAR)i;
+    else if (strcmp(key, "SMF") == 0) {
+        // Parse level (first word of value)
+        int vlen = 0;
+        char *type_arg;
+        while (value[vlen] && value[vlen] != ' ') vlen++;
+        if (http_cmpn(value, "NONE", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_NONE;
         }
-    }
-    else if (strcmp(key, "CLIENT_STATS_DAY_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_day_max = (UCHAR)i;
+        else if (http_cmpn(value, "ERROR", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_ERROR;
         }
-    }
-    else if (strcmp(key, "CLIENT_STATS_HOUR_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_hour_max = (UCHAR)i;
+        else if (http_cmpn(value, "AUTH", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_AUTH;
         }
-    }
-    else if (strcmp(key, "CLIENT_STATS_MINUTE_MAX") == 0) {
-        i = atoi(value);
-        if (i > 0) {
-            if (i > 255) i = 255;
-            httpd->cfg_st_min_max = (UCHAR)i;
+        else if (http_cmpn(value, "ALL", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_ALL;
         }
-    }
-    else if (strcmp(key, "CLIENT_STATS_DATASET") == 0) {
-        if (*value) httpd->st_dataset = strdup(value);
+        else {
+            wtof("HTTPD028W Invalid SMF level \"%s\"", value);
+        }
+        // Check for TYPE=nnn option
+        type_arg = strstr(value, "TYPE=");
+        if (type_arg) {
+            int t = atoi(type_arg + 5);
+            if (t >= 128 && t <= 255)
+                httpd->smf_type = (UCHAR)t;
+            else
+                wtof("HTTPD028W Invalid SMF TYPE=%d (128-255)", t);
+        }
     }
     else if (strcmp(key, "KEEPALIVE_TIMEOUT") == 0) {
         i = atoi(value);

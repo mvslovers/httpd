@@ -127,11 +127,12 @@ struct httpc {
 #define SSI_LEVEL_MAX   10          /* ... max SSI processing level     */
     UCHAR       content_length_set; /* 52 Content-Length was sent        */
     UCHAR       keepalive;          /* 53 keep-alive active             */
-    unsigned short request_count;   /* 54 requests on this connection   */
-    unsigned short unused3;         /* 56 available                     */
+    unsigned    connect_time;       /* 54 SMF time at connect (1/100s)  */
+    unsigned    total_bytes_sent;   /* 58 accum bytes all requests      */
+    unsigned    request_count;      /* 5C requests on this connection   */
 
-#define CBUFSIZE (0x1000-0x0058)    /* ... 4096-88 = 4008               */
-    UCHAR       buf[CBUFSIZE];      /* 58 data buffer                   */
+#define CBUFSIZE (0x1000-0x0060)    /* ... 4096-96 = 4000               */
+    UCHAR       buf[CBUFSIZE];      /* 60 data buffer                   */
 };                                  /* 1000 (4096 bytes)                */
 
 /* HTTP mime type */
