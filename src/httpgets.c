@@ -27,6 +27,8 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
         memset(buf, 0, max);
     }
 
+    int saw_cr = 0;
+
     for(i=0; i < max; ) {
         /* get one character from client socket */
         c = http_getc(httpc);
@@ -51,7 +53,7 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
                         if (httpd->client & HTTPD_CLIENT_INDUMP) {
                             wtodumpf(httpc->buf, i, "Receive Buffer");
                         }
-        
+
                         http_dbgf(fmt, httpc, httpc->socket, seconds);
                     }
                     httpc->state = CSTATE_CLOSE;
@@ -62,21 +64,30 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
             goto quit;
         }
 
-        /* check for ASCII CR and discard */
-        if (c==0x0D) continue;
-
-        /* check for ASCII LF */
-        if (c != 0x0A) {
-            /* not ASCII LF, translate ASCII to EBCDIC and save character */
-            buf[i++] = (UCHAR)asc2ebc[c];
+        /* check for ASCII CR */
+        if (c == 0x0D) {
+            saw_cr = 1;
             continue;
         }
 
-        /* ASCII LF */
-        buf[i++] = '\n';    /* EBCDIC newline   */
-        buf[i]   = 0;       /* end of string    */
-        rc       = i;       /* length of string */
-        break;
+        /* check for ASCII LF */
+        if (c == 0x0A) {
+            /* LF terminates line (CRLF or bare LF both accepted) */
+            buf[i++] = '\n';    /* EBCDIC newline   */
+            buf[i]   = 0;       /* end of string    */
+            rc       = i;       /* length of string */
+            break;
+        }
+
+        /* data character after CR without LF = bare CR (RFC 7230 §3.5) */
+        if (saw_cr) {
+            errno = EINVAL;
+            rc = -1;
+            goto quit;
+        }
+
+        /* translate ASCII to EBCDIC and save character */
+        buf[i++] = (UCHAR)asc2ebc[c];
     }
     
 quit:

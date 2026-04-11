@@ -11,12 +11,24 @@ int http_in(HTTPC *httpc)
     UCHAR       *buf    = httpc->buf;
     unsigned    len     = CBUFSIZE-1;
     UCHAR       *p;
+    int         host_count = 0;
 
     // wtof("%s: Enter", __func__);
     
     /* read the request string "method uri version" */
     rc = http_gets(httpc, buf, len);
-    if (rc < 0) goto failed;
+    if (rc < 0) {
+        if (errno == EINVAL) goto badrequest;
+        goto failed;
+    }
+    if (rc == 0) {
+        /* request line exceeds buffer — URI too long */
+        http_resp(httpc, 414);
+        http_printf(httpc, "Content-Type: text/plain\r\n\r\n");
+        http_printf(httpc, "414 URI Too Long\r\n");
+        httpc->state = CSTATE_DONE;
+        goto quit;
+    }
 
     /* "GET path/to/resource HTTP/1.0\n" */
 
@@ -39,14 +51,27 @@ int http_in(HTTPC *httpc)
     if (http_set_env(httpc, "REQUEST_URI", p)) goto failed;
 
     p = strtok(NULL, " ");
-    if (!p) goto failed;
+    if (!p) goto badrequest; /* missing HTTP version */
     if (http_set_env(httpc, "REQUEST_VERSION", p)) goto failed;
+
+    /* validate HTTP version — RFC 7230 §2.6 */
+    if (http_cmp(p, "HTTP/1.0") != 0 && http_cmp(p, "HTTP/1.1") != 0) {
+        http_resp(httpc, 505);
+        http_printf(httpc, "Content-Type: text/plain\r\n\r\n");
+        http_printf(httpc, "505 HTTP Version Not Supported\r\n");
+        httpc->state = CSTATE_DONE;
+        goto quit;
+    }
 
     /* create "HTTP_..." environment variables from HTTP headers */
     do {
         /* get HTTP header string */
         rc = http_gets(httpc, buf, len);
-        if (rc < 0) goto failed;
+        if (rc < 0) {
+            if (errno == EINVAL) goto badrequest;
+            goto failed;
+        }
+        if (rc == 0) goto badrequest; /* header line too long */
 
         /* check for end of HTTP headers */
         if (buf[0]=='\n') break;
@@ -55,21 +80,63 @@ int http_in(HTTPC *httpc)
         p = strrchr(buf, '\n');
         if (p) *p = 0;
 
-        // wtof("%s: \"%s\"", __func__, buf);
-
         /* find keyword delimiter */
         p = strchr(buf, ':');
         if (!p) continue;
 
         /* replace delimiter with 0 byte */
         *p++ = 0;
-        
+
+        /* validate header name — RFC 7230 §3.2.6 token chars only
+           allowlist approach avoids EBCDIC code page mismatches */
+        {
+            UCHAR *s;
+            for (s = buf; *s; s++) {
+                if (isalnum(*s)) continue;
+                if (*s == '!' || *s == '#' || *s == '$' || *s == '%' ||
+                    *s == '&' || *s == '\'' || *s == '*' || *s == '+' ||
+                    *s == '-' || *s == '.' || *s == '^' || *s == '_' ||
+                    *s == '`' || *s == '|' || *s == '~')
+                    continue;
+                goto badrequest;
+            }
+        }
+
         /* skip any spaces */
         while(*p==' ') p++;
+
+        /* validate header value — no control chars (RFC 7230 §3.2.6) */
+        {
+            UCHAR *s;
+            for (s = p; *s; s++) {
+                if (*s < ' ' && *s != '\t')
+                    goto badrequest;
+            }
+        }
+
+        /* track Host header for duplicate detection */
+        if (http_cmp(buf, "Host") == 0)
+            host_count++;
 
         /* create "HTTP_..." environment variable */
         if (http_set_http_env(httpc, buf, p)) goto failed;
     } while(rc > 0);
+
+    /* reject multiple Host headers — RFC 7230 §5.4 */
+    if (host_count > 1) goto badrequest;
+
+    /* validate Content-Length — RFC 7230 §3.3.2 (digits only) */
+    {
+        UCHAR *cl = http_get_env(httpc, "HTTP_CONTENT-LENGTH");
+        if (cl) {
+            UCHAR *s;
+            if (!*cl) goto badrequest;
+            for (s = cl; *s; s++) {
+                if (*s < '0' || *s > '9')
+                    goto badrequest;
+            }
+        }
+    }
 
     /* HTTP/1.1 requires a Host header */
     {
@@ -104,6 +171,13 @@ int http_in(HTTPC *httpc)
     /* next step will parse and do any additional processing */
     rc = 0;
     httpc->state = CSTATE_PARSE;
+    goto quit;
+
+badrequest:
+    http_resp(httpc, 400);
+    http_printf(httpc, "Content-Type: text/plain\r\n\r\n");
+    http_printf(httpc, "400 Bad Request\r\n");
+    httpc->state = CSTATE_DONE;
     goto quit;
 
 failed:

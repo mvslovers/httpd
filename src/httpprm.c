@@ -113,7 +113,7 @@ set_defaults(HTTPD *httpd)
     httpd->cgilua_path      = NULL;
     httpd->cgilua_cpath     = NULL;
     httpd->unused_80        = NULL;
-    httpd->docroot[0]       = '\0';
+    strcpy(httpd->docroot, "/www");
     httpd->codepage[0]      = '\0';
     httpd->dbg_enabled      = 0;
     httpd->cfg_keepalive_timeout = 5;
