@@ -523,6 +523,16 @@ socket_thread(void *arg1, void *arg2)
             httpc->state  = CSTATE_IN;
             httpsecs(&httpc->start);
             httpd->active_connections++;
+
+            // SMF session tracking
+            {
+                time_t now = time(0);
+                struct tm *tm = localtime(&now);
+                httpc->connect_time = (unsigned)(
+                    tm->tm_hour * 360000L
+                    + tm->tm_min * 6000L
+                    + tm->tm_sec * 100L);
+            }
             /* UFS session created lazily by http_get_ufs() */
 
             mgr = httpd->mgr;

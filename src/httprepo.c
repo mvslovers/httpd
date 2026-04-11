@@ -21,6 +21,9 @@ httprepo(HTTPC *httpc)
         httpd->total_errors++;
     httpd->total_bytes_sent += httpc->sent;
 
+    // Per-connection accumulators for session record
+    httpc->total_bytes_sent += httpc->sent;
+
     // SMF level check
     if (httpd->smf_level == SMF_LEVEL_NONE)
         goto done;
@@ -81,10 +84,10 @@ httpsmf_write_request(HTTPD *httpd, HTTPC *httpc)
     rec.resp_code   = httpc->resp;
     rec.bytes_sent  = httpc->sent;
 
-    // Duration in milliseconds
+    // Duration in microseconds
     elapsed = httpc->end - httpc->start;
     if (elapsed < 0.0) elapsed = 0.0;
-    rec.duration_ms = (unsigned)(elapsed * 1000.0);
+    rec.duration_us = (unsigned)(elapsed * 1000000.0);
 
     // Method
     p = http_get_env(httpc, "REQUEST_METHOD");
@@ -134,13 +137,14 @@ httpsmf_session(HTTPD *httpd, HTTPC *httpc)
     }
 
     rec.client_addr   = httpc->addr;
+    rec.connect_time  = httpc->connect_time;
     rec.request_count = httpc->request_count;
-    rec.total_bytes   = httpc->sent;
+    rec.total_bytes   = httpc->total_bytes_sent;
 
-    // Session duration in milliseconds
+    // Session duration in microseconds
     elapsed = httpc->end - httpc->start;
     if (elapsed < 0.0) elapsed = 0.0;
-    rec.duration_ms = (unsigned)(elapsed * 1000.0);
+    rec.duration_us = (unsigned)(elapsed * 1000000.0);
 
     smf_write(&rec);
 }

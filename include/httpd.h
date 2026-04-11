@@ -218,11 +218,12 @@ struct httpc {
 #define SSI_LEVEL_MAX	10			/* ... max SSI processing levele*/
 	UCHAR		content_length_set;	/* 52 Content-Length was sent	*/
 	UCHAR		keepalive;			/* 53 keep-alive active			*/
-	unsigned short request_count;	/* 54 requests on this conn		*/
-	unsigned short unused3;			/* 56 available					*/
+	unsigned	connect_time;		/* 54 SMF time at connect 1/100s*/
+	unsigned	total_bytes_sent;	/* 58 accum bytes all requests	*/
+	unsigned	request_count;		/* 5C requests on this conn		*/
 
-#define CBUFSIZE (0x1000-0x0058)    /* ... 4096-88 = 4008           */
-    UCHAR       buf[CBUFSIZE];      /* 50 data buffer               */
+#define CBUFSIZE (0x1000-0x0060)    /* ... 4096-96 = 4000           */
+    UCHAR       buf[CBUFSIZE];      /* 60 data buffer               */
                                     /* 1000                         */
 };                                  /* 1000 (4096 bytes)            */
 
@@ -255,10 +256,9 @@ struct smf_httpd_request {
     short           subtype;        /* 1A 1 = Request completed     */
     char            userid[8];      /* 1C RACF user (blank=none)    */
     unsigned        client_addr;    /* 24 Client IPv4 address       */
-    short           resp_code;      /* 28 HTTP status code          */
-    short           unused;         /* 2A alignment                 */
+    unsigned        resp_code;      /* 28 HTTP status code          */
     unsigned        bytes_sent;     /* 2C Response bytes            */
-    unsigned        duration_ms;    /* 30 Request duration (ms)     */
+    unsigned        duration_us;    /* 30 Request duration (us)     */
     char            method[8];      /* 34 GET/POST/PUT/DELETE       */
     char            uri[64];        /* 3C Request URI (truncated)   */
 };                                  /* 7C (124 bytes)               */
@@ -270,7 +270,7 @@ struct smf_httpd_session {
     char            userid[8];      /* 1C last RACF user            */
     unsigned        client_addr;    /* 24 Client IPv4 address       */
     unsigned        connect_time;   /* 28 Connect time (1/100s)     */
-    unsigned        duration_ms;    /* 2C Total session duration ms */
+    unsigned        duration_us;    /* 2C Total session duration us */
     unsigned        request_count;  /* 30 Requests on connection    */
     unsigned        total_bytes;    /* 34 Total bytes sent          */
 };                                  /* 38 (56 bytes)                */
