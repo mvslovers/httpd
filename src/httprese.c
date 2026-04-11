@@ -33,6 +33,7 @@ httprese(HTTPC *httpc)
     httpc->substate = 0;
     httpc->chunked = 0;
     httpc->content_length_set = 0;
+    httpc->rdw = 0;
     memset(httpc->buf, 0, CBUFSIZE);
 
     /* clear ACEE on UFS session between requests */
