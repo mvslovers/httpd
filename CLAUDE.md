@@ -35,16 +35,13 @@ These decisions are final:
 - **Remove MQTT telemetry** — HTTPT struct, telemetry_thread, mqtt370 dependency
 - **CGIs disabled by default** — No CGIs are registered unless explicitly configured in Parmlib. All existing CGI modules remain in the codebase but are only active when configured.
 
-## HTTPD 4.0.0 — Open Questions (2nd Planning Round)
+## HTTPD 4.0.0 — Open Items
 
-These items need further discussion before implementation:
-
-- ~~**Statistics subsystem**~~ — **Done.** Replaced with SMF Type 243 records + simple counters (see #54).
-- **DSL CGI (httpdsl*.c)** — Clarify scope and naming (Dataset List, not SSI). Keep, refactor, or remove?
-- **Demo CGIs (hello.c, abend0c1.c, test.c)** — Remove from build or just disable by default?
-- **Lua CGI / REXX CGI** — Code stays, just not registered by default. lua370 remains a dependency.
-- **Device Manager CGIs (httpdm.c, httpdmtt.c)** — Keep or remove?
-- **HTTPD server display (httpdsrv.c)** — Keep as built-in or externalize as optional CGI?
+1. **TSK-112 CGI Chunked Bug** (M, High) — CGI responses with chunked transfer encoding
+2. **TSK-110 Fehlende Status-Codes** (XS, High) — Missing HTTP status codes
+3. **TSK-108 HTTP Parsing härten** (L, High) — Harden HTTP request parsing
+4. **TSK-104 HTTPLUA auslagern** (L, Medium) — Extract HTTPLUA into separate module
+5. **TSK-10 Doku + Version Bump** (M, Medium) — Documentation and version bump to 4.0.0
 
 ## Dependencies (from project.toml)
 
