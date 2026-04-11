@@ -103,11 +103,14 @@ initialize(int argc, char **argv)
 		goto quit;
 	}
 
-	if (httpd->client & HTTPD_CLIENT_STATS) {
+	if (httpd->smf_level > SMF_LEVEL_NONE) {
+		static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
 		if (smf_active())
-			wtof("HTTPD415I SMF Type %d recording active", SMF_TYPE_HTTPD);
+			wtof("HTTPD415I SMF Type %d level %s",
+				(int)httpd->smf_type, levels[httpd->smf_level]);
 		else
-			wtof("HTTPD415W SMF recording is inactive");
+			wtof("HTTPD415W SMF Type %d configured but SMF inactive",
+				(int)httpd->smf_type);
 	}
 
     /* create socket thread */
@@ -303,11 +306,9 @@ terminate(void)
         httpd->ufssys = NULL;
     }
 
-	if (httpd->client & HTTPD_CLIENT_STATS) {
-		wtof("HTTPD416I Stats: %u requests, %u errors, %u bytes",
-			httpd->total_requests, httpd->total_errors,
-			httpd->total_bytes_sent);
-	}
+	wtof("HTTPD416I Stats: %u requests, %u errors, %u bytes",
+		httpd->total_requests, httpd->total_errors,
+		httpd->total_bytes_sent);
 
     /* just in case we missed something */
     close_fd_set();

@@ -54,7 +54,8 @@ typedef struct httpm    HTTPM;      /* HTTP Mime                    */
 typedef struct httpx    HTTPX;      /* HTTP function vector         */
 typedef struct httpv    HTTPV;      /* HTTP Variables               */
 typedef struct httpcgi  HTTPCGI;    /* HTTP CGI path and programs   */
-typedef struct smf_httpd_request SMF_HTTPD_REQ; /* SMF Type 243  */
+typedef struct smf_httpd_request SMF_HTTPD_REQ;     /* SMF request  */
+typedef struct smf_httpd_session SMF_HTTPD_SESS;    /* SMF session  */
 typedef enum   cstate   CSTATE;     /* HTTP Client state            */
 typedef enum   rdw      RDW;        /* RDW option                   */
 
@@ -117,7 +118,13 @@ struct httpd {
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
     UCHAR		cfg_mintask;		/* 65 config min task			*/
     UCHAR		cfg_client_timeout;	/* 66 client timeout seconds	*/
-    UCHAR		unused_67[4];		/* 67-6A (was: stats config)	*/
+    UCHAR		smf_level;			/* 67 SMF recording level		*/
+#define SMF_LEVEL_NONE   0			/* ... no SMF recording			*/
+#define SMF_LEVEL_ERROR  1			/* ... only resp >= 400			*/
+#define SMF_LEVEL_AUTH   2			/* ... auth events + errors		*/
+#define SMF_LEVEL_ALL    3			/* ... every request + sessions	*/
+    UCHAR		smf_type;			/* 68 SMF record type (def 243)	*/
+    UCHAR		unused_69[2];		/* 69-6A available				*/
     UCHAR       cfg_cgictx;         /* 6B # CGI context pointers    */
     UCHAR       ufs_enabled;        /* 6C UFS filesystem enabled    */
     UCHAR       dbg_enabled;        /* 6D debug output enabled      */
@@ -237,13 +244,14 @@ struct httpcgi {
     char  		*pgm;               /* 10 external program name     */
 };									/* 14 (20 bytes)				*/
 
-/* SMF Type 243 — HTTP request record */
-#define SMF_TYPE_HTTPD     243
-#define SMF_HTTPD_SUBTYPE_REQ  1
+/* SMF — HTTP records */
+#define SMF_TYPE_HTTPD_DEFAULT 243
+#define SMF_HTTPD_SUBTYPE_REQ  1	/* Request completed			*/
+#define SMF_HTTPD_SUBTYPE_SESS 2	/* Session closed				*/
 
 struct smf_httpd_request {
     SMF_HEADER      hdr;            /* 00 Standard SMF Header (18B) */
-    char            subsys[8];      /* 12 Subsystem ID (e.g. "HTTPD   ") */
+    char            subsys[8];      /* 12 Subsystem ID              */
     short           subtype;        /* 1A 1 = Request completed     */
     char            userid[8];      /* 1C RACF user (blank=none)    */
     unsigned        client_addr;    /* 24 Client IPv4 address       */
@@ -254,6 +262,18 @@ struct smf_httpd_request {
     char            method[8];      /* 34 GET/POST/PUT/DELETE       */
     char            uri[64];        /* 3C Request URI (truncated)   */
 };                                  /* 7C (124 bytes)               */
+
+struct smf_httpd_session {
+    SMF_HEADER      hdr;            /* 00 Standard SMF Header (18B) */
+    char            subsys[8];      /* 12 Subsystem ID              */
+    short           subtype;        /* 1A 2 = Session closed        */
+    char            userid[8];      /* 1C last RACF user            */
+    unsigned        client_addr;    /* 24 Client IPv4 address       */
+    unsigned        connect_time;   /* 28 Connect time (1/100s)     */
+    unsigned        duration_ms;    /* 2C Total session duration ms */
+    unsigned        request_count;  /* 30 Requests on connection    */
+    unsigned        total_bytes;    /* 34 Total bytes sent          */
+};                                  /* 38 (56 bytes)                */
 
 /* HTTP function execution vector */
 extern HTTPX    *httpx;             /* Global pointer to HTTPX      */
@@ -462,6 +482,7 @@ extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
 extern int http_debug(HTTPC *httpc, const char *options)				asm("HTTPDBUG");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
 extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");
+extern void httpsmf_session(HTTPD *httpd, HTTPC *httpc)				asm("HTTPSMFS");
 extern HTTPD *cgihttpd(void)											asm("CGIHTTPD");
 extern HTTPC *cgihttpc(void)											asm("CGIHTTPC");
 extern int http_getc(HTTPC *httpc)                                      asm("HTTPGETC");

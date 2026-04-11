@@ -296,9 +296,10 @@ d_stats(char *buf)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
+	static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
 
-	wtof("HTTPD411I SMF recording: %s",
-		(httpd->client & HTTPD_CLIENT_STATS) ? "ON" : "OFF");
+	wtof("HTTPD411I SMF: %s (Type %d)",
+		levels[httpd->smf_level], (int)httpd->smf_type);
 	wtof("HTTPD412I Requests: %u  Errors: %u  Bytes: %u  Active: %u",
 		httpd->total_requests, httpd->total_errors,
 		httpd->total_bytes_sent, httpd->active_connections);
@@ -785,33 +786,46 @@ s_stats(char *in)
     int         rc      = 0;
     char 		*p		= NULL;
 	char		*next 	= NULL;
+	static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
 
     /* obtain a exclusive lock on httpd */
     lock(httpd,LOCK_EXC);
 
 	if (!in) {
-		wtof("HTTPD048W Missing STATS ON|OFF [RESET]");
+		wtof("HTTPD048W Missing STATS NONE|ERROR|AUTH|ALL [RESET]");
 		goto quit;
 	}
 
 	p = strtok(in, " ,");
 	if (!p) {
-		wtof("HTTPD048W Missing STATS ON|OFF [RESET]");
+		wtof("HTTPD048W Missing STATS NONE|ERROR|AUTH|ALL [RESET]");
 		goto quit;
 	}
 
-	if (http_cmp(p, "ON")==0) {
-		httpd->client |= HTTPD_CLIENT_STATS;
-		wtof("HTTPD411I SMF recording is %s", "ON");
+	if (http_cmp(p, "NONE")==0) {
+		httpd->smf_level = SMF_LEVEL_NONE;
 	}
-	else if (http_cmp(p, "OFF")==0) {
-		httpd->client &= ~HTTPD_CLIENT_STATS;
-		wtof("HTTPD411I SMF recording is %s", "OFF");
+	else if (http_cmp(p, "ERROR")==0) {
+		httpd->smf_level = SMF_LEVEL_ERROR;
+	}
+	else if (http_cmp(p, "AUTH")==0) {
+		httpd->smf_level = SMF_LEVEL_AUTH;
+	}
+	else if (http_cmp(p, "ALL")==0) {
+		httpd->smf_level = SMF_LEVEL_ALL;
+	}
+	else if (http_cmp(p, "RESET")==0) {
+		httpd->total_requests = 0;
+		httpd->total_errors = 0;
+		httpd->total_bytes_sent = 0;
+		wtof("HTTPD411I Statistics counters reset");
+		goto quit;
 	}
 	else {
 		wtof("HTTPD411E Invalid SET STATS value \"%s\"", p);
 		goto quit;
 	}
+	wtof("HTTPD411I SMF level set to %s", levels[httpd->smf_level]);
 
 	// Check for RESET option
 	next = strtok(NULL, " ,");
@@ -821,7 +835,6 @@ s_stats(char *in)
 		httpd->total_bytes_sent = 0;
 		wtof("HTTPD411I Statistics counters reset");
 	}
-
 
 quit:
     unlock(httpd,LOCK_EXC);

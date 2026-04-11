@@ -99,7 +99,8 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_maxtask      = 9;
     httpd->cfg_mintask      = 3;
     httpd->cfg_client_timeout = 10;
-    memset(httpd->unused_67, 0, sizeof(httpd->unused_67));
+    httpd->smf_level        = SMF_LEVEL_NONE;
+    httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
     httpd->login            = 0;            /* NONE */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
@@ -322,6 +323,36 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     else if (strcmp(key, "CLIENT_STATS") == 0) {
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_STATS;
         else                 httpd->client &= ~HTTPD_CLIENT_STATS;
+    }
+    else if (strcmp(key, "SMF") == 0) {
+        // Parse level (first word of value)
+        int vlen = 0;
+        char *type_arg;
+        while (value[vlen] && value[vlen] != ' ') vlen++;
+        if (http_cmpn(value, "NONE", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_NONE;
+        }
+        else if (http_cmpn(value, "ERROR", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_ERROR;
+        }
+        else if (http_cmpn(value, "AUTH", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_AUTH;
+        }
+        else if (http_cmpn(value, "ALL", vlen) == 0) {
+            httpd->smf_level = SMF_LEVEL_ALL;
+        }
+        else {
+            wtof("HTTPD028W Invalid SMF level \"%s\"", value);
+        }
+        // Check for TYPE=nnn option
+        type_arg = strstr(value, "TYPE=");
+        if (type_arg) {
+            int t = atoi(type_arg + 5);
+            if (t >= 128 && t <= 255)
+                httpd->smf_type = (UCHAR)t;
+            else
+                wtof("HTTPD028W Invalid SMF TYPE=%d (128-255)", t);
+        }
     }
     else if (strcmp(key, "KEEPALIVE_TIMEOUT") == 0) {
         i = atoi(value);
