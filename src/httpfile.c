@@ -283,11 +283,13 @@ ssi_process(HTTPC *httpc, char *ssi)
 	while (isspace(*p)) p++;	/* skip any white space */
 	if (!*p) goto invalid;
 
-	p = strtok(p, " ");			/* isolate the ssi request */
-	if (!p) goto invalid;
-	
-	next = strtok(NULL,"");		/* remember whatever follows the request */
-	if (!next) goto invalid;
+	/* isolate the ssi request (split at first space) */
+	next = p;
+	while (*next && *next != ' ') next++;
+	if (!*next) goto invalid;
+	*next++ = 0;
+	while (isspace(*next)) next++;
+	if (!*next) goto invalid;
 
 	if (http_cmp(p, "echo")==0) {
 		/* next *should* point to whatever follows "<!--#echo " */
@@ -381,8 +383,12 @@ ssi_echo(HTTPC *httpc, char *next)
 
 	while(isspace(*p)) p++;
 	
-	var = strtok(p, "\"\'");
-	if (!var) goto quit;
+	/* extract quoted value — skip opening quote */
+	if (*p == '"' || *p == '\'') p++;
+	var = p;
+	while (*p && *p != '"' && *p != '\'') p++;
+	*p = 0;
+	if (!*var) goto quit;
 	
 	while(isspace(*var)) var++;
 
@@ -505,8 +511,12 @@ ssi_include(HTTPC *httpc, char *next)
 
 	while(isspace(*p)) p++;
 	
-	path = strtok(p, "\"\'");
-	if (!path) goto bad;
+	/* extract quoted path — skip opening quote */
+	if (*p == '"' || *p == '\'') p++;
+	path = p;
+	while (*p && *p != '"' && *p != '\'') p++;
+	*p = 0;
+	if (!*path) goto bad;
 	
 	while(isspace(*path)) path++;
 

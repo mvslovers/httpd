@@ -6,9 +6,14 @@
 extern HTTPV *
 httpnenv(const UCHAR *name, const UCHAR *value)
 {
-    int         namelen = strlen(name);
-    int         vallen  = value ? strlen(value) : 0;
-    HTTPV       *v      = calloc(1, sizeof(HTTPV)+namelen+vallen);
+    size_t      namelen = strlen(name);
+    size_t      vallen  = value ? strlen(value) : 0;
+    size_t      total   = sizeof(HTTPV) + namelen + vallen + 2;
+    HTTPV       *v;
+
+    if (namelen + vallen > 8192) return NULL; /* sanity limit */
+
+    v = calloc(1, total);
 
     if (v) {
         strcpy(v->eye, HTTPV_EYE);

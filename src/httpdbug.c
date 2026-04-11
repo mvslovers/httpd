@@ -20,25 +20,28 @@ http_debug(HTTPC *httpc, const char *options)
 	
 	http_printf(httpc, "<!--\n");
 
-	for(opt = strtok(opts, ","), next = strtok(NULL,""); opt; 
-		opt = next ? strtok(next, ",") : NULL, next = strtok(NULL,"")) {
+	for (opt = opts; opt && *opt; ) {
+		/* skip leading commas */
+		while (*opt == ',') opt++;
+		if (!*opt) break;
+
+		/* find end of this option */
+		char *end = strchr(opt, ',');
+		if (end) *end++ = 0;
 
 		len = strlen(opt);
 
 		if (http_cmpn(opt, "cgi", len)==0) {
 			dump_cgi(httpd, httpc);
-			continue;
 		}
-	
-		if (http_cmpn(opt, "help", len)==0 || http_cmp(opt, "?")==0) {
+		else if (http_cmpn(opt, "help", len)==0 || http_cmp(opt, "?")==0) {
 			dump_help(httpd, httpc);
-			continue;
 		}
-		if (http_cmpn(opt, "vars", len)==0) {
+		else if (http_cmpn(opt, "vars", len)==0) {
 			dump_vars(httpd, httpc);
-			continue;
 		}
 
+		opt = end;
 	}
 
 	http_printf(httpc, "-->\n");

@@ -89,7 +89,7 @@ httppars(HTTPC *httpc)
 
     if (http_set_env(httpc, "SERVER_PROTOCOL", "HTTP/1.1")) goto failed;
     
-    sprintf(tmp, "HTTPD/%s", httpc->httpd->version);
+    snprintf(tmp, sizeof(tmp), "HTTPD/%s", httpc->httpd->version);
     if (http_set_env(httpc, "SERVER_SOFTWARE", tmp)) goto failed;
 
     /* select next state based on request method */

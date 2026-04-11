@@ -342,6 +342,12 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
         memset(excp, 0, sizeof(fd_set));
     }
 
+    /* NOTE: httpd->httpc[] is read here without lock.
+     * This is safe because build_fd_set() runs in the same
+     * socket_thread as array_add(). array_del() in httpclos
+     * runs in worker threads but sets entries to NULL before
+     * removal, and we check for NULL below.
+     */
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];
         if (!httpc) continue;           /* no client handle? */
@@ -550,7 +556,9 @@ socket_thread(void *arg1, void *arg2)
             }
             else {
                 /* add new client to array of clients */
+                lock(httpd, 0);
                 array_add(&httpd->httpc, httpc);
+                unlock(httpd, 0);
             }
         } /* if (FD_ISSET(httpd->listen, &read)) */
 
