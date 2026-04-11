@@ -45,8 +45,7 @@
 #include "cred.h"					/* Credentials					*/
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 
-#define HTTPLUAX (httpd->luax) 		/* use this pointer				*/
-#include "httpluax.h"				/* Lua function vector struct	*/
+/* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
 
 typedef struct httpd    HTTPD;      /* HTTP Daemon (server)         */
 typedef struct httpc    HTTPC;      /* HTTP Client                  */
@@ -112,7 +111,7 @@ struct httpd {
 	time64_t 	uptime;				/* 48 Server startup time		*/
     void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
-    LUAX		*luax;				/* 58 Lua function vector		*/
+    void        *unused_58;         /* 58 (was: LUAX *luax)         */
     const char  *version;			/* 5C HTTPD Version				*/
     void        *unused_60;         /* 60 (was: lua_State *config)  */
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
@@ -135,9 +134,9 @@ struct httpd {
     unsigned	total_bytes_sent;	/* 78 total bytes sent			*/
     unsigned	active_connections;	/* 7C active client connections	*/
     void        *unused_80;         /* 80 (was: st_dataset)         */
-    UCHAR 		*cgilua_dataset;	/* 84 CGI Lua dataset			*/
-    UCHAR		*cgilua_path;		/* 88 CGI Lua package.path		*/
-    UCHAR 		*cgilua_cpath;		/* 8C CGI Lua package.cpath		*/
+    void        *unused_84;         /* 84 (was: cgilua_dataset)     */
+    void        *unused_88;         /* 88 (was: cgilua_path)        */
+    void        *unused_8C;         /* 8C (was: cgilua_cpath)       */
     UFS			*ufs;				/* 90 Unix "like" File System   */
     void        *unused_94;         /* 94 (was: HTTPT *httpt)       */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */

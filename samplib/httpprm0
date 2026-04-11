@@ -42,10 +42,8 @@
 # CGI=HTTPDSRV /.dsrv
 # CGI=HTTPDM /.dm
 # CGI=HTTPDMTT /.dmtt
-# CGI=HTTPDSL /dsl/*
-# CGI=HTTPJES2 /jes/*
-# CGI=HTTPLUA /lua/*
-# CGI=HTTPREXX /rexx/*
+# CGI=HTTPDSL /dsl/*        (deprecated — use mvsMF dataset API)
+# CGI=HTTPJES2 /jes/*       (deprecated — use mvsMF jobs API)
 #
 # --- SMF Recording ---
 # SMF=NONE|ERROR|AUTH|ALL [TYPE=nnn]

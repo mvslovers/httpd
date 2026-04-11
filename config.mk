@@ -18,14 +18,13 @@ CFLAGS   := -fverbose-asm -S -O1
 HTTPD_VERSION ?= 4.0.0-dev
 
 # Defines and include paths
-DEFS     := -DLUA_USE_C89 -DLUA_USE_JUMPTABLE=0 -DHTTPD_VERSION=\"$(HTTPD_VERSION)\"
+DEFS     := -DHTTPD_VERSION=\"$(HTTPD_VERSION)\"
 INC_DIR  := $(ROOT_DIR)include
 INC1     := $(ROOT_DIR)credentials/include
 INC2     := $(ROOT_DIR)contrib/crent370_sdk/inc
 INC3     := $(ROOT_DIR)contrib/ufs370_sdk/inc
-INC4     := $(ROOT_DIR)contrib/lua370_sdk/inc
-INC5     := $(ROOT_DIR)contrib/mqtt370_sdk/inc
-INCS     := -I$(INC_DIR) -I$(INC1) -I$(INC2) -I$(INC3) -I$(INC4) -I$(INC5)
+INC4     := $(ROOT_DIR)contrib/mqtt370_sdk/inc
+INCS     := -I$(INC_DIR) -I$(INC1) -I$(INC2) -I$(INC3) -I$(INC4)
 
 CFLAGS   += $(DEFS) $(INCS)
 

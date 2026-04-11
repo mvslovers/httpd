@@ -86,9 +86,6 @@ initialize(int argc, char **argv)
     /* set the server up time */
     httpd->uptime = time64(NULL);
 
-	/* httpd -> httpluax */
-    httpd->luax		= &httpluax;
-    
     /* Server version */
     httpd->version	= VERSION;
 
