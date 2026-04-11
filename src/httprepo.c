@@ -141,10 +141,19 @@ httpsmf_session(HTTPD *httpd, HTTPC *httpc)
     rec.request_count = httpc->request_count;
     rec.total_bytes   = httpc->total_bytes_sent;
 
-    // Session duration in microseconds
-    elapsed = httpc->end - httpc->start;
-    if (elapsed < 0.0) elapsed = 0.0;
-    rec.duration_us = (unsigned)(elapsed * 1000000.0);
+    // Session duration from connect_time to now (1/100s → microseconds)
+    {
+        time_t now = time(0);
+        struct tm *tm = localtime(&now);
+        unsigned close_time = (unsigned)(
+            tm->tm_hour * 360000L
+            + tm->tm_min * 6000L
+            + tm->tm_sec * 100L);
+        if (close_time >= httpc->connect_time)
+            rec.duration_us = (close_time - httpc->connect_time) * 10000;
+        else
+            rec.duration_us = 0;
+    }
 
     smf_write(&rec);
 }
