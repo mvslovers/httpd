@@ -44,6 +44,7 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 	}
 	
 	free(buf);
+	return 0;
 }
 
 static int
