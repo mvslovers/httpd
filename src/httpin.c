@@ -51,7 +51,7 @@ int http_in(HTTPC *httpc)
     if (http_set_env(httpc, "REQUEST_URI", p)) goto failed;
 
     p = strtok(NULL, " ");
-    if (!p) goto failed;
+    if (!p) goto badrequest; /* missing HTTP version */
     if (http_set_env(httpc, "REQUEST_VERSION", p)) goto failed;
 
     /* validate HTTP version — RFC 7230 §2.6 */
@@ -87,16 +87,18 @@ int http_in(HTTPC *httpc)
         /* replace delimiter with 0 byte */
         *p++ = 0;
 
-        /* validate header name — RFC 7230 §3.2.6 token chars only */
+        /* validate header name — RFC 7230 §3.2.6 token chars only
+           allowlist approach avoids EBCDIC code page mismatches */
         {
             UCHAR *s;
             for (s = buf; *s; s++) {
-                if (*s <= ' ' || *s == '(' || *s == ')' || *s == '<' ||
-                    *s == '>' || *s == '@' || *s == ',' || *s == ';' ||
-                    *s == '\\' || *s == '"' || *s == '/' || *s == '[' ||
-                    *s == ']' || *s == '?' || *s == '=' || *s == '{' ||
-                    *s == '}')
-                    goto badrequest;
+                if (isalnum(*s)) continue;
+                if (*s == '!' || *s == '#' || *s == '$' || *s == '%' ||
+                    *s == '&' || *s == '\'' || *s == '*' || *s == '+' ||
+                    *s == '-' || *s == '.' || *s == '^' || *s == '_' ||
+                    *s == '`' || *s == '|' || *s == '~')
+                    continue;
+                goto badrequest;
             }
         }
 
