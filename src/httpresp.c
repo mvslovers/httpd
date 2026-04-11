@@ -33,7 +33,11 @@ httpresp(HTTPC *httpc, int resp)
     case 401: p = "401 Unauthorized";           break;
     case 403: p = "403 Forbidden";              break;
     case 404: p = "404 Not Found";              break;
+    case 405: p = "405 Method Not Allowed";     break;
+    case 409: p = "409 Conflict";               break;
+    case 414: p = "414 URI Too Long";           break;
     case 500: p = "500 Internal Server Error";  break;
+    case 507: p = "507 Insufficient Storage";   break;
     case 501: p = "501 Not Implemented";        break;
     case 502: p = "502 Bad Gateway";            break;
     case 503: p = "503 Service Unavailable";    break;
