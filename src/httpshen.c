@@ -32,7 +32,16 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 		return ENOMEM;
 	}
 	
-	for(name=strtok(buf, "; "); name; name=strtok(NULL, "; ")) {
+	for (name = buf; name && *name; ) {
+		/* skip leading delimiters */
+		while (*name == ';' || *name == ' ') name++;
+		if (!*name) break;
+
+		/* find end of this token */
+		UCHAR *end = name;
+		while (*end && *end != ';' && *end != ' ') end++;
+		if (*end) *end++ = 0;
+
 		value = strchr(name, '=');
 		if (value) {
 			*value++ = 0;
@@ -41,6 +50,7 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 			value = "";
 		}
 		set_cookie(httpc, name, value);
+		name = end;
 	}
 	
 	free(buf);

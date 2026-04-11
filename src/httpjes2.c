@@ -492,11 +492,14 @@ do_print(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid)
         buf = calloc(1, strlen(p)+1);
         if (buf) {
             strcpy(buf, p);
-            for(p=strtok(buf, " ,"); p; p = strtok(NULL, " ,")) {
+            for (p = buf; p && *p; ) {
+                while (*p == ' ' || *p == ',') p++;
+                if (!*p) break;
                 n = (unsigned) atoi(p);
                 if (n) {
                     array_add(&dsid, (void*)n);
                 }
+                while (*p && *p != ' ' && *p != ',') p++;
             }
         }
     }
@@ -770,8 +773,13 @@ do_cancel_ex(HTTPD *httpd, HTTPC *httpc, const char *verb, int purge, int all)
     buf = calloc(1, strlen(jobid)+1);
     if (buf) {
         strcpy(buf, jobid);
-        for(p=strtok(buf, ","); p; p = strtok(NULL, ",")) {
+        for (p = buf; p && *p; ) {
+            while (*p == ',') p++;
+            if (!*p) break;
+            UCHAR *end = strchr(p, ',');
+            if (end) *end++ = 0;
             array_add(&jobids, p);
+            p = end;
         }
     }
 
