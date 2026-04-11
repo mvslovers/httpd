@@ -122,8 +122,12 @@ httppars(HTTPC *httpc)
         goto postdata;
     }
 
-    /* not implemented */
-    rc = http_resp_not_implemented(httpc);
+    /* method not allowed — RFC 7231 §6.5.5 */
+    http_resp(httpc, 405);
+    http_printf(httpc, "Cache-Control: no-store\r\n");
+    http_printf(httpc, "Content-Type: text/plain\r\n");
+    http_printf(httpc, "\r\n");
+    http_printf(httpc, "405 Method Not Allowed\n");
     httpc->state = CSTATE_DONE;
     goto quit;
 
