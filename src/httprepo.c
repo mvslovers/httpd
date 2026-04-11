@@ -53,7 +53,7 @@ httpsmf_write(HTTPD *httpd, HTTPC *httpc)
     memset(&rec, 0, sizeof(rec));
     smf_init(&rec, sizeof(rec), SMF_TYPE_HTTPD);
 
-    memcpy(rec.ssi, "HTTP", 4);
+    memcpy(rec.subsys, "HTTPD   ", 8);
     rec.subtype = SMF_HTTPD_SUBTYPE_REQ;
 
     // Userid from credential

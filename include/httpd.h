@@ -243,17 +243,17 @@ struct httpcgi {
 
 struct smf_httpd_request {
     SMF_HEADER      hdr;            /* 00 Standard SMF Header (18B) */
-    char            ssi[4];         /* 12 Subsystem ID "HTTP"       */
-    short           subtype;        /* 16 1 = Request completed     */
-    char            userid[8];      /* 18 RACF user (blank=none)    */
-    unsigned        client_addr;    /* 20 Client IPv4 address       */
-    short           resp_code;      /* 24 HTTP status code          */
-    short           unused;         /* 26 alignment                 */
-    unsigned        bytes_sent;     /* 28 Response bytes            */
-    unsigned        duration_ms;    /* 2C Request duration (ms)     */
-    char            method[8];      /* 30 GET/POST/PUT/DELETE       */
-    char            uri[64];        /* 38 Request URI (truncated)   */
-};                                  /* 78 (120 bytes)               */
+    char            subsys[8];      /* 12 Subsystem ID (e.g. "HTTPD   ") */
+    short           subtype;        /* 1A 1 = Request completed     */
+    char            userid[8];      /* 1C RACF user (blank=none)    */
+    unsigned        client_addr;    /* 24 Client IPv4 address       */
+    short           resp_code;      /* 28 HTTP status code          */
+    short           unused;         /* 2A alignment                 */
+    unsigned        bytes_sent;     /* 2C Response bytes            */
+    unsigned        duration_ms;    /* 30 Request duration (ms)     */
+    char            method[8];      /* 34 GET/POST/PUT/DELETE       */
+    char            uri[64];        /* 3C Request URI (truncated)   */
+};                                  /* 7C (124 bytes)               */
 
 /* HTTP function execution vector */
 extern HTTPX    *httpx;             /* Global pointer to HTTPX      */
