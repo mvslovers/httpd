@@ -6,8 +6,6 @@ type = "application"
 [build]
 cflags = [
 	"-O1",
-	"-DLUA_USE_C89",
-	"-DLUA_USE_JUMPTABLE=0",
 	"-I./include",
 	"-I./credentials/include",
 ]
@@ -50,7 +48,6 @@ space = ["TRK", 150, 50, 30]
 [dependencies]
 "mvslovers/crent370" = ">=1.0.9"
 "mvslovers/ufsd" = "=1.0.0-dev"
-"mvslovers/lua370" = ">=1.0.2"
 
 # --- Load Modules ------------------------------------------------
 
@@ -63,35 +60,7 @@ include = ["@@CRT1", "HTTPSTRT", "HTTPD", "HTTPPRM"]
 setcode = "AC(1)"
 
 [link.module.dep_includes]
-"mvslovers/lua370" = "*"
 "mvslovers/ufsd" = "*"
-
-# Lua extension module (custom entry point, no CRT)
-[[link.module]]
-name = "HTTPLUAX"
-entry = "HTTPLUAX"
-options = ["SIZE=(4000K,40K)", "LIST", "MAP", "XREF", "RENT"]
-include = ["HTTPLUAX"]
-
-[link.module.dep_includes]
-"mvslovers/lua370" = "*"
-
-# Lua CGI handler
-[[link.module]]
-name = "HTTPLUA"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "HTTPLUA"]
-
-[link.module.dep_includes]
-"mvslovers/ufsd" = "*"
-
-# BREXX say helper (@@CRTM instead of @@CRT1)
-[[link.module]]
-name = "HTTPSAY"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRTM", "HTTPSAY"]
 
 # JES2 CGI handler
 [[link.module]]
@@ -99,13 +68,6 @@ name = "HTTPJES2"
 entry = "@@CRT0"
 options = ["LIST", "MAP", "XREF", "RENT"]
 include = ["@@CRT1", "CGISTART", "HTTPJES2"]
-
-# REXX CGI handler
-[[link.module]]
-name = "HTTPREXX"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPREXX"]
 
 # SSI handler modules
 [[link.module]]
@@ -137,5 +99,5 @@ version_files = ["VERSION"]
 
 [artifacts]
 headers = true
-header_files = ["httpcgi.h", "httpxlat.h", "dbg.h", "errors.h"]
+header_files = ["httpcgi.h", "httpxlat.h", "dbg.h", "errors.h", "types.h"]
 loads = true

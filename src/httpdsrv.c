@@ -378,14 +378,14 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%p</td></tr>\n", 
         O(ufssys), httpd->ufssys);
     
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td><a href=\"/.dm?t=LUAX&m=%p&l=%u\">httpd->luax</a></td>"
-        "<td>Lua Function Vector</td>"
-        "<td>%p</td></tr>\n", 
-        O(luax), httpd->luax, sizeof(LUAX), httpd->luax);
+        "<td>httpd->unused_58</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_58), httpd->unused_58);
 
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->version</td>"
         "<td>Version String</td>"
@@ -457,28 +457,28 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%u</td></tr>\n",
         O(active_connections), httpd->active_connections);
     
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->cgilua_dataset</td>"
-        "<td>CGI Lua Dataset Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(cgilua_dataset), httpd->cgilua_dataset);
-    
-    http_printf(httpc, 
+        "<td>httpd->unused_84</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_84), httpd->unused_84);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->cgilua_path</td>"
-        "<td>CGI Lua Path Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(cgilua_path), httpd->cgilua_path);
-    
-    http_printf(httpc, 
+        "<td>httpd->unused_88</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_88), httpd->unused_88);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->cgilua_cpath</td>"
-        "<td>CGI Lua CPath Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(cgilua_cpath), httpd->cgilua_cpath);
-    
-    http_printf(httpc, 
+        "<td>httpd->unused_8C</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_8C), httpd->unused_8C);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->ufs</td>"
         "<td>Unix \"like\" File System Handle</td>"

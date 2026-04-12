@@ -109,9 +109,6 @@ set_defaults(HTTPD *httpd)
     httpd->bind_tries       = 10;
     httpd->bind_sleep       = 10;
     httpd->listen_queue     = 5;
-    httpd->cgilua_dataset   = NULL;
-    httpd->cgilua_path      = NULL;
-    httpd->cgilua_cpath     = NULL;
     httpd->unused_80        = NULL;
     strcpy(httpd->docroot, "/www");
     httpd->codepage[0]      = '\0';
@@ -302,15 +299,6 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         }
 
         free(tmp);
-    }
-    else if (strcmp(key, "CGILUA_DATASET") == 0) {
-        httpd->cgilua_dataset = strdup(value);
-    }
-    else if (strcmp(key, "CGILUA_PATH") == 0) {
-        httpd->cgilua_path = strdup(value);
-    }
-    else if (strcmp(key, "CGILUA_CPATH") == 0) {
-        httpd->cgilua_cpath = strdup(value);
     }
     else if (strcmp(key, "CLIENT_TIMEOUT_MSG") == 0) {
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_INMSG;

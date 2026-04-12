@@ -33,15 +33,15 @@ These decisions are final:
 - **UFSD-only docroot** — Remove DD-based file serving (`/DD:HTML(...)` paths), static files only from UFS
 - **Remove embedded FTPD** — FTP functionality available separately
 - **Remove MQTT telemetry** — HTTPT struct, telemetry_thread, mqtt370 dependency
-- **CGIs disabled by default** — No CGIs are registered unless explicitly configured in Parmlib. All existing CGI modules remain in the codebase but are only active when configured.
+- **Extract HTTPLUA/HTTPREXX** — Lua and REXX CGI handlers moved to separate projects (mvslovers/httplua, mvslovers/httprexx), lua370 dependency removed
+- **CGIs disabled by default** — No CGIs are registered unless explicitly configured in Parmlib.
 
 ## HTTPD 4.0.0 — Open Items
 
 1. **TSK-112 CGI Chunked Bug** (M, High) — CGI responses with chunked transfer encoding
 2. **TSK-110 Fehlende Status-Codes** (XS, High) — Missing HTTP status codes
 3. **TSK-108 HTTP Parsing härten** (L, High) — Harden HTTP request parsing
-4. **TSK-104 HTTPLUA auslagern** (L, Medium) — Extract HTTPLUA into separate module
-5. **TSK-10 Doku + Version Bump** (M, Medium) — Documentation and version bump to 4.0.0
+4. **TSK-10 Doku + Version Bump** (M, Medium) — Documentation and version bump to 4.0.0
 
 ## Dependencies (from project.toml)
 
@@ -49,7 +49,6 @@ These decisions are final:
 [dependencies]
 "mvslovers/crent370" = ">=1.0.6"
 "mvslovers/ufs370" = ">=1.0.0"
-"mvslovers/lua370" = "..."       # stays while Lua CGI code remains in codebase
 ```
 
 **Note:** mqtt370 dependency will be removed (MQTT telemetry confirmed for removal).
@@ -222,14 +221,14 @@ Missing `DD:HTTPDPRM` → server starts with defaults (port 8080, no CGIs).
 - **httpdsrv.c**: Server status display (2,675 LOC)
 - **httpjes2.c**: JES2 spool browser (975 LOC)
 - **httpdsl.c + helpers**: Dataset list/download (1,540 LOC total)
-- **httplua.c**: Lua CGI handler (1,115 LOC)
-- **httprexx.c**: REXX CGI handler (587 LOC)
+- **httplua.c**: Extracted → mvslovers/httplua
+- **httprexx.c**: Extracted → mvslovers/httprexx
 - **httpdm.c / httpdmtt.c**: Device manager display (440 LOC)
 - **hello.c, abend0c1.c, test.c**: Demo/test CGIs
 
 **Subsystems:**
 - **httprepo.c**: SMF Type 243 recording + simple counters (~90 LOC)
-- **Lua runtime**: lauxlib.c, liolib.c, loadlib.c, httpluax.c (3,297 LOC) — stays for Lua CGI
+- **Lua runtime**: Extracted → mvslovers/httplua
 - **FTP daemon**: ftp*.c (3,290 LOC) — confirmed for removal
 - **MQTT telemetry**: HTTPT struct, telemetry_thread — confirmed for removal
 
