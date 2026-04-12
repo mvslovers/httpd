@@ -79,6 +79,15 @@ httppc(HTTPC *httpc)
 					goto check_done;
 				}
 
+                /* extension-based CGI (pattern starts with "*."):
+                   set SCRIPT_FILENAME = docroot + request path */
+                if (cgi->path[0] == '*' && cgi->path[1] == '.') {
+                    char scriptfile[384];
+                    snprintf(scriptfile, sizeof(scriptfile), "%s%s",
+                             httpd->docroot, path);
+                    http_set_env(httpc, "SCRIPT_FILENAME", scriptfile);
+                }
+
                 /* path needs to be processed by external program */
                 rc = http_process_cgi(httpc, cgi);
                 goto check_done;
