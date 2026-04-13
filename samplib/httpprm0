@@ -31,22 +31,20 @@
 # DOCROOT=/www
 #
 # --- Debug ---
-# DEBUG=1
+# DEBUG=0
 #
-# --- CGI Modules ---
-# Format: CGI=PROGRAM /url/pattern   (URL prefix match)
-#         CGI=PROGRAM *.ext          (extension match — uses DOCROOT)
-# No CGIs are registered by default.
-# Uncomment the lines below to enable them.
+# --- Modules ---
+# Format: MOD=PROGRAM /url/pattern   (URL prefix match)
+#         MOD=PROGRAM *.ext          (explicit extension — uses DOCROOT)
+#         MOD=PROGRAM                (extension derived from module name,
+#                                     e.g. MOD=LUA → *.lua, MOD=REXX → *.rexx)
 #
-# CGI=MVSMF /zosmf/*
-# CGI=HTTPLUA *.lua
-# CGI=HTTPREXX *.rexx
-# CGI=HTTPDSRV /.dsrv
-# CGI=HTTPDM /.dm
-# CGI=HTTPDMTT /.dmtt
-# CGI=HTTPDSL /dsl/*        (deprecated — use mvsMF dataset API)
-# CGI=HTTPJES2 /jes/*       (deprecated — use mvsMF jobs API)
+MOD=MVSMF /zosmf/*
+# MOD=HTTPDSRV /.dsrv
+# MOD=HTTPDM /.dm
+# MOD=HTTPDMTT /.dmtt
+# MOD=HTTPDSL /dsl/*        (deprecated — use mvsMF dataset API)
+# MOD=HTTPJES2 /jes/*       (deprecated — use mvsMF jobs API)
 #
 # --- SMF Recording ---
 # SMF=NONE|ERROR|AUTH|ALL [TYPE=nnn]
