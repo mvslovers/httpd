@@ -1,123 +1,141 @@
-
 # HTTPD
 
-**HTTPD** is a multi-threaded HTTP/FTP server for IBM MVS 3.8j, originally created by Michael Dean Rayborn. It runs on Hercules-emulated MVS systems and provides static file serving, Lua CGI, BREXX CGI, JES2 job management, Server-Side Includes, MQTT telemetry, and a full FTP daemon.
+**HTTPD** is a multi-threaded HTTP/1.1 server for IBM MVS 3.8j, running on Hercules-emulated mainframe systems.
 
-This project is maintained as part of the [mvslovers](https://github.com/mvslovers) community.
+Originally created by Michael Dean Rayborn (versions 1.x–3.3.x), the project has been taken over and substantially reworked by Mike Großmann starting with version 4.0.0. The original author is no longer involved in development or support. A maintenance branch (`v3.3.x`) preserves the legacy codebase for reference; all active development happens on `main`.
 
-## Features
+Version 4.0.0 is a major release with two primary goals:
 
-- **HTTP Server** — Multi-threaded with configurable worker pool (3-9 threads)
-- **FTP Daemon** — Full FTP server on a separate port (default 8021)
-- **Lua CGI** — Run Lua scripts via `/lua/scriptname`
-- **BREXX CGI** — Run REXX scripts via `/rexx/scriptname`
-- **JES2 Integration** — Job status and output management via web interface
-- **Server-Side Includes** — Dynamic HTML processing
-- **MQTT Telemetry** — Optional server metrics publishing
-- **Credentials/RACF** — Authentication and session management with token support
-- **Lua Configuration** — All server settings via Lua scripts (`PARM='CONFIG=dataset(member)'`)
+- **HTTP/1.1 compliance** — persistent connections (Keep-Alive), chunked transfer encoding, strict request parsing (h1spec 33/33 tests passing)
+- **Leaner footprint** — removal of the embedded FTP daemon, MQTT telemetry, Lua scripting engine, demo CGIs, and the 4-tier in-memory statistics system
 
-## Architecture
+## What's New in 4.0.0
 
-The server uses a socket thread for accepting connections and a pool of worker threads for request processing. Each HTTP request flows through a state machine:
+**Added:**
 
-`CSTATE_IN` → `CSTATE_PARSE` → `CSTATE_GET/POST/...` → `CSTATE_DONE` → `CSTATE_REPORT` → `CSTATE_RESET`
+- Full HTTP/1.1 support with Keep-Alive and Chunked Transfer Encoding
+- Parmlib-based configuration (replaces Lua scripting)
+- SMF recording with configurable levels (NONE / ERROR / AUTH / ALL)
+- Extension-based CGI routing (`CGI=HTTPLUA *.lua` alongside URL prefix routing)
+- Automatic chunked fallback for CGI modules that don't set Content-Length
+- Hardened HTTP request parsing — invalid headers, methods, URIs rejected per RFC 7230
 
-All internal processing uses EBCDIC; ASCII conversion happens at network I/O boundaries.
+**Changed:**
 
-## Building
+- Static file serving is now UFS-only, provided by [UFSD](https://github.com/mvslovers/ufsd)
+- The old in-memory statistics system has been replaced by SMF Type 243 records
+
+**Removed:**
+
+- Embedded FTP daemon — replaced by the standalone [FTPD](https://github.com/mvslovers/ftpd) project
+- MQTT telemetry
+- Lua configuration engine (replaced by Parmlib)
+- Demo CGI modules (hello, abend0c1, test)
+- DD-based document root (UFS-only now)
+
+**Outlook:**
+
+- JES2 browser and dataset browser will be re-implemented as part of [mvsMF](https://github.com/mvslovers/mvsmf) in a future release
+- Lua and REXX CGI support is being reworked and may return in a later version
+
+## Installation
+
+> **Note:** Installation instructions will be finalized once the packaging system is complete. The following is a preliminary guide.
 
 ### Prerequisites
 
-- [c2asm370](https://github.com/mvslovers/c2asm370) — GCC 3.2.3 cross-compiler (C to S/370 assembly)
-- A running MVS 3.8j system with the [mvsMF](https://github.com/mvslovers/mvsmf) REST API (for remote assembly and link)
-- NCAL libraries on MVS: CRENT370, UFS370, LUA370, MQTT370
+- Hercules-emulated MVS 3.8j system (TK4- or TK5)
+- [UFSD](https://github.com/mvslovers/ufsd) — UFS filesystem daemon (required for static file serving)
+- [crent370](https://github.com/mvslovers/crent370) — C runtime library
 
-### Clone
+### JCL Procedure
 
-```bash
-git clone --recursive https://github.com/mvslovers/httpd.git
-cd httpd
-```
-
-### Configure
-
-Copy `.env.example` to `.env` and fill in your MVS connection and dataset settings:
-
-```bash
-cp .env.example .env
-vi .env
-```
-
-### Build
-
-```bash
-make                          # Compile all C sources, assemble on MVS
-make clean                    # Remove generated .s and .o files
-```
-
-`make` compiles all source files (including the `credentials/` subsystem),
-transfers the assembly to MVS via the mvsMF API, and produces NCAL modules
-in the configured HTTPD.NCALIB dataset.
-
-### Link
-
-```bash
-make link                     # Link all 13 load modules on MVS
-make link MODULES=HTTPJES2    # Link a single module
-make link MODULES="HTTPD HTTPLUA"  # Link specific modules
-```
-
-`make link` invokes `scripts/mvslink` which submits link-edit JCL for each
-load module. Each module has its own SYSLIB/NCALIB DD layout matching the
-required dependencies (see `scripts/mvslink` for details).
-
-The 13 load modules are: ABEND0C1, HELLO, HTTPD, HTTPDM, HTTPDMTT,
-HTTPDSL, HTTPDSRV, HTTPJES2, HTTPLUA, HTTPLUAX, HTTPREXX, HTTPSAY, HTTPTEST.
-
-### Build Pipeline
+Copy the STC procedure from `samplib/httpd` to `SYS2.PROCLIB(HTTPD)`:
 
 ```
-C source (.c)
-  --> c2asm370 (cross-compile to S/370 assembly)
-  --> mvsasm (assemble + NCAL link on MVS via mvsMF API)
-  --> mvslink (link load modules on MVS via mvsMF API)
+//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440
+//STEPLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
+//HTTPPRM  DD  DSN=SYS2.PARMLIB(HTTPPRM0),DISP=SHR,FREE=CLOSE
 ```
 
-### IDE Support
+### Parmlib
 
-```bash
-make compiledb                # Generate compile_commands.json for clangd
+Copy `samplib/httpprm0` to `SYS2.PARMLIB(HTTPPRM0)` and adjust as needed. A minimal configuration:
+
 ```
+PORT=8080
+DOCROOT=/www
+CGI=MVSMF /zosmf/*
+```
+
+### Starting and Stopping
+
+```
+/S HTTPD                         Start with default config
+/S HTTPD,M=HTTPPRM1              Start with alternate config member
+/F HTTPD,DISPLAY CONFIG          Show current configuration
+/F HTTPD,DISPLAY STATS           Show request counters
+/F HTTPD,HELP                    List available commands
+/P HTTPD                         Stop the server
+```
+
+For upgrading from HTTPD 3.x, see [docs/migration.md](docs/migration.md).
 
 ## Configuration
 
-The server is configured via Lua scripts specified on the EXEC card:
+The server is configured through a Parmlib member referenced by the `HTTPPRM` DD card. Key settings:
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `PORT` | 8080 | Listening port |
+| `DOCROOT` | `/www` | UFS document root |
+| `MINTASK` | 3 | Minimum worker threads |
+| `MAXTASK` | 9 | Maximum worker threads |
+| `KEEPALIVE_TIMEOUT` | 5 | Keep-alive idle timeout (seconds) |
+| `KEEPALIVE_MAX` | 100 | Max requests per connection |
+| `LOGIN` | NONE | Authentication mode (NONE / RACF) |
+| `SMF` | NONE | SMF recording level |
+| `CGI` | — | CGI module registration |
+
+For the complete reference, see [docs/configuration.md](docs/configuration.md).
+
+## CGI Modules
+
+HTTPD supports external CGI modules loaded at startup. In version 4.0.0, the primary CGI module is [mvsMF](https://github.com/mvslovers/mvsmf), which provides a z/OSMF-compatible REST API for datasets, jobs, and USS files.
 
 ```
-PARM='CONFIG=your.lua.config.dataset'
+CGI=MVSMF /zosmf/*
 ```
 
-If the server defaults are acceptable, the `PARM` can be omitted entirely.
+CGI routing supports both URL prefix matching and file extension matching:
 
-## Console Commands
+```
+CGI=MVSMF /zosmf/*       URL prefix — all requests under /zosmf/
+CGI=HTTPLUA *.lua         Extension  — .lua files served from DOCROOT
+```
 
-The server responds to MVS modify commands:
+Debug CGI modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not enabled by default. They are intended for development and troubleshooting only. See [docs/development.md](docs/development.md) for details.
 
-| Command | Description |
+## Ecosystem
+
+HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosystem for MVS 3.8j:
+
+| Project | Description |
 |---------|-------------|
-| `/F HTTPD,D V` | Display version |
-| `/F HTTPD,D M` | Display memory usage |
-| `/F HTTPD,D TIME` | Display server uptime |
-| `/F HTTPD,D LOGIN` | Display active sessions |
-| `/F HTTPD,D STATS` | Display server statistics |
-| `/F HTTPD,SET MIN=n` | Set minimum worker threads |
-| `/F HTTPD,SET MAX=n` | Set maximum worker threads |
+| [crent370](https://github.com/mvslovers/crent370) | C runtime library for MVS 3.8j |
+| [ufsd](https://github.com/mvslovers/ufsd) | Cross-address-space UFS filesystem daemon |
+| [mvsmf](https://github.com/mvslovers/mvsmf) | z/OSMF-compatible REST API |
+| [ftpd](https://github.com/mvslovers/ftpd) | Standalone FTP daemon (replaces embedded FTPD from 3.x) |
 
-## Acknowledgments
+## For Developers
 
-This project was created by **Michael Dean Rayborn**, whose extensive work on MVS 3.8j tooling — including CRENT370, UFS, Lua370, MQTT370, and BREXX370 — forms the foundation of the entire MVS open-source ecosystem.
+Build instructions, architecture overview, the ASCII/EBCDIC translation system, and how to write your own CGI modules are documented in [docs/development.md](docs/development.md).
+
+## Credits
+
+- **Michael Dean Rayborn** — original author (HTTPD 1.x through 3.3.x)
+- **Mike Großmann** — maintainer and developer of version 4.0.0+
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+See [LICENSE](LICENSE) for details.

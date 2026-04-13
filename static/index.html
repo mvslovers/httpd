@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HTTPD 4.0.0</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            padding: 2rem;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #58a6ff;
+            margin-bottom: 0.25rem;
+        }
+        .version {
+            font-size: 0.9rem;
+            color: #8b949e;
+            margin-bottom: 2rem;
+        }
+        .status {
+            display: inline-block;
+            background: #0d4429;
+            color: #3fb950;
+            padding: 0.4rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 2rem;
+        }
+        p {
+            color: #8b949e;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        .links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            transition: border-color 0.2s;
+        }
+        a:hover {
+            border-color: #58a6ff;
+        }
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.75rem;
+            color: #484f58;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTPD</h1>
+        <div class="version">Version 4.0.0 &mdash; MVS 3.8j</div>
+        <div class="status">&#x2713; Server is running</div>
+        <p>
+            HTTP/1.1 server for IBM MVS 3.8j on Hercules.<br>
+            Part of the <strong>mvslovers</strong> open-source ecosystem.
+        </p>
+        <div class="links">
+            <a href="https://github.com/mvslovers/httpd">GitHub</a>
+            <a href="https://github.com/mvslovers/mvsmf">mvsMF</a>
+            <a href="https://github.com/mvslovers">mvslovers</a>
+        </div>
+        <div class="footer">
+            HTTPD 4.0.0 &mdash; originally by Michael Dean Rayborn, maintained by Mike Gro&szlig;mann
+        </div>
+    </div>
+</body>
+</html>
