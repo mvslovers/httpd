@@ -65,14 +65,14 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 |---------|---------|-------------|
 | `DEBUG` | 0 | Debug level. `0` = off, `1` = basic debug output to `HTTPDBG` DD. |
 
-## CGI Modules
+## Server Modules
 
 ```
-CGI=PROGRAM /url/pattern        URL prefix match
-CGI=PROGRAM *.ext               File extension match
+MODULE=PROGRAM /url/pattern        URL prefix match
+MODULE=PROGRAM *.ext               File extension match
 ```
 
-CGI modules are external load modules that HTTPD loads at startup via `__load()`. Each CGI entry maps a URL pattern or file extension to a program name.
+Server modules are load modules that HTTPD loads at startup via `__load()` and calls directly through the HTTPX function vector. They run inside the server's address space — unlike traditional CGI programs which fork a new process per request. Each module entry maps a URL pattern or file extension to a program name.
 
 | Routing Type | Pattern | Behavior |
 |-------------|---------|----------|
@@ -81,7 +81,7 @@ CGI modules are external load modules that HTTPD loads at startup via `__load()`
 
 URL prefix matching is checked first. If no prefix matches, extension matching is attempted.
 
-### Available CGI Modules
+### Available Server Modules
 
 | Module | Pattern | Description |
 |--------|---------|-------------|
@@ -96,12 +96,12 @@ URL prefix matching is checked first. If no prefix matches, extension matching i
 
 ```
 # Production: only mvsMF
-CGI=MVSMF /zosmf/*
+MODULE=MVSMF /zosmf/*
 
 # Development: mvsMF + debug tools
-CGI=MVSMF /zosmf/*
-CGI=HTTPDSRV /.dsrv
-CGI=HTTPDMTT /.dmtt
+MODULE=MVSMF /zosmf/*
+MODULE=HTTPDSRV /.dsrv
+MODULE=HTTPDMTT /.dmtt
 ```
 
 ## SMF Recording
@@ -149,6 +149,6 @@ KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
 LOGIN=RACF
 TZOFFSET=+01:00
-CGI=MVSMF /zosmf/*
+MODULE=MVSMF /zosmf/*
 SMF=AUTH TYPE=243
 ```

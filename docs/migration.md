@@ -28,8 +28,8 @@ PORT=8080
 MINTASK=3
 MAXTASK=9
 DOCROOT=/www
-CGI=MVSMF /zosmf/*
-CGI=HTTPLUA *.lua
+MODULE=MVSMF /zosmf/*
+MODULE=HTTPLUA *.lua
 ```
 
 Copy `samplib/httpprm0` from the distribution to `SYS2.PARMLIB(HTTPPRM0)` as a starting point. The JCL procedure references it via the `HTTPPRM` DD card.
@@ -54,9 +54,9 @@ The MQTT telemetry publisher has been removed. There is no direct replacement in
 
 ### Lua Scripting Engine
 
-The embedded Lua interpreter has been removed from the HTTPD core. The Lua CGI module (HTTPLUA) has been moved to its own project: [mvslovers/httplua](https://github.com/mvslovers/httplua). Lua and REXX CGI support is being reworked and may return in a later version.
+The embedded Lua interpreter has been removed from the HTTPD core. The Lua module (HTTPLUA) has been moved to its own project: [mvslovers/httplua](https://github.com/mvslovers/httplua). Lua and REXX scripting modules are being reworked and will be available as optional add-ons in a future release.
 
-### Demo CGI Modules
+### Demo Modules
 
 The demo modules `hello.c`, `abend0c1.c`, and `test.c` have been removed. They were test programs from the original codebase.
 
@@ -79,7 +79,7 @@ The built-in web interfaces for JES2 job browsing (`HTTPJES2`) and dataset listi
 HTTPD 4.0.0 is a full HTTP/1.1 server:
 
 - **Keep-Alive** — persistent connections reduce TCP overhead. Configurable via `KEEPALIVE_TIMEOUT` and `KEEPALIVE_MAX`.
-- **Chunked Transfer Encoding** — responses without a known Content-Length are automatically sent using chunked encoding. This includes CGI module output.
+- **Chunked Transfer Encoding** — responses without a known Content-Length are automatically sent using chunked encoding. This includes server module output.
 - **Strict request parsing** — invalid headers, malformed Content-Length, duplicate Host headers, and other protocol violations are properly rejected. The server passes all 33 h1spec HTTP/1.1 compliance tests.
 
 ### SMF Recording
@@ -96,21 +96,21 @@ SMF=ALL TYPE=200      Same, using SMF record type 200 instead of default 243
 
 See [docs/smf-records.md](smf-records.md) for the record format and field descriptions.
 
-### Extension-Based CGI Routing
+### Extension-Based Module Routing
 
-In addition to URL prefix matching, CGI modules can now be registered by file extension:
+In addition to URL prefix matching, server modules can now be registered by file extension:
 
 ```
-CGI=HTTPLUA *.lua       Any .lua file in DOCROOT → HTTPLUA
-CGI=HTTPREXX *.rexx     Any .rexx file in DOCROOT → HTTPREXX
-CGI=MVSMF /zosmf/*      All requests under /zosmf/ → MVSMF (unchanged)
+MODULE=HTTPLUA *.lua       Any .lua file in DOCROOT → HTTPLUA
+MODULE=HTTPREXX *.rexx     Any .rexx file in DOCROOT → HTTPREXX
+MODULE=MVSMF /zosmf/*      All requests under /zosmf/ → MVSMF (unchanged)
 ```
 
 This allows script files to live alongside static content in the normal document root, similar to how Apache handles PHP.
 
-### Automatic Chunked Fallback for CGI
+### Automatic Chunked Fallback for Modules
 
-CGI modules that send HTTP response bodies without setting a `Content-Length` header automatically get chunked transfer encoding. This prevents browsers from hanging on Keep-Alive connections waiting for the response to end.
+Server modules that send HTTP response bodies without setting a `Content-Length` header automatically get chunked transfer encoding. This prevents browsers from hanging on Keep-Alive connections waiting for the response to end.
 
 ## Checklist
 

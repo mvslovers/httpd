@@ -1,6 +1,6 @@
 # HTTPD — Development Guide
 
-This document covers building HTTPD from source, the server architecture, the ASCII/EBCDIC translation system, and how to write custom CGI modules.
+This document covers building HTTPD from source, the server architecture, the ASCII/EBCDIC translation system, and how to write custom server modules.
 
 ## Building from Source
 
@@ -8,6 +8,7 @@ This document covers building HTTPD from source, the server architecture, the AS
 
 - `mbt` build system ([mvslovers/mbt](https://github.com/mvslovers/mbt))
 - `c2asm370` cross-compiler
+- [crent370](https://github.com/mvslovers/crent370) — C runtime library (build dependency)
 - Access to an MVS 3.8j system (Hercules) for linking and testing
 
 ### Build Commands
@@ -74,7 +75,7 @@ Each HTTP request flows through these states:
 |-------|------|-------------|
 | `CSTATE_IN` | httpin.c | Receive and buffer the request line and headers |
 | `CSTATE_PARSE` | httppars.c | Parse method, URI, headers, query string, POST body |
-| `CSTATE_GET` | httpget.c | Serve static file from UFS or dispatch to CGI |
+| `CSTATE_GET` | httpget.c | Serve static file from UFS or dispatch to server module |
 | `CSTATE_POST` | httppars.c | Parse POST body |
 | `CSTATE_DONE` | httpdone.c | Send final chunk terminator, finalize response |
 | `CSTATE_REPORT` | httpsmf.c | Write SMF record, increment counters |
@@ -82,20 +83,20 @@ Each HTTP request flows through these states:
 
 ### Key Data Structures
 
-**HTTPD** — Server-wide state. Single instance. Holds the listener socket, client array, worker pool, CGI registrations, configuration, and SMF settings.
+**HTTPD** — Server-wide state. Single instance. Holds the listener socket, client array, worker pool, module registrations, configuration, and SMF settings.
 
 **HTTPC** — Per-client session. Allocated on `accept()`, freed on connection close. Contains the socket, receive buffer (4 KB), environment variables, request state, response code, UFS handle, and credential pointer.
 
-**HTTPX** — Function vector table (~270 bytes). Contains ~68 function pointers that CGI modules use to call server functions without linking directly to server code. CGI modules receive this via `httpd->httpx`.
+**HTTPX** — Function vector table (~270 bytes). Contains ~68 function pointers that server modules use to call server functions without linking directly to server code. server modules receive this via `httpd->httpx`.
 
-**HTTPCGI** — CGI registration. Maps a URL pattern or file extension to a load module name.
+**HTTPCGI** — Module registration. Maps a URL pattern or file extension to a load module name. (Note: the struct is still named `HTTPCGI` internally — this will be renamed in a future release.)
 
 **HTTPV** — Environment variable. Header followed by `name\0value\0` storage. Allocated per variable, freed on request reset.
 
 ### Response Pipeline
 
 ```
-CGI Module / httpget.c
+Server Module / httpget.c
   → http_resp(httpc, 200)         Set status line
   → http_printf(httpc, header)    Send headers
   → http_printf(httpc, "\r\n")    End headers (triggers chunked fallback)
@@ -125,7 +126,7 @@ MVS stores data in EBCDIC. HTTP is an ASCII protocol. HTTPD translates at the ne
 | `http_atoe(buf, len)` | ASCII → EBCDIC | Translate buffer using the server's default codepage |
 | `http_xlate(buf, len, table)` | Explicit | Translate using a specific 256-byte translation table |
 
-CGI modules access translation through the HTTPX function vector. The codepage pair pointers (`xlate_cp037`, `xlate_1047`, `xlate_legacy`) provide direct access to specific tables when needed.
+server modules access translation through the HTTPX function vector. The codepage pair pointers (`xlate_cp037`, `xlate_1047`, `xlate_legacy`) provide direct access to specific tables when needed.
 
 ### Key Design Decision
 
@@ -133,22 +134,26 @@ CP037 is the default because the C compiler generates EBCDIC NEL (0x15) for `'\n
 
 For details on the codepage tables, roundtrip verification, and integration with mvsMF, see the source in `src/httpxlat.c` and `include/httpxlat.h`.
 
-## Writing CGI Modules
+## Writing Server Modules
 
 ### Overview
 
-CGI modules are external load modules that HTTPD loads at startup. They are registered via the Parmlib:
+HTTPD uses a server module system for extensibility. Modules are load modules that run inside the server's address space and are called directly through the HTTPX function vector — unlike traditional CGI programs (as defined by [RFC 3875](https://datatracker.ietf.org/doc/html/rfc3875)) which fork a new process per request and communicate via stdin/stdout.
+
+> **Note on naming:** Some internal code still uses the legacy name "CGI" (e.g. `httpcgi.h`, `HTTPCGI` struct, `cgimain` entry point). This will be renamed in a future release. The Parmlib keyword has already been changed from `CGI=` to `MODULE=`.
+
+Modules are registered via the Parmlib:
 
 ```
-CGI=MYMODULE /api/*        URL prefix routing
-CGI=MYMODULE *.ext         Extension-based routing
+MODULE=MYMODULE /api/*        URL prefix routing
+MODULE=MYMODULE *.ext         Extension-based routing
 ```
 
 HTTPD loads the module via `__load()` and calls its entry point for matching requests.
 
 ### Module Structure
 
-A CGI module links against `httpcgi.h` (not `httpd.h`). This lightweight header provides the HTTPX function vector macros without pulling in the full server internals.
+A server module links against `httpcgi.h` (not `httpd.h`). This lightweight header provides the HTTPX function vector macros without pulling in the full server internals.
 
 ```c
 #include "httpcgi.h"
@@ -159,14 +164,14 @@ int cgimain(HTTPD *httpd, HTTPC *httpc)
     http_resp(httpc, 200);
     http_printf(httpc, "Content-Type: text/plain\r\n");
     http_printf(httpc, "\r\n");
-    http_printf(httpc, "Hello from my CGI module!\n");
+    http_printf(httpc, "Hello from my server module!\n");
     return 0;
 }
 ```
 
 ### Available Functions (via HTTPX)
 
-CGI modules call server functions through the HTTPX function vector. Key functions:
+server modules call server functions through the HTTPX function vector. Key functions:
 
 **Response:**
 - `http_resp(httpc, code)` — set HTTP status code
@@ -183,7 +188,7 @@ CGI modules call server functions through the HTTPX function vector. Key functio
 **UFS:**
 - `http_open(httpc, path, mime)` — open a UFS file for serving
 
-### Building a CGI Module
+### Building a Server Module
 
 Create a `project.toml` with dependencies on `crent370` and `httpd`:
 
@@ -214,7 +219,7 @@ The following modules in the HTTPD source tree serve as examples:
 - `src/httpdmtt.c` — master trace table dump
 - [mvsMF](https://github.com/mvslovers/mvsmf) — full REST API implementation with router, middleware, and path parameter extraction
 
-### Debug CGI Modules
+### Debug Server Modules
 
 These modules are built into the HTTPD binary and can be enabled via Parmlib for development:
 
@@ -227,8 +232,8 @@ These modules are built into the HTTPD binary and can be enabled via Parmlib for
 Enable them during development:
 
 ```
-CGI=HTTPDSRV /.dsrv
-CGI=HTTPDMTT /.dmtt
+MODULE=HTTPDSRV /.dsrv
+MODULE=HTTPDMTT /.dmtt
 ```
 
 Do not enable in production — they expose server internals.
@@ -259,7 +264,7 @@ curl -v http://mvsdev.lan:1080/
 # Keep-Alive verification
 curl -v http://mvsdev.lan:1080/ http://mvsdev.lan:1080/
 
-# CGI module
+# server module
 curl -v http://mvsdev.lan:1080/.dmtt
 
 # HTTP/1.0 fallback

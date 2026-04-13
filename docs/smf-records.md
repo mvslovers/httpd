@@ -38,7 +38,7 @@ Written after each completed HTTP request (when the SMF level permits).
 
 | Offset | Length | Type | Field | Description |
 |--------|--------|------|-------|-------------|
-| 0x12 | 8 | char | subsys | Subsystem ID, padded with spaces. `"HTTPD   "` for core, `"MVSMF   "` for mvsMF, `"HTTPLUA "` for Lua CGI. |
+| 0x12 | 8 | char | subsys | Subsystem ID, padded with spaces. `"HTTPD   "` for core, `"MVSMF   "` for mvsMF, `"HTTPLUA "` for Lua module. |
 | 0x1A | 2 | short | subtype | Always 1 for request records. |
 | 0x1C | 8 | char | userid | RACF user ID (space-padded). Blank if no authentication. |
 | 0x24 | 4 | uint | client_addr | Client IPv4 address in network byte order. |
