@@ -66,7 +66,7 @@ Copy `samplib/httpprm0` to `SYS2.PARMLIB(HTTPPRM0)` and adjust as needed. A mini
 ```
 PORT=8080
 DOCROOT=/www
-MODULE=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*
 ```
 
 ### Starting and Stopping
@@ -96,7 +96,7 @@ The server is configured through a Parmlib member referenced by the `HTTPPRM` DD
 | `KEEPALIVE_MAX` | 100 | Max requests per connection |
 | `LOGIN` | NONE | Authentication mode (NONE / RACF) |
 | `SMF` | NONE | SMF recording level |
-| `MODULE` | — | Server module registration |
+| `MOD` | — | Server module registration |
 
 For the complete reference, see [docs/configuration.md](docs/configuration.md).
 
@@ -107,15 +107,18 @@ HTTPD uses a server module system for extending the server with custom functiona
 In version 4.0.0, the primary module is [mvsMF](https://github.com/mvslovers/mvsmf), which provides a z/OSMF-compatible REST API for datasets, jobs, and USS files.
 
 ```
-MODULE=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*
 ```
 
-Module routing supports both URL prefix matching and file extension matching:
+Module routing supports URL prefix matching and automatic extension matching:
 
 ```
-MODULE=MVSMF /zosmf/*       URL prefix — all requests under /zosmf/
-MODULE=MYSCRIPT *.lua        Extension  — files served from DOCROOT
+MOD=MVSMF /zosmf/*      URL prefix — all requests under /zosmf/
+MOD=LUA                  Extension — *.lua files served from DOCROOT
+MOD=REXX                 Extension — *.rexx files served from DOCROOT
 ```
+
+Scripting modules like LUA and REXX don't need an explicit pattern — HTTPD derives the file extension from the module name automatically.
 
 Debug modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not enabled by default. They are intended for development and troubleshooting only. See [docs/development.md](docs/development.md) for details on writing your own modules.
 

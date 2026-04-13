@@ -28,8 +28,8 @@ PORT=8080
 MINTASK=3
 MAXTASK=9
 DOCROOT=/www
-MODULE=MVSMF /zosmf/*
-MODULE=HTTPLUA *.lua
+MOD=MVSMF /zosmf/*
+MOD=LUA
 ```
 
 Copy `samplib/httpprm0` from the distribution to `SYS2.PARMLIB(HTTPPRM0)` as a starting point. The JCL procedure references it via the `HTTPPRM` DD card.
@@ -98,12 +98,12 @@ See [docs/smf-records.md](smf-records.md) for the record format and field descri
 
 ### Extension-Based Module Routing
 
-In addition to URL prefix matching, server modules can now be registered by file extension:
+In addition to URL prefix matching (e.g. `MOD=MVSMF /zosmf/*`), scripting modules can be registered without an explicit pattern. HTTPD automatically derives the file extension from the module name:
 
 ```
-MODULE=HTTPLUA *.lua       Any .lua file in DOCROOT → HTTPLUA
-MODULE=HTTPREXX *.rexx     Any .rexx file in DOCROOT → HTTPREXX
-MODULE=MVSMF /zosmf/*      All requests under /zosmf/ → MVSMF (unchanged)
+MOD=LUA                 Handles *.lua files from DOCROOT
+MOD=REXX                Handles *.rexx files from DOCROOT
+MOD=MVSMF /zosmf/*      All requests under /zosmf/ (explicit prefix)
 ```
 
 This allows script files to live alongside static content in the normal document root, similar to how Apache handles PHP.

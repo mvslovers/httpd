@@ -68,40 +68,42 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 ## Server Modules
 
 ```
-MODULE=PROGRAM /url/pattern        URL prefix match
-MODULE=PROGRAM *.ext               File extension match
+MOD=PROGRAM /url/pattern        URL prefix match
+MOD=PROGRAM                     Extension match (derives *.program from name)
 ```
 
-Server modules are load modules that HTTPD loads at startup via `__load()` and calls directly through the HTTPX function vector. They run inside the server's address space — unlike traditional CGI programs which fork a new process per request. Each module entry maps a URL pattern or file extension to a program name.
+Server modules are load modules that HTTPD loads at startup via `__load()` and calls directly through the HTTPX function vector. They run inside the server's address space — unlike traditional CGI programs which fork a new process per request.
 
-| Routing Type | Pattern | Behavior |
-|-------------|---------|----------|
-| URL prefix | `/zosmf/*` | All requests where the path starts with `/zosmf/` are routed to the module. |
-| Extension | `*.lua` | Requests for files with the `.lua` extension are routed to the module. The file path is resolved relative to `DOCROOT`. |
+| Routing Type | Syntax | Behavior |
+|-------------|--------|----------|
+| URL prefix | `MOD=MVSMF /zosmf/*` | All requests where the path starts with `/zosmf/` are routed to the module. |
+| Extension | `MOD=LUA` | HTTPD derives the extension `*.lua` from the module name. Requests for `.lua` files are routed to the module. The file path is resolved relative to `DOCROOT`. |
 
 URL prefix matching is checked first. If no prefix matches, extension matching is attempted.
 
 ### Available Server Modules
 
-| Module | Pattern | Description |
-|--------|---------|-------------|
-| MVSMF | `/zosmf/*` | z/OSMF-compatible REST API (datasets, jobs, USS files). Separate project: [mvsmf](https://github.com/mvslovers/mvsmf). |
-| HTTPDSRV | `/.dsrv` | Display server status. Debug tool, not for production. |
-| HTTPDM | `/.dm` | Display memory. Debug tool, not for production. |
-| HTTPDMTT | `/.dmtt` | Display master trace table. Debug tool, not for production. |
-| HTTPDSL | `/dsl/*` | Dataset list browser. **Deprecated** — will be replaced by mvsMF. |
-| HTTPJES2 | `/jes/*` | JES2 job browser. **Deprecated** — will be replaced by mvsMF. |
+| Module | Syntax | Description |
+|--------|--------|-------------|
+| MVSMF | `MOD=MVSMF /zosmf/*` | z/OSMF-compatible REST API (datasets, jobs, USS files). Separate project: [mvsmf](https://github.com/mvslovers/mvsmf). |
+| LUA | `MOD=LUA` | Lua scripting module. Handles `*.lua` files. Separate project (not shipped with 4.0.0). |
+| REXX | `MOD=REXX` | REXX scripting module. Handles `*.rexx` files. Separate project (not shipped with 4.0.0). |
+| HTTPDSRV | `MOD=HTTPDSRV /.dsrv` | Display server status. Debug tool, not for production. |
+| HTTPDM | `MOD=HTTPDM /.dm` | Display memory. Debug tool, not for production. |
+| HTTPDMTT | `MOD=HTTPDMTT /.dmtt` | Display master trace table. Debug tool, not for production. |
+| HTTPDSL | `MOD=HTTPDSL /dsl/*` | Dataset list browser. **Deprecated** — will be replaced by mvsMF. |
+| HTTPJES2 | `MOD=HTTPJES2 /jes/*` | JES2 job browser. **Deprecated** — will be replaced by mvsMF. |
 
 ### Example
 
 ```
 # Production: only mvsMF
-MODULE=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*
 
 # Development: mvsMF + debug tools
-MODULE=MVSMF /zosmf/*
-MODULE=HTTPDSRV /.dsrv
-MODULE=HTTPDMTT /.dmtt
+MOD=MVSMF /zosmf/*
+MOD=HTTPDSRV /.dsrv
+MOD=HTTPDMTT /.dmtt
 ```
 
 ## SMF Recording
@@ -149,6 +151,6 @@ KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
 LOGIN=RACF
 TZOFFSET=+01:00
-MODULE=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*
 SMF=AUTH TYPE=243
 ```
