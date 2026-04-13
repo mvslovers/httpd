@@ -14,6 +14,7 @@
 static void set_defaults(HTTPD *httpd);
 static void parse_line(HTTPD *httpd, char *line);
 static void parse_keyvalue(HTTPD *httpd, const char *key, const char *value);
+static void parse_mod(HTTPD *httpd, const char *value);
 static void parse_login(HTTPD *httpd, const char *value);
 static void parse_tzoffset(HTTPD *httpd, const char *value);
 static int  do_bind(HTTPD *httpd);
@@ -262,43 +263,12 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         if (i > 100) i = 100;
         httpd->listen_queue = i;
     }
+    else if (strcmp(key, "MOD") == 0) {
+        parse_mod(httpd, value);
+    }
     else if (strcmp(key, "CGI") == 0) {
-        /* CGI=PROGRAM /path/* */
-        char program[9];
-        char *path;
-        char *tmp;
-        int  j;
-        int  login = httpd->login & HTTPD_LOGIN_CGI;
-
-        tmp = strdup(value);
-        if (!tmp) return;
-
-        /* first token = program name */
-        path = tmp;
-        while (*path && *path != ' ' && *path != '\t')
-            path++;
-        if (*path) {
-            *path = '\0';
-            path++;
-            while (*path == ' ' || *path == '\t')
-                path++;
-        }
-
-        /* fold program name to uppercase, max 8 chars */
-        for (j = 0; j < 8 && tmp[j]; j++)
-            program[j] = (char)toupper((unsigned char)tmp[j]);
-        program[j] = '\0';
-
-        if (program[0] && path[0]) {
-            if (!http_add_cgi(httpd, program, path, login)) {
-                wtof("HTTPD035W Unable to register CGI %s for %s",
-                     program, path);
-            } else {
-                wtof("HTTPD036I CGI %s registered for %s", program, path);
-            }
-        }
-
-        free(tmp);
+        wtof("HTTPD410W CGI= is deprecated, use MOD= instead");
+        parse_mod(httpd, value);
     }
     else if (strcmp(key, "CLIENT_TIMEOUT_MSG") == 0) {
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_INMSG;
@@ -364,6 +334,61 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     else {
         wtof("HTTPD020W Unknown config key: %s", key);
     }
+}
+
+/* ====================================================================
+** Parse MOD=PROGRAM [pattern]
+** If pattern is omitted, derive *.<lowercase program> and use DOCROOT.
+** ================================================================= */
+static void
+parse_mod(HTTPD *httpd, const char *value)
+{
+    char  program[9];
+    char  auto_pattern[16];
+    char *path;
+    char *tmp;
+    int   j;
+    int   login = httpd->login & HTTPD_LOGIN_CGI;
+
+    tmp = strdup(value);
+    if (!tmp) return;
+
+    /* first token = program name */
+    path = tmp;
+    while (*path && *path != ' ' && *path != '\t')
+        path++;
+    if (*path) {
+        *path = '\0';
+        path++;
+        while (*path == ' ' || *path == '\t')
+            path++;
+    }
+
+    /* fold program name to uppercase, max 8 chars */
+    for (j = 0; j < 8 && tmp[j]; j++)
+        program[j] = (char)toupper((unsigned char)tmp[j]);
+    program[j] = '\0';
+
+    /* no pattern → derive *.<lowercase program> */
+    if (!path[0]) {
+        auto_pattern[0] = '*';
+        auto_pattern[1] = '.';
+        for (j = 0; j < 8 && program[j]; j++)
+            auto_pattern[2 + j] = (char)tolower((unsigned char)program[j]);
+        auto_pattern[2 + j] = '\0';
+        path = auto_pattern;
+    }
+
+    if (program[0]) {
+        if (!http_add_cgi(httpd, program, path, login)) {
+            wtof("HTTPD035W Unable to register module %s for %s",
+                 program, path);
+        } else {
+            wtof("HTTPD036I Module %s registered for %s", program, path);
+        }
+    }
+
+    free(tmp);
 }
 
 /* ====================================================================

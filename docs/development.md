@@ -138,16 +138,31 @@ For details on the codepage tables, roundtrip verification, and integration with
 
 ### Overview
 
-HTTPD uses a server module system for extensibility. Modules are load modules that run inside the server's address space and are called directly through the HTTPX function vector — unlike traditional CGI programs (as defined by [RFC 3875](https://datatracker.ietf.org/doc/html/rfc3875)) which fork a new process per request and communicate via stdin/stdout.
+HTTPD uses a **server module** system for extensibility — not traditional CGI.
 
-> **Note on naming:** Some internal code still uses the legacy name "CGI" (e.g. `httpcgi.h`, `HTTPCGI` struct, `cgimain` entry point). This will be renamed in a future release. The Parmlib keyword has already been changed from `CGI=` to `MODULE=`.
+The difference matters: [Traditional CGI](https://publib.boulder.ibm.com/httpserv/manual24/howto/cgi.html) (as defined by [RFC 3875](https://datatracker.ietf.org/doc/html/rfc3875)) forks a new process for each request and communicates via stdin/stdout and environment variables. HTTPD modules are fundamentally different:
+
+| | Traditional CGI | HTTPD Server Modules |
+|---|----------------|---------------------|
+| Execution | Forked process per request | Loaded into server address space at startup |
+| Communication | stdin/stdout, env vars | HTTPX function vector (direct function calls) |
+| Request data | `$REQUEST_METHOD`, `$QUERY_STRING` env vars | `http_get_env(httpc, "REQUEST_METHOD")` via HTTPX |
+| Response | Write to stdout | `http_resp()`, `http_printf()` via HTTPX |
+| Performance | Process fork overhead per request | Direct function call (~10µs) |
+| Analogy | Perl/Python CGI scripts | Apache `mod_php`, `mod_rewrite` |
+
+This means you cannot write a standard CGI script (e.g. a REXX program that reads environment variables and writes to stdout) and expect it to work with HTTPD. Server modules must be compiled as MVS load modules and use the HTTPX API.
+
+> **Note on naming:** Some internal code still uses the legacy name "CGI" (e.g. `httpcgi.h`, `HTTPCGI` struct, `cgimain` entry point). This will be renamed in a future release. The Parmlib keyword has already been changed from `CGI=` to `MOD=`.
 
 Modules are registered via the Parmlib:
 
 ```
-MODULE=MYMODULE /api/*        URL prefix routing
-MODULE=MYMODULE *.ext         Extension-based routing
+MOD=MYMODULE /api/*        URL prefix routing
+MOD=LUA                    Extension routing (derives *.lua from name)
 ```
+
+When no pattern is specified, HTTPD derives the file extension from the module name (lowercase). The module then handles all requests for files with that extension in the DOCROOT.
 
 HTTPD loads the module via `__load()` and calls its entry point for matching requests.
 
@@ -171,7 +186,7 @@ int cgimain(HTTPD *httpd, HTTPC *httpc)
 
 ### Available Functions (via HTTPX)
 
-server modules call server functions through the HTTPX function vector. Key functions:
+Server modules call server functions through the HTTPX function vector. Key functions:
 
 **Response:**
 - `http_resp(httpc, code)` — set HTTP status code
@@ -232,8 +247,8 @@ These modules are built into the HTTPD binary and can be enabled via Parmlib for
 Enable them during development:
 
 ```
-MODULE=HTTPDSRV /.dsrv
-MODULE=HTTPDMTT /.dmtt
+MOD=HTTPDSRV /.dsrv
+MOD=HTTPDMTT /.dmtt
 ```
 
 Do not enable in production — they expose server internals.
