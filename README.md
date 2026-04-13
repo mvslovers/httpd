@@ -44,9 +44,9 @@ Version 4.0.0 is a major release with two primary goals:
 
 ### Prerequisites
 
-- Hercules-emulated MVS 3.8j system (TK4- or TK5)
+- Hercules-emulated MVS 3.8j system ([TK4-](http://wotho.ethz.ch/tk4-/), [TK5](https://www.prince-webdesign.nl/tk5), or [MVS/CE](https://github.com/MVS-sysgen/MVS-CE))
 - [UFSD](https://github.com/mvslovers/ufsd) — UFS filesystem daemon (required for static file serving)
-- [crent370](https://github.com/mvslovers/crent370) — C runtime library
+- [FTPD](https://github.com/mvslovers/ftpd) — FTP daemon (required to transfer files to the UFS filesystem)
 
 ### JCL Procedure
 
@@ -118,7 +118,7 @@ Debug CGI modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not
 
 ## Ecosystem
 
-HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosystem for MVS 3.8j:
+HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosystem for MVS 3.8j. For an overview of all projects and how they fit together, see the [mvsMF Ecosystem](https://mvslovers.github.io/mvsmf/) documentation.
 
 | Project | Description |
 |---------|-------------|
