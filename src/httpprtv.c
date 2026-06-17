@@ -26,9 +26,19 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
            and inject Transfer-Encoding: chunked for HTTP/1.1 if needed */
         if (len == 2 && buf[0] == '\r' && buf[1] == '\n'
             && httpc->resp > 0 && !httpc->rdw) {
+            /* Responses that never carry a message body (RFC 7230 3.3.1):
+               1xx, 204 No Content and 304 Not Modified. These must not be
+               chunked: injecting Transfer-Encoding: chunked makes httpdone()
+               append a "0\r\n\r\n" terminator, which is an illegal body and
+               is rejected by strict HTTP parsers (e.g. llhttp / Node.js).
+               NOTE: a response to HEAD is body-less too — add it here if HEAD
+               ever returns a real status (it currently returns 501). */
+            int bodyless = httpc->resp == 204 || httpc->resp == 304
+                         || (httpc->resp >= 100 && httpc->resp < 200);
+
             httpc->rdw = 1; /* headers ended — don't re-trigger */
 
-            if (!httpc->content_length_set && !httpc->chunked) {
+            if (!bodyless && !httpc->content_length_set && !httpc->chunked) {
                 UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
                 if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
                     /* inject Transfer-Encoding header before blank line */

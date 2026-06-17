@@ -157,6 +157,10 @@ In HTTPD 4.0.0, CGI registration moves from Lua defaults to Parmlib-only. No CGI
 ### HTTP/1.1 Design (to be implemented)
 
 **Response body framing — decision logic:**
+0. If the status is body-less (`1xx`, `204`, `304`) → never set Content-Length or
+   Transfer-Encoding and never emit a body (RFC 7230 §3.3.1). The chunked fallback in
+   `httpprtv.c` skips these; otherwise the `0\r\n\r\n` trailer from `httpdone.c` is an
+   illegal body that strict parsers (llhttp/Node) reject.
 1. If handler/CGI set Content-Length (e.g. mvsMF's `sendDefaultHeaders()`) → use as-is
 2. If static file with known size (UFS `filesize`) → send Content-Length
 3. Otherwise → send `Transfer-Encoding: chunked`
