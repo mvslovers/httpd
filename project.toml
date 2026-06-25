@@ -4,100 +4,81 @@ version = "4.0.0-dev"
 type = "application"
 
 [build]
-cflags = [
-	"-O1",
-	"-I./include",
-	"-I./credentials/include",
-]
-
-[build.sources]
-c_dirs = ["src/", "credentials/src/"]
-
-[mvs.build.datasets.source]
-suffix = "SOURCE"
-dsorg = "PO"
-recfm = "FB"
-lrecl = 80
-blksize = 19040
-space = ["TRK", 600, 100, 200]
-
-[mvs.build.datasets.punch]
-suffix = "OBJECT"
-dsorg = "PO"
-recfm = "FB"
-lrecl = 80
-blksize = 19040
-space = ["TRK", 100, 50, 200]
-
-[mvs.build.datasets.ncalib]
-suffix = "NCALIB"
-dsorg = "PO"
-recfm = "U"
-lrecl = 0
-blksize = 19069
-space = ["TRK", 100, 50, 200]
-
-[mvs.build.datasets.syslmod]
-suffix = "LOAD"
-dsorg = "PO"
-recfm = "U"
-lrecl = 0
-blksize = 15040
-space = ["TRK", 150, 50, 30]
+cflags = ["-I", "include", "-I", "credentials/include"]
 
 [dependencies]
-"mvslovers/crent370" = ">=1.0.9"
 "mvslovers/ufsd" = "=1.0.0-dev"
 
-# --- Load Modules ------------------------------------------------
+# -- Internal autocall archive ------------------------------------
+# All of httpd's objects, archived into build/httpdint.a.  Every module
+# autocalls it: each [[module]] below lists only its own root source(s)
+# (each root defines its own main(), so they cannot be globbed into one
+# module), and the linker pulls the shared rest from this archive by
+# autocall (referenced members only -> minimal load modules).  Mirrors the
+# v1 NCALIB-autocall model; never shipped (the public client lib is [lib]).
+[internal]
+sources = ["src/*.c", "credentials/src/*.c"]
+# cgistart is the CGI launcher: a per-module root (force-included by each CGI
+# module) AND shipped in [lib] for external CGIs.  Keep it OUT of the autocall
+# pool so its @@START can never shadow another module's entry.
+exclude = ["src/cgistart.c"]
 
-# Main HTTPD server
-[[link.module]]
+# -- Load Modules -------------------------------------------------
+# v1 'include = ["@@CRT1", <members>]' -> startup = "crt1" + the member
+# roots as 'sources'; the shared body resolves from [internal] by autocall.
+
+# Main HTTPD server (APF-authorized)
+[[module]]
 name = "HTTPD"
-entry = "@@CRT0"
-options = ["SIZE=(4000K,40K)", "LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "HTTPSTRT", "HTTPD", "HTTPPRM"]
-setcode = "AC(1)"
-
-[link.module.dep_includes]
-"mvslovers/ufsd" = "*"
+startup = "crt1"
+sources = ["src/httpstrt.c", "src/httpd.c", "src/httpprm.c"]
+ac = 1
 
 # JES2 CGI handler
-[[link.module]]
+[[module]]
 name = "HTTPJES2"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPJES2"]
+startup = "crt1"
+sources = ["src/cgistart.c", "src/httpjes2.c"]
 
-# SSI handler modules
-[[link.module]]
+# SSI handler modules (CGI programs sharing the cgistart launcher)
+[[module]]
 name = "HTTPDM"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPDM"]
+startup = "crt1"
+sources = ["src/cgistart.c", "src/httpdm.c"]
 
-[[link.module]]
+[[module]]
 name = "HTTPDMTT"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPDMTT"]
+startup = "crt1"
+sources = ["src/cgistart.c", "src/httpdmtt.c"]
 
-[[link.module]]
+[[module]]
 name = "HTTPDSL"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPDSL"]
+startup = "crt1"
+sources = ["src/cgistart.c", "src/httpdsl.c"]
 
-[[link.module]]
+[[module]]
 name = "HTTPDSRV"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "CGISTART", "HTTPDSRV"]
+startup = "crt1"
+sources = ["src/cgistart.c", "src/httpdsrv.c"]
+
+# -- Public CGI SDK export ----------------------------------------
+# What httpd ships for consumers (e.g. mvsmf, which declares
+# "mvslovers/httpd" in its [dependencies]).  The client library is the
+# CGI launcher cgistart.o plus the public headers: a CGI program links
+# cgistart (which provides __start, builds argv, and calls the program's
+# main()) and reaches the http_* API at runtime through the httpx
+# callback table (http_get_httpx()).  cgistart uses only the public API
+# (httpcgi.h), so external CGIs need not copy it -- they link this object.
+[lib]
+name = "httpd"
+sources = ["src/cgistart.c"]
+headers = [
+	"include/httpcgi.h",
+	"include/httpxlat.h",
+	"include/dbg.h",
+	"include/errors.h",
+	"include/types.h",
+]
 
 [release]
 version_files = ["VERSION"]
-
-[artifacts]
-headers = true
-header_files = ["httpcgi.h", "httpxlat.h", "dbg.h", "errors.h", "types.h"]
-loads = true
