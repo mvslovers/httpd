@@ -1,2 +1,2 @@
 MBT_ROOT := mbt
-include $(MBT_ROOT)/mk/core.mk
+include $(MBT_ROOT)/mk/mbt.mk
