@@ -4,7 +4,9 @@ version = "4.0.0-dev"
 type = "application"
 
 [build]
-cflags = ["-I", "include", "-I", "credentials/include"]
+# -DVERSION feeds httpd.c's `#ifndef VERSION` (otherwise it reports
+# "0.0.0-unknown"). v1's mbt injected it automatically; v2 does not.
+cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_VERSION)\"']
 
 [dependencies]
 "mvslovers/ufsd" = "=1.0.0-dev"
