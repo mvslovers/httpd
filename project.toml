@@ -18,6 +18,10 @@ cflags = ["-I", "include", "-I", "credentials/include"]
 # v1 NCALIB-autocall model; never shipped (the public client lib is [lib]).
 [internal]
 sources = ["src/*.c", "credentials/src/*.c"]
+# cgistart is the CGI launcher: a per-module root (force-included by each CGI
+# module) AND shipped in [lib] for external CGIs.  Keep it OUT of the autocall
+# pool so its @@START can never shadow another module's entry.
+exclude = ["src/cgistart.c"]
 
 # -- Load Modules -------------------------------------------------
 # v1 'include = ["@@CRT1", <members>]' -> startup = "crt1" + the member
@@ -57,15 +61,17 @@ name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
-# -- Public header export -----------------------------------------
+# -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
-# "mvslovers/httpd" in its [dependencies]).  httpd exposes no client
-# archive: a CGI reaches the http_* API at runtime through the httpx
-# callback table the server fills in (see cgistart.c), so consumers
-# compile against these headers and link nothing from httpd.
-# Headers-only [lib] -- no sources, no .a (replaces v1 [artifacts]).
+# "mvslovers/httpd" in its [dependencies]).  The client library is the
+# CGI launcher cgistart.o plus the public headers: a CGI program links
+# cgistart (which provides __start, builds argv, and calls the program's
+# main()) and reaches the http_* API at runtime through the httpx
+# callback table (http_get_httpx()).  cgistart uses only the public API
+# (httpcgi.h), so external CGIs need not copy it -- they link this object.
 [lib]
 name = "httpd"
+sources = ["src/cgistart.c"]
 headers = [
 	"include/httpcgi.h",
 	"include/httpxlat.h",
