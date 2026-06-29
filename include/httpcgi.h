@@ -295,6 +295,8 @@ struct httpx {
     HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
     UFS *       (*http_get_ufs)(HTTPC *);
                                     /* 120 get/create UFS handle        */
+    void *      (*http_cgictx_get)(HTTPD *, const char *, unsigned);
+                                    /* 124 find/create CGI context      */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -518,5 +520,8 @@ struct httpx {
 
 #define http_get_ufs(httpc) \
     ((httpx->http_get_ufs)((httpc)))
+
+#define http_cgictx_get(httpd,eye,size) \
+    ((httpx->http_cgictx_get)((httpd),(eye),(size)))
 
 #endif /* HTTPCGI_H */

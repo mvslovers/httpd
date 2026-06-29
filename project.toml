@@ -63,6 +63,15 @@ name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
+# -- Tests --------------------------------------------------------
+# http_cgictx_get() registrar.  Uses lock()/__getm() (MVS SVCs), so it is
+# MVS-only (make test-mvs); the host build is skipped (it pulls httpd.h's
+# crent370 internals).  http_cgictx_get resolves from the [internal] autocall
+# archive, so only the test root is listed here.
+[[test]]
+name = "TSTGCTX"
+sources = ["test/mvs/tstgctx.c"]
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the

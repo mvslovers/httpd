@@ -203,6 +203,9 @@ Server modules call server functions through the HTTPX function vector. Key func
 **UFS:**
 - `http_open(httpc, path, mime)` — open a UFS file for serving
 
+**Cross-request context:**
+- `http_cgictx_get(httpd, eye, size)` — find or create one context block per 8-byte eyecatcher. A module that needs a single, address-space-lifetime block (shared across requests and workers) registers it here. The block begins with the 8-byte eyecatcher (`char eye[8]`, stamped on create); `size` is used only on create and ignored on a hit, so always pass the same size for the same eyecatcher. The block is zeroed on create, lives until the address space ends, and is never freed individually. Returns the block, or `NULL` if the context array is full or storage is exhausted. Example: `http_cgictx_get(httpd, "MVSMFCTX", sizeof(MVSMF_CTX))`.
+
 ### Building a Server Module
 
 Create a `project.toml` with dependencies on `crent370` and `httpd`:
