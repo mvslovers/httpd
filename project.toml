@@ -20,10 +20,14 @@ cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_V
 # v1 NCALIB-autocall model; never shipped (the public client lib is [lib]).
 [internal]
 sources = ["src/*.c", "credentials/src/*.c"]
-# cgistart is the CGI launcher: a per-module root (force-included by each CGI
-# module) AND shipped in [lib] for external CGIs.  Keep it OUT of the autocall
-# pool so its @@START can never shadow another module's entry.
-exclude = ["src/cgistart.c"]
+# Module entry points are kept OUT of the autocall pool so their custom __start
+# can never shadow another module's (or a test's) entry by autocall:
+#   - cgistart: the CGI launcher (a per-module root, also shipped in [lib]).
+#   - httpstrt: HTTPD's own __start (rejects SYSPRINT, opens HTTPDOUT/ERR/IN).
+# The HTTPD module lists httpstrt.c in its own [[module]] sources, so it still
+# gets it; everything else (CGI modules, [[test]] modules) resolves the default
+# libc __start instead.
+exclude = ["src/cgistart.c", "src/httpstrt.c"]
 
 # -- Load Modules -------------------------------------------------
 # v1 'include = ["@@CRT1", <members>]' -> startup = "crt1" + the member
@@ -62,6 +66,15 @@ sources = ["src/cgistart.c", "src/httpdsl.c"]
 name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
+
+# -- Tests --------------------------------------------------------
+# http_cgictx_get() registrar.  Uses lock()/__getm() (MVS SVCs), so it is
+# MVS-only (make test-mvs); the host build is skipped (it pulls httpd.h's
+# crent370 internals).  http_cgictx_get resolves from the [internal] autocall
+# archive, so only the test root is listed here.
+[[test]]
+name = "TSTGCTX"
+sources = ["test/mvs/tstgctx.c"]
 
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares

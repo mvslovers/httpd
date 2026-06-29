@@ -141,7 +141,6 @@ struct httpd {
     void        *unused_94;         /* 94 (was: HTTPT *httpt)       */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */
     void        **cgictx;           /* 9C array of CGI context ptrs */
-#define HTTPD_CGICTX_MVSMF  0       /* ... MVSMF CGI context index  */
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */
 #define HTTPD_CGICTX_MAX    255     /* ... maximum number of cgictx */
     char        docroot[128];       /* A0 UFS document root prefix  */
@@ -415,6 +414,8 @@ struct httpx {
     HTTPCP      *xlate_legacy;      /* 11C legacy hybrid codepage pair  */
     UFS *       (*http_get_ufs)(HTTPC *);
                                     /* 120 get/create UFS handle    */
+    void *      (*http_cgictx_get)(HTTPD *, const char *, unsigned);
+                                    /* 124 find/create CGI context  */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -475,6 +476,7 @@ extern HTTPCGI *http_add_cgi(HTTPD *httpd, const char *pgm, const char *path, in
 extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTTPPCGI");
 extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
 extern UFS *http_get_ufs(HTTPC *)                                          asm("HTTPGUFS");
+extern void *http_cgictx_get(HTTPD *, const char *, unsigned)              asm("HTTPGCTX");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -700,6 +702,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_get_ufs(httpc) \
     ((httpx->http_get_ufs)((httpc)))
+
+#define http_cgictx_get(httpd,eye,size) \
+    ((httpx->http_cgictx_get)((httpd),(eye),(size)))
 
 #endif  /* ifndef HTTPX_H */
 
