@@ -1,0 +1,509 @@
+# HTTPD Core — Refactoring Backlog (Performance · Security · Memory)
+
+**Last consolidated:** 2026-06-30
+**Supersedes:** `code-review-2026-03-10.md`, `code-review-2026-04-11.md`,
+`code-review-open-findings.md`, `memory-audit-2026-06-30.md` (all merged here;
+see *Provenance* at the end).
+
+This is the single working backlog for the next performance, security and
+memory refactorings of the **HTTPD core** (the HTTPD load module and the core
+pipeline it links — input, parse, dispatch, file serving, response/send, env
+vars, credentials, SMF, operator console, translation). The built-in **CGI
+modules are out of scope** (HTTPDSRV/HTTPJES2/HTTPDSL/HTTPDM/HTTPDMTT, mvsMF).
+
+## How to read this
+
+Every finding below was **re-verified against the current `main` on
+2026-06-30** — the older reviews predate the mbt v2 migration, the FTP/MQTT/Lua
+removals, and the `CGI=`→`MOD=` and 204/304-chunked fixes, so a large share of
+their findings are already fixed (see *Resolved / moved*). Findings carry a
+**Status**:
+
+- **Open** — present and unmitigated in current code (verified).
+- **Partial** — partially mitigated; residual risk remains.
+- **Latent** — the unsafe code exists but is not reachable by any current caller.
+- **Resolved / Moved** — fixed, or relocated out of the HTTPD core.
+
+**Severity:** Critical / High / Medium / Low. **Effort:** XS (<1h) … L (days).
+Each finding cross-references its original ID (`F-xx` from the open-findings
+list, `H/M/L` from the memory audit, `CRIT/HIGH#n` from the 2026-03 review).
+
+Constraints that bound every recommendation (do not propose violations):
+24-bit, EBCDIC (CP037), gnu99, no VLAs, no POSIX; **HTTPC is exactly 4096 bytes**
+(fixed ABI); **HTTPX is append-only**; **per-byte `recv()` in
+`http_getc`/`http_gets` is an intentional TCP/IP ring-buffer workaround — never
+propose bulk `recv()`**.
+
+---
+
+## Executive summary
+
+The per-request hot path is overwhelmingly stack-based and leak-free on the
+happy path; the prior reviews' worst items (the `sprintf`/`vsprintf` family, the
+integer overflow, the array-add race, FTP/Lua/MQTT attack surface) are **fixed
+or removed**. What remains clusters into a few high-value refactors:
+
+**Top priority — two remotely-reachable defects that compound into a DoS:**
+
+1. **`S1` — remote stack overflow** in the static-file directory-index fallback
+   (`httpget.c`), reachable by an unauthenticated GET in the default config.
+2. **`M1` — per-abend resource leak**: any abend in HTTPD *core* code skips
+   `http_close()`, leaking the 4 KB HTTPC, its socket, env and UFS handles, and
+   leaving a stale pointer in `httpd->busy`.
+
+`S1` forces a core abend → `M1` leaks an HTTPC + socket on every hit → file
+descriptors and worker slots exhaust → with `M5` the listener then dies. Fixing
+`S1` (bound the copy) and `M1` (wrap request processing in `try()`) removes the
+whole chain and also contains every other core fault.
+
+**Also high-value:**
+- `S2`/`S3` — `httpcred` login/redirect path: a `sprintf` into `buf[512]` from a
+  cookie value (overflow + reflected XSS) and an unterminated, unfiltered
+  redirect (header injection).
+- `M2` — the credential array has **no reaper** (unbounded CRED+ACEE growth);
+  this is also the missing "session timeout" from the security backlog.
+- `P1` — environment-variable lookup is **O(n) linear** on every access — a
+  clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
+  dominates; profile before investing).
+
+**Counts (open/partial):** Security 12 · Memory & Stability 12 · Performance 7.
+
+---
+
+## A. Security
+
+### S1 — Remote stack overflow: directory-index fallback `memcpy` into `buf[300]`
+*Critical · Open · Effort XS · `httpget.c:23,47-50` · was F-01 / audit H1*
+
+```c
+23   UCHAR  buf[300];
+47   len = strlen(path);                 /* path = REQUEST_PATH, bounded by CBUFSIZE (4000) */
+48   if (path[len-1]=='/') {
+49       memcpy(buf, path, len);         /* up to ~4000 bytes into buf[300] */
+50       strcpy(&buf[len], "index.html");
+```
+`REQUEST_PATH` is client-controlled and bounded only by `CBUFSIZE` (4000), not
+300. **Reachability verified:** the only URI cap is the 414 gate in
+`httpin.c:24-31`, which fires only when the whole request line exceeds
+`CBUFSIZE-1` (~3999) — so a path of ~301–3980 chars ending in `/` passes 414,
+survives parsing, and reaches this `memcpy`. The preceding `http_open` clamps
+into its own `buf[256]`, fails, and falls through here with the full-length
+path. **Unauthenticated** in the default config (`LOGIN NONE`).
+**Fix:** reject over-long paths (or clamp) before the copy, e.g.
+`if (len + sizeof("default.html") > sizeof(buf)) { http_resp_not_found(...); ... }`;
+build the candidate into the size-checked buffer. Do **not** just enlarge `buf` —
+the input is unbounded; bound it. (Also guard `path` NULL/empty — see S9b.)
+
+### S2 — Stack overflow + reflected XSS: cookie value `sprintf` into `buf[512]`
+*Critical · Open · Effort S · `httpcred.c:237,253-255` · was F-02 / CRIT(2026-04)*
+
+```c
+237  char buf[512];
+253  for(i=0; body3[i]; i++) {
+254      sprintf(buf, body3[i], uri);            /* uri = Sec-Uri cookie, unbounded */
+255      if (rc=http_printf(httpc, " %s\n", buf)) goto quit;
+```
+`print_body()` formats the `Sec-Uri` cookie value into a fixed 512-byte stack
+buffer with `sprintf` (overflow), and writes it **unescaped** into the login
+form HTML (reflected markup/XSS).
+**Fix:** `snprintf`; HTML-escape `uri` (`< > " & '`); enforce a server-side
+cookie-length limit.
+
+### S3 — Header injection / over-read: `Sec-Uri` redirect not terminated or filtered
+*High · Open · Effort S · `httpcred.c:393-401` (+ `Location:` use) · was F-03 / audit L10*
+
+```c
+393  buf = base64_decode(uri, strlen(uri), &len);
+395  if (buf) { strncpy(uribuf, buf, sizeof(uribuf));   /* uribuf[256]: not NUL-terminated */
+396             free(buf); ... uri = uribuf; }
+...  http_printf(httpc, "Location: %s\r\n", uri);       /* CR/LF not rejected */
+```
+`strncpy` does not terminate a ≥256-byte decoded value (over-read when
+`%s`-printed), and the decoded value reaches the `Location:` header without
+CR/LF filtering (response splitting / open redirect).
+**Fix:** `uribuf[sizeof(uribuf)-1] = 0;` after the copy; reject `\r`/`\n`; allow
+only relative (`/…`) redirect targets. (Aligns with TSK-108.)
+
+### S4 — SSI path traversal: `ssi_include` opens directive path unchecked
+*High · Open · Effort S · `httpfile.c:472-533` · was F-05 / CRIT#4(2026-03)*
+
+`ssi_include()` extracts the `file`/`virtual` path from the directive and passes
+it straight to `http_open(httpc, path, mime)` (line 533) with **no `..`
+rejection and no docroot confinement** (the `uri[]` copy at 524 is only for
+display). An SSI document containing `<!--#include virtual="../../…" -->` can
+escape the intended directory.
+**Fix:** reject `..` segments and confirm the resolved path is within DOCROOT
+before opening. *Note:* confirm whether UFSD already sandboxes to the docroot —
+if so this is defense-in-depth; if not it is a real arbitrary-read. Requires SSI
+enabled and the ability to place an SSI file.
+
+### S5 — Percent-decoder out-of-bounds read on trailing `%`
+*Medium · Open · Effort XS · `httpdeco.c:15-21` · was F-07 / audit L7*
+
+```c
+case '%':
+    temp[0] = str[1];           /* str[1] may be the NUL */
+    temp[1] = str[2];           /* reads one byte past the NUL */
+```
+A URI ending in `%` reads one byte past the string (worst case one past
+`httpc->buf`); the value is discarded (benign read) but invalid escapes are also
+silently accepted. **Fix:** decode only inside the existing `if (str[1] &&
+str[2])` guard; optionally reject invalid escapes with 400.
+
+### S6 — SSI output uses unbounded `vsprintf` into `buf[4096]`
+*Medium · Open · Effort XS · `httpfile.c:595,598` · was F-08 / audit M3*
+
+```c
+595  char buf[4096];
+598  len = vsprintf(buf, fmt, args);     /* not vsnprintf */
+```
+`ssi_printv` (every `ssi_printf`) is unbounded. `ssi_printenv` emits a row per
+env var — including attacker-controlled `HTTP_*` headers (~4000 bytes) — and
+`ssi_echo` echoes an env value; either can exceed 4096 → stack overflow.
+**Fix:** `vsnprintf(buf, sizeof(buf), fmt, args)` + handle truncation.
+
+### S7 — POST/PUT body: no `Content-Length` enforcement (413)
+*Medium · Partial · Effort S · `httppars.c:140-215` · was F-09 / MED#9(2026-03)*
+
+The keep-alive **poisoning** half is now mitigated: when a body was present but
+not fully read, keep-alive is disabled (`httppars.c:206-210`,
+`HTTP_CONTENT-LENGTH`/`HTTP_TRANSFER-ENCODING` ⇒ `keepalive = 0`). **Residual:**
+the body is still read with a blanket `recv(buf, CBUFSIZE-1)` with no
+`Content-Length` parse, no `413 Payload Too Large` for oversize bodies, and no
+rejection of a missing `Content-Length` (RFC 7230 §3.3.3).
+**Fix:** parse `Content-Length`, read exactly that many bytes, 413 on oversize,
+reject missing CL on a body-bearing method.
+
+### S8 — No limit on query/POST parameter count (memory-exhaustion DoS)
+*Medium · Open · Effort XS · `httppars.c` query/POST loops · was F-12 / MED#11*
+
+Each parameter is `array_add`'d to the env list with no cap; `?a=1&b=2&…`
+(thousands) exhausts memory. **Fix:** cap (e.g. 256 params) and reject with 400.
+
+### S9 — Operator `D M` / `D TI` with no argument abends the console thread
+*Low · Open · Effort XS · `httpcons.c:326,377` · audit L4*
+
+`display()` passes `rest = strtok(NULL,"")` (NULL when the verb has no argument)
+into `strtoul(NULL,…)` / `strtol(NULL,…)` on the console thread (no `try()`).
+**Fix:** `if (!buf) { wtof(usage); return 0; }` (as `s_login`/`s_stats` already
+do).
+**S9b (related to S1):** `httpget.c:31,36,47` assume `path` is non-NULL/non-empty;
+`http_get_env` can return NULL → `http_cmp(NULL,…)`/`strlen(NULL)`/`path[-1]`.
+Fold the NULL guard in with S1.
+
+### S10 — Latent `strcat("&")` in query parsing
+*Low · Open · Effort XS · `httppars.c:49,168` · was F-10*
+
+Guarded today (`if (strlen(buf) < CBUFSIZE-2) strcat(buf,"&")`) but fragile.
+**Fix:** position-based write or `strncat`.
+
+### S11 — `strtok` in the request-line parser
+*Low · Open · Effort XS · `httpin.c:45,49,51` · was F-11*
+
+Non-reentrant and inconsistent with the rest of the codebase (other `strtok`
+sites were replaced under GH#11). Safe today (per-worker buffer). **Fix:**
+manual `strchr`-based tokenisation.
+
+### S12 — SSI echo NULL/empty var guard *(mostly resolved)*
+*Low · Partial · `httpfile.c:391` · was F-13*
+
+An empty-variable guard is now present (`if (!*var) goto quit;`), and `var` is a
+non-NULL pointer into the parse buffer, so the original NULL-deref is not
+reachable. Optionally harden to `if (!var || !*var)` for symmetry.
+
+### Security architecture backlog (design-level, cross-cutting)
+*From the 2026-03 review §Security Architecture — still valid:*
+- **No TLS** — login credentials are sent in plaintext POST.
+- **No `HttpOnly`/`Secure`/`SameSite`** on the `Sec-Token` cookie.
+- **No session timeout / token expiry** — see `M2` (no reaper); fixing `M2`
+  delivers this.
+- **No login rate-limiting** — brute force possible.
+- **Blowfish** (64-bit block) for in-memory CREDID — adequate for transient
+  storage, dated as a standard.
+- **Binary authorization only** (login-or-not). For per-endpoint/RACF-resource
+  authorization, see *Architecture* (HTTPX auth helper).
+
+---
+
+## B. Memory & Stability
+
+### M1 — Worker abend leaks HTTPC + socket + env + UFS, and corrupts `busy`
+*High · Open · Effort M · `httpd.c:591,606-612` · audit H2*
+
+```c
+591  abendrpt(ESTAE_CREATE, DUMP_DEFAULT);      /* worker ESTAE: dumps + percolates */
+606  while(httpc->state != CSTATE_CLOSE) { http_process_client(httpc); ... }  /* abend here */
+612  http_close(httpc);                          /* SKIPPED on abend */
+```
+The ESTAE installed by `abendrpt` does not retry — `libc370 @@abrpt.c:361,366`
+does `SETRP(sdwa,0,0,0); return 0` (percolate). Any abend in **core** code (not
+a CGI under `__linkds`, whose abends *are* caught and reach `CSTATE_CLOSE`)
+terminates the worker before `http_close`. Leaked per abend: the 4 KB HTTPC
+(`httpd.c:516`), its env array, its `ufs` session, any open `ufp`, **and the
+socket** (FD leak); plus `httpd->busy` keeps a **stale pointer** (the worker
+added it at `httppc.c:28` and abended before `http_reset_busy` at `httppc.c:149`;
+`http_close`/`httpclos` never touch `busy`). Reproducible trigger: `httpget.c:36`
+`/abend`; remote trigger: **S1**.
+**Fix:** wrap the per-request processing in `try()`/`tryrc()` (`clibtry.h`,
+already used at `httpd.c:903` and in mvsMF's `router.c`); on non-zero rc run
+`http_close(httpc)` + `http_reset_busy(httpc)` before looping. Keep `abendrpt`
+for the dump. This also contains S9b and the other core derefs.
+
+### M2 — Credential array has no reaper → unbounded CRED + ACEE growth
+*Medium · Open · Effort M · `credentials/src/crednew.c:10` · audit M1 (= security session-timeout)*
+
+`cred->last = time64(NULL)` is written once and **never read** (verified: no
+reader in `src/` or `credentials/src/`); there is no idle-expiry, reaper, or
+reconfig. A `CRED` (≈80 B) + a RACF ACEE is added per distinct
+`(addr,user,pass)` login and removed only by an explicit `/logout` with the
+exact `Sec-Token`, or at shutdown. A client that never logs out, or re-logs-in,
+leaves the prior CRED+ACEE resident forever.
+**Fix:** refresh `cred->last` on each `cred_find_by_token` hit; add a periodic
+sweep that `array_del`+`cred_free`s entries idle beyond a configurable TTL (this
+*is* the missing session timeout); or cap the array.
+
+### M3 — `cred_free` releases storage before releasing its lock
+*Medium · Open · Effort XS · `credentials/src/credfree.c:42-45` · audit M2*
+
+```c
+42   free(c);                  /* storage returned to heap... */
+45   unlock(c, LOCK_EXC);      /* ...ENQ on &c released AFTER */
+```
+The address-keyed ENQ is held while the block is back on the free-list; a
+concurrent worker that re-`malloc`s the address and `trylock`s it sees a stale
+"busy". **Fix:** unlock before free (`memset → unlock → free → *cred = NULL`).
+
+### M4 — Queue-add failure leaks the accepted HTTPC + socket
+*Medium · Open · Effort XS · `httpd.c:551` · audit M4*
+
+`cthread_queue_add(mgr, httpc)`'s return is ignored; on its internal `calloc`
+failure (OOM) or a QUIESCE/STOPPED race the client is neither queued nor freed →
+HTTPC + socket leak. **Fix:** `if (cthread_queue_add(mgr, httpc)) http_close(httpc);`.
+
+### M5 — Listener thread dies permanently on a transient accept/calloc error
+*Medium · Open · Effort XS · `httpd.c:498-502,516-520` · audit M5*
+
+A single transient `accept()` error or HTTPC `calloc` failure does `goto quit`,
+exiting the accept loop for good — the server stops accepting all new
+connections. **Fix:** `continue` for transient errors; reserve loop exit for
+SHUTDOWN/QUIESCE. (This is where FD exhaustion from M1 becomes a total outage.)
+
+### M6 — `crt->crtufs` dangling after `ufsfree`
+*Low · Open · Effort XS · `httpgufs.c:17` + `httpclos.c:36` · audit L2*
+
+`http_get_ufs` caches the session in the per-worker `crt->crtufs`; `httpclos`
+frees+NULLs `httpc->ufs` but not the cached alias. Safe today (next
+`http_get_ufs` overwrites it before any UFS op). **Fix:** clear `crt->crtufs` in
+`httpclos` when it equals the freed session.
+
+### M7 — Keep-alive reset does not close `fp`/`ufp`
+*Low · Latent · Effort XS · `httprese.c` · audit L3*
+
+`httprese` frees `env` and retains `ufs` (correct), but never closes `fp`/`ufp`.
+Safe only because every current RESET is preceded by `httpdone` (which closes
+them) or reaches RESET with no file open. A future handler that opens a UFS file
+then transitions straight to RESET would leak a handle per persistent
+connection. **Fix:** mirror `httpclos.c:34-35`'s defensive close at the top of
+`httprese`.
+
+### M8 — `array_add` return ignored in `http_set_env`
+*Low · Open · Effort XS · `httpsenv.c:25` · audit L5*
+
+On OOM the new HTTPV is neither stored nor freed (orphan the teardown can't
+reach), and `http_del_env` already removed the old one — the variable silently
+vanishes. **Fix:** `if (array_add(&httpc->env, v)) { free(v); rc=-1; }`.
+
+### M9 — Env-var block over-allocation (~4 bytes/var)
+*Low · Open · Effort XS · `httpnenv.c:11` · audit L6*
+
+`total = sizeof(HTTPV)(16) + namelen + vallen + 2` where the layout needs
+`offsetof(HTTPV,name)(12) + namelen+1 + vallen+1`. ~4 wasted bytes **per env
+var, per request** — the only pure per-request memory waste. **Fix:**
+`total = offsetof(HTTPV,name) + namelen + 1 + vallen + 1;` (see also `P5`).
+
+### M10 — Unchecked `strdup` in CGI registration
+*Low · Open · Effort XS · `httpacgi.c:23-24` · was F (mem 2026-03) / audit L9*
+
+`cgi->path`/`cgi->pgm` aren't NULL-checked and `array_add` is unconditional; an
+OOM at config time registers a half-built entry → later NULL-deref at
+match/link. (Config-time only; the strdup storage itself is intentionally
+AS-lifetime.) **Fix:** free the partial entry on failure; don't register it.
+
+### M11 — `cgictx` array not freed at `terminate()`
+*Low · Open · Effort XS · `httpd.c:167-168,284-304` · audit L19*
+
+Benign one-shot (reclaimed at AS end). **Fix:** `free(httpd->cgictx)` in
+`terminate()` for completeness. (The pointed-to `__getm` context blocks are
+AS-lifetime **by design** — not a leak.)
+
+### M12 — `http_gets` NULL-buf 1-byte overflow
+*Low · Latent · Effort XS · `httpgets.c:76-77` · audit L8*
+
+In the `buf==NULL` branch `max==CBUFSIZE` (4000), so an exact-length line + LF
+writes `buf[4000]` (one past `httpc->buf`). **Unreachable today** — both callers
+pass `max=CBUFSIZE-1`. **Fix:** set `max=CBUFSIZE-1` in the NULL branch too.
+
+---
+
+## C. Performance
+
+### P1 — Environment-variable lookup is O(n) linear, on every access
+*Medium · Open · Effort S-M · `httpfenv.c` · from 2026-03 §Memory & Optimization*
+
+```c
+for(n=0; n<count; n++)
+    if (http_cmp(v->name, name)==0) { indx = n+1; break; }   /* caseless, full scan */
+```
+`http_get_env`/`http_find_env` scan the whole env array (50+ vars/request:
+headers + query + cookies) on every lookup, and the request path looks up many
+vars — a clear O(n) inefficiency worth removing. Comparison is **caseless**
+(`http_cmp`), so any index must normalise case. *Caveat (unprofiled):* this is
+single-digit microseconds per lookup — meaningful for **static/non-CGI**
+requests, but for CGI dispatch the LINK SVC (`P7`, ~50 ms) dominates by orders
+of magnitude. Confirm the bottleneck by profiling before investing here.
+**Options (pick one):** a small hash (FNV/DJB2 over the upcased name); keep the
+array sorted + binary search (no extra memory); or a one-slot last-hit cache
+(smallest change). Hash gives the best worst-case for header-heavy requests.
+
+### P2 — Worker busy-spins on `EWOULDBLOCK` mid-send
+*Medium · Open · Effort M · `httpd.c:606-609` + `httpsend.c:24-25` · audit M6 / was F-04*
+
+Sockets are non-blocking (`ioctlsocket(FIONBIO)`, `httpd.c:509`). On
+`EWOULDBLOCK`, `send_raw` returns the partial count without advancing state, and
+the worker loop (`while(state!=CSTATE_CLOSE) http_process_client(httpc);`) has no
+`select`/yield between iterations — a slow/stalled client makes the worker spin
+at 100% CPU while holding `httpc->ufp` open, degrading the whole pool.
+**Fix:** gate re-entry on writability (the existing `select` in `socket_thread`)
+and/or enforce `CLIENT_TIMEOUT` during transfer. (Keep the per-byte `recv` read
+path — intentional.)
+
+### P3 — Chunked short-send desyncs the chunk frame
+*Low · Open · Effort S · `httpsend.c:54-68` · audit L17 / part of F-04*
+
+The chunked branch only checks `rc < 0`; `send_raw` returns a positive short
+count on `EWOULDBLOCK`, so a partial header/data send is treated as complete and
+corrupts framing. **Fix:** treat `rc < hdrlen`/`rc < len` as incomplete (ties to
+P2; do the send-state machine once).
+
+### P4 — Triple 4 KB `memset` of `httpc->buf` per request
+*Low · Open · Effort XS · `httppars.c:151,189,213` · from 2026-03*
+
+Three `memset(httpc->buf, 0, CBUFSIZE)` (4000 B each) per request body path.
+**Fix:** zero only the used portion (`memset(buf, 0, len+1)`), or rely on
+`http_gets`'s own clearing where it already zeroes.
+
+### P5 — Hot-path env allocation churn (arena opportunity)
+*Low · Open · Effort M · `httpnenv.c` + `httprese.c` · from 2026-03 (ties M9)*
+
+Each request `calloc`s 10–20 small HTTPV blocks and frees them in `httprese`.
+For higher load, a per-HTTPC env arena/pool (reset, not freed, between requests)
+would cut allocator traffic and fragmentation. Acceptable at current load (3–9
+clients); revisit if concurrency grows. Combine with M9's sizing fix.
+
+### P6 — Large transient stack frames vs the 64 KB worker stack
+*Info · `httpprtv.c:12` (`buf[5120]`), `httpfile.c:595` (`buf[4096]`), SSI recursion ≤10 · audit L18/L15*
+
+Not leaks (stack, auto-freed), but the deep chain
+`worker → httppc → __linkds → CGI → http_printf(buf[5120])` plus SSI recursion
+to depth 10 (per-frame `uri[256]`+`tmp[256]`+`save[256]` + `buf[4096]`) is the
+stack budget to watch. **Action:** keep an eye on worst-case depth; shrink
+per-frame buffers or lower `SSI_LEVEL_MAX` only if stack-overflow evidence
+appears.
+
+### P7 — LINK SVC per CGI dispatch (~50 ms)
+*Architecture · `httppc.c`/`httplink.c` · from 2026-03 §Router comparison*
+
+Every CGI dispatch is a `__linkds` LINK SVC. A built-in method/`{param}` router
+(see *Architecture*) for hot, in-process handlers would avoid the re-LINK cost
+for frequently-called endpoints and enable mvsMF integration.
+
+---
+
+## Verified clean / intentional — do **not** re-flag
+
+- **Per-byte `recv()`** (`http_getc`/`http_gets`) — TCP/IP ring-buffer
+  workaround; must not become bulk `recv()`.
+- **`__getm` CGI-context blocks** (`httpgctx.c`) and the **`strdup`s in
+  `httpacgi.c`** — allocated once, AS-lifetime, never freed by design.
+- **`httpc->cred` is a borrowed pointer** (the CRED lives in the process-wide
+  array); `httprese` correctly NULLs it, never frees it.
+- **Env-var ownership:** the `httpc->env` array owns each HTTPV; `http_set_env`
+  replaces via delete-old-then-add; `array_free(&httpc->env)` frees each element
+  and NULLs the pointer — no double-free/UAF across keep-alive then close.
+- **CGI abends** are caught by `__linkds`'s ESTAE (→ `CSTATE_CLOSE` →
+  `http_close`); only *core* abends leak (M1).
+- **`httpclos`/`httpdone`** are a correct teardown net on the normal/keep-alive
+  paths. **SMF records** and **LINK parameter lists** are stack structs.
+
+---
+
+## Resolved / moved since the earlier reviews (do not re-open)
+
+| Earlier finding | Status | Evidence |
+|-----------------|--------|----------|
+| `sprintf` in header/query/POST name build (CRIT#1) | **Resolved** | `snprintf` — `httpshen.c:14,65`, `httpsqen.c:11`, `httppars.c:231` |
+| Unbounded `vsprintf` in `http_printv` (CRIT#2) | **Resolved** | `vsnprintf` — `httpprtv.c:14` |
+| Integer overflow in `httpnenv` (HIGH#6) | **Resolved** | `size_t` + `if (namelen+vallen>8192) return NULL` — `httpnenv.c:9-15` |
+| Missing return in `parse_cookies` (HIGH#7) | **Resolved** | `httpshen.c` returns on all paths |
+| Race on client `array_add` (HIGH#8) | **Resolved** | `lock(httpd,0)` around add — `httpd.c:556-558` |
+| Version-string `sprintf` (LOW#13) | **Resolved** | `snprintf` — `httppars.c:92` |
+| FTP path traversal + `sprintf` overflows (CRIT#5, MED#12) | **Removed** | FTP daemon removed (TSK-2) |
+| MQTT telemetry NULL-checks + partial leak (`httppubf.c`) | **Removed** | MQTT telemetry removed |
+| Lua config NULL-checks (`httpconf.c`) | **Removed** | Lua config replaced by Parmlib (`httpprm.c`) |
+| `httplua.c` `strcpy` into `dataset[256]` (F-06) | **Moved** | now `mvslovers/httplua` |
+| Keep-alive body poisoning (part of F-09) | **Mitigated** | `keepalive=0` on unread body — `httppars.c:206-210` |
+| SSI echo empty-var (F-13) | **Mostly resolved** | `if (!*var)` — `httpfile.c:391` (see S12) |
+
+---
+
+## Architecture & roadmap (planning horizon, lower urgency)
+
+- **File consolidation.** Post FTP/MQTT/Lua removal the tree is much smaller, but
+  several single-function clusters remain (env CRUD across `httpfenv/nenv/denv/`
+  `senv/shen/sqen`, `dbg*` ×7, busy `is/sbz/rbz`). Consolidating is a
+  build-system change (source list) with **no ABI impact** — improves
+  navigability for the refactors above.
+- **Built-in router + middleware** (method dispatch, `{param}` extraction,
+  before/after middleware) exported via HTTPX (append-only). Reduces LINK
+  overhead (P7), enables path-parameter handlers, and is the basis for mvsMF to
+  register routes instead of carrying its own `router.c`.
+- **RACF resource-auth helper in HTTPX** (`http_check_auth(class,resource,attr)`)
+  so CGIs can do fine-grained authorization and reuse the httpd session instead
+  of re-authenticating (mvsMF `authmw.c` currently re-auths every request).
+- **Unified error model.** Define `enum httpd_rc` in `errors.h` and adopt
+  goto-cleanup consistently (three error conventions coexist today).
+
+### Suggested refactoring order
+
+1. **Stability/security criticals:** **S1** (bound the copy) + **M1** (`try()`
+   net) — together they kill the remote DoS chain and contain all core faults.
+2. **Quick security wins:** **S2**, **S3** (`httpcred` `snprintf` + escape +
+   CR/LF reject), **S5**, **S6** (`vsnprintf`), **M3** (unlock/free swap),
+   **M4**, **M5** (one-line robustness). Mostly XS.
+3. **Memory stability:** **M2** (credential reaper — also closes the
+   session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
+4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
+   (one send-state machine), **P4**.
+5. **Hardening:** **S4**, **S7**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
+6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
+   consolidation, and the security-architecture backlog (cookie flags, rate
+   limiting, TLS).
+
+---
+
+## Provenance & methodology
+
+Consolidated from four prior documents and **re-verified against `main` on
+2026-06-30** (static inspection of `src/` and `credentials/src/`, plus the
+`libc370` abend-recovery path; no runtime fuzzing):
+
+- `code-review-2026-03-10.md` — broad review (security, architecture, memory,
+  router comparison; pre-FTP/MQTT/Lua-removal).
+- `code-review-2026-04-11.md` — focused memory-safety/security pass (7 findings).
+- `code-review-open-findings.md` — the 2026-04-12 consolidation (F-01…F-13).
+- `memory-audit-2026-06-30.md` — six-subsystem memory & stability audit
+  (H1/H2 + M/L series), every concrete finding hand-verified.
+
+Each finding above carries its original ID for traceability. Where the older
+reviews and the current code disagreed, the **current code wins** and the status
+reflects today's `main`.
