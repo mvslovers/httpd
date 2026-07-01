@@ -390,9 +390,9 @@ thread (wait on `mgr->task->termecb`) before `cthread_delete(&mgr->task)` /
 `free(mgr)`, instead of fixed 0.25 s `STIMER` waits; and worker teardown should
 confirm `termecb` before `cthread_worker_del` (as `dispatch_thread_check`
 already does on the graceful path) rather than force-detach an active subtask.
-HTTPD only calls the shared API — no local fix, but worth a tracking issue
-against libc370. Same abend-fragility family as **M1** (different trigger:
-shutdown teardown vs request processing).
+HTTPD only calls the shared API — no local fix. Tracked in
+**mvslovers/libc370#6**. Same abend-fragility family as **M1** (different
+trigger: shutdown teardown vs request processing).
 
 ---
 
@@ -536,8 +536,8 @@ for frequently-called endpoints and enable mvsMF integration.
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** **S4**, **S7**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
-   **M13** (shutdown teardown race) is mostly a **libc370** fix — raise a tracking
-   issue there; it affects every cthread user, not just HTTPD.
+   **M13** (shutdown teardown race) is mostly a **libc370** fix — tracked in
+   mvslovers/libc370#6; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
    consolidation, and the security-architecture backlog (cookie flags, rate
    limiting, TLS).
