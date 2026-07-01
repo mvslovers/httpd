@@ -66,7 +66,7 @@ whole chain and also contains every other core fault.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 12 · Memory & Stability 12 · Performance 7.
+**Counts (open/partial):** Security 12 · Memory & Stability 13 · Performance 7.
 
 ---
 
@@ -343,6 +343,57 @@ In the `buf==NULL` branch `max==CBUFSIZE` (4000), so an exact-length line + LF
 writes `buf[4000]` (one past `httpc->buf`). **Unreachable today** — both callers
 pass `max=CBUFSIZE-1`. **Fix:** set `max=CBUFSIZE-1` in the NULL branch too.
 
+### M13 — Shutdown teardown race: worker force-DETACHed → S33E + nested reporter abend
+*Medium · Open (root cause in libc370 cthread) · Effort M · `httpd.c:274` (`terminate` → `cthread_manager_term`) + libc370 `@@cmterm.c`/`@@cminit.c`/`@@cmwshu.c` · observed in a 2026-07-01 STC log*
+
+On a live `P HTTPD`, 5 of 6 workers logged `HTTPD060I SHUTDOWN` cleanly; the
+**first-created** worker (`0CB0C8`, `TCB=009CD500`) did **not**, and abended
+instead — after which `terminate()` still reached `HTTPD002I SHUTDOWN`:
+
+```
+ABEND S33E detected ... TCB=009CD500   PSW 00000000 00000000  KEY(0) MODE(SUP)
+ABEND S0C4 detected ... epname get_addr offset 00000064  TCB=009CD500  KEY(8) MODE(PROB)
+```
+
+**Mechanism (confirmed by reading the teardown):** `terminate()` →
+`cthread_manager_term` (`httpd.c:274`) tears workers down **in reverse creation
+order** using **fixed `STIMER` waits, not a join**, and force-detaches subtasks
+that have not set `termecb`:
+- `cthread_worker_shutdown` posts `POST_SHUTDOWN`, waits ≤5 s, then
+  `cthread_detach`s the still-active task; `dispatch_thread_term` does
+  shutdown + `cthread_worker_del` back-to-back; `cthread_delete` →
+  `cthread_detach` → `try(detach,…)` issues an MVS **DETACH of an incomplete
+  subtask**, which abnormally terminates it → the **S33E** (KEY 0/SUP = the
+  DETACH/termination path; PSW 0 = no clean failing PSW).
+- The worker's ESTAE (`abendrpt`) then runs `get_addr` (libc370
+  `@@abrpt.c:50`), which dereferences a register value (`*np`, ≈offset 0x64)
+  pointing into the just-freed save area → the **nested S0C4**, caught by the
+  reporter's own `failed()` recovery (it even ships a commented "force a bad
+  address to test failed()" hook). So the S0C4 is *noise on top of* the S33E,
+  not the defect.
+
+The **first-created** worker is the consistent victim because the reverse walk
+handles it **last** — it is the one most exposed to the window where
+`cthread_manager_term` stops waiting and the force-detach / `free(mgr)` opens.
+(*The exact victim selection is a well-supported hypothesis; the underlying race
+is confirmed from the code.*)
+
+**Impact:** shutdown is **unclean** — two spurious abends per `P HTTPD`.
+Functional impact today is low (the address space still terminates), but under
+different timing (a slow-to-exit worker) `cthread_manager_term` can
+`cthread_delete(&mgr->task)` + `free(mgr)` while the dispatch thread is still in
+`dispatch_thread_term` iterating `mgr->worker` → a genuine use-after-free.
+
+**Root cause & fix — in `libc370` (shared by all cthread users: ufsd, ftpd, …,
+so coordinate there):** `cthread_manager_term` should **join** the dispatch
+thread (wait on `mgr->task->termecb`) before `cthread_delete(&mgr->task)` /
+`free(mgr)`, instead of fixed 0.25 s `STIMER` waits; and worker teardown should
+confirm `termecb` before `cthread_worker_del` (as `dispatch_thread_check`
+already does on the graceful path) rather than force-detach an active subtask.
+HTTPD only calls the shared API — no local fix, but worth a tracking issue
+against libc370. Same abend-fragility family as **M1** (different trigger:
+shutdown teardown vs request processing).
+
 ---
 
 ## C. Performance
@@ -485,6 +536,8 @@ for frequently-called endpoints and enable mvsMF integration.
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** **S4**, **S7**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
+   **M13** (shutdown teardown race) is mostly a **libc370** fix — raise a tracking
+   issue there; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
    consolidation, and the security-architecture backlog (cookie flags, rate
    limiting, TLS).
@@ -507,3 +560,8 @@ Consolidated from four prior documents and **re-verified against `main` on
 Each finding above carries its original ID for traceability. Where the older
 reviews and the current code disagreed, the **current code wins** and the status
 reflects today's `main`.
+
+**2026-07-01:** added **M13** (shutdown teardown race) from a live `P HTTPD` STC
+log, verified against `httpd.c`'s `terminate()` and the libc370 cthread teardown
+(`@@cmterm.c`/`@@cminit.c`/`@@cmwshu.c`/`@@ctdel.c`/`@@ctdet.c`) and the abend
+reporter (`@@abrpt.c`).
