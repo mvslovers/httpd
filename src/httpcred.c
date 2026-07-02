@@ -210,7 +210,6 @@ static const char *body2[] = {
 };
 
 static const char *body3[] = {
-	"    <input type=\"hidden\" name=\"uri\" value=\"%s\">",
 	"    <button type=\"submit\">Login</button>",
 	"    <p class=\"message\">This server uses cookies to store a security token when you login.</p>",
 	"   </div>",
@@ -234,7 +233,7 @@ print_body(HTTPD *httpd, HTTPC *httpc, const char *msg)
 	int		rc;
 	char	*p;
 	char	*uri = http_get_env(httpc, "HTTP_Cookie-Sec-Uri");
-	char	buf[512];
+	char	esc[512];
 
 	if (!uri) uri = "/";
 	
@@ -250,9 +249,16 @@ print_body(HTTPD *httpd, HTTPC *httpc, const char *msg)
 		if (rc=http_printf(httpc, " %s\n", body2[i])) goto quit;
 	}
 
+	/* The hidden field carries the client-controlled Sec-Uri cookie back to
+	   the form.  HTML-escape it (reflected XSS) and print it directly -- never
+	   sprintf an unbounded cookie value into a fixed stack buffer (overflow). */
+	http_html_escape((UCHAR *)esc, sizeof(esc), (UCHAR *)uri);
+	if (rc=http_printf(httpc,
+	        "    <input type=\"hidden\" name=\"uri\" value=\"%s\">\n", esc))
+		goto quit;
+
 	for(i=0; body3[i]; i++) {
-		sprintf(buf, body3[i], uri);
-		if (rc=http_printf(httpc, " %s\n", buf)) goto quit;
+		if (rc=http_printf(httpc, " %s\n", body3[i])) goto quit;
 	}
 
 quit:
@@ -388,20 +394,31 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 #if 0
 	wtof("httpcred.c:process_post() uri=\"%s\"", uri ? uri : "(null)");
 #endif
-	/* if the uri is for "/login" then we want to redirect to "/" */
+	/* decode the Sec-Uri cookie into the post-login redirect target */
 	if (uri) {
 		buf = base64_decode(uri, strlen(uri), &len);
 		if (buf) {
-			strncpy(uribuf, buf, sizeof(uribuf));
+			/* base64_decode returns binary and does not NUL-terminate; copy
+			   exactly the decoded length (bounded) and terminate.  strncpy
+			   here would over-read buf hunting for a NUL. */
+			if (len >= sizeof(uribuf)) len = sizeof(uribuf) - 1;
+			memcpy(uribuf, buf, len);
+			uribuf[len] = 0;
 			free(buf);
 #if 0
 			wtof("httpcred.c:process_post() uribuf=\"%s\"", uribuf);
 #endif
 			uri = uribuf;
 		}
-		
-		if (http_cmpn(uri, "/login", 6)==0) {
+
+		/* only follow a safe, site-local target: reject CR/LF (Location
+		   header injection) and off-site / protocol-relative URIs (open
+		   redirect); otherwise fall back to "/" */
+		if (!http_safe_redirect((UCHAR *)uri)) {
 			uri = "/";
+		}
+		else if (http_cmpn(uri, "/login", 6)==0) {
+			uri = "/";   /* don't bounce the user back to the login page */
 		}
 	}
 	else {

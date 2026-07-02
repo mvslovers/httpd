@@ -63,17 +63,17 @@ listener bailing on a transient error) remains of this chain — a one-liner in
 the *Also high-value* / hardening set below.
 
 **Also high-value:**
-- `S2`/`S3` — `httpcred` login/redirect path: a `sprintf` into `buf[512]` from a
-  cookie value (overflow + reflected XSS) and an unterminated, unfiltered
-  redirect (header injection).
+- ~~`S2`/`S3` — `httpcred` login/redirect path~~ **✔ Resolved (PR #79 / issue
+  #78)** — cookie `sprintf`/XSS and the unterminated, unfiltered redirect are
+  fixed via `http_html_escape()` + `http_safe_redirect()`.
 - `M2` — the credential array has **no reaper** (unbounded CRED+ACEE growth);
   this is also the missing "session timeout" from the security backlog.
 - `P1` — environment-variable lookup is **O(n) linear** on every access — a
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 11 · Memory & Stability 12 · Performance 7.
-*(S1 resolved 2026-07-02, PR #73; M1 resolved 2026-07-02, PR #77.)*
+**Counts (open/partial):** Security 9 · Memory & Stability 12 · Performance 7.
+*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79.)*
 
 ---
 
@@ -111,7 +111,14 @@ build the candidate into the size-checked buffer. Do **not** just enlarge `buf` 
 the input is unbounded; bound it. (Also guard `path` NULL/empty — see S9b.)
 
 ### S2 — Stack overflow + reflected XSS: cookie value `sprintf` into `buf[512]`
-*Critical · Open · Effort S · `httpcred.c:237,253-255` · was F-02 / CRIT(2026-04)*
+*Critical · Resolved (2026-07-02, PR #79 / issue #78) · Effort S · `httpcred.c:237,253-255` · was F-02 / CRIT(2026-04)*
+
+> **Resolved:** the fixed `buf[512]` + `sprintf` is gone. `print_body()` now
+> HTML-escapes the `Sec-Uri` cookie with the new `http_html_escape()`
+> (`src/httpesc.c`, escapes `& < > " '`, bounded + always terminated) and
+> prints the hidden field directly — no unbounded copy into a stack buffer, no
+> unescaped reflection. Verified natively (`TSTSAFE`, incl. a `"><script>`
+> breakout).
 
 ```c
 237  char buf[512];
@@ -126,7 +133,16 @@ form HTML (reflected markup/XSS).
 cookie-length limit.
 
 ### S3 — Header injection / over-read: `Sec-Uri` redirect not terminated or filtered
-*High · Open · Effort S · `httpcred.c:393-401` (+ `Location:` use) · was F-03 / audit L10*
+*High · Resolved (2026-07-02, PR #79 / issue #78) · Effort S · `httpcred.c:393-401` (+ `Location:` use) · was F-03 / audit L10*
+
+> **Resolved:** the `strncpy` (a *source* over-read — `base64_decode` returns
+> binary and does not NUL-terminate, so it scanned past the decoded allocation)
+> is replaced by a length-bounded `memcpy` of the reported decoded length +
+> explicit terminate. Before it reaches `Location:`, the target is validated by
+> the new `http_safe_redirect()` (`src/httpsrdr.c`): reject unless it is a
+> single-leading-`/` site-local path with no `//`/`/\` and no CR/LF, else fall
+> back to `/` — closing the header-injection and open-redirect. Edge-case table
+> verified natively (`TSTSAFE`).
 
 ```c
 393  buf = base64_decode(uri, strlen(uri), &len);
@@ -536,6 +552,8 @@ for frequently-called endpoints and enable mvsMF integration.
 | SSI echo empty-var (F-13) | **Mostly resolved** | `if (!*var)` — `httpfile.c:391` (see S12) |
 | Directory-index stack overflow + NULL path (S1 / S9b) | **Resolved (2026-07-02)** | bounded copy + NULL/empty guard — `httpget.c`, PR #73 / issue #72 |
 | Worker abend leaks HTTPC/socket + corrupts `busy` (M1) | **Resolved (2026-07-02)** | `try()` net + gated `http_reset_busy` before `http_close` — `httpd.c`, PR #77 / issue #76 |
+| Cookie `sprintf` overflow + reflected XSS (S2) | **Resolved (2026-07-02)** | `http_html_escape()` + direct print — `httpcred.c`/`httpesc.c`, PR #79 / issue #78 |
+| `Sec-Uri` redirect over-read + header injection / open redirect (S3) | **Resolved (2026-07-02)** | length-bounded `memcpy` + `http_safe_redirect()` — `httpcred.c`/`httpsrdr.c`, PR #79 / issue #78 |
 
 ---
 
@@ -546,18 +564,27 @@ refactorings (the working policy: **when a fix lands and a unit test is
 sensible, add it in the same PR**). Because `httpd.h` pulls the non-host-portable
 crent370/libc370 runtime stack, tests that reach through it are **MVS-target**
 (`make test-mvs`) and carry `host = false` so `make test-host` skips them
-cleanly (needs mbt ≥ `d57d447`). Assertions on decoded/translated bytes must use
-the `asc2ebc`/`ebc2asc` tables (or char literals), never bare hex — EBCDIC.
+cleanly (needs mbt ≥ `d57d447`). **Where a fix extracts a pure helper, keep that
+helper free of `httpd.h`** (only `<stddef.h>` + char literals): the test then
+runs **DUAL** (host *and* MVS), so the logic is actually *executed* on the host
+— real signal, not just a cc370 compile. Assertions on decoded/translated bytes
+must use the `asc2ebc`/`ebc2asc` tables (or char literals), never bare hex —
+EBCDIC.
 
 **Done**
 - `TSTDECO` — `http_decode()`/`httpdeco()` percent/plus decoder, incl. the **S5**
   trailing-`%` boundary (pins current behaviour; update the assertion when S5 is
-  fixed). *(PR #75 / issue #74.)*
+  fixed). MVS-target. *(PR #75 / issue #74.)*
+- `TSTSAFE` — `http_html_escape()` (**S2**) + `http_safe_redirect()` (**S3**),
+  the extracted string-safety helpers. **Dual** (runs on host + MVS); 26
+  assertions incl. an XSS breakout and the open-redirect / CRLF edge-case table.
+  *(PR #79 / issue #78.)*
 
 **Open — pure helpers, cleanly unit-testable (good next targets)**
 - **`httpcmp`/`httpcmpn`** — EBCDIC caseless compare (collation correctness; XS).
 - **`http_mime`** — extension→type mapping (table lookup; XS).
-- **`base64_decode`** — pairs with **S3** (decode length/termination edge cases).
+- *(base64 decode itself is a **libc370** function — a test belongs there, not
+  here; the httpd-side S3 sanitiser is covered by `TSTSAFE`.)*
 - **`httpnenv`** — env-block sizing math, pairs with **M9** (assert the exact
   `offsetof`-based size; guards the over-alloc fix).
 - **`httpdeco` invalid-escape** — extend `TSTDECO` when **S5** is fixed (reject /
@@ -593,9 +620,9 @@ the `asc2ebc`/`ebc2asc` tables (or char literals), never bare hex — EBCDIC.
 1. **Stability/security criticals:** ~~**S1** (bound the copy)~~ **✔ done (PR #73)**
    + ~~**M1** (`try()` net)~~ **✔ done (PR #77)** — the S1→M1 DoS leak-chain is
    broken both ways; only **M5** of that chain remains (see step 2).
-2. **Quick security wins:** **S2**, **S3** (`httpcred` `snprintf` + escape +
-   CR/LF reject), **S5**, **S6** (`vsnprintf`), **M3** (unlock/free swap),
-   **M4**, **M5** (one-line robustness). Mostly XS.
+2. **Quick security wins:** ~~**S2**, **S3** (`httpcred` escape + CR/LF
+   reject)~~ **✔ done (PR #79)**; remaining: **S5**, **S6** (`vsnprintf`),
+   **M3** (unlock/free swap), **M4**, **M5** (one-line robustness). Mostly XS.
 3. **Memory stability:** **M2** (credential reaper — also closes the
    session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
@@ -643,3 +670,11 @@ placed **before** `http_close` (resetting after close is a use-after-free — se
 the M1 note). PR #77, issue #76. Counts M&S 13→12. Added a **Testing backlog**
 section and began an MVS-target unit suite (`TSTDECO`, PR #75) with the
 `host = false` skip convention.
+
+**2026-07-02:** **S2** (cookie `sprintf` overflow + reflected XSS) and **S3**
+(`Sec-Uri` redirect over-read + `Location:` header injection / open redirect)
+fixed in `httpcred.c` — extracted `http_html_escape()` (`src/httpesc.c`) and
+`http_safe_redirect()` (`src/httpsrdr.c`), replaced `strncpy` with a
+length-bounded `memcpy` (the real bug: `base64_decode` output is not
+NUL-terminated). Both helpers are host-portable → **dual** `TSTSAFE` test, run
+natively (26/26). PR #79, issue #78. Counts Security 11→9.

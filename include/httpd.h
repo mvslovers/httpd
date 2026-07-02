@@ -448,6 +448,9 @@ extern UCHAR *http_etoa(UCHAR *, int)                                   asm("HTT
 extern UCHAR *http_atoe(UCHAR *, int)                                   asm("HTTPATOE");
 extern int http_cmp(const UCHAR *, const UCHAR *)                       asm("HTTPCMP");
 extern int http_cmpn(const UCHAR *, const UCHAR *, int)                 asm("HTTPCMPN");
+/* internal string-safety helpers (not CGI-facing, so no HTTPX vector) */
+extern UCHAR *http_html_escape(UCHAR *, size_t, const UCHAR *)          asm("HTTPESC");
+extern int http_safe_redirect(const UCHAR *)                           asm("HTTPSRDR");
 extern int http_dbgw(const char *, int)                                 asm("DBGW");
 extern int http_dbgs(const char *)                                      asm("DBGS");
 extern int http_dbgf(const char *fmt, ...)                              asm("DBGF");
