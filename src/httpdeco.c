@@ -13,12 +13,20 @@ httpdeco(UCHAR *str)
     while(*str) {
         switch (*str) {
         case '%':
-            /* convert %xx ASCII value to EBCDIC character */
-            temp[0] = str[1];
-            temp[1] = str[2];
-            temp[2] = 0;
-            out[0] = asc2ebc[strtoul(temp, NULL, 16)];
-            if (str[1] && str[2]) str+=2;
+            /* convert %xx ASCII value to EBCDIC character.  Read str[1]/str[2]
+               only when both are present -- otherwise a trailing '%' (str[1]
+               is the NUL) would read one byte past the string.  An incomplete
+               escape at end-of-string is passed through literally. */
+            if (str[1] && str[2]) {
+                temp[0] = str[1];
+                temp[1] = str[2];
+                temp[2] = 0;
+                out[0] = asc2ebc[strtoul(temp, NULL, 16)];
+                str += 2;
+            }
+            else {
+                out[0] = *str;      /* '%' with no following pair */
+            }
             break;
         case '+':
             /* convert '+' to ' ' */

@@ -72,8 +72,8 @@ the *Also high-value* / hardening set below.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 9 · Memory & Stability 12 · Performance 7.
-*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79.)*
+**Counts (open/partial):** Security 8 · Memory & Stability 12 · Performance 7.
+*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79; S5 PR #81.)*
 
 ---
 
@@ -170,7 +170,14 @@ if so this is defense-in-depth; if not it is a real arbitrary-read. Requires SSI
 enabled and the ability to place an SSI file.
 
 ### S5 — Percent-decoder out-of-bounds read on trailing `%`
-*Medium · Open · Effort XS · `httpdeco.c:15-21` · was F-07 / audit L7*
+*Medium · Resolved (2026-07-02, PR #81 / issue #80) · Effort XS · `httpdeco.c:15-21` · was F-07 / audit L7*
+
+> **Resolved:** the `str[1]`/`str[2]` reads moved **inside** the `if (str[1] &&
+> str[2])` guard, so `&&` short-circuits and a trailing bare `%` never reads
+> `str[2]` (one past the NUL). An incomplete escape at end-of-string (`%`, `%4`)
+> is now passed through literally instead of decoding a partial value.
+> `TSTDECO`'s trailing-`%` assertion was updated to the new contract (+ an
+> incomplete-escape case).
 
 ```c
 case '%':
@@ -554,6 +561,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | Worker abend leaks HTTPC/socket + corrupts `busy` (M1) | **Resolved (2026-07-02)** | `try()` net + gated `http_reset_busy` before `http_close` — `httpd.c`, PR #77 / issue #76 |
 | Cookie `sprintf` overflow + reflected XSS (S2) | **Resolved (2026-07-02)** | `http_html_escape()` + direct print — `httpcred.c`/`httpesc.c`, PR #79 / issue #78 |
 | `Sec-Uri` redirect over-read + header injection / open redirect (S3) | **Resolved (2026-07-02)** | length-bounded `memcpy` + `http_safe_redirect()` — `httpcred.c`/`httpsrdr.c`, PR #79 / issue #78 |
+| Percent-decoder OOB read on trailing `%` (S5) | **Resolved (2026-07-02)** | reads guarded by `str[1] && str[2]`; incomplete escape passed through — `httpdeco.c`, PR #81 / issue #80 |
 
 ---
 
@@ -573,8 +581,9 @@ EBCDIC.
 
 **Done**
 - `TSTDECO` — `http_decode()`/`httpdeco()` percent/plus decoder, incl. the **S5**
-  trailing-`%` boundary (pins current behaviour; update the assertion when S5 is
-  fixed). MVS-target. *(PR #75 / issue #74.)*
+  trailing-`%` / incomplete-escape boundary (asserts the post-fix contract:
+  incomplete escapes preserved literally). MVS-target. *(PR #75 / issue #74;
+  S5 assertion updated in PR #81.)*
 - `TSTSAFE` — `http_html_escape()` (**S2**) + `http_safe_redirect()` (**S3**),
   the extracted string-safety helpers. **Dual** (runs on host + MVS); 26
   assertions incl. an XSS breakout and the open-redirect / CRLF edge-case table.
@@ -587,8 +596,6 @@ EBCDIC.
   here; the httpd-side S3 sanitiser is covered by `TSTSAFE`.)*
 - **`httpnenv`** — env-block sizing math, pairs with **M9** (assert the exact
   `offsetof`-based size; guards the over-alloc fix).
-- **`httpdeco` invalid-escape** — extend `TSTDECO` when **S5** is fixed (reject /
-  pass-through `%`, `%4`, `%zz`).
 
 **Hard to unit-test (integration / MVS-only) — verify behaviourally, not with mbtcheck**
 - **M1** abend recovery — drive via `GET /abend` (`httpget.c:36`); confirm the
@@ -621,8 +628,9 @@ EBCDIC.
    + ~~**M1** (`try()` net)~~ **✔ done (PR #77)** — the S1→M1 DoS leak-chain is
    broken both ways; only **M5** of that chain remains (see step 2).
 2. **Quick security wins:** ~~**S2**, **S3** (`httpcred` escape + CR/LF
-   reject)~~ **✔ done (PR #79)**; remaining: **S5**, **S6** (`vsnprintf`),
-   **M3** (unlock/free swap), **M4**, **M5** (one-line robustness). Mostly XS.
+   reject)~~ **✔ done (PR #79)**; ~~**S5** (percent-decoder OOB)~~ **✔ done
+   (PR #81)**; remaining: **S6** (`vsnprintf`), **M3** (unlock/free swap),
+   **M4**, **M5** (one-line robustness). Mostly XS.
 3. **Memory stability:** **M2** (credential reaper — also closes the
    session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
@@ -678,3 +686,9 @@ fixed in `httpcred.c` — extracted `http_html_escape()` (`src/httpesc.c`) and
 length-bounded `memcpy` (the real bug: `base64_decode` output is not
 NUL-terminated). Both helpers are host-portable → **dual** `TSTSAFE` test, run
 natively (26/26). PR #79, issue #78. Counts Security 11→9.
+
+**2026-07-02:** **S5** (percent-decoder OOB read on trailing `%`) fixed in
+`httpdeco.c` — the `str[1]`/`str[2]` reads moved inside the `if (str[1] &&
+str[2])` guard (`&&` short-circuits, so `str[2]` is never read past the NUL);
+incomplete escapes are passed through literally. `TSTDECO`'s trailing-`%`
+assertion updated to the new contract. PR #81, issue #80. Counts Security 9→8.
