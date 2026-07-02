@@ -33,6 +33,15 @@ httpget(HTTPC *httpc)
 
     // wtof("%s: path=\"%s\"", __func__, path);
 
+    /* REQUEST_PATH may be absent (NULL) or empty; http_cmp() and the
+       path[len-1] index below both assume a non-empty string, so reject
+       here before touching it */
+    if (!path || !*path) {
+        rc = http_resp_not_found(httpc, path);
+        httpc->state = CSTATE_DONE;
+        goto quit;
+    }
+
     if (http_cmp(path, "/abend")==0) {
         __asm__("DC\tH'0'");
     }
@@ -46,6 +55,14 @@ httpget(HTTPC *httpc)
     /* If the path is for a directory, try index.html / default.html */
     len = strlen(path);
     if (path[len-1]=='/') {
+        /* path is client-controlled and bounded only by CBUFSIZE (4000),
+           not by sizeof(buf); reject candidates that would not fit the
+           appended index filename rather than overflowing buf[] */
+        if (len + sizeof("default.html") > sizeof(buf)) {
+            rc = http_resp_not_found(httpc, path);
+            httpc->state = CSTATE_DONE;
+            goto quit;
+        }
         memcpy(buf, path, len);
         strcpy(&buf[len], "index.html");
         mime = http_mime(buf);
