@@ -496,10 +496,16 @@ socket_thread(void *arg1, void *arg2)
             len = sizeof(addr);
             sock = accept(httpd->listen, &addr, &len);
             if (sock<0) {
+                /* transient (client reset before accept, EINTR, ...): drop
+                   this connection but keep listening.  A real shutdown/quiesce
+                   is handled at the top of the loop, so don't kill the
+                   listener on a single accept() failure. */
+                if (httpd->flag & HTTPD_FLAG_QUIESCE) continue;
+                if (httpd->flag & HTTPD_FLAG_SHUTDOWN) continue;
                 wtof("HTTPD052E accept() failed, rc=%d, error=%d\n",
                     sock, errno);
                 http_dbgf("accept() failed, rc=%d, error=%d\n", sock, errno);
-                goto quit;
+                continue;
             }
 
             http_dbgf("new connection on socket=%d\n", sock);
@@ -515,8 +521,12 @@ socket_thread(void *arg1, void *arg2)
             /* we've accepted a connection */
             httpc = calloc(1, sizeof(HTTPC));
             if (!httpc) {
+                /* out of memory for this client: close the accepted socket
+                   (don't leak the fd) and keep listening -- memory may free
+                   up; a persistent OOM still lets QUIESCE/SHUTDOWN exit. */
                 wtof("HTTPD999E Out of memory!");
-                goto quit;
+                closesocket(sock);
+                continue;
             }
             strcpy(httpc->eye, HTTPC_EYE);
             httpc->httpd  = httpd;
@@ -547,8 +557,16 @@ socket_thread(void *arg1, void *arg2)
                     http_close(httpc);
                 }
                 else {
-                    /* queue client to thread manager work queue */
-                    cthread_queue_add(mgr, httpc);
+                    /* queue client to thread manager work queue.  A calloc
+                       OOM inside cthread_queue_add returns non-zero without
+                       queueing -- close the client so its HTTPC + socket don't
+                       leak.  (Success returns 0; a QUIESCE/STOPPED race also
+                       returns 0 there, but is covered by the state check above
+                       -- the narrow remaining window is benign, reclaimed at
+                       address-space end.) */
+                    if (cthread_queue_add(mgr, httpc)) {
+                        http_close(httpc);
+                    }
                 }
             }
             else {

@@ -37,12 +37,14 @@ int cred_free(CRED **cred)
 
 	/* wipe the credential storage */
 	memset(c, 0xFE, sizeof(CRED));
-	
+
+	/* unlock BEFORE freeing: releasing the address-keyed ENQ after free()
+	   leaves the block on the free-list while still locked, so a worker that
+	   re-mallocs the address and trylocks it sees a stale "busy" */
+	unlock(c, LOCK_EXC);
+
 	/* release the credential storage */
 	free(c);
-
-	/* unlock this address */
-	unlock(c, LOCK_EXC);
 
 	/* clear the pointer to the credential storage */
 	*cred = NULL;
