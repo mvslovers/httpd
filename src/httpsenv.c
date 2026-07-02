@@ -21,8 +21,13 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 #if 0
 	wtof("%s: name=\"%s\", value=\"%s\"", __func__, v->name, v->value);
 #endif
-    /* add the new variable to the array */
-    array_add(&httpc->env, v);
+    /* add the new variable to the array.  http_del_env() already removed any
+       old value, so on an array_add OOM the variable would silently vanish and
+       the new HTTPV would be an unreachable orphan -- free it and report. */
+    if (array_add(&httpc->env, v)) {
+        free(v);
+        rc = -1;
+    }
 
 quit:
     return rc;

@@ -23,8 +23,25 @@ HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
     cgi->path = strdup(path);
     cgi->pgm  = strdup(pgm);
 
-    /* add to array of CGI */
-    array_add(&httpd->httpcgi, cgi);
+    /* on OOM don't register a half-built entry -- a NULL path/pgm would
+       NULL-deref later at CGI match/link.  (For a successfully registered
+       entry the strdup storage is AS-lifetime by design.) */
+    if (!cgi->path || !cgi->pgm) {
+        free(cgi->path);
+        free(cgi->pgm);
+        free(cgi);
+        cgi = NULL;
+        goto quit;
+    }
+
+    /* add to array of CGI; free the entry on an array_add OOM so it doesn't
+       leak (it isn't registered, so no later reference to it) */
+    if (array_add(&httpd->httpcgi, cgi)) {
+        free(cgi->path);
+        free(cgi->pgm);
+        free(cgi);
+        cgi = NULL;
+    }
 
 quit:
     return cgi;

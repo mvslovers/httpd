@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 7 · Memory & Stability 9 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85.)*
+**Counts (open/partial):** Security 7 · Memory & Stability 6 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87.)*
 
 ---
 
@@ -381,27 +381,35 @@ connection. **Fix:** mirror `httpclos.c:34-35`'s defensive close at the top of
 `httprese`.
 
 ### M8 — `array_add` return ignored in `http_set_env`
-*Low · Open · Effort XS · `httpsenv.c:25` · audit L5*
+*Low · Resolved (2026-07-02, PR #87 / issue #86) · Effort XS · `httpsenv.c:25` · audit L5*
 
-On OOM the new HTTPV is neither stored nor freed (orphan the teardown can't
+On OOM the new HTTPV was neither stored nor freed (orphan the teardown can't
 reach), and `http_del_env` already removed the old one — the variable silently
-vanishes. **Fix:** `if (array_add(&httpc->env, v)) { free(v); rc=-1; }`.
+vanished.
+
+> **Resolved:** `if (array_add(&httpc->env, v)) { free(v); rc = -1; }`
+> (`array_add`/`@@aradd.c` returns 0 on success, -1 on failure — verified).
 
 ### M9 — Env-var block over-allocation (~4 bytes/var)
-*Low · Open · Effort XS · `httpnenv.c:11` · audit L6*
+*Low · Resolved (2026-07-02, PR #87 / issue #86) · Effort XS · `httpnenv.c:11` · audit L6*
 
 `total = sizeof(HTTPV)(16) + namelen + vallen + 2` where the layout needs
 `offsetof(HTTPV,name)(12) + namelen+1 + vallen+1`. ~4 wasted bytes **per env
-var, per request** — the only pure per-request memory waste. **Fix:**
-`total = offsetof(HTTPV,name) + namelen + 1 + vallen + 1;` (see also `P5`).
+var, per request** — the only pure per-request memory waste.
+
+> **Resolved:** `total = offsetof(HTTPV, name) + namelen + 1 + vallen + 1;`.
+> Guarded by the new `TSTNENV` (name/value round-trip + layout assertions).
 
 ### M10 — Unchecked `strdup` in CGI registration
-*Low · Open · Effort XS · `httpacgi.c:23-24` · was F (mem 2026-03) / audit L9*
+*Low · Resolved (2026-07-02, PR #87 / issue #86) · Effort XS · `httpacgi.c:23-24` · was F (mem 2026-03) / audit L9*
 
-`cgi->path`/`cgi->pgm` aren't NULL-checked and `array_add` is unconditional; an
-OOM at config time registers a half-built entry → later NULL-deref at
-match/link. (Config-time only; the strdup storage itself is intentionally
-AS-lifetime.) **Fix:** free the partial entry on failure; don't register it.
+`cgi->path`/`cgi->pgm` weren't NULL-checked and `array_add` was unconditional; an
+OOM at config time registered a half-built entry → later NULL-deref at
+match/link.
+
+> **Resolved:** on a `strdup` NULL or an `array_add` failure the partial entry
+> is freed and not registered. (The strdup storage of a *successfully*
+> registered entry stays AS-lifetime by design.)
 
 ### M11 — `cgictx` array not freed at `terminate()`
 *Low · Open · Effort XS · `httpd.c:167-168,284-304` · audit L19*
@@ -587,6 +595,9 @@ for frequently-called endpoints and enable mvsMF integration.
 | `cred_free` frees storage before unlock (M3) | **Resolved (2026-07-02)** | reorder `memset → unlock → free` — `credfree.c`, PR #85 / issue #84 |
 | Queue-add failure leaks HTTPC + socket (M4) | **Resolved (2026-07-02)** | check `cthread_queue_add` rc → `http_close` — `httpd.c`, PR #85 / issue #84 |
 | Listener dies on transient accept/calloc error (M5) | **Resolved (2026-07-02)** | `continue` (+ `closesocket` on OOM) instead of `goto quit` — `httpd.c`, PR #85 / issue #84 |
+| `http_set_env` drops the var on `array_add` OOM (M8) | **Resolved (2026-07-02)** | check rc → free orphan — `httpsenv.c`, PR #87 / issue #86 |
+| Env-block ~4 B/var over-allocation (M9) | **Resolved (2026-07-02)** | `offsetof`-based sizing + `TSTNENV` — `httpnenv.c`, PR #87 / issue #86 |
+| Unchecked `strdup`/`array_add` in CGI registration (M10) | **Resolved (2026-07-02)** | free partial entry on failure — `httpacgi.c`, PR #87 / issue #86 |
 
 ---
 
@@ -613,14 +624,15 @@ EBCDIC.
   the extracted string-safety helpers. **Dual** (runs on host + MVS); 26
   assertions incl. an XSS breakout and the open-redirect / CRLF edge-case table.
   *(PR #79 / issue #78.)*
+- `TSTNENV` — `http_new_env()`/`httpnenv()` env-block allocation + layout,
+  guarding the **M9** `offsetof` sizing (name/value round-trip). MVS-target.
+  *(PR #87 / issue #86.)*
 
 **Open — pure helpers, cleanly unit-testable (good next targets)**
 - **`httpcmp`/`httpcmpn`** — EBCDIC caseless compare (collation correctness; XS).
 - **`http_mime`** — extension→type mapping (table lookup; XS).
 - *(base64 decode itself is a **libc370** function — a test belongs there, not
   here; the httpd-side S3 sanitiser is covered by `TSTSAFE`.)*
-- **`httpnenv`** — env-block sizing math, pairs with **M9** (assert the exact
-  `offsetof`-based size; guards the over-alloc fix).
 
 **Hard to unit-test (integration / MVS-only) — verify behaviourally, not with mbtcheck**
 - **M1** abend recovery — drive via `GET /abend` (`httpget.c:36`); confirm the
@@ -655,8 +667,9 @@ EBCDIC.
 2. **Quick security wins:** ~~**S2**, **S3**~~ **✔ (PR #79)**; ~~**S5**~~ **✔
    (PR #81)**; ~~**S6**~~ **✔ (PR #83)**; ~~**M3** (unlock/free swap), **M4**,
    **M5** (one-line robustness)~~ **✔ (PR #85)**. **Step 2 complete.**
-3. **Memory stability:** **M2** (credential reaper — also closes the
-   session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
+3. **Memory stability:** ~~**M8**/**M9**/**M10** (env/CGI alloc hygiene)~~ **✔
+   (PR #87)**; remaining: **M2** (credential reaper — also closes the
+   session-timeout security gap).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** **S4**, **S7**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
@@ -729,3 +742,12 @@ before `free`; check the queue-add rc (verified against libc370 that it returns
 `-1` only on OOM, `0` on success); `continue` instead of `goto quit` (+
 `closesocket` on OOM). M5 closes the last piece of the S1→M1→M5 chain. PR #85,
 issue #84. Counts M&S 12→9.
+
+**2026-07-02:** **M8** (`http_set_env` drops the var on `array_add` OOM), **M9**
+(env-block ~4 B/var over-allocation), **M10** (unchecked `strdup`/`array_add` in
+CGI registration) fixed in `httpsenv.c`/`httpnenv.c`/`httpacgi.c` — check
+`array_add` rc (verified `@@aradd.c`: 0 success / -1 failure) and free orphans;
+size the env block with `offsetof(HTTPV,name)` not `sizeof(HTTPV)`; free a
+half-built CGI entry on OOM. Added `TSTNENV` (guards the M9 layout). PR #87,
+issue #86. Counts M&S 9→6. **Backlog steps 2–3 (quick wins + alloc hygiene)
+complete; remaining memory item is M2 (credential reaper / session timeout).**

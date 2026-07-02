@@ -8,7 +8,10 @@ httpnenv(const UCHAR *name, const UCHAR *value)
 {
     size_t      namelen = strlen(name);
     size_t      vallen  = value ? strlen(value) : 0;
-    size_t      total   = sizeof(HTTPV) + namelen + vallen + 2;
+    /* the block holds "name\0value\0" starting at v->name; size it to exactly
+       that (offsetof, not sizeof(HTTPV), which counts name[2] + padding and
+       over-allocates ~4 bytes per var) */
+    size_t      total   = offsetof(HTTPV, name) + namelen + 1 + vallen + 1;
     HTTPV       *v;
 
     if (namelen + vallen > 8192) return NULL; /* sanity limit */
