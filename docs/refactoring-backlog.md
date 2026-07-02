@@ -56,11 +56,10 @@ or removed**. What remains clusters into a few high-value refactors:
    `try()`; cleanup always runs and a caught abend logs `HTTPD062E`.
 
 `S1` forced a core abend → `M1` leaked an HTTPC + socket on every hit → file
-descriptors and worker slots exhaust → with `M5` the listener then dies. **Both
-halves are now fixed:** `S1` closed the remote trigger and `M1` closed the leak
-(and contains every *other* core fault, e.g. the local `/abend`). Only `M5` (the
-listener bailing on a transient error) remains of this chain — a one-liner in
-the *Also high-value* / hardening set below.
+descriptors and worker slots exhaust → with `M5` the listener then dies. **The
+whole chain is now closed:** `S1` (remote trigger, PR #73), `M1` (the leak +
+every *other* core fault, PR #77), and `M5` (the listener no longer bails on a
+transient error, PR #85).
 
 **Also high-value:**
 - ~~`S2`/`S3` — `httpcred` login/redirect path~~ **✔ Resolved (PR #79 / issue
@@ -72,8 +71,8 @@ the *Also high-value* / hardening set below.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 7 · Memory & Stability 12 · Performance 7.
-*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79; S5 PR #81; S6 PR #83.)*
+**Counts (open/partial):** Security 7 · Memory & Stability 9 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85.)*
 
 ---
 
@@ -322,7 +321,10 @@ sweep that `array_del`+`cred_free`s entries idle beyond a configurable TTL (this
 *is* the missing session timeout); or cap the array.
 
 ### M3 — `cred_free` releases storage before releasing its lock
-*Medium · Open · Effort XS · `credentials/src/credfree.c:42-45` · audit M2*
+*Medium · Resolved (2026-07-02, PR #85 / issue #84) · Effort XS · `credentials/src/credfree.c:42-45` · audit M2*
+
+> **Resolved:** reordered to `memset → unlock → free → *cred = NULL`, so the
+> ENQ is released before the block returns to the free-list.
 
 ```c
 42   free(c);                  /* storage returned to heap... */
@@ -333,19 +335,32 @@ concurrent worker that re-`malloc`s the address and `trylock`s it sees a stale
 "busy". **Fix:** unlock before free (`memset → unlock → free → *cred = NULL`).
 
 ### M4 — Queue-add failure leaks the accepted HTTPC + socket
-*Medium · Open · Effort XS · `httpd.c:551` · audit M4*
+*Medium · Resolved (2026-07-02, PR #85 / issue #84) · Effort XS · `httpd.c:551` · audit M4*
 
-`cthread_queue_add(mgr, httpc)`'s return is ignored; on its internal `calloc`
-failure (OOM) or a QUIESCE/STOPPED race the client is neither queued nor freed →
-HTTPC + socket leak. **Fix:** `if (cthread_queue_add(mgr, httpc)) http_close(httpc);`.
+`cthread_queue_add(mgr, httpc)`'s return was ignored; on its internal `calloc`
+failure (OOM) the client is neither queued nor freed → HTTPC + socket leak.
+
+> **Resolved:** `if (cthread_queue_add(mgr, httpc)) http_close(httpc);`.
+> Verified against the libc370 source: `cthread_queue_add` returns `-1` **only**
+> on the `calloc` OOM (not queued), and `0` on success (`ecb_post` always
+> returns 0) — so the close never double-frees a queued client. *Residual:* the
+> QUIESCE/STOPPED race also returns `0` (the API can't distinguish it from
+> success), but it is covered by the state check just above; the narrow TOCTOU
+> window is a benign shutdown-time leak (reclaimed at AS end), not fixable
+> without a libc370 API change.
 
 ### M5 — Listener thread dies permanently on a transient accept/calloc error
-*Medium · Open · Effort XS · `httpd.c:498-502,516-520` · audit M5*
+*Medium · Resolved (2026-07-02, PR #85 / issue #84) · Effort XS · `httpd.c:498-502,516-520` · audit M5*
 
-A single transient `accept()` error or HTTPC `calloc` failure does `goto quit`,
-exiting the accept loop for good — the server stops accepting all new
-connections. **Fix:** `continue` for transient errors; reserve loop exit for
-SHUTDOWN/QUIESCE. (This is where FD exhaustion from M1 becomes a total outage.)
+A single transient `accept()` error or HTTPC `calloc` failure did `goto quit`,
+exiting the accept loop for good — the server stopped accepting all new
+connections. (This was where FD exhaustion from a fault became a total outage —
+the last piece of the S1→M1→M5 chain.)
+
+> **Resolved:** both now `continue` (a real SHUTDOWN/QUIESCE still exits via the
+> checks at the top of the loop, mirrored in the accept handler). On the
+> `calloc` failure the already-accepted socket is `closesocket()`d first so the
+> fd is not leaked.
 
 ### M6 — `crt->crtufs` dangling after `ufsfree`
 *Low · Open · Effort XS · `httpgufs.c:17` + `httpclos.c:36` · audit L2*
@@ -569,6 +584,9 @@ for frequently-called endpoints and enable mvsMF integration.
 | `Sec-Uri` redirect over-read + header injection / open redirect (S3) | **Resolved (2026-07-02)** | length-bounded `memcpy` + `http_safe_redirect()` — `httpcred.c`/`httpsrdr.c`, PR #79 / issue #78 |
 | Percent-decoder OOB read on trailing `%` (S5) | **Resolved (2026-07-02)** | reads guarded by `str[1] && str[2]`; incomplete escape passed through — `httpdeco.c`, PR #81 / issue #80 |
 | Unbounded `vsprintf` in SSI `ssi_printv` (S6) | **Resolved (2026-07-02)** | `vsnprintf` + clamp — `httpfile.c`, PR #83 / issue #82 |
+| `cred_free` frees storage before unlock (M3) | **Resolved (2026-07-02)** | reorder `memset → unlock → free` — `credfree.c`, PR #85 / issue #84 |
+| Queue-add failure leaks HTTPC + socket (M4) | **Resolved (2026-07-02)** | check `cthread_queue_add` rc → `http_close` — `httpd.c`, PR #85 / issue #84 |
+| Listener dies on transient accept/calloc error (M5) | **Resolved (2026-07-02)** | `continue` (+ `closesocket` on OOM) instead of `goto quit` — `httpd.c`, PR #85 / issue #84 |
 
 ---
 
@@ -632,12 +650,11 @@ EBCDIC.
 ### Suggested refactoring order
 
 1. **Stability/security criticals:** ~~**S1** (bound the copy)~~ **✔ done (PR #73)**
-   + ~~**M1** (`try()` net)~~ **✔ done (PR #77)** — the S1→M1 DoS leak-chain is
-   broken both ways; only **M5** of that chain remains (see step 2).
-2. **Quick security wins:** ~~**S2**, **S3** (`httpcred` escape + CR/LF
-   reject)~~ **✔ done (PR #79)**; ~~**S5** (percent-decoder OOB)~~ **✔ done
-   (PR #81)**; ~~**S6** (`vsnprintf`)~~ **✔ done (PR #83)**; remaining: **M3**
-   (unlock/free swap), **M4**, **M5** (one-line robustness). Mostly XS.
+   + ~~**M1** (`try()` net)~~ **✔ done (PR #77)** — the S1→M1→M5 DoS chain is now
+   fully closed (M5 in step 2).
+2. **Quick security wins:** ~~**S2**, **S3**~~ **✔ (PR #79)**; ~~**S5**~~ **✔
+   (PR #81)**; ~~**S6**~~ **✔ (PR #83)**; ~~**M3** (unlock/free swap), **M4**,
+   **M5** (one-line robustness)~~ **✔ (PR #85)**. **Step 2 complete.**
 3. **Memory stability:** **M2** (credential reaper — also closes the
    session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
@@ -704,3 +721,11 @@ assertion updated to the new contract. PR #81, issue #80. Counts Security 9→8.
 `httpfile.c` — `vsnprintf(buf, sizeof(buf), …)` + clamp the would-be length to
 `sizeof(buf)-1` before `ssi_buffer()`, mirroring `http_printv()`. PR #83,
 issue #82. Counts Security 8→7.
+
+**2026-07-02:** **M3** (`cred_free` unlock/free order), **M4** (`cthread_queue_add`
+return unchecked → HTTPC+socket leak), **M5** (listener bails on transient
+`accept`/`calloc` error) fixed in `credfree.c`/`httpd.c` — reorder to `unlock`
+before `free`; check the queue-add rc (verified against libc370 that it returns
+`-1` only on OOM, `0` on success); `continue` instead of `goto quit` (+
+`closesocket` on OOM). M5 closes the last piece of the S1→M1→M5 chain. PR #85,
+issue #84. Counts M&S 12→9.
