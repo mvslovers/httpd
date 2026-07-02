@@ -87,6 +87,14 @@ name = "TSTDECO"
 sources = ["test/tstdeco.c"]
 host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
+# String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
+# Both are free of httpd.h, so this test is DUAL: it runs natively via
+# test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
+# so the host build (no autocall) can link them.
+[[test]]
+name = "TSTSAFE"
+sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the
