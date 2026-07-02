@@ -95,6 +95,14 @@ host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 name = "TSTSAFE"
 sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 
+# http_new_env() / httpnenv() env-block allocation + layout (guards the M9
+# offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
+# (HTTPNENV) resolves from the [internal] autocall archive.
+[[test]]
+name = "TSTNENV"
+sources = ["test/tstnenv.c"]
+host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the
