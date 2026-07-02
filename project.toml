@@ -75,6 +75,17 @@ sources = ["src/cgistart.c", "src/httpdsrv.c"]
 [[test]]
 name = "TSTGCTX"
 sources = ["test/mvs/tstgctx.c"]
+host = false            # uses lock()/__getm() SVCs -> MVS-only (test-mvs)
+
+# http_decode() / httpdeco() URI percent+plus decoder.  MVS-target like
+# TSTGCTX: httpdeco pulls no SVCs, but it is reached through httpd.h (crent370
+# runtime headers, not host-portable), so the host build cannot compile it.
+# httpdeco (HTTPDECO) and asc2ebc resolve from the [internal] autocall archive,
+# so only the test root is listed here.
+[[test]]
+name = "TSTDECO"
+sources = ["test/tstdeco.c"]
+host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
