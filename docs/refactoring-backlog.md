@@ -47,14 +47,18 @@ or removed**. What remains clusters into a few high-value refactors:
 
 1. **`S1` — remote stack overflow** in the static-file directory-index fallback
    (`httpget.c`), reachable by an unauthenticated GET in the default config.
+   **✔ Resolved (PR #73 / issue #72)** — the copy is now bounded and `path`
+   NULL/empty is guarded (S9b).
 2. **`M1` — per-abend resource leak**: any abend in HTTPD *core* code skips
    `http_close()`, leaking the 4 KB HTTPC, its socket, env and UFS handles, and
    leaving a stale pointer in `httpd->busy`.
 
-`S1` forces a core abend → `M1` leaks an HTTPC + socket on every hit → file
-descriptors and worker slots exhaust → with `M5` the listener then dies. Fixing
-`S1` (bound the copy) and `M1` (wrap request processing in `try()`) removes the
-whole chain and also contains every other core fault.
+`S1` forced a core abend → `M1` leaks an HTTPC + socket on every hit → file
+descriptors and worker slots exhaust → with `M5` the listener then dies. `S1`
+(bound the copy) is now fixed, closing the *remote* trigger; **`M1`** (wrap
+request processing in `try()`) is still open and remains the priority — it
+contains every *other* core fault (e.g. the local `/abend` trigger) and is what
+breaks the leak half of the chain for good.
 
 **Also high-value:**
 - `S2`/`S3` — `httpcred` login/redirect path: a `sprintf` into `buf[512]` from a
@@ -66,14 +70,24 @@ whole chain and also contains every other core fault.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 12 · Memory & Stability 13 · Performance 7.
+**Counts (open/partial):** Security 11 · Memory & Stability 13 · Performance 7.
+*(S1 resolved 2026-07-02, PR #73.)*
 
 ---
 
 ## A. Security
 
 ### S1 — Remote stack overflow: directory-index fallback `memcpy` into `buf[300]`
-*Critical · Open · Effort XS · `httpget.c:23,47-50` · was F-01 / audit H1*
+*Critical · Resolved (2026-07-02, PR #73 / issue #72) · Effort XS · `httpget.c:23,47-50` · was F-01 / audit H1*
+
+> **Resolved:** the directory-index fallback now rejects candidates that would
+> not fit the appended index filename (`if (len + sizeof("default.html") >
+> sizeof(buf)) → 404`) *before* the `memcpy`, and `httpget()` guards
+> `REQUEST_PATH` NULL/empty at the top (folding in **S9b**) before `http_cmp`
+> and the `path[len-1]` index. No ABI change. Fix in PR #73 (issue #72);
+> pending review/merge to `main`. Once merged the DoS chain's remote entry
+> point is closed; **M1** remains open as the defence-in-depth containment
+> layer for any *other* core fault.
 
 ```c
 23   UCHAR  buf[300];
@@ -187,9 +201,10 @@ Each parameter is `array_add`'d to the env list with no cap; `?a=1&b=2&…`
 into `strtoul(NULL,…)` / `strtol(NULL,…)` on the console thread (no `try()`).
 **Fix:** `if (!buf) { wtof(usage); return 0; }` (as `s_login`/`s_stats` already
 do).
-**S9b (related to S1):** `httpget.c:31,36,47` assume `path` is non-NULL/non-empty;
-`http_get_env` can return NULL → `http_cmp(NULL,…)`/`strlen(NULL)`/`path[-1]`.
-Fold the NULL guard in with S1.
+**S9b (related to S1) — Resolved (PR #73):** `httpget.c:31,36,47` assumed `path`
+was non-NULL/non-empty; `http_get_env` can return NULL → `http_cmp(NULL,…)`/
+`strlen(NULL)`/`path[-1]`. Now guarded at the top of `httpget()` as part of the
+S1 fix (respond 404 on NULL/empty `REQUEST_PATH`).
 
 ### S10 — Latent `strcat("&")` in query parsing
 *Low · Open · Effort XS · `httppars.c:49,168` · was F-10*
@@ -504,6 +519,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | `httplua.c` `strcpy` into `dataset[256]` (F-06) | **Moved** | now `mvslovers/httplua` |
 | Keep-alive body poisoning (part of F-09) | **Mitigated** | `keepalive=0` on unread body — `httppars.c:206-210` |
 | SSI echo empty-var (F-13) | **Mostly resolved** | `if (!*var)` — `httpfile.c:391` (see S12) |
+| Directory-index stack overflow + NULL path (S1 / S9b) | **Resolved (2026-07-02)** | bounded copy + NULL/empty guard — `httpget.c`, PR #73 / issue #72 |
 
 ---
 
@@ -526,8 +542,9 @@ for frequently-called endpoints and enable mvsMF integration.
 
 ### Suggested refactoring order
 
-1. **Stability/security criticals:** **S1** (bound the copy) + **M1** (`try()`
-   net) — together they kill the remote DoS chain and contain all core faults.
+1. **Stability/security criticals:** ~~**S1** (bound the copy)~~ **✔ done (PR #73)**
+   + **M1** (`try()` net) — S1 killed the remote trigger; **M1** is the remaining
+   priority and contains all *other* core faults.
 2. **Quick security wins:** **S2**, **S3** (`httpcred` `snprintf` + escape +
    CR/LF reject), **S5**, **S6** (`vsnprintf`), **M3** (unlock/free swap),
    **M4**, **M5** (one-line robustness). Mostly XS.
@@ -565,3 +582,8 @@ reflects today's `main`.
 log, verified against `httpd.c`'s `terminate()` and the libc370 cthread teardown
 (`@@cmterm.c`/`@@cminit.c`/`@@cmwshu.c`/`@@ctdel.c`/`@@ctdet.c`) and the abend
 reporter (`@@abrpt.c`).
+
+**2026-07-02:** **S1** (remote directory-index stack overflow) and **S9b**
+(NULL/empty `REQUEST_PATH` guard) fixed in `httpget.c` — bounded the index-append
+copy and guard `path` before `http_cmp`/`path[len-1]`. PR #73, issue #72. Status
+tables, counts (Security 12→11) and the refactoring order updated accordingly.
