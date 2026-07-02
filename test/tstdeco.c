@@ -73,15 +73,17 @@ int main(void)
     http_decode(buf);
     CHECK(buf[0] == asc2ebc[0x2f], "uppercase hex escape decodes the same");
 
-    /* boundary: a trailing '%' with no hex digits (relates to S5 in the
-       refactoring backlog). Current contract: the escape is not advanced,
-       the leading literal survives, and no crash occurs. buf is padded so
-       the decoder's str[2] look-ahead stays inside this array. When S5 is
-       fixed this assertion is updated to the new trailing-'%' contract. */
-    memset(buf, 0, sizeof(buf));
+    /* boundary (S5): an incomplete escape at end-of-string is now passed
+       through literally rather than reading past the string / decoding a
+       partial value.  A trailing bare '%' no longer reads str[2] (one past
+       the NUL). */
     strcpy((char *)buf, "a%");
     http_decode(buf);
-    CHECK(buf[0] == 'a', "trailing '%' keeps the preceding literal (no crash)");
+    CHECK(strcmp((char *)buf, "a%") == 0, "trailing '%' is preserved literally");
+
+    strcpy((char *)buf, "x%4");
+    http_decode(buf);
+    CHECK(strcmp((char *)buf, "x%4") == 0, "incomplete escape '%4' is preserved literally");
 
     return mbt_test_summary("TSTDECO");
 }
