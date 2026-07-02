@@ -594,8 +594,14 @@ ssi_printv(HTTPC *httpc, const char *fmt, va_list args)
     int     len;
     char	buf[4096];
 
-	/* Okay here we go. Format the string into the buffer */
-    len = vsprintf(buf, fmt, args);
+	/* Okay here we go. Format the string into the buffer.  vsnprintf (not
+	   vsprintf): an SSI line built from an over-long env value -- e.g. an
+	   attacker-controlled HTTP_* header echoed by ssi_printenv/ssi_echo --
+	   could exceed buf[].  vsnprintf returns the would-be length, so clamp it
+	   before ssi_buffer() copies it (mirrors http_printv() in httpprtv.c). */
+    len = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (len >= (int)sizeof(buf))
+        len = sizeof(buf) - 1;
     if (len < 0) {
 		wtof("%s: looks like a bug to me, len=%d, httpc->len=%d", 
 			__func__, len, httpc->len);

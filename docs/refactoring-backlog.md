@@ -72,8 +72,8 @@ the *Also high-value* / hardening set below.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 8 · Memory & Stability 12 · Performance 7.
-*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79; S5 PR #81.)*
+**Counts (open/partial):** Security 7 · Memory & Stability 12 · Performance 7.
+*(2026-07-02: S1 PR #73; M1 PR #77; S2+S3 PR #79; S5 PR #81; S6 PR #83.)*
 
 ---
 
@@ -190,7 +190,13 @@ silently accepted. **Fix:** decode only inside the existing `if (str[1] &&
 str[2])` guard; optionally reject invalid escapes with 400.
 
 ### S6 — SSI output uses unbounded `vsprintf` into `buf[4096]`
-*Medium · Open · Effort XS · `httpfile.c:595,598` · was F-08 / audit M3*
+*Medium · Resolved (2026-07-02, PR #83 / issue #82) · Effort XS · `httpfile.c:595,598` · was F-08 / audit M3*
+
+> **Resolved:** `ssi_printv()` now uses `vsnprintf(buf, sizeof(buf), …)` and
+> clamps the would-be length to `sizeof(buf)-1` before `ssi_buffer()` copies it
+> (so an over-long SSI line — e.g. an attacker-controlled `HTTP_*` header echoed
+> by `ssi_printenv`/`ssi_echo` — truncates instead of overflowing the stack).
+> Mirrors the `http_printv()` pattern (`httpprtv.c:14-16`).
 
 ```c
 595  char buf[4096];
@@ -562,6 +568,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | Cookie `sprintf` overflow + reflected XSS (S2) | **Resolved (2026-07-02)** | `http_html_escape()` + direct print — `httpcred.c`/`httpesc.c`, PR #79 / issue #78 |
 | `Sec-Uri` redirect over-read + header injection / open redirect (S3) | **Resolved (2026-07-02)** | length-bounded `memcpy` + `http_safe_redirect()` — `httpcred.c`/`httpsrdr.c`, PR #79 / issue #78 |
 | Percent-decoder OOB read on trailing `%` (S5) | **Resolved (2026-07-02)** | reads guarded by `str[1] && str[2]`; incomplete escape passed through — `httpdeco.c`, PR #81 / issue #80 |
+| Unbounded `vsprintf` in SSI `ssi_printv` (S6) | **Resolved (2026-07-02)** | `vsnprintf` + clamp — `httpfile.c`, PR #83 / issue #82 |
 
 ---
 
@@ -629,8 +636,8 @@ EBCDIC.
    broken both ways; only **M5** of that chain remains (see step 2).
 2. **Quick security wins:** ~~**S2**, **S3** (`httpcred` escape + CR/LF
    reject)~~ **✔ done (PR #79)**; ~~**S5** (percent-decoder OOB)~~ **✔ done
-   (PR #81)**; remaining: **S6** (`vsnprintf`), **M3** (unlock/free swap),
-   **M4**, **M5** (one-line robustness). Mostly XS.
+   (PR #81)**; ~~**S6** (`vsnprintf`)~~ **✔ done (PR #83)**; remaining: **M3**
+   (unlock/free swap), **M4**, **M5** (one-line robustness). Mostly XS.
 3. **Memory stability:** **M2** (credential reaper — also closes the
    session-timeout security gap), **M8**/**M9**/**M10** (env/CGI alloc hygiene).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
@@ -692,3 +699,8 @@ natively (26/26). PR #79, issue #78. Counts Security 11→9.
 str[2])` guard (`&&` short-circuits, so `str[2]` is never read past the NUL);
 incomplete escapes are passed through literally. `TSTDECO`'s trailing-`%`
 assertion updated to the new contract. PR #81, issue #80. Counts Security 9→8.
+
+**2026-07-02:** **S6** (unbounded `vsprintf` in SSI `ssi_printv`) fixed in
+`httpfile.c` — `vsnprintf(buf, sizeof(buf), …)` + clamp the would-be length to
+`sizeof(buf)-1` before `ssi_buffer()`, mirroring `http_printv()`. PR #83,
+issue #82. Counts Security 8→7.
