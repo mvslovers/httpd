@@ -49,16 +49,18 @@ or removed**. What remains clusters into a few high-value refactors:
    (`httpget.c`), reachable by an unauthenticated GET in the default config.
    **✔ Resolved (PR #73 / issue #72)** — the copy is now bounded and `path`
    NULL/empty is guarded (S9b).
-2. **`M1` — per-abend resource leak**: any abend in HTTPD *core* code skips
+2. **`M1` — per-abend resource leak**: any abend in HTTPD *core* code skipped
    `http_close()`, leaking the 4 KB HTTPC, its socket, env and UFS handles, and
    leaving a stale pointer in `httpd->busy`.
+   **✔ Resolved (PR #77 / issue #76)** — request processing now runs under
+   `try()`; cleanup always runs and a caught abend logs `HTTPD062E`.
 
-`S1` forced a core abend → `M1` leaks an HTTPC + socket on every hit → file
-descriptors and worker slots exhaust → with `M5` the listener then dies. `S1`
-(bound the copy) is now fixed, closing the *remote* trigger; **`M1`** (wrap
-request processing in `try()`) is still open and remains the priority — it
-contains every *other* core fault (e.g. the local `/abend` trigger) and is what
-breaks the leak half of the chain for good.
+`S1` forced a core abend → `M1` leaked an HTTPC + socket on every hit → file
+descriptors and worker slots exhaust → with `M5` the listener then dies. **Both
+halves are now fixed:** `S1` closed the remote trigger and `M1` closed the leak
+(and contains every *other* core fault, e.g. the local `/abend`). Only `M5` (the
+listener bailing on a transient error) remains of this chain — a one-liner in
+the *Also high-value* / hardening set below.
 
 **Also high-value:**
 - `S2`/`S3` — `httpcred` login/redirect path: a `sprintf` into `buf[512]` from a
@@ -70,8 +72,8 @@ breaks the leak half of the chain for good.
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 11 · Memory & Stability 13 · Performance 7.
-*(S1 resolved 2026-07-02, PR #73.)*
+**Counts (open/partial):** Security 11 · Memory & Stability 12 · Performance 7.
+*(S1 resolved 2026-07-02, PR #73; M1 resolved 2026-07-02, PR #77.)*
 
 ---
 
@@ -243,7 +245,20 @@ reachable. Optionally harden to `if (!var || !*var)` for symmetry.
 ## B. Memory & Stability
 
 ### M1 — Worker abend leaks HTTPC + socket + env + UFS, and corrupts `busy`
-*High · Open · Effort M · `httpd.c:591,606-612` · audit H2*
+*High · Resolved (2026-07-02, PR #77 / issue #76) · Effort M · `httpd.c:591,606-612` · audit H2*
+
+> **Resolved:** the per-request state loop is now factored into `serve_client()`
+> and run under `try()` (ESTAE) in `worker_thread`. A core abend returns for
+> cleanup instead of percolating past `http_close()`, so the HTTPC, socket, env
+> and UFS handles are always freed; a caught abend logs `HTTPD062E` (no dump —
+> we don't want an SVC dump per malicious `/abend`). **Ordering correction to
+> the fix below:** `http_reset_busy(httpc)` must run **before** `http_close(httpc)`
+> — `http_close` frees `httpc`, and `httprbz` reads `httpc->httpd` and matches
+> pointer values in `busy`, so resetting *after* close is a use-after-free that
+> can even evict a *different* client (whose new HTTPC reused the freed address)
+> from `busy`. The reset is gated on the abend branch (the normal path already
+> cleared `busy` at `httppc.c:149`). `abendrpt` stays as the worker-level net.
+> The **S1 → M1 → M5** DoS leak-chain is now broken at the leak half.
 
 ```c
 591  abendrpt(ESTAE_CREATE, DUMP_DEFAULT);      /* worker ESTAE: dumps + percolates */
@@ -520,6 +535,39 @@ for frequently-called endpoints and enable mvsMF integration.
 | Keep-alive body poisoning (part of F-09) | **Mitigated** | `keepalive=0` on unread body — `httppars.c:206-210` |
 | SSI echo empty-var (F-13) | **Mostly resolved** | `if (!*var)` — `httpfile.c:391` (see S12) |
 | Directory-index stack overflow + NULL path (S1 / S9b) | **Resolved (2026-07-02)** | bounded copy + NULL/empty guard — `httpget.c`, PR #73 / issue #72 |
+| Worker abend leaks HTTPC/socket + corrupts `busy` (M1) | **Resolved (2026-07-02)** | `try()` net + gated `http_reset_busy` before `http_close` — `httpd.c`, PR #77 / issue #76 |
+
+---
+
+## Testing backlog
+
+HTTPD had one test (`TSTGCTX`); a small suite is now being grown alongside these
+refactorings (the working policy: **when a fix lands and a unit test is
+sensible, add it in the same PR**). Because `httpd.h` pulls the non-host-portable
+crent370/libc370 runtime stack, tests that reach through it are **MVS-target**
+(`make test-mvs`) and carry `host = false` so `make test-host` skips them
+cleanly (needs mbt ≥ `d57d447`). Assertions on decoded/translated bytes must use
+the `asc2ebc`/`ebc2asc` tables (or char literals), never bare hex — EBCDIC.
+
+**Done**
+- `TSTDECO` — `http_decode()`/`httpdeco()` percent/plus decoder, incl. the **S5**
+  trailing-`%` boundary (pins current behaviour; update the assertion when S5 is
+  fixed). *(PR #75 / issue #74.)*
+
+**Open — pure helpers, cleanly unit-testable (good next targets)**
+- **`httpcmp`/`httpcmpn`** — EBCDIC caseless compare (collation correctness; XS).
+- **`http_mime`** — extension→type mapping (table lookup; XS).
+- **`base64_decode`** — pairs with **S3** (decode length/termination edge cases).
+- **`httpnenv`** — env-block sizing math, pairs with **M9** (assert the exact
+  `offsetof`-based size; guards the over-alloc fix).
+- **`httpdeco` invalid-escape** — extend `TSTDECO` when **S5** is fixed (reject /
+  pass-through `%`, `%4`, `%zz`).
+
+**Hard to unit-test (integration / MVS-only) — verify behaviourally, not with mbtcheck**
+- **M1** abend recovery — drive via `GET /abend` (`httpget.c:36`); confirm the
+  worker survives (`HTTPD062E`) and FD / worker / `busy` counts stay flat.
+- Socket/keep-alive framing, CGI dispatch, SSI, auth — covered by the mvsMF
+  `curl-*.sh` scripts against a live server.
 
 ---
 
@@ -543,8 +591,8 @@ for frequently-called endpoints and enable mvsMF integration.
 ### Suggested refactoring order
 
 1. **Stability/security criticals:** ~~**S1** (bound the copy)~~ **✔ done (PR #73)**
-   + **M1** (`try()` net) — S1 killed the remote trigger; **M1** is the remaining
-   priority and contains all *other* core faults.
+   + ~~**M1** (`try()` net)~~ **✔ done (PR #77)** — the S1→M1 DoS leak-chain is
+   broken both ways; only **M5** of that chain remains (see step 2).
 2. **Quick security wins:** **S2**, **S3** (`httpcred` `snprintf` + escape +
    CR/LF reject), **S5**, **S6** (`vsnprintf`), **M3** (unlock/free swap),
    **M4**, **M5** (one-line robustness). Mostly XS.
@@ -587,3 +635,11 @@ reporter (`@@abrpt.c`).
 (NULL/empty `REQUEST_PATH` guard) fixed in `httpget.c` — bounded the index-append
 copy and guard `path` before `http_cmp`/`path[len-1]`. PR #73, issue #72. Status
 tables, counts (Security 12→11) and the refactoring order updated accordingly.
+
+**2026-07-02:** **M1** (worker-abend resource leak) fixed in `httpd.c` — the
+per-request loop is factored into `serve_client()` and run under `try()`;
+cleanup always runs, a caught abend logs `HTTPD062E`, and `http_reset_busy` was
+placed **before** `http_close` (resetting after close is a use-after-free — see
+the M1 note). PR #77, issue #76. Counts M&S 13→12. Added a **Testing backlog**
+section and began an MVS-target unit suite (`TSTDECO`, PR #75) with the
+`host = false` skip convention.

@@ -570,6 +570,21 @@ quit:
     return 0;
 }
 
+/* Drive one client's state machine to completion (or to shutdown).  Split
+   out so worker_thread can run it under try() (ESTAE): a core abend anywhere
+   in the request pipeline then returns here for cleanup instead of
+   percolating past http_close() -- which would otherwise leak the HTTPC, its
+   socket, env and UFS handles and leave a stale pointer in httpd->busy (M1). */
+static int
+serve_client(HTTPC *httpc, CTHDWORK *work)
+{
+    while (httpc->state != CSTATE_CLOSE) {
+        http_process_client(httpc);
+        if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
+    }
+    return 0;
+}
+
 static int
 worker_thread(void *udata, CTHDWORK *work)
 {
@@ -603,9 +618,19 @@ worker_thread(void *udata, CTHDWORK *work)
             /* process request */
             httpc = (HTTPC*)data;
             if (httpc && strcmp(httpc->eye, HTTPC_EYE)==0) {
-                while(httpc->state != CSTATE_CLOSE) {
-                    http_process_client(httpc);
-                    if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
+                /* Run the request under ESTAE.  A core abend (not a CGI under
+                   __linkds, whose abends are caught there) would otherwise
+                   skip http_close() and leak the client; try() catches it so
+                   cleanup still runs.  On an abend the pipeline never reached
+                   http_reset_busy() (httppc.c:149), so drop the stale busy
+                   entry here -- while httpc is still valid, before close frees
+                   it.  The normal path already cleared busy, so gate on rc. */
+                rc = try(serve_client, httpc, work);
+                if (rc) {
+                    wtof("HTTPD062E ABEND %08X in worker(%06X) "
+                         "client(%08X) socket(%d)",
+                        rc, work, httpc, httpc->socket);
+                    http_reset_busy(httpc);
                 }
                 http_dbgf("closing client(%08X) socket(%d)\n",
                     httpc, httpc->socket);
