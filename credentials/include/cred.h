@@ -128,8 +128,19 @@ extern CRED *cred_find_by_acee(ACEE *acee)													asm("CREDFBAC");
  * returns NULL on error, check console for errors.
  * cred was added to WSA cred array if not NULL.
  */
-extern CRED * 
+extern CRED *
 cred_login(unsigned addr, unsigned char *userid, unsigned char *password)					asm("CREDLIN");
+
+/* overflow cap on the credential array (login flood protection, M2) */
+#define CRED_MAX 256
+
+/* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs.
+ * ttl_secs == 0 disables reaping. Returns the number reaped. */
+extern unsigned cred_reap(unsigned ttl_secs)												asm("CREDREAP");
+
+/* credexp() - pure expiry decision: has a credential idle for elapsed_secs
+ * exceeded ttl_secs? (ttl 0 -> never; negative elapsed -> not yet; '>' bound) */
+extern int credexp(long elapsed_secs, unsigned ttl_secs)									asm("CREDEXP");
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* The following function prototypes are used internally.                             */

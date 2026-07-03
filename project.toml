@@ -101,6 +101,12 @@ sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 name = "TSTBODY"
 sources = ["test/tstbody.c", "src/httpbody.c"]
 
+# credexp() credential-reaper expiry decision (M2 session timeout).  Free of
+# project headers -> DUAL (host + MVS); helper source listed for the host link.
+[[test]]
+name = "TSTEXPIRE"
+sources = ["test/tstexpire.c", "credentials/src/credexp.c"]
+
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
 # (HTTPNENV) resolves from the [internal] autocall archive.

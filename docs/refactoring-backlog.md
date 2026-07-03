@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 1 · Memory & Stability 4 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89; S8 #91; S9+S10+S12+M6+M11 #93.)* Remaining Security: **S11** (deferred).
+**Counts (open/partial):** Security 1 · Memory & Stability 3 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89; S8 #91; S9+S10+S12+M6+M11 #93; M2 #95.)* Remaining: Security **S11** (deferred); M&S = **M7/M12** (latent) + **M13** (libc370).
 
 ---
 
@@ -289,8 +289,9 @@ the parse buffer, so the original NULL-deref was not reachable.
 *From the 2026-03 review §Security Architecture — still valid:*
 - **No TLS** — login credentials are sent in plaintext POST.
 - **No `HttpOnly`/`Secure`/`SameSite`** on the `Sec-Token` cookie.
-- **No session timeout / token expiry** — see `M2` (no reaper); fixing `M2`
-  delivers this.
+- ~~**No session timeout / token expiry**~~ **✔ delivered by `M2`** (PR #95):
+  idle CRED+ACEE reaper with a Parmlib `SESSION_TIMEOUT`. Token *expiry* (a hard
+  max-age independent of activity) is still open if wanted.
 - **No login rate-limiting** — brute force possible.
 - **Blowfish** (64-bit block) for in-memory CREDID — adequate for transient
   storage, dated as a standard.
@@ -301,6 +302,13 @@ the parse buffer, so the original NULL-deref was not reachable.
   UFS root — bounded to the UFS namespace but not to a subtree. Not the SSI
   traversal (S4), but a config-hardening gap: consider requiring `DOCROOT` (or
   defaulting to a safe subtree) rather than serving the UFS root.
+- **Credential-package unification (needs joint analysis).** HTTPD's credential
+  subsystem (`credentials/` — the AS-wide `cred_array()`, `cred_login`/`_find`/
+  `_free`/`_reap`, CRED+ACEE) and **mvsMF's own authentication** are currently
+  **two separate auth tracks**; the maintainer wants a single model backing both
+  (mvsMF presently rolls its own). Before deeper credential work, analyse and
+  discuss the whole package jointly (httpd + mvsMF) to converge on one track.
+  Ties to the HTTPX `http_check_auth` helper idea under *Architecture*.
 
 ---
 
@@ -342,17 +350,32 @@ already used at `httpd.c:903` and in mvsMF's `router.c`); on non-zero rc run
 for the dump. This also contains S9b and the other core derefs.
 
 ### M2 — Credential array has no reaper → unbounded CRED + ACEE growth
-*Medium · Open · Effort M · `credentials/src/crednew.c:10` · audit M1 (= security session-timeout)*
+*Medium · Resolved (2026-07-03, PR #95 / issue #94) · Effort M · `credentials/src/crednew.c:10` · audit M1 (= security session-timeout)*
 
-`cred->last = time64(NULL)` is written once and **never read** (verified: no
-reader in `src/` or `credentials/src/`); there is no idle-expiry, reaper, or
-reconfig. A `CRED` (≈80 B) + a RACF ACEE is added per distinct
-`(addr,user,pass)` login and removed only by an explicit `/logout` with the
-exact `Sec-Token`, or at shutdown. A client that never logs out, or re-logs-in,
-leaves the prior CRED+ACEE resident forever.
-**Fix:** refresh `cred->last` on each `cred_find_by_token` hit; add a periodic
-sweep that `array_del`+`cred_free`s entries idle beyond a configurable TTL (this
-*is* the missing session timeout); or cap the array.
+`cred->last = time64(NULL)` was written once and never read; a `CRED` (≈80 B) +
+RACF ACEE per login was removed only by explicit `/logout` or shutdown.
+
+> **Resolved — this is the session timeout.**
+> - **Refresh:** `cred_find_by_token()` (the only per-request lookup — verified;
+>   `by_id`/`by_acee` unused) stamps `cred->last = time64(NULL)` on every hit.
+> - **Reaper:** `cred_reap(ttl_secs)` (`credreap.c`) walks the WSA array under
+>   `LOCK_EXC`, `array_del`s entries idle > TTL (skipping any `testlock` shows
+>   in-use), and `cred_free`s them (RACF logout) **after releasing** the array
+>   lock. The decision is a pure `credexp(elapsed,ttl)` helper — dual-tested
+>   (`TSTEXPIRE`).
+> - **Sweep** runs in the `socket_thread` select loop, throttled ~60 s — **no
+>   new thread** (`cred_array()` is AS-wide, so the socket_thread sees the
+>   workers' creds).
+> - **Config** `SESSION_TIMEOUT <min>` (Parmlib, default 30, `0`=off →
+>   `httpd->cfg_session_timeout`, reusing padding). `httpprm` warns if it is
+>   `<= CLIENT_TIMEOUT`.
+> - **Cap** in `cred_login()`: reject a new login when the array is full
+>   (`CRED_MAX` 256) — no eviction of a live session.
+> - **UAF note (honest):** the guard is refresh-at-lookup **+ the invariant
+>   `SESSION_TIMEOUT` >> longest request** (`CLIENT_TIMEOUT` and worst-case CGI
+>   runtime); `testlock` catches a concurrent *free*, not a borrow. A request
+>   outliving the TTL could still race — hence the config warning. See also the
+>   **credential-package unification** note under *Security architecture*.
 
 ### M3 — `cred_free` releases storage before releasing its lock
 *Medium · Resolved (2026-07-02, PR #85 / issue #84) · Effort XS · `credentials/src/credfree.c:42-45` · audit M2*
@@ -644,6 +667,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | SSI echo var guard (S12) | **Resolved (2026-07-03)** | `!var \|\| !*var` — `httpfile.c`, PR #93 / issue #92 |
 | `crt->crtufs` dangling after `ufsfree` (M6) | **Resolved (2026-07-03)** | clear alias before free — `httpclos.c`, PR #93 / issue #92 |
 | `cgictx` array not freed at `terminate()` (M11) | **Resolved (2026-07-03)** | `free(httpd->cgictx)` — `httpd.c`, PR #93 / issue #92 |
+| Credential reaper / session timeout (M2) | **Resolved (2026-07-03)** | `cred_reap` + refresh + `SESSION_TIMEOUT` + cap + `TSTEXPIRE` — `credentials/`+`httpd.c`+`httpprm.c`, PR #95 / issue #94 |
 
 ---
 
@@ -677,6 +701,10 @@ EBCDIC.
   §3.3.3). **Dual** (host + MVS); 16 assertions over the decision table
   (absent/zero/valid/oversize/negative/junk/OWS/`Transfer-Encoding`).
   *(PR #89 / issue #88.)*
+- `TSTEXPIRE` — `credexp()` credential-reaper expiry decision (**M2**). **Dual**
+  (host + MVS); 9 assertions (`ttl==0`, strict `>` boundary, clock skew). The
+  reaper's real risk is `cred_reap()`'s concurrency — behavioural/MVS-only.
+  *(PR #95 / issue #94.)*
 
 **Open — pure helpers, cleanly unit-testable (good next targets)**
 - **`httpcmp`/`httpcmpn`** — EBCDIC caseless compare (collation correctness; XS).
@@ -718,8 +746,8 @@ EBCDIC.
    (PR #81)**; ~~**S6**~~ **✔ (PR #83)**; ~~**M3** (unlock/free swap), **M4**,
    **M5** (one-line robustness)~~ **✔ (PR #85)**. **Step 2 complete.**
 3. **Memory stability:** ~~**M8**/**M9**/**M10** (env/CGI alloc hygiene)~~ **✔
-   (PR #87)**; remaining: **M2** (credential reaper — also closes the
-   session-timeout security gap).
+   (PR #87)**; ~~**M2** (credential reaper / session timeout)~~ **✔ (PR #95)**.
+   **Step 3 complete.**
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), ~~**S7**~~
@@ -836,3 +864,14 @@ Counts Security 5→4. With **S7** this closes the request-body DoS pair.
 Counts Security 4→1, M&S 6→4. **S11** (request-line `strtok` rewrite) and **P4**
 (`memset` reduction) were deliberately deferred (regression risk / perf,
 disproportionate to their Low severity).
+
+**2026-07-03:** **M2** (credential reaper / session timeout) implemented across
+`credentials/` (`credreap.c`, `credexp.c`, refresh in `credfbtk.c`, cap in
+`credlin.c`), `httpd.c` (throttled sweep in `socket_thread`), `httpprm.c`
+(`SESSION_TIMEOUT`, default 30 min, `0`=off; warns if `<= CLIENT_TIMEOUT`) and
+`httpd.h` (`cfg_session_timeout` in reused padding). Reviewed design: reject-on-
+full cap (no eviction), free-after-unlock in the sweep, refresh-at-lookup + the
+`SESSION_TIMEOUT >> longest-request` invariant as the UAF guard. Pure `credexp`
+dual-tested (`TSTEXPIRE`, 9, native). PR #95, issue #94. Counts M&S 4→3.
+**Also filed:** the *credential-package unification* item (httpd creds vs mvsMF's
+own auth — two tracks to converge) under *Security architecture*.

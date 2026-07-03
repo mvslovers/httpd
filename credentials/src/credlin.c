@@ -1,6 +1,8 @@
 #include "cred.h"
 
-CRED * 
+#undef array_count
+
+CRED *
 cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
 {
 	CRED	***array= cred_array();
@@ -76,6 +78,15 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
 	if (!cred) {
 		wtof("%s: cred_new() failed", __func__);
 		racf_logout(&acee);
+		goto cleanup;
+	}
+
+	/* overflow protection (M2): reject the new session when the array is full
+	   rather than evict a live one (login flood).  cred_free() logs the ACEE
+	   back out and NULLs cred, so cred_login() returns NULL. */
+	if (array_count(array) >= CRED_MAX) {
+		wtof("%s: credential array full (%u); login rejected", __func__, CRED_MAX);
+		cred_free(&cred);
 		goto cleanup;
 	}
 
