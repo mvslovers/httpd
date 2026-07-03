@@ -50,9 +50,12 @@ httppars(HTTPC *httpc)
         /* create "QUERY_STRING" environment variable */
         if (http_set_env(httpc, "QUERY_STRING", p+1)) goto failed;
 
-        /* parse the query string */
-        if (strlen(buf) < CBUFSIZE - 2)
-            strcat(buf, "&");   /* append a final "&" to buffer */
+        /* append a trailing "&" so the loop terminates the last field
+           (position-based, no strcat rescan) */
+        {
+            size_t qn = strlen(buf);
+            if (qn < CBUFSIZE - 1) { buf[qn] = '&'; buf[qn+1] = 0; }
+        }
         *p++ = 0;           /* "?" -> 0 byte */
         buf = p;            /* start of query variables */
         for (p=strchr(buf,'&'); p; buf=&buf[pos], p=strchr(buf,'&')) {
@@ -213,9 +216,12 @@ postdata:
     /* create "POST_STRING" environment variable */
     if (http_set_env(httpc, "POST_STRING", buf)) goto failed;
 
-    /* parse string into "POST_..." variables */
-    if (strlen(buf) < CBUFSIZE - 2)
-        strcat(buf, "&");   /* append a final "&" to buffer */
+    /* parse string into "POST_..." variables; append a trailing "&" so the
+       loop terminates the last field (position-based, no strcat rescan) */
+    {
+        size_t pn = strlen(buf);
+        if (pn < CBUFSIZE - 1) { buf[pn] = '&'; buf[pn+1] = 0; }
+    }
     for (p=strchr(buf,'&'); p; buf=&buf[pos], p=strchr(buf,'&')) {
         *p++ = 0;
         pos = (int)(p - buf);

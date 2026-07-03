@@ -388,7 +388,7 @@ ssi_echo(HTTPC *httpc, char *next)
 	var = p;
 	while (*p && *p != '"' && *p != '\'') p++;
 	*p = 0;
-	if (!*var) goto quit;
+	if (!var || !*var) goto quit;
 	
 	while(isspace(*var)) var++;
 
