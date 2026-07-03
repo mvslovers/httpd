@@ -302,13 +302,15 @@ the parse buffer, so the original NULL-deref was not reachable.
   UFS root — bounded to the UFS namespace but not to a subtree. Not the SSI
   traversal (S4), but a config-hardening gap: consider requiring `DOCROOT` (or
   defaulting to a safe subtree) rather than serving the UFS root.
-- **Credential-package unification (needs joint analysis).** HTTPD's credential
-  subsystem (`credentials/` — the AS-wide `cred_array()`, `cred_login`/`_find`/
-  `_free`/`_reap`, CRED+ACEE) and **mvsMF's own authentication** are currently
-  **two separate auth tracks**; the maintainer wants a single model backing both
-  (mvsMF presently rolls its own). Before deeper credential work, analyse and
-  discuss the whole package jointly (httpd + mvsMF) to converge on one track.
-  Ties to the HTTPX `http_check_auth` helper idea under *Architecture*.
+- **Auth redesign — see [`docs/auth-redesign.md`](auth-redesign.md).** The joint
+  httpd ↔ mvsMF analysis is written up there (2026-07-04): one `credentials/`
+  store, **three sources** (Form / Basic / z/OSMF token API), **per-route auth
+  policy** (replacing the coarse global `LOGIN` bitmask), decoupled login
+  presentation, and an **HTTPX auth export** (`http_get_userid`/`get_acee`/
+  `check_auth`) so mvsMF retires its own `authmw.c` (currently `racf_login` per
+  request, password kept in JS/env). Subsumes the earlier "no session timeout"
+  (M2) and per-endpoint-authorization / `http_check_auth` items. Tracked as an
+  epic; foundation step 1 = httpd Basic Auth + credential resolver.
 
 ---
 
