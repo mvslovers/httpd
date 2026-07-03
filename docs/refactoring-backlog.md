@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 5 · Memory & Stability 6 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89.)*
+**Counts (open/partial):** Security 4 · Memory & Stability 6 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89; S8 #91.)*
 
 ---
 
@@ -233,10 +233,15 @@ unread body). The residual was: a blanket `recv(buf, CBUFSIZE-1)` with no
 > for the CGI to read (`httppars.c:113-118`) — unchanged.
 
 ### S8 — No limit on query/POST parameter count (memory-exhaustion DoS)
-*Medium · Open · Effort XS · `httppars.c` query/POST loops · was F-12 / MED#11*
+*Medium · Resolved (2026-07-03, PR #91 / issue #90) · Effort XS · `httppars.c` query/POST loops · was F-12 / MED#11*
 
-Each parameter is `array_add`'d to the env list with no cap; `?a=1&b=2&…`
-(thousands) exhausts memory. **Fix:** cap (e.g. 256 params) and reject with 400.
+Each parameter was `array_add`'d to the env list with no cap; `?a=1&b=2&…`
+(thousands) exhausts memory.
+
+> **Resolved:** a single `nparam` counter caps the **combined** query + POST
+> parameter count at `HTTP_MAX_PARAMS` (256); exceeding it → **400** via a shared
+> `badrequest:` handler (onto which S7's malformed-`Content-Length` case was also
+> folded, deduping the 400 emission).
 
 ### S9 — Operator `D M` / `D TI` with no argument abends the console thread
 *Low · Open · Effort XS · `httpcons.c:326,377` · audit L4*
@@ -619,6 +624,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | Unchecked `strdup`/`array_add` in CGI registration (M10) | **Resolved (2026-07-02)** | free partial entry on failure — `httpacgi.c`, PR #87 / issue #86 |
 | SSI path traversal (S4) | **Already mitigated** — finding corrected (no code) | `http_open` rejects `..` (`httpopen.c:17`, `0c171fe`) + prepends DOCROOT (`:50`, `1c2ad3c`) |
 | POST body `Content-Length` enforcement (S7) | **Resolved (2026-07-03)** | `httpbody()` classifier: 413/400/zero-body + recv capped at CL + `TSTBODY` — `httppars.c`/`httpbody.c`, PR #89 / issue #88 |
+| Unbounded query/POST parameter count (S8) | **Resolved (2026-07-03)** | combined 256-param cap → 400 — `httppars.c`, PR #91 / issue #90 |
 
 ---
 
@@ -698,7 +704,8 @@ EBCDIC.
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), ~~**S7**~~
-   **✔ (PR #89)**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
+   **✔ (PR #89)**, ~~**S8**~~ **✔ (PR #91)**, **S9–S12**,
+   **M6**/**M7**/**M11**/**M12**.
    **M13** (shutdown teardown race) is mostly a **libc370** fix — tracked in
    mvslovers/libc370#6; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
@@ -795,3 +802,9 @@ TSK-110), **400** on malformed CL, **zero-length body** on missing CL/no TE
 capped at the declared length. Scope kept tight (no exact-CL loop = slowloris
 risk, no chunked decode, no POST keep-alive). Dual `TSTBODY` (16, run
 natively). PR #89, issue #88. Counts Security 6→5.
+
+**2026-07-03:** **S8** (unbounded query/POST parameter count) fixed in
+`httppars.c` — a combined `nparam` counter caps query + POST parameters at
+`HTTP_MAX_PARAMS` (256); over the cap → **400** via a shared `badrequest:`
+handler (S7's malformed-CL case folded onto it too). PR #91, issue #90.
+Counts Security 5→4. With **S7** this closes the request-body DoS pair.
