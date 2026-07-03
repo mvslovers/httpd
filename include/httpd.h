@@ -44,6 +44,7 @@
 #include "types.h"                  /* UCHAR, USHRT, UINT, ULONG    */
 #include "cred.h"					/* Credentials					*/
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
+#include "httpbody.h"               /* request body classification  */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
 

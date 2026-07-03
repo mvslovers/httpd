@@ -35,6 +35,7 @@ httpresp(HTTPC *httpc, int resp)
     case 404: p = "404 Not Found";              break;
     case 405: p = "405 Method Not Allowed";     break;
     case 409: p = "409 Conflict";               break;
+    case 413: p = "413 Payload Too Large";      break;
     case 414: p = "414 URI Too Long";           break;
     case 500: p = "500 Internal Server Error";  break;
     case 507: p = "507 Insufficient Storage";   break;

@@ -138,6 +138,43 @@ failed:
     goto quit;
 
 postdata:
+    /* classify the request body (RFC 7230 §3.3.3) before reading it */
+    {
+        const UCHAR *cl = http_get_env(httpc, "HTTP_CONTENT-LENGTH");
+        int          te = (http_get_env(httpc, "HTTP_TRANSFER-ENCODING") != NULL);
+        long         clen = 0;
+
+        switch (httpbody(cl, te, CBUFSIZE-1, &clen)) {
+        case HTTP_BODY_TOO_LARGE:
+            /* body larger than we buffer: reject, leave it unread, close */
+            httpc->keepalive = 0;
+            http_resp(httpc, 413);
+            http_printf(httpc, "Cache-Control: no-store\r\n");
+            http_printf(httpc, "Content-Type: text/plain\r\n");
+            http_printf(httpc, "\r\n");
+            http_printf(httpc, "413 Payload Too Large\n");
+            httpc->state = CSTATE_DONE;
+            goto quit;
+        case HTTP_BODY_BAD:
+            /* malformed Content-Length */
+            httpc->keepalive = 0;
+            http_resp(httpc, 400);
+            http_printf(httpc, "Cache-Control: no-store\r\n");
+            http_printf(httpc, "Content-Type: text/plain\r\n");
+            http_printf(httpc, "\r\n");
+            http_printf(httpc, "400 Bad Request\n");
+            httpc->state = CSTATE_DONE;
+            goto quit;
+        case HTTP_BODY_NONE:
+            /* no body to read (no CL & no TE, CL 0, or a chunked body we do
+               not decode here) -- don't block on a recv that won't complete */
+            goto nodata;
+        default:                    /* HTTP_BODY_READ */
+            datalen = (int)clen;    /* bytes to read (1..CBUFSIZE-1) */
+            break;
+        }
+    }
+
     /* what type of POST data do we have */
     p = http_get_env(httpc, "HTTP_CONTENT-TYPE");
     if (!p) goto nodata;
@@ -147,10 +184,12 @@ postdata:
     /* if not form data then leav it alone */
     if (http_cmp(p, "application/x-www-form-urlencoded")!=0) goto postother;
 
-    /* retrieve the form data and decode into "POST_..." variables */
+    /* retrieve the form data and decode into "POST_..." variables.  Read at
+       most the declared Content-Length so we never slurp bytes belonging to a
+       pipelined next request (single non-blocking recv -- see S7 scope). */
     memset(httpc->buf, 0, CBUFSIZE);
     buf = httpc->buf;
-    len = CBUFSIZE-1;
+    len = datalen;
     rc = recv(httpc->socket, buf, len, 0);
     if (rc < 0) goto failed;
     
@@ -185,10 +224,10 @@ postdata:
     goto nodata;
 
 postother:
-    /* some other POST data to be received */
+    /* some other POST data to be received -- read at most Content-Length */
     memset(httpc->buf, 0, CBUFSIZE);
     buf = httpc->buf;
-    len = CBUFSIZE-1;
+    len = datalen;
     rc = recv(httpc->socket, buf, len, 0);
     if (rc < 0) goto failed;
     
