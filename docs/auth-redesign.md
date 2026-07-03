@@ -103,22 +103,47 @@ cached CRED+ACEE (no RACF call); only a miss does `cred_login()`.
 helper): try **Sec-Token cookie → `Authorization: Basic` → `Authorization:
 Bearer <token>`**, each → `httpc->cred`.
 
-### 2.2 Per-route auth **policy** (replace the global bitmask)
+### 2.2 Per-route auth **policy** — a 2-stage gate in the pipeline
 
-Each route declares its own policy in the `MOD=` line; the global `LOGIN` stays
-as the default:
+Each **route** (a path prefix) declares its own policy; the global `LOGIN` stays
+as the default. Two kinds of route carry the *same* policy:
+
+- **`MOD=`** — a route **with a program** (CGI), as today.
+- **`LOC=`** — a route **without a program**: a path prefix served statically
+  (falls through to `httpget`) that still carries auth policy. This is the piece
+  the SPA / static HTML deployments need.
 
 ```
-MOD HTTPREXX /*.rxp                              # no auth
-MOD MVSMF    /zosmf/*   AUTH=BASIC,TOKEN         # required; accept Basic + token
-MOD HTTPDSRV /.dsrv     AUTH=FORM                # required; browser form
-MOD ADMIN    /admin/*   AUTH=BASIC RES=FACILITY:HTTPD.ADMIN   # + RACF resource
+MOD HTTPREXX /*.rxp                                        # CGI, no auth
+MOD MVSMF    /zosmf/*  AUTH=BASIC,TOKEN RES=FACILITY:MVSMF.ACCESS   # CGI + RACF/RAKF resource
+MOD HTTPDSRV /.dsrv    AUTH=FORM                           # CGI, browser form
+LOC /admin/*           AUTH=BASIC       RES=FACILITY:HTTPD.ADMIN    # STATIC subtree behind a profile
+LOC /                  AUTH=NONE                           # public (the SPA login page must load)
 ```
 
-Three axes per route: **whether** (overrides the global default), **method /
-challenge** (`FORM` | `BASIC` | `TOKEN` | `ANY`), and an **optional RACF
-resource** for `racf_auth(class,resource,attr)` → fine-grained authorization
-instead of binary "logged in". `needs_login()` reads the route policy.
+Axes per route: **whether** (overrides the global default), **method / challenge**
+(`FORM` | `BASIC` | `TOKEN` | `ANY`), and an **optional RACF/RAKF resource**
+(`RES=class:resource`).
+
+**The check runs in httpd's request pipeline — not in the CGI** — so it applies
+**uniformly to static and CGI routes**. Enforced as a **2-stage gate** before
+httpd serves a file *or* dispatches a CGI:
+
+1. **Authenticate** → resolve `httpc->cred` (cookie / Basic / token). Missing →
+   **401** (+ challenge per method).
+2. **Authorize** → if the route has `RES=`, call
+   `racf_auth(httpc->cred->acee, class, resource, attr)`. Denied → **403**.
+
+A CGI (mvsMF) can still do *finer* checks via `http_check_auth` (§2.4, e.g.
+per-dataset RACHECK), but the coarse route-level gate is httpd's — which is why a
+**static** route (`LOC=`) can be protected by a RACF/RAKF profile exactly like a
+CGI. `needs_login()`/the route lookup drive both stages.
+
+*Notes:* RAKF implements SAF, so `racf_auth` (RACHECK/FRACHECK, `safp.h`) works
+for defined resources — it only needs the ACEE, which comes from `httpc->cred`.
+For the SPA, the assets are usually **public** (`LOC / AUTH=NONE` — you must load
+the login page to log in) and the **API** routes are protected; `LOC=`+`RES=` is
+for gating a *whole* static deployment / admin area behind a profile.
 
 ### 2.3 Presentation decoupled (mechanism ≠ UI)
 
@@ -163,8 +188,11 @@ clients work the standard way:
    resolver (cookie → Basic → Bearer). *(no `credentials/` change)*
 2. **Token API** (`/zosmf/services/authenticate`) returning the token; accept
    `Bearer`.
-3. **Per-route policy** in `MOD=` + `needs_login()` reads it; decouple the
-   challenge (form vs 401) from the core.
+3. **Per-route policy**: `MOD=` (CGI) **and** `LOC=` (static prefix) carry the
+   same policy; a **2-stage gate in the pipeline** — authenticate (→401) then,
+   if `RES=` is set, `racf_auth` (→403) — applied *before* serving a file or
+   dispatching a CGI, so static/SPA routes get RACF/RAKF protection too. Decouple
+   the challenge (form vs 401) from the core.
 4. **HTTPX auth export** (`get_userid`/`get_acee`/`check_auth`).
 
 ### 3.2 mvsMF
