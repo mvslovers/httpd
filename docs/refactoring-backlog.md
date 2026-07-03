@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 6 · Memory & Stability 6 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 was already mitigated — finding corrected, no code.)*
+**Counts (open/partial):** Security 5 · Memory & Stability 6 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89.)*
 
 ---
 
@@ -213,16 +213,24 @@ env var — including attacker-controlled `HTTP_*` headers (~4000 bytes) — and
 **Fix:** `vsnprintf(buf, sizeof(buf), fmt, args)` + handle truncation.
 
 ### S7 — POST/PUT body: no `Content-Length` enforcement (413)
-*Medium · Partial · Effort S · `httppars.c:140-215` · was F-09 / MED#9(2026-03)*
+*Medium · Resolved (2026-07-03, PR #89 / issue #88) · Effort S · `httppars.c:140-215` · was F-09 / MED#9(2026-03)*
 
-The keep-alive **poisoning** half is now mitigated: when a body was present but
-not fully read, keep-alive is disabled (`httppars.c:206-210`,
-`HTTP_CONTENT-LENGTH`/`HTTP_TRANSFER-ENCODING` ⇒ `keepalive = 0`). **Residual:**
-the body is still read with a blanket `recv(buf, CBUFSIZE-1)` with no
-`Content-Length` parse, no `413 Payload Too Large` for oversize bodies, and no
-rejection of a missing `Content-Length` (RFC 7230 §3.3.3).
-**Fix:** parse `Content-Length`, read exactly that many bytes, 413 on oversize,
-reject missing CL on a body-bearing method.
+The keep-alive **poisoning** half was already mitigated (`keepalive=0` on an
+unread body). The residual was: a blanket `recv(buf, CBUFSIZE-1)` with no
+`Content-Length` parse, no `413`, and mishandling of a missing CL.
+
+> **Resolved:** a new pure classifier `httpbody()` (`src/httpbody.c`, RFC 7230
+> §3.3.3) maps `(Content-Length, Transfer-Encoding?) → {NONE, READ(n),
+> TOO_LARGE, BAD}`. `httppars` now: **413** on an oversize CL (added the missing
+> `413 Payload Too Large` to `http_resp`, ref TSK-110), **400** on a malformed
+> CL, treats a missing CL / no TE as a **zero-length body** (RFC rule 6 — fixes
+> the old blanket-`recv` → `EWOULDBLOCK` → RESET on a bodyless POST), and caps
+> the single non-blocking `recv` at the declared length. Classifier dual-tested
+> (`TSTBODY`, 16 assertions, run natively). **Deliberately out of scope** (kept
+> tight): no "read exactly CL" loop (on a non-blocking socket that is itself a
+> slowloris — needs `select`+`CLIENT_TIMEOUT`, see `P2`), no chunked
+> request-body decode, no POST keep-alive enablement. **PUT** bodies are left
+> for the CGI to read (`httppars.c:113-118`) — unchanged.
 
 ### S8 — No limit on query/POST parameter count (memory-exhaustion DoS)
 *Medium · Open · Effort XS · `httppars.c` query/POST loops · was F-12 / MED#11*
@@ -610,6 +618,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | Env-block ~4 B/var over-allocation (M9) | **Resolved (2026-07-02)** | `offsetof`-based sizing + `TSTNENV` — `httpnenv.c`, PR #87 / issue #86 |
 | Unchecked `strdup`/`array_add` in CGI registration (M10) | **Resolved (2026-07-02)** | free partial entry on failure — `httpacgi.c`, PR #87 / issue #86 |
 | SSI path traversal (S4) | **Already mitigated** — finding corrected (no code) | `http_open` rejects `..` (`httpopen.c:17`, `0c171fe`) + prepends DOCROOT (`:50`, `1c2ad3c`) |
+| POST body `Content-Length` enforcement (S7) | **Resolved (2026-07-03)** | `httpbody()` classifier: 413/400/zero-body + recv capped at CL + `TSTBODY` — `httppars.c`/`httpbody.c`, PR #89 / issue #88 |
 
 ---
 
@@ -639,6 +648,10 @@ EBCDIC.
 - `TSTNENV` — `http_new_env()`/`httpnenv()` env-block allocation + layout,
   guarding the **M9** `offsetof` sizing (name/value round-trip). MVS-target.
   *(PR #87 / issue #86.)*
+- `TSTBODY` — `httpbody()` request-body length classifier (**S7**, RFC 7230
+  §3.3.3). **Dual** (host + MVS); 16 assertions over the decision table
+  (absent/zero/valid/oversize/negative/junk/OWS/`Transfer-Encoding`).
+  *(PR #89 / issue #88.)*
 
 **Open — pure helpers, cleanly unit-testable (good next targets)**
 - **`httpcmp`/`httpcmpn`** — EBCDIC caseless compare (collation correctness; XS).
@@ -684,8 +697,8 @@ EBCDIC.
    session-timeout security gap).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
-5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), **S7**,
-   **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
+5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), ~~**S7**~~
+   **✔ (PR #89)**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
    **M13** (shutdown teardown race) is mostly a **libc370** fix — tracked in
    mvslovers/libc370#6; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
@@ -773,3 +786,12 @@ predating the consolidation. The finding traced the caller but missed the
 callee's guard. No code change (a redundant `ssi_include` reject would be
 defensive noise). Backlog corrected; Security count 7→6. Filed the separate
 `DOCROOT`-unset confinement gap under *Security architecture*.
+
+**2026-07-03:** **S7** (POST body `Content-Length` enforcement) fixed in
+`httppars.c` — new pure `httpbody()` classifier (`src/httpbody.c`, RFC 7230
+§3.3.3): **413** on oversize CL (added the missing `413` to `http_resp`, ref
+TSK-110), **400** on malformed CL, **zero-length body** on missing CL/no TE
+(fixes the old blanket-`recv`→RESET on a bodyless POST), and the `recv` is
+capped at the declared length. Scope kept tight (no exact-CL loop = slowloris
+risk, no chunked decode, no POST keep-alive). Dual `TSTBODY` (16, run
+natively). PR #89, issue #88. Counts Security 6→5.
