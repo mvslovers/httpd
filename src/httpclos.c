@@ -33,7 +33,13 @@ httpclos(HTTPC *httpc)
         /* make sure we closed the file */
         if (httpc->fp) http_done(httpc);
         if (httpc->ufp) ufs_fclose(&httpc->ufp);
-        if (httpc->ufs) ufsfree(&httpc->ufs);
+        if (httpc->ufs) {
+            /* http_get_ufs() cached this session in crt->crtufs; clear that
+               per-task alias before freeing so it isn't left dangling (M6) */
+            CLIBCRT *crt = __crtget();
+            if (crt && crt->crtufs == httpc->ufs) crt->crtufs = NULL;
+            ufsfree(&httpc->ufs);
+        }
 
         /* make sure we reset the handle */
         if (httpc->env) http_reset(httpc);

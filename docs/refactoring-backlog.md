@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 4 · Memory & Stability 6 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89; S8 #91.)*
+**Counts (open/partial):** Security 1 · Memory & Stability 4 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 already mitigated — corrected. 2026-07-03: S7 #89; S8 #91; S9+S10+S12+M6+M11 #93.)* Remaining Security: **S11** (deferred).
 
 ---
 
@@ -244,36 +244,46 @@ Each parameter was `array_add`'d to the env list with no cap; `?a=1&b=2&…`
 > folded, deduping the 400 emission).
 
 ### S9 — Operator `D M` / `D TI` with no argument abends the console thread
-*Low · Open · Effort XS · `httpcons.c:326,377` · audit L4*
+*Low · Resolved (2026-07-03, PR #93 / issue #92) · Effort XS · `httpcons.c:326,377` · audit L4*
 
-`display()` passes `rest = strtok(NULL,"")` (NULL when the verb has no argument)
+`display()` passed `rest = strtok(NULL,"")` (NULL when the verb has no argument)
 into `strtoul(NULL,…)` / `strtol(NULL,…)` on the console thread (no `try()`).
-**Fix:** `if (!buf) { wtof(usage); return 0; }` (as `s_login`/`s_stats` already
-do).
+
+> **Resolved:** `d_memory()` now requires an address (`if (!buf)` → usage);
+> `d_time()` treats a missing argument as "no override" (`buf ? strtol(...) :
+> 0`) so **`D TI` correctly displays the time** — the finding's blanket "print
+> usage" would have broken the valid no-argument `D TI`.
 **S9b (related to S1) — Resolved (PR #73):** `httpget.c:31,36,47` assumed `path`
 was non-NULL/non-empty; `http_get_env` can return NULL → `http_cmp(NULL,…)`/
 `strlen(NULL)`/`path[-1]`. Now guarded at the top of `httpget()` as part of the
 S1 fix (respond 404 on NULL/empty `REQUEST_PATH`).
 
 ### S10 — Latent `strcat("&")` in query parsing
-*Low · Open · Effort XS · `httppars.c:49,168` · was F-10*
+*Low · Resolved (2026-07-03, PR #93 / issue #92) · Effort XS · `httppars.c:49,168` · was F-10*
 
-Guarded today (`if (strlen(buf) < CBUFSIZE-2) strcat(buf,"&")`) but fragile.
-**Fix:** position-based write or `strncat`.
+Guarded today but fragile.
+
+> **Resolved:** both query and POST loops now append the trailing `"&"` with a
+> position-based write (single scan, no `strcat`).
 
 ### S11 — `strtok` in the request-line parser
-*Low · Open · Effort XS · `httpin.c:45,49,51` · was F-11*
+*Low · Open (deferred) · Effort XS · `httpin.c:45,49,51` · was F-11*
 
 Non-reentrant and inconsistent with the rest of the codebase (other `strtok`
 sites were replaced under GH#11). Safe today (per-worker buffer). **Fix:**
-manual `strchr`-based tokenisation.
+manual `strchr`-based tokenisation. *Deferred from the 2026-07-03 cleanup
+bundle:* rewriting a working hot-path tokenizer for reentrancy-consistency
+carries regression risk (space-run leniency, edge cases) out of proportion to a
+Low, safe-today finding — do it as its own careful change if wanted.
 
 ### S12 — SSI echo NULL/empty var guard *(mostly resolved)*
-*Low · Partial · `httpfile.c:391` · was F-13*
+*Low · Resolved (2026-07-03, PR #93 / issue #92) · `httpfile.c:391` · was F-13*
 
-An empty-variable guard is now present (`if (!*var) goto quit;`), and `var` is a
-non-NULL pointer into the parse buffer, so the original NULL-deref is not
-reachable. Optionally harden to `if (!var || !*var)` for symmetry.
+An empty-variable guard was already present and `var` is a non-NULL pointer into
+the parse buffer, so the original NULL-deref was not reachable.
+
+> **Resolved:** hardened to `if (!var || !*var)` for symmetry with the
+> codebase's other guards.
 
 ### Security architecture backlog (design-level, cross-cutting)
 *From the 2026-03 review §Security Architecture — still valid:*
@@ -387,12 +397,14 @@ the last piece of the S1→M1→M5 chain.)
 > fd is not leaked.
 
 ### M6 — `crt->crtufs` dangling after `ufsfree`
-*Low · Open · Effort XS · `httpgufs.c:17` + `httpclos.c:36` · audit L2*
+*Low · Resolved (2026-07-03, PR #93 / issue #92) · Effort XS · `httpgufs.c:17` + `httpclos.c:36` · audit L2*
 
 `http_get_ufs` caches the session in the per-worker `crt->crtufs`; `httpclos`
-frees+NULLs `httpc->ufs` but not the cached alias. Safe today (next
-`http_get_ufs` overwrites it before any UFS op). **Fix:** clear `crt->crtufs` in
-`httpclos` when it equals the freed session.
+freed+NULLed `httpc->ufs` but not the cached alias (safe today, but a dangling
+per-task pointer).
+
+> **Resolved:** `httpclos` now clears `crt->crtufs` (when it equals the freed
+> session) before `ufsfree()`.
 
 ### M7 — Keep-alive reset does not close `fp`/`ufp`
 *Low · Latent · Effort XS · `httprese.c` · audit L3*
@@ -436,11 +448,13 @@ match/link.
 > registered entry stays AS-lifetime by design.)
 
 ### M11 — `cgictx` array not freed at `terminate()`
-*Low · Open · Effort XS · `httpd.c:167-168,284-304` · audit L19*
+*Low · Resolved (2026-07-03, PR #93 / issue #92) · Effort XS · `httpd.c:167-168,284-304` · audit L19*
 
-Benign one-shot (reclaimed at AS end). **Fix:** `free(httpd->cgictx)` in
-`terminate()` for completeness. (The pointed-to `__getm` context blocks are
-AS-lifetime **by design** — not a leak.)
+Benign one-shot (reclaimed at AS end).
+
+> **Resolved:** `terminate()` now `free(httpd->cgictx)` for completeness. (The
+> pointed-to `__getm` context blocks remain AS-lifetime **by design** — not
+> freed.)
 
 ### M12 — `http_gets` NULL-buf 1-byte overflow
 *Low · Latent · Effort XS · `httpgets.c:76-77` · audit L8*
@@ -625,6 +639,11 @@ for frequently-called endpoints and enable mvsMF integration.
 | SSI path traversal (S4) | **Already mitigated** — finding corrected (no code) | `http_open` rejects `..` (`httpopen.c:17`, `0c171fe`) + prepends DOCROOT (`:50`, `1c2ad3c`) |
 | POST body `Content-Length` enforcement (S7) | **Resolved (2026-07-03)** | `httpbody()` classifier: 413/400/zero-body + recv capped at CL + `TSTBODY` — `httppars.c`/`httpbody.c`, PR #89 / issue #88 |
 | Unbounded query/POST parameter count (S8) | **Resolved (2026-07-03)** | combined 256-param cap → 400 — `httppars.c`, PR #91 / issue #90 |
+| Console `D M`/`D TI` no-arg abend (S9) | **Resolved (2026-07-03)** | NULL guards (`D TI` still shows time) — `httpcons.c`, PR #93 / issue #92 |
+| Fragile `strcat("&")` in parse loops (S10) | **Resolved (2026-07-03)** | position-based append — `httppars.c`, PR #93 / issue #92 |
+| SSI echo var guard (S12) | **Resolved (2026-07-03)** | `!var \|\| !*var` — `httpfile.c`, PR #93 / issue #92 |
+| `crt->crtufs` dangling after `ufsfree` (M6) | **Resolved (2026-07-03)** | clear alias before free — `httpclos.c`, PR #93 / issue #92 |
+| `cgictx` array not freed at `terminate()` (M11) | **Resolved (2026-07-03)** | `free(httpd->cgictx)` — `httpd.c`, PR #93 / issue #92 |
 
 ---
 
@@ -704,8 +723,9 @@ EBCDIC.
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
 5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), ~~**S7**~~
-   **✔ (PR #89)**, ~~**S8**~~ **✔ (PR #91)**, **S9–S12**,
-   **M6**/**M7**/**M11**/**M12**.
+   **✔ (PR #89)**, ~~**S8**~~ **✔ (PR #91)**, ~~**S9**, **S10**, **S12**,
+   **M6**, **M11**~~ **✔ (PR #93)**; remaining **S11** (deferred), **M7**/**M12**
+   (latent — defensive, unreachable today).
    **M13** (shutdown teardown race) is mostly a **libc370** fix — tracked in
    mvslovers/libc370#6; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
@@ -808,3 +828,11 @@ natively). PR #89, issue #88. Counts Security 6→5.
 `HTTP_MAX_PARAMS` (256); over the cap → **400** via a shared `badrequest:`
 handler (S7's malformed-CL case folded onto it too). PR #91, issue #90.
 Counts Security 5→4. With **S7** this closes the request-body DoS pair.
+
+**2026-07-03:** cleanup bundle **S9** (console `D M`/`D TI` no-arg NULL-deref —
+`D TI` now still shows the time), **S10** (position-based `"&"` append), **S12**
+(`!var || !*var` guard), **M6** (clear the `crt->crtufs` alias before
+`ufsfree`), **M11** (`free(httpd->cgictx)` at `terminate`). PR #93, issue #92.
+Counts Security 4→1, M&S 6→4. **S11** (request-line `strtok` rewrite) and **P4**
+(`memset` reduction) were deliberately deferred (regression risk / perf,
+disproportionate to their Low severity).

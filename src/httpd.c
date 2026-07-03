@@ -296,6 +296,13 @@ terminate(void)
         array_free(&httpd->httpcgi);
     }
 
+    /* free the per-CGI context pointer array (M11); the blocks it points to
+       are AS-lifetime __getm storage by design and are not freed here */
+    if (httpd->cgictx) {
+        free(httpd->cgictx);
+        httpd->cgictx = NULL;
+    }
+
     /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
     if (httpd->ufssys) {

@@ -323,10 +323,20 @@ static int
 d_memory(char *buf)
 {
 	char		*next = NULL;
-	char		*mem = (char *) strtoul(buf, &next, 16);
-	int			len = next ? (int) strtoul(next+1, NULL, 0) : 256;
+	char		*mem;
+	int			len;
 	unsigned    rc;
-	
+
+	/* D M with no address would strtoul(NULL) -> deref NULL on the console
+	   thread; an address is required */
+	if (!buf) {
+		wtof("HTTPD000I usage: Display Memory xxxxxx[,nnn] (D M xxxxxx)");
+		return 0;
+	}
+
+	mem = (char *) strtoul(buf, &next, 16);
+	len = next ? (int) strtoul(next+1, NULL, 0) : 256;
+
 	/* sanity check length */
 	if (len <= 0) len = 256;
 	if (len > 4096) len = 4096;
@@ -374,7 +384,9 @@ d_time(char *buf)
 	int			tzoffset	= httpd->tzoffset;
 	int			sign		= tzoffset < 0 ? -1 : 1;
 	char		*next 		= NULL;
-	int 		minutes 	= strtol(buf, &next, 10);
+	/* "D TI" with no argument is valid (show time at the configured offset);
+	   strtol(NULL) would deref NULL, so default to 0 (= use tzoffset below) */
+	int 		minutes 	= buf ? strtol(buf, &next, 10) : 0;
 	time64_t	gmt 		= time64(NULL);
 	time64_t	lot;
 	unsigned    offset;
