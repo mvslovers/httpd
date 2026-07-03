@@ -86,6 +86,19 @@ http_config(HTTPD *httpd, const char *member)
          httpd->cfg_client_timeout);
     wtof("HTTPD034I KEEPALIVE_TIMEOUT=%d KEEPALIVE_MAX=%d",
          httpd->cfg_keepalive_timeout, httpd->cfg_keepalive_max);
+    wtof("HTTPD035I SESSION_TIMEOUT=%d min%s", httpd->cfg_session_timeout,
+         httpd->cfg_session_timeout ? "" : " (reaper disabled)");
+
+    /* the reaper must not free a credential still borrowed by an in-flight
+       request: SESSION_TIMEOUT (min) must exceed the longest request
+       (CLIENT_TIMEOUT, sec, and worst-case CGI runtime).  Warn on an unsafe
+       config (M2). */
+    if (httpd->cfg_session_timeout &&
+        (long)httpd->cfg_session_timeout * 60 <= httpd->cfg_client_timeout) {
+        wtof("HTTPD035W SESSION_TIMEOUT (%d min) <= CLIENT_TIMEOUT (%d sec); "
+             "raise it well above the longest request",
+             httpd->cfg_session_timeout, httpd->cfg_client_timeout);
+    }
 
     return 0;
 }
@@ -116,6 +129,7 @@ set_defaults(HTTPD *httpd)
     httpd->dbg_enabled      = 0;
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
+    httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
 }
 
 /* ====================================================================
@@ -214,6 +228,13 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
             if (i > 255) i = 255;
             httpd->cfg_client_timeout = (UCHAR)i;
         }
+    }
+    else if (strcmp(key, "SESSION_TIMEOUT") == 0) {
+        /* credential idle TTL in minutes; 0 disables reaping (M2) */
+        i = atoi(value);
+        if (i < 0) i = 0;
+        if (i > 65535) i = 65535;
+        httpd->cfg_session_timeout = (USHRT)i;
     }
     else if (strcmp(key, "LOGIN") == 0) {
         parse_login(httpd, value);

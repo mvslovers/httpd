@@ -437,6 +437,7 @@ socket_thread(void *arg1, void *arg2)
     fd_set      read;
     struct sockaddr_in addr;
     struct sockaddr_in *a = (struct sockaddr_in *)&addr;
+    time64_t    last_sweep = time64(NULL);  /* credential reaper throttle (M2) */
 
     http_enter("socket_thread()\n");
 
@@ -449,6 +450,17 @@ socket_thread(void *arg1, void *arg2)
     /* we loop until we're shut down */
     while(task) {
         if (httpd->flag & HTTPD_FLAG_SHUTDOWN) break;
+
+        /* periodically reap idle credentials (M2), throttled to ~60s so the
+           select loop's ~1/s wakeups don't sweep every tick */
+        {
+            time64_t now = time64(NULL);
+            if (difftime64(now, last_sweep) >= 60.0) {
+                last_sweep = now;
+                if (httpd->cfg_session_timeout)
+                    cred_reap((unsigned)httpd->cfg_session_timeout * 60);
+            }
+        }
 
         /* process clients */
         if (process_clients(&read, NULL, NULL)) break;

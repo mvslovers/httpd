@@ -150,7 +150,7 @@ struct httpd {
     char        codepage[16];       /* 124 codepage name            */
     UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */
-    UCHAR       unused_136[2];      /* 136 alignment padding        */
+    USHRT       cfg_session_timeout; /* 136 credential idle TTL (min), 0=off */
 };                                  /* 138                          */
 
 /* HTTP variables */

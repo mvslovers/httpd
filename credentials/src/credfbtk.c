@@ -26,7 +26,13 @@ CRED *cred_find_by_token(CREDTOK *token)
 			break;
 		}
 	}
-	
+
+	/* refresh the last-used stamp so activity keeps the session alive past the
+	   reaper's TTL (M2).  Written under LOCK_SHR -- a torn 8-byte write between
+	   near-simultaneous readers is benign (all write ~now); the reaper reads it
+	   under LOCK_EXC after these readers drain. */
+	if (found) found->last = time64(NULL);
+
 	if (lockrc==0) unlock(array, LOCK_SHR);
 	
 quit:
