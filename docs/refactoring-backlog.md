@@ -71,8 +71,8 @@ transient error, PR #85).
   clear win for static-request throughput (for CGI paths the LINK SVC, `P7`,
   dominates; profile before investing).
 
-**Counts (open/partial):** Security 7 · Memory & Stability 6 · Performance 7.
-*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87.)*
+**Counts (open/partial):** Security 6 · Memory & Stability 6 · Performance 7.
+*(2026-07-02: S1 #73; M1 #77; S2+S3 #79; S5 #81; S6 #83; M3+M4+M5 #85; M8+M9+M10 #87; S4 was already mitigated — finding corrected, no code.)*
 
 ---
 
@@ -156,17 +156,23 @@ CR/LF filtering (response splitting / open redirect).
 only relative (`/…`) redirect targets. (Aligns with TSK-108.)
 
 ### S4 — SSI path traversal: `ssi_include` opens directive path unchecked
-*High · Open · Effort S · `httpfile.c:472-533` · was F-05 / CRIT#4(2026-03)*
+*High · Resolved — already mitigated (finding was inaccurate; no code change) · `httpfile.c:533` → `httpopen.c:17,50` · was F-05 / CRIT#4(2026-03)*
 
-`ssi_include()` extracts the `file`/`virtual` path from the directive and passes
-it straight to `http_open(httpc, path, mime)` (line 533) with **no `..`
-rejection and no docroot confinement** (the `uri[]` copy at 524 is only for
-display). An SSI document containing `<!--#include virtual="../../…" -->` can
-escape the intended directory.
-**Fix:** reject `..` segments and confirm the resolved path is within DOCROOT
-before opening. *Note:* confirm whether UFSD already sandboxes to the docroot —
-if so this is defense-in-depth; if not it is a real arbitrary-read. Requires SSI
-enabled and the ability to place an SSI file.
+> **Not a live defect — the finding traced the caller but missed the callee's
+> guard.** `ssi_include()`'s **only** file open is line 533 → `http_open()`, and
+> `http_open` already: (1) rejects **any** `..` in the path — `httpopen.c:17`
+> `if (strstr(path, "..")) goto quit;` (commit `0c171fe`, 2026-03-01) — and (2)
+> prepends `DOCROOT` before opening — `httpopen.c:50`
+> `snprintf(ufspath, "%s%s", dr, buf)` (commit `1c2ad3c`, 2026-03-16). Both
+> predate the 2026-06-30 consolidation, so the "no `..` rejection / no docroot
+> confinement" claim was wrong about the then-current code. Attack walk-through:
+> `virtual="../../etc/passwd"` → `strstr` hits `..` → `goto quit` → NULL → SSI
+> prints "Oops: we didn't find". There is **no** open path in `ssi_include` that
+> bypasses `http_open`, so **no `ssi_include` code change is warranted** (a
+> redundant reject would be defensive noise). *Separate, not S4:* with `DOCROOT`
+> **unset** (`dr[0]==0`) there is no docroot confinement — still bounded to the
+> UFS namespace and still `..`-free, so not a traversal; tracked as a config-
+> hardening note under *Security architecture* below.
 
 ### S5 — Percent-decoder out-of-bounds read on trailing `%`
 *Medium · Resolved (2026-07-02, PR #81 / issue #80) · Effort XS · `httpdeco.c:15-21` · was F-07 / audit L7*
@@ -267,6 +273,11 @@ reachable. Optionally harden to `if (!var || !*var)` for symmetry.
   storage, dated as a standard.
 - **Binary authorization only** (login-or-not). For per-endpoint/RACF-resource
   authorization, see *Architecture* (HTTPX auth helper).
+- **`DOCROOT` unset ⇒ no docroot confinement** (`httpopen.c:48-54`). With no
+  `DOCROOT` configured, `http_open` opens the raw (still `..`-free) path in the
+  UFS root — bounded to the UFS namespace but not to a subtree. Not the SSI
+  traversal (S4), but a config-hardening gap: consider requiring `DOCROOT` (or
+  defaulting to a safe subtree) rather than serving the UFS root.
 
 ---
 
@@ -598,6 +609,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | `http_set_env` drops the var on `array_add` OOM (M8) | **Resolved (2026-07-02)** | check rc → free orphan — `httpsenv.c`, PR #87 / issue #86 |
 | Env-block ~4 B/var over-allocation (M9) | **Resolved (2026-07-02)** | `offsetof`-based sizing + `TSTNENV` — `httpnenv.c`, PR #87 / issue #86 |
 | Unchecked `strdup`/`array_add` in CGI registration (M10) | **Resolved (2026-07-02)** | free partial entry on failure — `httpacgi.c`, PR #87 / issue #86 |
+| SSI path traversal (S4) | **Already mitigated** — finding corrected (no code) | `http_open` rejects `..` (`httpopen.c:17`, `0c171fe`) + prepends DOCROOT (`:50`, `1c2ad3c`) |
 
 ---
 
@@ -672,7 +684,8 @@ EBCDIC.
    session-timeout security gap).
 4. **Performance:** **P1** (env-lookup index — biggest CPU win), then **P2**/**P3**
    (one send-state machine), **P4**.
-5. **Hardening:** **S4**, **S7**, **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
+5. **Hardening:** ~~**S4**~~ (already mitigated — finding corrected), **S7**,
+   **S8**, **S9–S12**, **M6**/**M7**/**M11**/**M12**.
    **M13** (shutdown teardown race) is mostly a **libc370** fix — tracked in
    mvslovers/libc370#6; it affects every cthread user, not just HTTPD.
 6. **Architecture:** router/middleware, HTTPX auth helper, error enum, file
@@ -751,3 +764,12 @@ size the env block with `offsetof(HTTPV,name)` not `sizeof(HTTPV)`; free a
 half-built CGI entry on OOM. Added `TSTNENV` (guards the M9 layout). PR #87,
 issue #86. Counts M&S 9→6. **Backlog steps 2–3 (quick wins + alloc hygiene)
 complete; remaining memory item is M2 (credential reaper / session timeout).**
+
+**2026-07-02:** **S4** (SSI path traversal) reviewed and found **already
+mitigated** — `ssi_include`'s only open (`httpfile.c:533`) goes through
+`http_open`, which already rejects `..` (`httpopen.c:17`, commit `0c171fe`,
+2026-03-01) and prepends `DOCROOT` (`:50`, `1c2ad3c`, 2026-03-16), both
+predating the consolidation. The finding traced the caller but missed the
+callee's guard. No code change (a redundant `ssi_include` reject would be
+defensive noise). Backlog corrected; Security count 7→6. Filed the separate
+`DOCROOT`-unset confinement gap under *Security architecture*.
