@@ -4,6 +4,10 @@
 */
 #include "httpd.h"
 
+/* cap on the combined query + POST parameter count (memory-exhaustion DoS):
+   each parameter allocates an HTTPV and grows the env array */
+#define HTTP_MAX_PARAMS 256
+
 static int http_set_post_env(HTTPC *httpc, const UCHAR *name, const UCHAR *value);
 
 /* http_parse() - client state CSTATE_PARSE
@@ -21,6 +25,7 @@ httppars(HTTPC *httpc)
     int     pos     = 0;
     UCHAR   *data   = NULL;
     int     datalen = 0;
+    int     nparam  = 0;
     int     i;
     UCHAR   *p;
     int     salen;
@@ -54,6 +59,7 @@ httppars(HTTPC *httpc)
             *p++ = 0;
             pos = (int)(p - buf);
             if (!buf[0]) continue;  /* "&&" or trailing "&" */
+            if (++nparam > HTTP_MAX_PARAMS) goto badrequest;
 
             p = strchr(buf,'=');
             if (!p) {
@@ -137,6 +143,18 @@ failed:
     httpc->state = CSTATE_RESET;
     goto quit;
 
+badrequest:
+    /* malformed request (bad Content-Length) or too many parameters: emit a
+       proper 400 and close (the connection state may be inconsistent) */
+    httpc->keepalive = 0;
+    http_resp(httpc, 400);
+    http_printf(httpc, "Cache-Control: no-store\r\n");
+    http_printf(httpc, "Content-Type: text/plain\r\n");
+    http_printf(httpc, "\r\n");
+    http_printf(httpc, "400 Bad Request\n");
+    httpc->state = CSTATE_DONE;
+    goto quit;
+
 postdata:
     /* classify the request body (RFC 7230 §3.3.3) before reading it */
     {
@@ -156,15 +174,7 @@ postdata:
             httpc->state = CSTATE_DONE;
             goto quit;
         case HTTP_BODY_BAD:
-            /* malformed Content-Length */
-            httpc->keepalive = 0;
-            http_resp(httpc, 400);
-            http_printf(httpc, "Cache-Control: no-store\r\n");
-            http_printf(httpc, "Content-Type: text/plain\r\n");
-            http_printf(httpc, "\r\n");
-            http_printf(httpc, "400 Bad Request\n");
-            httpc->state = CSTATE_DONE;
-            goto quit;
+            goto badrequest;        /* malformed Content-Length */
         case HTTP_BODY_NONE:
             /* no body to read (no CL & no TE, CL 0, or a chunked body we do
                not decode here) -- don't block on a recv that won't complete */
@@ -210,6 +220,7 @@ postdata:
         *p++ = 0;
         pos = (int)(p - buf);
         if (!buf[0]) continue;  /* "&&" or trailing "&" */
+        if (++nparam > HTTP_MAX_PARAMS) goto badrequest;
 
         p = strchr(buf,'=');
         if (!p) {
