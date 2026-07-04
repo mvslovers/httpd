@@ -93,7 +93,15 @@ reaper). Feed it from **three sources**, all resolving to the same
 |--------|-----|------|
 | **Form** | browser (optional) | HTML form → `POST /login` → `Set-Cookie: Sec-Token` |
 | **Basic** | REST / curl / Zowe CLI | `Authorization: Basic` → resolve-or-create by token |
-| **Token API** | SPA / z/OSMF clients | `POST` creds once → token back → present token (cookie or `Bearer`) |
+| **Token** | SPA / z/OSMF clients | login endpoint (Basic, **owned by mvsMF**) hands back our token as `LtpaToken2`; later requests present it (cookie or `Bearer`) |
+
+> **Division of labour (corrected 2026-07-04):** the **login/logout endpoints
+> live in mvsMF** (`POST`/`DELETE /zosmf/services/authenticate`), **not** in
+> httpd. httpd owns only the *mechanism*: it resolves the Basic credentials on
+> the login call (source **Basic**, already done — #96), **exposes the resulting
+> token** to the CGI (HTTPX `http_get_token`, §2.4), and **accepts that token
+> back** on later requests (resolver, §2.5). The "LTPA token" is just our
+> internal `CREDTOK` wrapped in a `LtpaToken2` cookie — opaque to clients.
 
 The **deterministic token** makes Basic and re-auth cheap: build
 `CREDTOK = SHA-256(addr,user,pass)`, `cred_find_by_token()` — a hit reuses the
@@ -159,25 +167,43 @@ for gating a *whole* static deployment / admin area behind a profile.
 Append to the HTTPX vector (append-only) a small auth contract, e.g.:
 
 ```c
-UCHAR *http_get_userid(HTTPC *);                 /* from httpc->cred */
-ACEE  *http_get_acee(HTTPC *);                   /* the RACF ACEE    */
-int    http_check_auth(HTTPC *, const char *class,
-                       const char *resource, int attr);  /* racf_auth */
+UCHAR   *http_get_userid(HTTPC *);               /* from httpc->cred        */
+ACEE    *http_get_acee(HTTPC *);                 /* the RACF ACEE           */
+CREDTOK *http_get_token(HTTPC *);                /* the session token       */
+int      http_logout(HTTPC *);                   /* credtok_logout()        */
+int      http_check_auth(HTTPC *, const char *class,
+                         const char *resource, int attr);  /* racf_auth     */
 ```
 
 Then mvsMF **deletes `authmw.c`**: httpd has already resolved `httpc->cred`
-(from Basic/token), so mvsMF reads the userid/ACEE and, where needed, calls
-`http_check_auth` — **no per-request `racf_login`**, no password in env vars.
+(from Basic/token — the resolver runs on every request), so mvsMF **reads** the
+userid/ACEE, gets the **token** to hand back as `LtpaToken2`, calls `http_logout`
+for its `DELETE` handler, and (where needed) `http_check_auth` — **no
+per-request `racf_login`**, no password in env vars, and no bespoke
+credential-store logic. mvsMF does **not** call `cred_login` itself; it just
+reads what httpd resolved.
 
-### 2.5 z/OSMF compatibility (the token source)
+### 2.5 The token source — mvsMF owns the endpoint, httpd owns the token
 
-Implement the z/OSMF authenticate contract so the SPA and z/OSMF-compatible
-clients work the standard way:
-- `POST /zosmf/services/authenticate` → `cred_login`, return the token (body +
-  `Set-Cookie`); the token *is* the `Sec-Token` (CREDTOK), just wrapped
-  z/OSMF-style (endpoint path, cookie name, JSON).
-- Accept that token on later requests (cookie or `Bearer`) → the resolver.
-- `DELETE /zosmf/services/authenticate` → `credtok_logout`.
+The **login/logout endpoints live in mvsMF** (`POST`/`DELETE
+/zosmf/services/authenticate`); httpd only supplies and accepts the token.
+
+- **Login** (`POST`, mvsMF): the client sends `Authorization: Basic`. httpd's
+  resolver (#96) resolves it → `httpc->cred`. mvsMF's handler reads the token
+  via `http_get_token()` and returns `Set-Cookie: LtpaToken2=<base64(CREDTOK)>`
+  (+ JSON per the z/OSMF spec). If `httpc->cred` is NULL (bad creds), mvsMF
+  returns its own z/OSMF-shaped 401. httpd must **not** gate the authenticate
+  route (it's the default; #98 makes it explicit).
+- **Later requests** (httpd): the resolver **accepts the token back** — a
+  `LtpaToken2` cookie (and/or `Authorization: Bearer <token>`) → decode →
+  `cred_find_by_token`.
+- **Logout** (`DELETE`, mvsMF): calls `http_logout()` (→ `credtok_logout`),
+  expires the cookie.
+
+The `LtpaToken2` is our internal `CREDTOK` (base64), **opaque** to clients —
+Zowe/SPA store and replay it as-is. Real WebSphere-LTPA encoding is **not**
+implemented; if we ever need a structured/validated token, go straight to
+**JWT** rather than emulating LTPA.
 
 ---
 
@@ -186,19 +212,24 @@ clients work the standard way:
 ### 3.1 httpd (the foundation)
 1. **Basic Auth source** + `WWW-Authenticate` challenge + factor the credential
    resolver (cookie → Basic → Bearer). *(no `credentials/` change)*
-2. **Token API** (`/zosmf/services/authenticate`) returning the token; accept
-   `Bearer`.
+2. **Accept the session token back** on later requests: extend the resolver to
+   read a `LtpaToken2` cookie (and/or `Authorization: Bearer <token>`) →
+   `cred_find_by_token`. *(The `/zosmf/services/authenticate` endpoint itself is
+   mvsMF's — httpd only accepts the token and exposes it via 4.)*
 3. **Per-route policy**: `MOD=` (CGI) **and** `LOC=` (static prefix) carry the
    same policy; a **2-stage gate in the pipeline** — authenticate (→401) then,
    if `RES=` is set, `racf_auth` (→403) — applied *before* serving a file or
    dispatching a CGI, so static/SPA routes get RACF/RAKF protection too. Decouple
    the challenge (form vs 401) from the core.
-4. **HTTPX auth export** (`get_userid`/`get_acee`/`check_auth`).
+4. **HTTPX auth export** (`get_userid`/`get_acee`/`get_token`/`logout`/
+   `check_auth`).
 
 ### 3.2 mvsMF
-5. **Delete `authmw.c`**; use `http_get_userid`/`http_get_acee` (+
-   `http_check_auth` for fine-grained routes). Configure `MOD MVSMF /zosmf/*
-   AUTH=BASIC,TOKEN`.
+5. Implement `POST`/`DELETE /zosmf/services/authenticate` (mvslovers/mvsmf#162):
+   the login handler reads the httpd-resolved token via `http_get_token` and
+   returns it as `LtpaToken2`; the logout handler calls `http_logout`. **Delete
+   `authmw.c`**; read userid/ACEE via the export (`http_check_auth` for
+   fine-grained routes). Configure `MOD MVSMF /zosmf/* AUTH=BASIC,TOKEN`.
 
 ### 3.3 SPA (`static/`)
 6. Login: `POST` creds **once** to the authenticate endpoint → store the
@@ -222,8 +253,9 @@ clients work the standard way:
 - **Crypto:** Blowfish (64-bit) + weak salt (`cred_init` uses the HTTPD struct /
   object code) — revisit for a unified model.
 - **Realm** source (fixed vs Parmlib).
-- **z/OSMF fidelity:** how close to the real `/zosmf/services/authenticate`
-  response/cookies do we need to be for Zowe-CLI compatibility?
+- **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**
+  `CREDTOK` (Zowe/SPA replay it as-is). We do **not** emulate real WebSphere
+  LTPA; if a structured/validated token is ever needed, go straight to **JWT**.
 
 ## 5. Suggested sequencing
 An **epic** with sub-issues, foundation-first:
