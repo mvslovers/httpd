@@ -417,6 +417,17 @@ struct httpx {
                                     /* 120 get/create UFS handle    */
     void *      (*http_cgictx_get)(HTTPD *, const char *, unsigned);
                                     /* 124 find/create CGI context  */
+    UCHAR *     (*http_get_userid)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 128 client userid into buf   */
+    ACEE *      (*http_get_acee)(HTTPC *);
+                                    /* 12C client RACF ACEE / NULL  */
+    int         (*http_get_token)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 130 copy session token, ret len */
+    int         (*http_check_auth)(HTTPC *, const char *classname,
+                                   const char *resource, int attr);
+                                    /* 134 RACF resource check      */
+    int         (*http_logout)(HTTPC *);
+                                    /* 138 end client session       */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -481,6 +492,12 @@ extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTT
 extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
 extern UFS *http_get_ufs(HTTPC *)                                          asm("HTTPGUFS");
 extern void *http_cgictx_get(HTTPD *, const char *, unsigned)              asm("HTTPGCTX");
+extern UCHAR *http_get_userid(HTTPC *, UCHAR *out, unsigned outlen)         asm("HTTPGUID");
+extern ACEE *http_get_acee(HTTPC *)                                        asm("HTTPGACE");
+extern int http_get_token(HTTPC *, UCHAR *out, unsigned outlen)            asm("HTTPGTOK");
+extern int http_check_auth(HTTPC *, const char *classname,
+                           const char *resource, int attr)                asm("HTTPCKAU");
+extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -709,6 +726,21 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_cgictx_get(httpd,eye,size) \
     ((httpx->http_cgictx_get)((httpd),(eye),(size)))
+
+#define http_get_userid(httpc,out,outlen) \
+    ((httpx->http_get_userid)((httpc),(out),(outlen)))
+
+#define http_get_acee(httpc) \
+    ((httpx->http_get_acee)((httpc)))
+
+#define http_get_token(httpc,out,outlen) \
+    ((httpx->http_get_token)((httpc),(out),(outlen)))
+
+#define http_check_auth(httpc,classname,resource,attr) \
+    ((httpx->http_check_auth)((httpc),(classname),(resource),(attr)))
+
+#define http_logout(httpc) \
+    ((httpx->http_logout)((httpc)))
 
 #endif  /* ifndef HTTPX_H */
 

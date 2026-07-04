@@ -42,6 +42,7 @@
 
 typedef struct httpd    HTTPD;      /* HTTP Daemon (server) — opaque    */
 typedef struct cred     CRED;       /* Credentials          — opaque    */
+struct acee;                        /* RACF ACEE — full def via <racf.h> */
 #ifndef LIBUFS_H
 typedef struct ufs      UFS;        /* UFS filesystem       — opaque    */
 typedef struct ufsfile  UFSFILE;    /* UFS file handle      — opaque    */
@@ -297,6 +298,17 @@ struct httpx {
                                     /* 120 get/create UFS handle        */
     void *      (*http_cgictx_get)(HTTPD *, const char *, unsigned);
                                     /* 124 find/create CGI context      */
+    UCHAR *     (*http_get_userid)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 128 client userid into buf       */
+    struct acee *(*http_get_acee)(HTTPC *);
+                                    /* 12C client RACF ACEE / NULL      */
+    int         (*http_get_token)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 130 copy session token, ret len  */
+    int         (*http_check_auth)(HTTPC *, const char *classname,
+                                   const char *resource, int attr);
+                                    /* 134 RACF resource check          */
+    int         (*http_logout)(HTTPC *);
+                                    /* 138 end client session           */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -523,5 +535,20 @@ struct httpx {
 
 #define http_cgictx_get(httpd,eye,size) \
     ((httpx->http_cgictx_get)((httpd),(eye),(size)))
+
+#define http_get_userid(httpc,out,outlen) \
+    ((httpx->http_get_userid)((httpc),(out),(outlen)))
+
+#define http_get_acee(httpc) \
+    ((httpx->http_get_acee)((httpc)))
+
+#define http_get_token(httpc,out,outlen) \
+    ((httpx->http_get_token)((httpc),(out),(outlen)))
+
+#define http_check_auth(httpc,classname,resource,attr) \
+    ((httpx->http_check_auth)((httpc),(classname),(resource),(attr)))
+
+#define http_logout(httpc) \
+    ((httpx->http_logout)((httpc)))
 
 #endif /* HTTPCGI_H */
