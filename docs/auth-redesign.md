@@ -205,6 +205,22 @@ Zowe/SPA store and replay it as-is. Real WebSphere-LTPA encoding is **not**
 implemented; if we ever need a structured/validated token, go straight to
 **JWT** rather than emulating LTPA.
 
+**Authoritative wire contract (IBM z/OSMF "Basic authentication" docs — pins the
+exact flow):**
+1. First request carries `Authorization: Basic <base64(userid:password)>`.
+2. On success the response is **HTTP 200** with an **`LtpaToken2`** value (IBM's
+   real one "supports strong encryption"; ours is the opaque `CREDTOK`).
+3. Subsequent requests supply the token via the **`Cookie`** header —
+   `Cookie: LtpaToken2=<tokenvalue>` — **instead of** the Basic header.
+
+So the standard transport is the **`LtpaToken2` cookie** — that is what httpd's
+resolver (§2.5 / #97) and Zowe/the SPA rely on; `Authorization: Bearer` is an
+optional convenience, not part of the z/OSMF contract. Note our `CREDTOK` is a
+**one-way `SHA-256` session id** (it does not carry a recoverable password), so
+opaque replay is a reasonable session token even without LTPA-style content
+encryption; its only weakness is that it is *deterministic / not rotated* — see
+the token-model note in §4.
+
 ---
 
 ## 3. Migration path
