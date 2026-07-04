@@ -58,7 +58,8 @@ httppc(HTTPC *httpc)
             HTTPCGI *cgi = http_find_cgi(httpd, path);
 
             /* resolve the client credential for this request into httpc->cred:
-               Sec-Token cookie, then HTTP Basic auth (see resolve_credential) */
+               Sec-Token / LtpaToken2 cookie, Bearer, or Basic (see
+               resolve_credential) */
             resolve_credential(httpc);
 
             if (cgi) {
@@ -220,41 +221,68 @@ quit:
 }
 
 /*
+** token_to_cred() - decode a base64 session-token string into a CREDTOK and
+** resolve the session (NULL on a miss).  Shared by the Sec-Token / LtpaToken2
+** cookies and the Bearer header; cred_find_by_token() refreshes cred->last (M2).
+*/
+static CRED *
+token_to_cred(const char *b64)
+{
+	CREDTOK	tok;
+	size_t	len;
+	char	*buf;
+
+	if (!b64 || !*b64) return NULL;
+
+	buf = base64_decode(b64, strlen(b64), &len);
+	if (!buf) return NULL;
+
+	memset(&tok, 0, sizeof(tok));
+	if (len > sizeof(tok)) len = sizeof(tok);
+	memcpy(&tok, buf, len);
+	free(buf);
+
+	return cred_find_by_token(&tok);
+}
+
+/*
 ** resolve_credential() - set httpc->cred from the request, trying each
-** credential source in turn.  cred_find_by_token()/cred_login() refresh
-** cred->last (M2), so activity keeps the session alive.
-**   1. Sec-Token cookie                     -> cred_find_by_token()
-**   2. Authorization: Basic <b64(user:pass)> -> cred_login() (find-or-create;
-**      a token hit reuses the cached CRED+ACEE, so no per-request racf_login)
+** credential source in turn (cred_find_by_token()/cred_login() refresh
+** cred->last, M2, so activity keeps the session alive):
+**   1. Sec-Token cookie                       (form / POST login)
+**   2. LtpaToken2 cookie                       (z/OSMF token; mvsMF's authenticate
+**                                               endpoint hands back our token)
+**   3. Authorization: Bearer <token>           (optional; the z/OSMF standard is
+**                                               the LtpaToken2 cookie above)
+**   4. Authorization: Basic <b64(user:pass)>   (find-or-create; a token hit
+**      reuses the cached CRED+ACEE, so no per-request racf_login)
 */
 static void
 resolve_credential(HTTPC *httpc)
 {
-	char	*cookie;
 	char	*authhdr;
 
 	httpc->cred = NULL;
 
-	/* 1. Sec-Token cookie (issued by the form / POST login) */
-	cookie = http_get_env(httpc, "HTTP_Cookie-Sec-Token");
-	if (cookie) {
-		CREDTOK	tok;
-		size_t	len = strlen(cookie);
-		char	*buf = base64_decode(cookie, len, &len);
-
-		if (buf) {
-			memset(&tok, 0, sizeof(tok));
-			if (len > sizeof(tok)) len = sizeof(tok);
-			memcpy(&tok, buf, len);
-			free(buf);
-			httpc->cred = cred_find_by_token(&tok);
-		}
-	}
+	/* 1. Sec-Token cookie */
+	httpc->cred = token_to_cred(http_get_env(httpc, "HTTP_Cookie-Sec-Token"));
 	if (httpc->cred) return;
 
-	/* 2. HTTP Basic auth: Authorization: Basic <base64(user:pass)> */
+	/* 2. LtpaToken2 cookie (our token under the z/OSMF cookie name) */
+	httpc->cred = token_to_cred(http_get_env(httpc, "HTTP_Cookie-LtpaToken2"));
+	if (httpc->cred) return;
+
 	authhdr = http_get_env(httpc, "HTTP_Authorization");
-	if (authhdr && http_cmpn(authhdr, "Basic ", 6) == 0) {
+	if (!authhdr) return;
+
+	/* 3. Authorization: Bearer <token> */
+	if (http_cmpn(authhdr, "Bearer ", 7) == 0) {
+		httpc->cred = token_to_cred(authhdr + 7);
+		return;
+	}
+
+	/* 4. HTTP Basic auth: Authorization: Basic <base64(user:pass)> */
+	if (http_cmpn(authhdr, "Basic ", 6) == 0) {
 		size_t	dlen = 0;
 		char	*dec = base64_decode(authhdr + 6, strlen(authhdr + 6), &dlen);
 
