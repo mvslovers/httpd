@@ -79,6 +79,11 @@ static HTTPX vect = {
     &http_legacy,               /* 11C legacy hybrid codepage pair  */
     http_get_ufs,               /* 120 http_get_ufs()               */
     http_cgictx_get,            /* 124 http_cgictx_get()            */
+    http_get_userid,            /* 128 http_get_userid()            */
+    http_get_acee,              /* 12C http_get_acee()              */
+    http_get_token,             /* 130 http_get_token()             */
+    http_check_auth,            /* 134 http_check_auth()            */
+    http_logout,                /* 138 http_logout()                */
 };
 
 HTTPX *httpx = &vect;
