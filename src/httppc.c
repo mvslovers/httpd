@@ -3,14 +3,19 @@
 */
 #include "httpd.h"
 
-static int needs_login(HTTPC *httpc, HTTPCGI *cgi);
+/* Basic-auth realm advertised in the WWW-Authenticate challenge (fixed for now;
+   a per-route / Parmlib realm is a later step of the auth redesign). */
+#define HTTP_AUTH_REALM "MVS"
+
+static int  needs_login(HTTPC *httpc, HTTPCGI *cgi);
+static void resolve_credential(HTTPC *httpc);
+static int  auth_required_response(HTTPC *httpc);
 
 /* http_process_client() */
 int
 httppc(HTTPC *httpc)
 {
 	HTTPD 	*httpd 		= httpc->httpd;
-	CRED	*cred;
     int     rc  		= 0;
     int		needslogin;
     char    *path;
@@ -35,7 +40,6 @@ httppc(HTTPC *httpc)
     }
     if (httpc->state==CSTATE_PARSE) {
         http_parse(httpc);
-		cred = httpc->cred;
     }
 
     /* the state should be GET, HEAD, PUT, or POST at this point */
@@ -52,30 +56,15 @@ httppc(HTTPC *httpc)
 #endif
         if (path) {
             HTTPCGI *cgi = http_find_cgi(httpd, path);
-			char 	*cookie = http_get_env(httpc, "HTTP_Cookie-Sec-Token");
-#if 0
-			wtof("httpc.c: Sec-Token=\"%s\"", cookie ? cookie : "(null)");
-#endif
-			if (cookie) {
-				CREDTOK tok;
-				size_t len = strlen(cookie);
-				char *buf;
 
-				httpc->cred = cred = NULL;
-				
-				buf = base64_decode(cookie, strlen(cookie), &len);
-				if (buf) {
-					if (len > sizeof(CREDTOK)) len = sizeof(CREDTOK);
-					memcpy(&tok, buf, len);
-					free(buf);
-					httpc->cred = cred = cred_find_by_token(&tok);
-				}
-			}
+            /* resolve the client credential for this request into httpc->cred:
+               Sec-Token cookie, then HTTP Basic auth (see resolve_credential) */
+            resolve_credential(httpc);
 
             if (cgi) {
 				if (needs_login(httpc, cgi)) {
-					/* request user login */
-					rc = httpcred(httpc);
+					/* not authenticated: 401 challenge (Basic) or login form */
+					rc = auth_required_response(httpc);
 					goto check_done;
 				}
 
@@ -103,7 +92,7 @@ httppc(HTTPC *httpc)
         /* not a CGI request */
         needslogin = needs_login(httpc, NULL);
 		if (needslogin) {
-			rc = httpcred(httpc);
+			rc = auth_required_response(httpc);
 			goto check_done;
 		}
         
@@ -228,4 +217,98 @@ needs_login(HTTPC *httpc, HTTPCGI *cgi)
 
 quit:
 	return needlogin;
+}
+
+/*
+** resolve_credential() - set httpc->cred from the request, trying each
+** credential source in turn.  cred_find_by_token()/cred_login() refresh
+** cred->last (M2), so activity keeps the session alive.
+**   1. Sec-Token cookie                     -> cred_find_by_token()
+**   2. Authorization: Basic <b64(user:pass)> -> cred_login() (find-or-create;
+**      a token hit reuses the cached CRED+ACEE, so no per-request racf_login)
+*/
+static void
+resolve_credential(HTTPC *httpc)
+{
+	char	*cookie;
+	char	*authhdr;
+
+	httpc->cred = NULL;
+
+	/* 1. Sec-Token cookie (issued by the form / POST login) */
+	cookie = http_get_env(httpc, "HTTP_Cookie-Sec-Token");
+	if (cookie) {
+		CREDTOK	tok;
+		size_t	len = strlen(cookie);
+		char	*buf = base64_decode(cookie, len, &len);
+
+		if (buf) {
+			memset(&tok, 0, sizeof(tok));
+			if (len > sizeof(tok)) len = sizeof(tok);
+			memcpy(&tok, buf, len);
+			free(buf);
+			httpc->cred = cred_find_by_token(&tok);
+		}
+	}
+	if (httpc->cred) return;
+
+	/* 2. HTTP Basic auth: Authorization: Basic <base64(user:pass)> */
+	authhdr = http_get_env(httpc, "HTTP_Authorization");
+	if (authhdr && http_cmpn(authhdr, "Basic ", 6) == 0) {
+		size_t	dlen = 0;
+		char	*dec = base64_decode(authhdr + 6, strlen(authhdr + 6), &dlen);
+
+		if (dec) {
+			char	creds[256];
+			char	*colon;
+			size_t	n = dlen;
+
+			/* base64_decode() does not NUL-terminate; copy bounded + terminate.
+			   The decoded user:pass is ASCII on the wire -> translate to EBCDIC. */
+			if (n >= sizeof(creds)) n = sizeof(creds) - 1;
+			memcpy(creds, dec, n);
+			creds[n] = 0;
+			free(dec);
+			http_atoe(creds, n);
+
+			colon = strchr(creds, ':');
+			if (colon) {
+				*colon = 0;
+				httpc->cred = cred_login(httpc->addr,
+				                         (UCHAR *)creds, (UCHAR *)(colon + 1));
+			}
+			memset(creds, 0, sizeof(creds));   /* scrub the password */
+		}
+	}
+}
+
+/*
+** auth_required_response() - the request needs a login but isn't authenticated.
+** A client that sent an Authorization header is a REST/Basic client -> answer a
+** 401 challenge; otherwise fall back to the interactive HTML login form.
+*/
+static int
+auth_required_response(HTTPC *httpc)
+{
+	int	rc;
+
+	if (http_get_env(httpc, "HTTP_Authorization")) {
+		rc = http_resp(httpc, 401);
+		if (rc) goto quit;
+		rc = http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
+		                 HTTP_AUTH_REALM);
+		if (rc) goto quit;
+		http_printf(httpc, "Cache-Control: no-store\r\n");
+		http_printf(httpc, "Content-Type: text/plain\r\n");
+		http_printf(httpc, "\r\n");
+		http_printf(httpc, "401 Unauthorized\n");
+		httpc->state = CSTATE_DONE;
+		return 0;
+	}
+
+	/* interactive client: render the login form */
+	return httpcred(httpc);
+
+quit:
+	return rc;
 }
