@@ -1,5 +1,7 @@
 /* httpacgi() - add path and pgm to array of HTTPCGI in HTTPD handle
    note: pgm and path much be literal string constants that do not change.
+   A NULL pgm registers a program-less (LOC=) route: a static path prefix
+   that carries auth policy but falls through to httpget instead of a CGI.
 */
 #include "httpd.h"
 
@@ -8,7 +10,6 @@ HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
     HTTPCGI *cgi    = NULL;
 
     if (!httpd) goto quit;
-    if (!pgm) goto quit;
     if (!path) goto quit;
 
     cgi = calloc(1, sizeof(HTTPCGI));
@@ -21,12 +22,13 @@ HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
     cgi->login = (login ? 1 : 0);
     cgi->len  = strlen(path);
     cgi->path = strdup(path);
-    cgi->pgm  = strdup(pgm);
+    cgi->pgm  = pgm ? strdup(pgm) : NULL;   /* NULL pgm == LOC route */
 
-    /* on OOM don't register a half-built entry -- a NULL path/pgm would
-       NULL-deref later at CGI match/link.  (For a successfully registered
-       entry the strdup storage is AS-lifetime by design.) */
-    if (!cgi->path || !cgi->pgm) {
+    /* on OOM don't register a half-built entry -- a NULL path would NULL-deref
+       later at CGI match; a NULL pgm from a failed strdup (pgm was non-NULL)
+       would NULL-deref at CGI link.  (For a successfully registered entry the
+       strdup storage is AS-lifetime by design.) */
+    if (!cgi->path || (pgm && !cgi->pgm)) {
         free(cgi->path);
         free(cgi->pgm);
         free(cgi);

@@ -72,7 +72,7 @@ dump_cgi(HTTPD *httpd, HTTPC *httpc)
         if (!p) continue;
         
         http_printf(httpc, "   Path=\"%s\" Program=\"%s\" Login=%u Wild=%u\n",
-			p->path, p->pgm, p->login, p->wild);
+			p->path, p->pgm ? p->pgm : "(none)", p->login, p->wild);
     }
 
 quit:

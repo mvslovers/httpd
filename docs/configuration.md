@@ -53,6 +53,37 @@ All static content (HTML, CSS, JS, images) is served from this directory. Server
 
 When `LOGIN=RACF`, unauthenticated requests to protected resources receive a redirect to the login page. After successful RACF authentication, a `Sec-Token` cookie is issued. Sessions are bound to the client's IP address.
 
+`LOGIN` remains the global default. Individual routes can override it and add a
+resource check with the per-route `AUTH=` / `RES=` options (see below).
+
+### Per-route authentication policy (`AUTH=`, `RES=`)
+
+Both `MOD=` (a CGI route) and `LOC=` (a program-less static route) can carry a
+per-route auth policy as trailing options. The server enforces it in its request
+pipeline as a **2-stage gate**, uniformly for CGI and static routes, *before* it
+serves a file or dispatches a CGI:
+
+1. **Authenticate** — the credential is resolved from the request (`Sec-Token` /
+   `LtpaToken2` cookie, `Authorization: Bearer`, or `Authorization: Basic`). If
+   the route requires an identity and none is present, the server answers **401**
+   with the challenge selected by `AUTH=`.
+2. **Authorize** — if the route sets `RES=class:resource`, the server issues a
+   RACF/RAKF check (RACHECK/FRACHECK) under the client's ACEE. On denial it
+   answers **403**.
+
+| Option | Values | Description |
+|--------|--------|-------------|
+| `AUTH=` | `NONE` \| `FORM` \| `BASIC` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = redirect to the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. **Omitted** = inherit the global `LOGIN` default (backward compatible). |
+| `RES=` | `class:resource` | Optional RACF/RAKF resource for stage 2, e.g. `RES=FACILITY:MVSMF.ACCESS`. Checked for `READ`. A resource always requires an identity, so it implies authentication even without `AUTH=`. |
+
+The credential resolver always tries every source, so `AUTH=` only selects the
+*challenge* shown when authentication is missing — it does not restrict which
+source a client may use. `AUTH=NONE` combined with `RES=` is contradictory (a
+public route has no ACEE to check) — the server warns and `NONE` wins.
+
+`/login`, `/logout` and the login-page assets (`/login.*`, `/favicon.*`) are
+always reachable so an `AUTH=FORM` challenge can render.
+
 ## Timezone
 
 | Keyword | Default | Description |
@@ -70,9 +101,13 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 ```
 MOD=PROGRAM /url/pattern        URL prefix match
 MOD=PROGRAM                     Extension match (derives *.program from name)
+MOD=PROGRAM /url/pattern AUTH=BASIC RES=class:resource   with auth policy
 ```
 
 Server modules are load modules that HTTPD loads at startup via `__load()` and calls directly through the HTTPX function vector. They run inside the server's address space — unlike traditional CGI programs which fork a new process per request.
+
+Any `MOD=` route may add the per-route `AUTH=` / `RES=` options described under
+[Security](#security).
 
 | Routing Type | Syntax | Behavior |
 |-------------|--------|----------|
@@ -104,6 +139,35 @@ MOD=MVSMF /zosmf/*
 MOD=MVSMF /zosmf/*
 MOD=HTTPDSRV /.dsrv
 MOD=HTTPDMTT /.dmtt
+```
+
+## Static Locations (`LOC=`)
+
+```
+LOC=/url/prefix                 static path prefix (falls through to DOCROOT)
+LOC=/url/prefix AUTH=mode RES=class:resource   with auth policy
+```
+
+A `LOC=` route matches a path **without** a program: the request falls through
+to the normal static file handler (`DOCROOT`), but the route still carries the
+same per-route `AUTH=` / `RES=` policy as `MOD=`. This lets a whole static
+subtree (an SPA, an admin area) sit behind a login or a RACF/RAKF profile without
+a CGI.
+
+Path matching is the same as for `MOD=`: a path is matched **exactly** unless it
+contains a wildcard, so a subtree needs a trailing `*` (`LOC=/admin/*`, not
+`LOC=/admin`). Routes are tested in the order they appear, so list the more
+specific prefixes before a catch-all — a catch-all `LOC=/*` must come *after*
+`MOD=MVSMF /zosmf/*`, or it shadows it.
+
+```
+# SPA: the whole document tree is public (the login page must load), the API
+# is protected -- list the API route first so the catch-all doesn't shadow it
+MOD=MVSMF /zosmf/*     AUTH=BASIC RES=FACILITY:MVSMF.ACCESS
+LOC=/*                 AUTH=NONE
+
+# Static admin area behind a RACF profile
+LOC=/admin/*          AUTH=BASIC RES=FACILITY:HTTPD.ADMIN
 ```
 
 ## SMF Recording

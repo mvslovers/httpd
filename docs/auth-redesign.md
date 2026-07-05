@@ -226,19 +226,23 @@ the token-model note in §4.
 ## 3. Migration path
 
 ### 3.1 httpd (the foundation)
-1. **Basic Auth source** + `WWW-Authenticate` challenge + factor the credential
-   resolver (cookie → Basic → Bearer). *(no `credentials/` change)*
-2. **Accept the session token back** on later requests: extend the resolver to
-   read a `LtpaToken2` cookie (and/or `Authorization: Bearer <token>`) →
-   `cred_find_by_token`. *(The `/zosmf/services/authenticate` endpoint itself is
-   mvsMF's — httpd only accepts the token and exposes it via 4.)*
-3. **Per-route policy**: `MOD=` (CGI) **and** `LOC=` (static prefix) carry the
-   same policy; a **2-stage gate in the pipeline** — authenticate (→401) then,
-   if `RES=` is set, `racf_auth` (→403) — applied *before* serving a file or
-   dispatching a CGI, so static/SPA routes get RACF/RAKF protection too. Decouple
-   the challenge (form vs 401) from the core.
-4. **HTTPX auth export** (`get_userid`/`get_acee`/`get_token`/`logout`/
-   `check_auth`).
+1. ✅ **(done — #96)** **Basic Auth source** + `WWW-Authenticate` challenge +
+   factor the credential resolver (cookie → Basic → Bearer). *(no `credentials/`
+   change)*
+2. ✅ **(done — #97)** **Accept the session token back** on later requests:
+   extend the resolver to read a `LtpaToken2` cookie (and/or `Authorization:
+   Bearer <token>`) → `cred_find_by_token`. *(The `/zosmf/services/authenticate`
+   endpoint itself is mvsMF's — httpd only accepts the token and exposes it via
+   4.)*
+3. ✅ **(done — #98)** **Per-route policy**: `MOD=` (CGI) **and** `LOC=` (static
+   prefix) carry the same policy; a **2-stage gate in the pipeline** —
+   authenticate (→401) then, if `RES=` is set, `racf_auth` (→403) — applied
+   *before* serving a file or dispatching a CGI, so static/SPA routes get
+   RACF/RAKF protection too. Decouple the challenge (form vs 401) from the core.
+   *(`AUTH=` is `NONE`/`FORM`/`BASIC`; a route without `AUTH=` inherits the
+   global `LOGIN` default.)*
+4. ✅ **(done — #99)** **HTTPX auth export** (`get_userid`/`get_acee`/
+   `get_token`/`logout`/`check_auth`).
 
 ### 3.2 mvsMF
 5. Implement `POST`/`DELETE /zosmf/services/authenticate` (mvslovers/mvsmf#162):
