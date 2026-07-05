@@ -15,6 +15,7 @@ static void set_defaults(HTTPD *httpd);
 static void parse_line(HTTPD *httpd, char *line);
 static void parse_keyvalue(HTTPD *httpd, const char *key, const char *value);
 static void parse_mod(HTTPD *httpd, const char *value);
+static void parse_loc(HTTPD *httpd, const char *value);
 static void parse_login(HTTPD *httpd, const char *value);
 static void parse_tzoffset(HTTPD *httpd, const char *value);
 static int  do_bind(HTTPD *httpd);
@@ -291,6 +292,9 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         wtof("HTTPD410W CGI= is deprecated, use MOD= instead");
         parse_mod(httpd, value);
     }
+    else if (strcmp(key, "LOC") == 0) {
+        parse_loc(httpd, value);
+    }
     else if (strcmp(key, "CLIENT_TIMEOUT_MSG") == 0) {
         if (atoi(value) > 0) httpd->client |= HTTPD_CLIENT_INMSG;
         else                 httpd->client &= ~HTTPD_CLIENT_INMSG;
@@ -358,7 +362,110 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
 }
 
 /* ====================================================================
-** Parse MOD=PROGRAM [pattern]
+** Per-route auth policy, shared by MOD= (CGI) and LOC= (static prefix).
+** ================================================================= */
+typedef struct {
+    UCHAR   auth;               /* HTTP_AUTH_* (DEFAULT until AUTH= seen)   */
+    UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
+    char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
+    char   *resname;            /* strdup'd RACF resource name              */
+} ROUTE_POLICY;
+
+/* tokenize() - split s in place into whitespace-delimited tokens.  Returns the
+** count, filling tok[0..count) with pointers into s (each NUL-terminated). */
+static int
+tokenize(char *s, char **tok, int max)
+{
+    int n = 0;
+
+    while (*s && n < max) {
+        while (*s == ' ' || *s == '\t') s++;    /* skip leading blanks */
+        if (!*s) break;
+        tok[n++] = s;
+        while (*s && *s != ' ' && *s != '\t') s++;
+        if (*s) *s++ = '\0';                    /* terminate the token */
+    }
+    return n;
+}
+
+/* is_route_kv() - true if tok is a trailing route option (AUTH=.../RES=...)
+** rather than a positional path token. */
+static int
+is_route_kv(const char *tok)
+{
+    return http_cmpn(tok, "AUTH=", 5) == 0 || http_cmpn(tok, "RES=", 4) == 0;
+}
+
+/* parse_kv_tail() - parse the trailing AUTH=/RES= tokens (tok[start..ntok)),
+** shared by parse_mod() and parse_loc().  Unknown tokens are warned + ignored;
+** strdup'd RES= strings are handed to the route by apply_policy(). */
+static void
+parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
+{
+    int i;
+
+    for (i = start; i < ntok; i++) {
+        char *t = tok[i];
+
+        if (http_cmpn(t, "AUTH=", 5) == 0) {
+            char *v = t + 5;
+
+            if (http_cmp(v, "NONE") == 0)       pol->auth = HTTP_AUTH_NONE;
+            else if (http_cmp(v, "FORM") == 0)  pol->auth = HTTP_AUTH_FORM;
+            else if (http_cmp(v, "BASIC") == 0) pol->auth = HTTP_AUTH_BASIC;
+            else
+                wtof("HTTPD411W ignoring unknown AUTH mode '%s'", v);
+        }
+        else if (http_cmpn(t, "RES=", 4) == 0) {
+            char *v     = t + 4;                /* class:resource */
+            char *colon = strchr(v, ':');
+
+            if (colon && colon[1]) {
+                *colon = '\0';
+                free(pol->resclass);
+                free(pol->resname);
+                pol->resclass = strdup(v);
+                pol->resname  = strdup(colon + 1);
+                pol->resattr  = RACF_ATTR_READ;
+            }
+            else {
+                wtof("HTTPD412W ignoring malformed RES= '%s' "
+                     "(need class:resource)", v);
+            }
+        }
+        else {
+            wtof("HTTPD413W ignoring unknown route option '%s'", t);
+        }
+    }
+
+    /* AUTH=NONE with a resource is contradictory: a public route has no ACEE
+       to check against.  Warn and let NONE win -- the gate skips authz. */
+    if (pol->auth == HTTP_AUTH_NONE && pol->resclass) {
+        wtof("HTTPD414W AUTH=NONE ignores RES=%s:%s (public route)",
+             pol->resclass, pol->resname);
+    }
+}
+
+/* apply_policy() - move the parsed policy onto a freshly registered route
+** (the strdup'd RES= storage becomes AS-lifetime, like path/pgm), or release
+** it if the route could not be registered. */
+static void
+apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
+{
+    if (cgi) {
+        cgi->auth     = pol->auth;
+        cgi->resattr  = pol->resattr;
+        cgi->resclass = pol->resclass;
+        cgi->resname  = pol->resname;
+    }
+    else {
+        free(pol->resclass);
+        free(pol->resname);
+    }
+}
+
+/* ====================================================================
+** Parse MOD=PROGRAM [pattern] [AUTH=mode] [RES=class:resource]
 ** If pattern is omitted, derive *.<lowercase program> and use DOCROOT.
 ** ================================================================= */
 static void
@@ -366,32 +473,40 @@ parse_mod(HTTPD *httpd, const char *value)
 {
     char  program[9];
     char  auto_pattern[16];
-    char *path;
+    char *tok[8];
     char *tmp;
+    char *path;
+    int   ntok;
+    int   ti;
     int   j;
     int   login = httpd->login & HTTPD_LOGIN_CGI;
+    ROUTE_POLICY pol;
+    HTTPCGI *cgi;
 
     tmp = strdup(value);
     if (!tmp) return;
 
-    /* first token = program name */
-    path = tmp;
-    while (*path && *path != ' ' && *path != '\t')
-        path++;
-    if (*path) {
-        *path = '\0';
-        path++;
-        while (*path == ' ' || *path == '\t')
-            path++;
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+
+    ntok = tokenize(tmp, tok, 8);
+    if (ntok < 1) {                             /* no program name */
+        free(tmp);
+        return;
     }
 
-    /* fold program name to uppercase, max 8 chars */
-    for (j = 0; j < 8 && tmp[j]; j++)
-        program[j] = (char)toupper((unsigned char)tmp[j]);
+    /* first token = program name, folded to uppercase, max 8 chars */
+    for (j = 0; j < 8 && tok[0][j]; j++)
+        program[j] = (char)toupper((unsigned char)tok[0][j]);
     program[j] = '\0';
 
-    /* no pattern → derive *.<lowercase program> */
-    if (!path[0]) {
+    /* optional second token = path pattern (unless it's already AUTH=/RES=) */
+    ti = 1;
+    if (ti < ntok && !is_route_kv(tok[ti])) {
+        path = tok[ti];
+        ti++;
+    }
+    else {
+        /* no explicit pattern -> derive *.<lowercase program> */
         auto_pattern[0] = '*';
         auto_pattern[1] = '.';
         for (j = 0; j < 8 && program[j]; j++)
@@ -400,13 +515,67 @@ parse_mod(HTTPD *httpd, const char *value)
         path = auto_pattern;
     }
 
+    /* remaining tokens = per-route AUTH=/RES= policy */
+    parse_kv_tail(httpd, tok, ti, ntok, &pol);
+
     if (program[0]) {
-        if (!http_add_cgi(httpd, program, path, login)) {
+        cgi = http_add_cgi(httpd, program, path, login);
+        apply_policy(cgi, &pol);
+        if (!cgi) {
             wtof("HTTPD035W Unable to register module %s for %s",
                  program, path);
         } else {
             wtof("HTTPD036I Module %s registered for %s", program, path);
         }
+    }
+    else {
+        apply_policy(NULL, &pol);               /* release RES= strings */
+    }
+
+    free(tmp);
+}
+
+/* ====================================================================
+** Parse LOC=PATH [AUTH=mode] [RES=class:resource]
+** A program-less route: a static path prefix that carries the same auth
+** policy as MOD= but falls through to httpget (pgm == NULL) instead of
+** dispatching a CGI.  This is what static/SPA deployments need to protect a
+** whole subtree behind a login or a RACF/RAKF profile.
+** ================================================================= */
+static void
+parse_loc(HTTPD *httpd, const char *value)
+{
+    char *tok[8];
+    char *tmp;
+    char *path;
+    int   ntok;
+    ROUTE_POLICY pol;
+    HTTPCGI *cgi;
+
+    tmp = strdup(value);
+    if (!tmp) return;
+
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+
+    ntok = tokenize(tmp, tok, 8);
+    if (ntok < 1 || is_route_kv(tok[0])) {      /* first token must be a path */
+        wtof("HTTPD415W LOC= requires a path (e.g. LOC /admin/* AUTH=BASIC)");
+        free(tmp);
+        return;
+    }
+
+    path = tok[0];
+
+    /* remaining tokens = per-route AUTH=/RES= policy */
+    parse_kv_tail(httpd, tok, 1, ntok, &pol);
+
+    /* pgm == NULL registers a program-less (static) route */
+    cgi = http_add_cgi(httpd, NULL, path, 0);
+    apply_policy(cgi, &pol);
+    if (!cgi) {
+        wtof("HTTPD416W Unable to register location %s", path);
+    } else {
+        wtof("HTTPD417I Location %s registered", path);
     }
 
     free(tmp);

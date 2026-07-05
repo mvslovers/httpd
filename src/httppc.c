@@ -9,7 +9,10 @@
 
 static int  needs_login(HTTPC *httpc, HTTPCGI *cgi);
 static void resolve_credential(HTTPC *httpc);
-static int  auth_required_response(HTTPC *httpc);
+static void auth_gate(HTTPC *httpc, HTTPCGI *route);
+static int  auth_required_response(HTTPC *httpc, UCHAR mode);
+static int  forbidden_response(HTTPC *httpc);
+static int  is_asset_exempt(const char *path);
 
 /* http_process_client() */
 int
@@ -17,9 +20,9 @@ httppc(HTTPC *httpc)
 {
 	HTTPD 	*httpd 		= httpc->httpd;
     int     rc  		= 0;
-    int		needslogin;
     char    *path;
     char	*debug;
+    HTTPCGI	*route;
 
 #if 0
     http_enter("http_process_client()\n");
@@ -49,54 +52,59 @@ httppc(HTTPC *httpc)
     case CSTATE_PUT:    /* process PUT request          */
     case CSTATE_POST:   /* process POST request         */
     case CSTATE_DELETE: /* process DELETE request       */
-        /* check this path name for CGI processing */
         path = http_get_env(httpc, "REQUEST_PATH");
 #if 0
 		wtof("httpc.c: path=\"%s\"", path ? path : "(null)");
 #endif
-        if (path) {
-            HTTPCGI *cgi = http_find_cgi(httpd, path);
+        /* resolve the client credential for this request into httpc->cred:
+           Sec-Token / LtpaToken2 cookie, Bearer, or Basic (see
+           resolve_credential) */
+        resolve_credential(httpc);
 
-            /* resolve the client credential for this request into httpc->cred:
-               Sec-Token / LtpaToken2 cookie, Bearer, or Basic (see
-               resolve_credential) */
-            resolve_credential(httpc);
+        /* find the route (MOD= CGI or LOC= static prefix) owning this path */
+        route = path ? http_find_cgi(httpd, path) : NULL;
 
-            if (cgi) {
-				if (needs_login(httpc, cgi)) {
-					/* not authenticated: 401 challenge (Basic) or login form */
-					rc = auth_required_response(httpc);
-					goto check_done;
-				}
-
-                /* extension-based CGI (pattern starts with "*."):
-                   set SCRIPT_FILENAME = docroot + request path */
-                if (cgi->path[0] == '*' && cgi->path[1] == '.') {
-                    char scriptfile[384];
-                    snprintf(scriptfile, sizeof(scriptfile), "%s%s",
-                             httpd->docroot, path);
-                    http_set_env(httpc, "SCRIPT_FILENAME", scriptfile);
-                }
-
-                /* path needs to be processed by external program */
-                rc = http_process_cgi(httpc, cgi);
-                goto check_done;
-            }
-            
-            /* process /login or /logout request */
-            if (http_cmp(path, "/login")==0 || http_cmp(path, "/logout")==0) {
-				rc = httpcred(httpc);
-				goto check_done;
-			}
+        /* /login and /logout are the auth UI endpoints: always dispatch them,
+           in every mode, so an AUTH=FORM challenge can never lock itself out */
+        if (path && (http_cmp(path, "/login")==0 ||
+                     http_cmp(path, "/logout")==0)) {
+            rc = httpcred(httpc);
+            goto check_done;
         }
 
-        /* not a CGI request */
-        needslogin = needs_login(httpc, NULL);
-		if (needslogin) {
-			rc = auth_required_response(httpc);
-			goto check_done;
-		}
-        
+        /* 2-stage gate (authenticate -> 401, authorize -> 403), applied
+           uniformly to CGI and static routes before anything is served.
+           Login-page assets (/login.*, /favicon.*) stay reachable on a read
+           request so an AUTH=FORM challenge can load its own page. */
+        {
+            int exempt = is_asset_exempt(path) &&
+                         (httpc->state == CSTATE_GET ||
+                          httpc->state == CSTATE_HEAD);
+            if (!exempt) {
+                auth_gate(httpc, route);
+                if (httpc->state == CSTATE_DONE) goto check_done;
+            }
+        }
+
+        /* CGI dispatch -- only routes that carry a program (pgm != NULL).
+           A LOC= route has pgm == NULL and falls through to static serving. */
+        if (route && route->pgm) {
+            /* extension-based CGI (pattern starts with "*."):
+               set SCRIPT_FILENAME = docroot + request path */
+            if (route->path[0] == '*' && route->path[1] == '.') {
+                char scriptfile[384];
+                snprintf(scriptfile, sizeof(scriptfile), "%s%s",
+                         httpd->docroot, path);
+                http_set_env(httpc, "SCRIPT_FILENAME", scriptfile);
+            }
+
+            /* path needs to be processed by external program */
+            rc = http_process_cgi(httpc, route);
+            goto check_done;
+        }
+
+        /* not a CGI: serve statically (route was NULL or a LOC policy route,
+           already gated above) */
         if (httpc->state == CSTATE_GET) {
             /* process GET request          */
             http_get(httpc);
@@ -311,32 +319,123 @@ resolve_credential(HTTPC *httpc)
 }
 
 /*
-** auth_required_response() - the request needs a login but isn't authenticated.
-** A client that sent an Authorization header is a REST/Basic client -> answer a
-** 401 challenge; otherwise fall back to the interactive HTML login form.
+** is_asset_exempt() - login-page assets that must load even when a wildcard
+** route would otherwise gate them, so an AUTH=FORM challenge can render its
+** page.  (/login and /logout themselves are dispatched before the gate.)
 */
 static int
-auth_required_response(HTTPC *httpc)
+is_asset_exempt(const char *path)
 {
-	int	rc;
+	if (!path) return 0;
+	if (__patmat(path, "/login.*"))   return 1;
+	if (__patmat(path, "/favicon.*")) return 1;
+	return 0;
+}
 
-	if (http_get_env(httpc, "HTTP_Authorization")) {
-		rc = http_resp(httpc, 401);
-		if (rc) goto quit;
-		rc = http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
-		                 HTTP_AUTH_REALM);
-		if (rc) goto quit;
-		http_printf(httpc, "Cache-Control: no-store\r\n");
-		http_printf(httpc, "Content-Type: text/plain\r\n");
-		http_printf(httpc, "\r\n");
-		http_printf(httpc, "401 Unauthorized\n");
-		httpc->state = CSTATE_DONE;
-		return 0;
+/*
+** auth_gate() - per-route 2-stage authorization gate, run in the pipeline
+** before a file is served or a CGI is dispatched (uniform for both):
+**   Stage 1 (authenticate): does the route require an identity?  If so and the
+**     client is not authenticated -> 401 (challenge per the route's AUTH mode).
+**   Stage 2 (authorize): if the route sets RES=class:resource, RACHECK it under
+**     the client's ACEE (http_check_auth) -> 403 on deny.
+** On 401/403 the response is emitted and httpc->state is set to CSTATE_DONE;
+** the caller detects that and stops.  route == NULL (a plain static path)
+** falls back to the legacy global LOGIN default.
+*/
+static void
+auth_gate(HTTPC *httpc, HTTPCGI *route)
+{
+	UCHAR	mode   = route ? route->auth : HTTP_AUTH_DEFAULT;
+	int		authed = (httpc->cred && httpc->cred->id.addr == httpc->addr);
+	int		need_authn;
+
+	/* Stage 1: does this route require authentication? */
+	if (mode == HTTP_AUTH_NONE) {
+		need_authn = 0;
+	}
+	else if (mode == HTTP_AUTH_FORM || mode == HTTP_AUTH_BASIC) {
+		need_authn = 1;
+	}
+	else {
+		/* HTTP_AUTH_DEFAULT: inherit the legacy global LOGIN policy.  A LOC=
+		   route (program-less) is treated like a plain static path (NULL). */
+		need_authn = needs_login(httpc, (route && route->pgm) ? route : NULL);
 	}
 
-	/* interactive client: render the login form */
-	return httpcred(httpc);
+	/* a RACF resource gate (RES=) always needs an identity to check against */
+	if (route && route->resclass && mode != HTTP_AUTH_NONE) {
+		need_authn = 1;
+	}
 
-quit:
-	return rc;
+	if (need_authn && !authed) {
+		auth_required_response(httpc, mode);
+		return;
+	}
+
+	/* Stage 2: authorize the resource under the client's ACEE.  Skipped for
+	   AUTH=NONE (a public route has no identity to check -> NONE wins). */
+	if (route && route->resclass && route->resname && authed &&
+	    mode != HTTP_AUTH_NONE) {
+		if (http_check_auth(httpc, route->resclass, route->resname,
+		                    route->resattr) != 0) {
+			forbidden_response(httpc);
+		}
+	}
+}
+
+/*
+** auth_required_response() - the request needs a login but isn't authenticated.
+** The challenge follows the route's AUTH mode:
+**   BASIC   -> 401 + WWW-Authenticate: Basic
+**   FORM    -> the interactive HTML login form
+**   DEFAULT -> legacy heuristic: a client that sent an Authorization header is
+**              a REST/Basic client (401); a browser gets the form.
+** Always ends with httpc->state == CSTATE_DONE so the pipeline stops.
+*/
+static int
+auth_required_response(HTTPC *httpc, UCHAR mode)
+{
+	int	use_basic;
+
+	if (mode == HTTP_AUTH_FORM) {
+		return httpcred(httpc);              /* renders the form, sets DONE */
+	}
+	else if (mode == HTTP_AUTH_BASIC) {
+		use_basic = 1;
+	}
+	else {
+		/* DEFAULT: REST client (sent Authorization) -> 401, else the form */
+		use_basic = (http_get_env(httpc, "HTTP_Authorization") != NULL);
+	}
+
+	if (!use_basic) {
+		return httpcred(httpc);              /* interactive client -> form */
+	}
+
+	http_resp(httpc, 401);
+	http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
+	            HTTP_AUTH_REALM);
+	http_printf(httpc, "Cache-Control: no-store\r\n");
+	http_printf(httpc, "Content-Type: text/plain\r\n");
+	http_printf(httpc, "\r\n");
+	http_printf(httpc, "401 Unauthorized\n");
+	httpc->state = CSTATE_DONE;
+	return 0;
+}
+
+/*
+** forbidden_response() - the client is authenticated but the route's RES=
+** resource check denied access.  403 + short body; ends at CSTATE_DONE.
+*/
+static int
+forbidden_response(HTTPC *httpc)
+{
+	http_resp(httpc, 403);
+	http_printf(httpc, "Cache-Control: no-store\r\n");
+	http_printf(httpc, "Content-Type: text/plain\r\n");
+	http_printf(httpc, "\r\n");
+	http_printf(httpc, "403 Forbidden\n");
+	httpc->state = CSTATE_DONE;
+	return 0;
 }

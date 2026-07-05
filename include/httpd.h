@@ -238,11 +238,25 @@ struct httpcgi {
     UCHAR       eye[8];             /* 00 Eye catcher for dumps     */
 #define HTTPCGI_EYE  "HTTPCGI"      /* ...                          */
     UCHAR       wild;               /* 08 '*' or '?' in path name   */
-	UCHAR		login;				/* 09 login required			*/
+	UCHAR		login;				/* 09 login required (legacy)	*/
     USHRT       len;                /* 0A Path length               */
     char  		*path;              /* 0C Path name to match        */
-    char  		*pgm;               /* 10 external program name     */
-};									/* 14 (20 bytes)				*/
+    char  		*pgm;               /* 10 program (NULL = LOC route) */
+    /* per-route auth policy -- append-only.  HTTPCGI is heap-allocated and
+       opaque to CGI modules (httpcgi.h), so appending fields is safe. */
+    UCHAR       auth;               /* 14 AUTH mode (HTTP_AUTH_*)   */
+    UCHAR       resattr;            /* 15 RACF attr (RACF_ATTR_*)   */
+    char        *resclass;          /* 18 RACF class (NULL = none)  */
+    char        *resname;           /* 1C RACF resource name        */
+};									/* 20 (32 bytes)				*/
+
+/* HTTPCGI.auth -- per-route authentication mode.  DEFAULT (0) means the route
+   carried no AUTH= keyword and inherits the legacy global LOGIN policy, so
+   existing Parmlib members and calloc'd routes keep their old behavior. */
+#define HTTP_AUTH_DEFAULT 0         /* no AUTH= -> inherit global LOGIN     */
+#define HTTP_AUTH_NONE    1         /* AUTH=NONE  -> public, no challenge   */
+#define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
+#define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
 
 /* SMF — HTTP records */
 #define SMF_TYPE_HTTPD_DEFAULT 243

@@ -1513,8 +1513,8 @@ display_cgi_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *cgi, unsigned n)
     http_printf(httpc, "<tr><td>+%04X</td>"
         "<td>cgi->pgm</td>"
         "<td>Program Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(pgm), cgi->pgm);
+        "<td>\"%s\"</td></tr>\n",
+        O(pgm), cgi->pgm ? cgi->pgm : "(none)");
 
 #if 0
     http_printf(httpc, "<tr><td>----------</td>"
