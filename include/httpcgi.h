@@ -309,6 +309,8 @@ struct httpx {
                                     /* 134 RACF resource check          */
     int         (*http_logout)(HTTPC *);
                                     /* 138 end client session           */
+    UCHAR *     (*http_get_password)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 13C client password into buf     */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -550,5 +552,8 @@ struct httpx {
 
 #define http_logout(httpc) \
     ((httpx->http_logout)((httpc)))
+
+#define http_get_password(httpc,out,outlen) \
+    ((httpx->http_get_password)((httpc),(out),(outlen)))
 
 #endif /* HTTPCGI_H */
