@@ -173,6 +173,8 @@ CREDTOK *http_get_token(HTTPC *);                /* the session token       */
 int      http_logout(HTTPC *);                   /* credtok_logout()        */
 int      http_check_auth(HTTPC *, const char *class,
                          const char *resource, int attr);  /* racf_auth     */
+UCHAR   *http_get_password(HTTPC *, UCHAR *out, unsigned outlen);
+                                                 /* decrypted pw (INTRDR)   */
 ```
 
 Then mvsMF **deletes `authmw.c`**: httpd has already resolved `httpc->cred`

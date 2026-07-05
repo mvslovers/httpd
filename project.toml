@@ -124,6 +124,15 @@ name = "TSTGUID"
 sources = ["test/mvs/tstguid.c"]
 host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
+# http_get_password() end-to-end on a live HTTPC (issue #111): decrypts the
+# caller's password from httpc->cred->id via the key pointer cached in the HTTPD
+# block, for the JES2 INTRDR job-card use case.  MVS-only (blowfish + RACF SVCs);
+# http_get_password/credid_/cred_ resolve from the [internal] autocall archive.
+[[test]]
+name = "TSTGPWD"
+sources = ["test/mvs/tstgpwd.c"]
+host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
+
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
 # (HTTPNENV) resolves from the [internal] autocall archive.
