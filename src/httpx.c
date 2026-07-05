@@ -84,6 +84,7 @@ static HTTPX vect = {
     http_get_token,             /* 130 http_get_token()             */
     http_check_auth,            /* 134 http_check_auth()            */
     http_logout,                /* 138 http_logout()                */
+    http_get_password,          /* 13C http_get_password()          */
 };
 
 HTTPX *httpx = &vect;

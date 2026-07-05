@@ -174,6 +174,14 @@ quit:
 		wtof("HTTPD047E Unable to initialize server credential key, rc=%d", rc);
 	}
 
+	/* Cache the blowfish key pointer in the HTTPD block so CGI-context code
+	   (http_get_password) can reach it without credkey()/__wsaget(), which
+	   only read the key from httpd's own GRT.  cred_init() runs here in that
+	   GRT, so credkey() is valid; the key bytes live at a stable WSA address
+	   readable across the shared address space, so caching the pointer (no
+	   copy) is enough for a CGI running under its own GRT (issue #111). */
+	httpd->credkey = credkey();
+
     /* unlock the httpd */
     unlock(httpd,0);
 

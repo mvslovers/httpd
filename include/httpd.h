@@ -151,7 +151,8 @@ struct httpd {
     UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */
     USHRT       cfg_session_timeout; /* 136 credential idle TTL (min), 0=off */
-};                                  /* 138                          */
+    CREDKEY     *credkey;           /* 138 blowfish key ptr (issue #111) */
+};                                  /* 13C                          */
 
 /* HTTP variables */
 struct httpv {
@@ -442,6 +443,8 @@ struct httpx {
                                     /* 134 RACF resource check      */
     int         (*http_logout)(HTTPC *);
                                     /* 138 end client session       */
+    UCHAR *     (*http_get_password)(HTTPC *, UCHAR *out, unsigned outlen);
+                                    /* 13C client password into buf */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -512,6 +515,7 @@ extern int http_get_token(HTTPC *, UCHAR *out, unsigned outlen)            asm("
 extern int http_check_auth(HTTPC *, const char *classname,
                            const char *resource, int attr)                asm("HTTPCKAU");
 extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");
+extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("HTTPGPWD");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -755,6 +759,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_logout(httpc) \
     ((httpx->http_logout)((httpc)))
+
+#define http_get_password(httpc,out,outlen) \
+    ((httpx->http_get_password)((httpc),(out),(outlen)))
 
 #endif  /* ifndef HTTPX_H */
 
