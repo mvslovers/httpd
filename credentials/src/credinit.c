@@ -5,7 +5,7 @@ int cred_init(void *salt, unsigned saltlen)
 	BLOWFISH_KEY	*key = credkey();
 	int				rc = 0;
 	
-	if (!credkey) {
+	if (!key) {
 		wtof("%s: unable to allocate WSA for BLOWFISH_KEY", __func__);
 		return -1;
 	}
