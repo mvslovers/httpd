@@ -15,32 +15,43 @@
 #define HTTP_PRIVATE
 #include "httpd.h"
 
-/* http_get_userid() - copy the client's (decrypted) userid into the caller's
-** buffer as a NUL-terminated string.  Returns out on success, or NULL if
-** there is no credential (or no room).  The transient decrypted CREDID also
-** exposes the password, so it is scrubbed before returning. */
+/* http_get_userid() - copy the client's userid into the caller's buffer as a
+** NUL-terminated string.  Returns out on success, or NULL if there is no
+** authenticated credential (or no room).
+**
+** The userid is read straight from the RACF ACEE (aceeuser is a length-
+** prefixed field: byte 0 = length, bytes 1.. = the userid) -- the same
+** RACF-canonical source http_get_acee() consumers already trust.  We do NOT
+** decrypt httpc->cred->id here: the credential's blowfish key lives in
+** per-GRT WSA (credkey()) and is only initialized in httpd's own GRT by
+** cred_init().  A CGI reached through the HTTPX vector runs under its own C
+** runtime / GRT, where that key is still zero, so credid_dec() would decrypt
+** with an all-zero key and return garbage (issue #109). Reading the ACEE
+** needs no key and is therefore correct from any execution context. */
 __asm__("\n&FUNC SETC 'HTTPGUID'");
 #undef http_get_userid
 UCHAR *
 http_get_userid(HTTPC *httpc, UCHAR *out, unsigned outlen)
 {
-    CREDID   id;
-    unsigned n;
+    ACEE     *acee;
+    unsigned  len;
+    unsigned  n;
 
     if (!out || outlen == 0) return NULL;
     out[0] = 0;
 
-    if (!httpc || !httpc->cred) return NULL;
+    if (!httpc || !httpc->cred || !httpc->cred->acee) return NULL;
 
-    credid_dec(&httpc->cred->id, &id);
+    acee = httpc->cred->acee;
+    len  = (unsigned char) acee->aceeuser[0];   /* length-prefixed userid */
+    if (len > 8) len = 8;                        /* userid is at most 8 chars */
+    if (len > outlen - 1) len = outlen - 1;
 
-    /* id.userid is a NUL-terminated 8+0 field; copy it bounded + terminate */
-    for (n = 0; n < outlen - 1 && id.userid[n]; n++) {
-        out[n] = id.userid[n];
+    for (n = 0; n < len; n++) {
+        out[n] = acee->aceeuser[1 + n];
     }
     out[n] = 0;
 
-    memset(&id, 0, sizeof(id));   /* scrub the decrypted userid/password */
     return out;
 }
 

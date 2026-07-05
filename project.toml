@@ -107,6 +107,23 @@ sources = ["test/tstbody.c", "src/httpbody.c"]
 name = "TSTEXPIRE"
 sources = ["test/tstexpire.c", "credentials/src/credexp.c"]
 
+# credid_enc()/credid_dec() round-trip + flag survival across a repeat read of a
+# stored CRED (issue #109: http_get_userid() garbage on a cache-hit read).
+# blowfish_encrypt/decrypt are crent370 (MVS) -> MVS-only test (test-mvs); the
+# credid_*/cred_* bodies resolve from the [internal] autocall archive.
+[[test]]
+name = "TSTCRED"
+sources = ["test/mvs/tstcred.c"]
+host = false            # blowfish_* are MVS-only (crent370) -> test-mvs
+
+# http_get_userid() end-to-end on a live HTTPC (issue #109): real cred_login()
+# + cache hit + the real HTTPGUID export.  MVS-only (blowfish + RACF SVCs);
+# http_get_userid/credid_/cred_ resolve from the [internal] autocall archive.
+[[test]]
+name = "TSTGUID"
+sources = ["test/mvs/tstguid.c"]
+host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
+
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
 # (HTTPNENV) resolves from the [internal] autocall archive.
