@@ -22,7 +22,14 @@
 # KEEPALIVE_MAX=100
 #
 # --- Security ---
+# LOGIN is the GLOBAL default for routes that set no explicit AUTH= (below).
 # LOGIN=NONE
+#
+# Per-route auth policy -- trailing options on MOD= and LOC= override LOGIN:
+#   AUTH=NONE|FORM|BASIC   NONE=public, FORM=login form, BASIC=401 challenge
+#   RES=class:resource     optional RACF/RAKF resource check (READ)
+# A route without AUTH= inherits the LOGIN default.  /login, /logout and the
+# login-page assets stay reachable so an AUTH=FORM challenge can render.
 #
 # --- Timezone ---
 # TZOFFSET=+01:00
@@ -38,13 +45,23 @@
 #         MOD=PROGRAM *.ext          (explicit extension — uses DOCROOT)
 #         MOD=PROGRAM                (extension derived from module name,
 #                                     e.g. MOD=LUA → *.lua, MOD=REXX → *.rexx)
+#         any MOD= may add trailing  AUTH=mode  and/or  RES=class:resource
 #
 MOD=MVSMF /zosmf/*
-# MOD=HTTPDSRV /.dsrv
+# MOD=MVSMF /zosmf/*  AUTH=BASIC RES=FACILITY:MVSMF.ACCESS  (protected API)
+# MOD=HTTPDSRV /.dsrv  AUTH=FORM                             (browser login)
 # MOD=HTTPDM /.dm
 # MOD=HTTPDMTT /.dmtt
 # MOD=HTTPDSL /dsl/*        (deprecated — use mvsMF dataset API)
 # MOD=HTTPJES2 /jes/*       (deprecated — use mvsMF jobs API)
+#
+# --- Static locations (LOC=) ---
+# A path prefix WITHOUT a program: served statically from DOCROOT but still
+# carrying the same AUTH=/RES= policy as MOD=.  Paths match exactly unless
+# wildcarded (use a trailing *), and routes are tested in order, so list
+# specific prefixes before a catch-all.
+# LOC=/admin/*  AUTH=BASIC RES=FACILITY:HTTPD.ADMIN  (static area, profile)
+# LOC=/*        AUTH=NONE                             (public SPA docroot)
 #
 # --- SMF Recording ---
 # SMF=NONE|ERROR|AUTH|ALL [TYPE=nnn]
