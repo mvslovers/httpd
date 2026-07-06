@@ -47,6 +47,12 @@
 #                                     e.g. MOD=LUA → *.lua, MOD=REXX → *.rexx)
 #         any MOD= may add trailing  AUTH=mode  and/or  RES=class:resource
 #
+# Public z/OSMF endpoints must precede the gated /zosmf/* catch-all (first
+# match wins): the anonymous reachability probe (/zosmf/info) and the token
+# login/logout endpoint (/zosmf/services/authenticate) do their own auth, so
+# the gate must not challenge them.
+MOD=MVSMF /zosmf/info                    AUTH=NONE
+MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
 MOD=MVSMF /zosmf/*
 # MOD=MVSMF /zosmf/*  AUTH=BASIC RES=FACILITY:MVSMF.ACCESS  (protected API)
 # MOD=HTTPDSRV /.dsrv  AUTH=FORM                             (browser login)
