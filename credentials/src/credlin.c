@@ -65,11 +65,12 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
 	cred = cred_find_by_token(&tok);
 	if (cred) goto cleanup;
 
-	/* attempt to login via racf interface */
+	/* attempt to login via racf interface.  On failure RAKF already writes its
+	   own RAKF0004 audit message, so we do NOT log here -- an httpd message
+	   would only duplicate it, and logging the attempted password (pass) would
+	   leak a plaintext credential to the console/SYSLOG (issue #116). */
 	acee = racf_login(user, pass, 0, &rc);
 	if (!acee) {
-		wtof("%s: racf_login(\"%s\", \"%s\") failed, rc=%d", 
-			__func__, user, pass, rc);
 		goto cleanup;
 	}
 
