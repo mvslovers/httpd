@@ -387,7 +387,8 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 /*
 ** auth_required_response() - the request needs a login but isn't authenticated.
 ** The challenge follows the route's AUTH mode:
-**   BASIC   -> 401 + WWW-Authenticate: Basic
+**   BASIC   -> 401 + WWW-Authenticate: Basic (suppressed for XHR clients that
+**              send the z/OSMF CSRF marker -- see the emit below)
 **   FORM    -> the interactive HTML login form
 **   DEFAULT -> legacy heuristic: a client that sent an Authorization header is
 **              a REST/Basic client (401); a browser gets the form.
@@ -414,8 +415,17 @@ auth_required_response(HTTPC *httpc, UCHAR mode)
 	}
 
 	http_resp(httpc, 401);
-	http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
-	            HTTP_AUTH_REALM);
+	/* Omit the Basic challenge for XHR/API clients that identify via the
+	   z/OSMF CSRF marker.  A WWW-Authenticate makes the browser pop its native
+	   credential dialog, and the Basic credentials it then caches outlive the
+	   token session -- defeating token logout (#119).  A challenge-less 401
+	   lets the SPA's own "session expired" handling see the 401.  Genuine
+	   Basic clients (curl -u, Zowe) send credentials preemptively and do not
+	   need the challenge; a plain browser navigation (no marker) still gets it. */
+	if (http_get_env(httpc, "HTTP_X-CSRF-ZOSMF-HEADER") == NULL) {
+		http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
+		            HTTP_AUTH_REALM);
+	}
 	http_printf(httpc, "Cache-Control: no-store\r\n");
 	http_printf(httpc, "Content-Type: text/plain\r\n");
 	http_printf(httpc, "\r\n");
