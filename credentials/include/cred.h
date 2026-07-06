@@ -93,9 +93,18 @@ credid_enc(CREDID *in, CREDID *out)															asm("CREDIDEN");
 extern CREDTOK 
 credtok_gen(CREDID *id)																		asm("CREDTOKG");
 
-/* logout CRED for this CREDTOK */
-extern int 
+/* logout CRED for this CREDTOK (uses cred_array() -- caller must run in the
+   GRT where the credential store was initialized, i.e. httpd's own core) */
+extern int
 credtok_logout(CREDTOK *token)																asm("CREDTOKL");
+
+/* credtok_logout_arr() - like credtok_logout() but operates on the caller-
+   supplied credential array instead of cred_array().  cred_array() reads the
+   current GRT's WSA, so it is empty/foreign from a CGI's GRT; passing httpd's
+   own array pointer (cached at cred_init() time) makes logout work from any
+   execution context.  See issue #113 (same GRT/WSA class as #109/#111). */
+extern int
+credtok_logout_arr(CRED ***array, CREDTOK *token)											asm("CREDTKLA");
 
 /* cred_new() - allocate a new CRED struct. all parms can be NULL */
 extern CRED *

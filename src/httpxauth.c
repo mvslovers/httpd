@@ -97,7 +97,19 @@ http_check_auth(HTTPC *httpc, const char *classname, const char *resource, int a
 
 /* http_logout() - end the client's session: drop the CRED (and its ACEE) from
 ** the credential store by token and clear httpc->cred.  Returns 0 on success,
-** -1 if there was no session. */
+** -1 if there was no session (or no cached store).
+**
+** We must NOT reach the store via credtok_logout()/cred_array() here:
+** cred_array() reads the credential array out of the *current* GRT's WSA, which
+** is only populated in httpd's own GRT.  A CGI reached through the HTTPX vector
+** runs under its own GRT, where that slot is empty -- so the token scan finds
+** nothing, the CRED stays in httpd's real store, and the (deterministic) token
+** keeps resolving: logout would be a silent no-op (issue #113).  Instead we use
+** the array pointer httpd cached in the HTTPD block at cred_init() time
+** (httpc->httpd->credarr), the same GRT-independent pattern http_get_password()
+** uses for the blowfish key (#111).  The array lives in the shared address
+** space (address-keyed ENQ lock, subpool-0 storage), so mutating/freeing it
+** from the CGI's GRT is safe. */
 __asm__("\n&FUNC SETC 'HTTPLOUT'");
 #undef http_logout
 int
@@ -105,9 +117,9 @@ http_logout(HTTPC *httpc)
 {
     int rc;
 
-    if (!httpc || !httpc->cred) return -1;
+    if (!httpc || !httpc->cred || !httpc->httpd) return -1;
 
-    rc = credtok_logout(&httpc->cred->token);
+    rc = credtok_logout_arr(httpc->httpd->credarr, &httpc->cred->token);
     httpc->cred = NULL;   /* the CRED it pointed at may now be freed */
     return rc;
 }

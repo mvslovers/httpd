@@ -182,6 +182,13 @@ quit:
 	   copy) is enough for a CGI running under its own GRT (issue #111). */
 	httpd->credkey = credkey();
 
+	/* Likewise cache the credential array pointer so http_logout() can reach
+	   httpd's real store from a CGI's GRT.  cred_array() is GRT-relative too,
+	   so a CGI calling it sees an empty/foreign array and logout invalidates
+	   nothing; caching httpd's array pointer here (in httpd's GRT) fixes it
+	   (issue #113, same class as #111). */
+	httpd->credarr = cred_array();
+
     /* unlock the httpd */
     unlock(httpd,0);
 
