@@ -152,7 +152,8 @@ struct httpd {
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */
     USHRT       cfg_session_timeout; /* 136 credential idle TTL (min), 0=off */
     CREDKEY     *credkey;           /* 138 blowfish key ptr (issue #111) */
-};                                  /* 13C                          */
+    CRED        ***credarr;         /* 13C credential array ptr (issue #113) */
+};                                  /* 140                          */
 
 /* HTTP variables */
 struct httpv {

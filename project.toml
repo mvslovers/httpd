@@ -133,6 +133,15 @@ name = "TSTGPWD"
 sources = ["test/mvs/tstgpwd.c"]
 host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
+# credtok_logout_arr() + wrapper (issue #113): logout must find, unlink and free
+# the CRED in the supplied array so the token stops resolving.  Guards the split
+# that lets http_logout() reach httpd's store from a CGI's GRT.  MVS-only (SHA256
+# token + array/lock SVCs); cred_/credtok_ resolve from the [internal] archive.
+[[test]]
+name = "TSTLOUT"
+sources = ["test/mvs/tstlout.c"]
+host = false            # crent370 SVCs are MVS-only -> test-mvs
+
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
 # (HTTPNENV) resolves from the [internal] autocall archive.
