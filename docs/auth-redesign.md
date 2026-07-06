@@ -286,7 +286,10 @@ An **epic** with sub-issues, foundation-first:
 3. httpd: per-route policy in `MOD=` + challenge decoupling.
 4. httpd: HTTPX auth export.
 5. mvsMF: drop `authmw.c`; adopt the export.
-6. SPA: token login; drop the stored password.
+6. SPA: token login — the SPA drops its client-side stored password, but
+   httpd keeps retaining the CRED password (encrypted): it is the only source
+   `http_get_password()` has for token-safe INTRDR job submit (#111). #161
+   must not remove that retention.
 
 Steps 1–2 already let the SPA and Zowe authenticate properly and remove the
 per-request `racf_login`; 3–6 complete the unification and the fine-grained
