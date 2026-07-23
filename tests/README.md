@@ -49,14 +49,24 @@ Which shutdown path the run exercises:
 > different path. Use **`longpoll`** to gate `#179` (mvslovers/mvsmf#179).
 
 Example `LONGPOLL_CMD` — one synchronous unsolicited-message detection PUT that
-blocks up to 20 s (mvsMF console API):
+blocks up to 60 s (mvsMF console **issue-command** endpoint,
+`PUT /zosmf/restconsoles/consoles/{console-name}` — *not* the `/solmsgs` collect
+sub-resource):
 
 ```sh
 LONGPOLL_CMD='curl -s -o /dev/null -u USER:PASS -X PUT \
   -H "Content-Type: application/json" \
-  -d "{\"cmd\":\"D T\",\"unsol-key\":\"IEE136I\",\"unsol-detect-sync\":\"Y\",\"unsol-detect-timeout\":\"20\"}" \
-  http://HOST:PORT/zosmf/restconsoles/consoles/defcn/solmsgs'
+  -d "{\"cmd\":\"D T\",\"unsol-key\":\"IEE136I\",\"unsol-detect-sync\":\"Y\",\"unsol-detect-timeout\":\"60\"}" \
+  http://HOST:PORT/zosmf/restconsoles/consoles/defcn'
 ```
+
+The long poll must **still be running when `P HTTPD` is issued** — that is the
+whole point. The in-flight count is measured `LONGPOLL_SETTLE` s after launch,
+but the stop lands later. In `STOP_ADAPTER=cmd` mode the stop follows
+immediately, so a `unsol-detect-timeout` of ~60 s is ample. In `manual` mode the
+operator's reaction time is unbounded: set `unsol-detect-timeout` comfortably
+above how long you expect to take typing `P HTTPD`, or the polls will have
+already returned (no worker parked → INCONCLUSIVE, not a real reproduction).
 
 ### Result
 
