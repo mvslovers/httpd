@@ -54,6 +54,16 @@
 #      the authoritative signal is the address-space end (note 3). The SA03 run
 #      produced zero HTTPD060I, so a PASS with zero of them emits a CAUTION, not
 #      a FAIL. Do not turn these into a hard requirement.
+#
+#   5. PROVOCATION MODE decides WHICH shutdown path you test. Default
+#      PROVOKE=abend faults handlers -- that is the recovery-drain path
+#      (libc370#9), NOT a worker parked in a long poll. The #179 / SA03 crash
+#      needs a worker still IN FLIGHT in a long poll when P HTTPD lands, which a
+#      fast fault cannot create; PROVOKE=longpoll launches $LONGPOLL_N concurrent
+#      blocking long-polls (LONGPOLL_CMD, e.g. an unsol-detect-sync console PUT)
+#      and proves >=1 is still parked at stop. Proof-of-scenario is that in-flight
+#      count, NOT a fault marker -- a clean parked poll faults nothing. A green
+#      abend run does NOT establish the #179 fix; use longpoll for that.
 # ---------------------------------------------------------------------------
 # Configuration (override via environment or a sourced .env)
 # ---------------------------------------------------------------------------
@@ -65,6 +75,16 @@
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
 #   WAIT_SECS      max seconds to wait for the AS to end   (default: 120)
 #   JOBNAME        MVS jobname of the HTTPD started task   (default: HTTPD)
+#
+#   PROVOKE        pre-stop scenario: abend | longpoll     (default: abend)
+#                  abend    -> fault handlers (recovery-drain path; libc370#9).
+#                  longpoll -> park workers in an in-flight long poll at P HTTPD
+#                              (the #179 / SA03 path a fast fault cannot create).
+#   LONGPOLL_CMD   PROVOKE=longpoll, REQUIRED: one blocking long-poll request
+#                  (e.g. an unsol-detect-sync console PUT). Run $LONGPOLL_N times,
+#                  concurrently, in the background — see tests/README.md.
+#   LONGPOLL_N     PROVOKE=longpoll: concurrent long-polls              (default: 4)
+#   LONGPOLL_SETTLE PROVOKE=longpoll: seconds to let them park pre-stop (default: 3)
 #
 #   STOP_ADAPTER   how "P HTTPD" is issued: manual | cmd   (default: manual)
 #   STOP_CMD       command line to issue P HTTPD when STOP_ADAPTER=cmd
@@ -93,6 +113,9 @@ FAULT_MARK=${FAULT_MARK:-HTTPD062E|MVSMF99E}
 WAIT_SECS=${WAIT_SECS:-120}
 STOP_ADAPTER=${STOP_ADAPTER:-manual}
 JOBNAME=${JOBNAME:-HTTPD}
+PROVOKE=${PROVOKE:-abend}
+LONGPOLL_N=${LONGPOLL_N:-4}
+LONGPOLL_SETTLE=${LONGPOLL_SETTLE:-3}
 
 fail() { printf '%s\n' "$*" >&2; exit 2; }
 
@@ -104,10 +127,15 @@ CURL="curl -s -S -o /dev/null -w %{http_code} --max-time 10"
 BASE="http://${HTTPD_HOST}:${HTTPD_PORT}"
 
 echo "== httpd#122 shutdown acceptance =="
-echo "   target : $BASE"
-echo "   abend  : $ABEND_PATH x $ABEND_HITS"
-echo "   stop   : $STOP_ADAPTER"
-echo "   log    : $CONSOLE_LOG"
+echo "   target  : $BASE"
+echo "   provoke : $PROVOKE"
+if [ "$PROVOKE" = abend ]; then
+    echo "   abend   : $ABEND_PATH x $ABEND_HITS"
+else
+    echo "   longpoll: $LONGPOLL_N concurrent, settle ${LONGPOLL_SETTLE}s"
+fi
+echo "   stop    : $STOP_ADAPTER"
+echo "   log     : $CONSOLE_LOG"
 echo
 
 # --- 1. mark the log window START (byte offset) — see note #1 above ---------
@@ -118,21 +146,48 @@ log_offset=$(printf '%s' "$log_offset" | tr -d ' ')
 echo "-- console-log window starts at byte offset $log_offset --"
 echo
 
-# --- 2. provoke: fault the handler enough times to poison the worker pool ---
-echo "-- provoking handler abend ($ABEND_PATH) --"
-faulted=0
-i=0
-while [ "$i" -lt "$ABEND_HITS" ]; do
-    i=$((i + 1))
-    code=$($CURL "${BASE}${ABEND_PATH}" 2>/dev/null) || code="conn-reset"
-    # A faulting worker drops the connection or returns 5xx; a clean 200/404
-    # means the handler did NOT fault (wrong path / already handled otherwise).
-    case "$code" in
-        5*|conn-reset|000) faulted=$((faulted + 1)) ;;
-    esac
-    printf '   hit %2d -> %s\n' "$i" "$code"
-done
-echo "   handler-fault responses: $faulted / $ABEND_HITS"
+# --- 2. provoke: put the worker pool into the pre-stop state under test -----
+# abend    -> handlers fault (fast; the recovery-drain path, libc370#9).
+# longpoll -> workers PARKED in an in-flight long poll still running when P HTTPD
+#             lands — the #179 / SA03 path a fast fault cannot reproduce.
+LONGPOLL_PIDS=""
+inflight=0
+case "$PROVOKE" in
+abend)
+    echo "-- provoking handler abend ($ABEND_PATH x $ABEND_HITS) --"
+    faulted=0
+    i=0
+    while [ "$i" -lt "$ABEND_HITS" ]; do
+        i=$((i + 1))
+        code=$($CURL "${BASE}${ABEND_PATH}" 2>/dev/null) || code="conn-reset"
+        # A faulting worker drops the connection or returns 5xx; a clean 200/404
+        # means the handler did NOT fault (wrong path / already handled otherwise).
+        case "$code" in
+            5*|conn-reset|000) faulted=$((faulted + 1)) ;;
+        esac
+        printf '   hit %2d -> %s\n' "$i" "$code"
+    done
+    echo "   handler-fault responses: $faulted / $ABEND_HITS"
+    ;;
+longpoll)
+    [ -n "${LONGPOLL_CMD:-}" ] || fail "PROVOKE=longpoll requires LONGPOLL_CMD (one blocking long-poll request)."
+    echo "-- launching $LONGPOLL_N concurrent long-polls (must be in flight at P HTTPD) --"
+    trap '[ -n "$LONGPOLL_PIDS" ] && kill $LONGPOLL_PIDS 2>/dev/null' EXIT INT TERM
+    i=0
+    while [ "$i" -lt "$LONGPOLL_N" ]; do
+        i=$((i + 1))
+        sh -c "$LONGPOLL_CMD" >/dev/null 2>&1 &
+        LONGPOLL_PIDS="$LONGPOLL_PIDS $!"
+    done
+    # let the requests reach and PARK in the poll loop before we stop the server
+    sleep "$LONGPOLL_SETTLE"
+    for p in $LONGPOLL_PIDS; do
+        kill -0 "$p" 2>/dev/null && inflight=$((inflight + 1))
+    done
+    echo "   long-polls still in flight after ${LONGPOLL_SETTLE}s: $inflight / $LONGPOLL_N"
+    ;;
+*) fail "unknown PROVOKE '$PROVOKE' (use abend|longpoll)." ;;
+esac
 echo
 
 # --- 3. issue P HTTPD -------------------------------------------------------
@@ -201,8 +256,16 @@ clean=$(grep -Ec "HTTPD002I Server is SHUTDOWN|HTTPD060I SHUTDOWN worker" "$wind
 # run when JES config omits one.
 if [ "$hasp395" -ne 0 ] || [ "$ief404" -ne 0 ]; then end_seen=1; else end_seen=0; fi
 
+# proof the intended scenario actually ran (mode-specific):
+#   abend    -> a handler faulted (fault marker present in the window)
+#   longpoll -> at least one long-poll was still parked when P HTTPD landed
+case "$PROVOKE" in
+abend)    provoked=$faultmarks; provoke_desc="fault marker ($FAULT_MARK)" ;;
+longpoll) provoked=$inflight;   provoke_desc="in-flight long-poll at stop" ;;
+esac
+
 echo "-- assertion over captured console window --"
-echo "   fault markers ($FAULT_MARK) : $faultmarks"
+echo "   provocation ($PROVOKE) proof          : $provoked  [$provoke_desc]"
 echo "   S33E                                  : $s33e"
 echo "   __CRTGET ... not found in PPA         : $crtget"
 echo "   SVC dump markers                      : $svcdump"
@@ -215,13 +278,17 @@ echo
 rm -f "$window"
 
 # --- 6. verdict -------------------------------------------------------------
-if [ "$faultmarks" -eq 0 ]; then
+if [ "$provoked" -eq 0 ]; then
     cat <<EOF
 RESULT: INCONCLUSIVE
-The console window shows no handler-fault marker ($FAULT_MARK), so no handler
-faulted. This test did NOT exercise #122. Check ABEND_PATH, that GET is not
-gated by LOGIN (set HTTPD_AUTH), and that CONSOLE_LOG really captured this run,
-then re-run.
+No proof the intended scenario ran (${provoke_desc} absent), so this run did NOT
+exercise the shutdown path under test.
+  abend    : no handler faulted — check ABEND_PATH, LOGIN gating (HTTPD_AUTH),
+             and that CONSOLE_LOG captured this run.
+  longpoll : no long-poll was still in flight at P HTTPD — the requests finished
+             too fast. Raise the endpoint timeout, LONGPOLL_N, or LONGPOLL_SETTLE
+             so a worker is genuinely parked at stop.
+Then re-run.
 EOF
     exit 3
 fi
@@ -230,7 +297,7 @@ if [ "$s33e" -ne 0 ] || [ "$crtget" -ne 0 ] || [ "$svcdump" -ne 0 ] \
    || [ "$abend" -ne 0 ] || [ "$hasp310" -ne 0 ]; then
     cat <<EOF
 RESULT: FAIL
-The address space did not terminate cleanly after a faulted handler + P HTTPD.
+The address space did not terminate cleanly after the provocation + P HTTPD.
 A crash signature (S33E / __CRTGET spam / SVC dump) and/or an ABNORMAL address-
 space end (IEF450I ... ABEND, or "\$HASP310 ... TERMINATED AT END OF MEMORY")
 appeared in the window — see the counts above.
@@ -257,7 +324,7 @@ fi
 
 cat <<EOF
 RESULT: PASS
-A handler faulted ($FAULT_MARK present) yet shutdown was clean: no S33E, no
+The provocation ran ($provoke_desc) yet shutdown was clean: no S33E, no
 __CRTGET spam, no SVC dump, and no abnormal address-space end (no IEF450I ABEND,
 no \$HASP310 EOM). The address-space end was captured in the window, so this is a
 real clean termination and not a truncated log.
