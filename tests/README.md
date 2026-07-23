@@ -23,12 +23,50 @@ This test observes the symptom in httpd's own address space.
 
 1. Records the current byte offset of `CONSOLE_LOG` (the assertion window
    starts here — see "Windowed assertion" below).
-2. Provokes a faulting handler: `ABEND_HITS` requests to `ABEND_PATH`
-   (default `/abend`, whose handler executes `DC H'0'` → S0C1 inside the
-   worker request pipeline). Repeated hits poison the whole worker pool.
+2. Provokes the pre-stop state under test (`PROVOKE`, see "Provocation modes"):
+   either faulting handlers (`abend`) or workers parked in an in-flight long
+   poll (`longpoll`, the `#179` / `SA03` path).
 3. Issues `P HTTPD` (see adapters below).
 4. Waits up to `WAIT_SECS` for the listener to stop accepting.
 5. Asserts over the console-log slice appended during this run.
+
+### Provocation modes (`PROVOKE`)
+
+Which shutdown path the run exercises:
+
+- **`abend`** (default) — `ABEND_HITS` requests to `ABEND_PATH` (default
+  `/abend`, whose handler executes `DC H'0'` → S0C1). Handlers fault *fast*, so
+  this drives libc370's **recovery-drain** path. Proof-of-scenario is a fault
+  marker (`HTTPD062E` / `MVSMF99E`) in the window.
+- **`longpoll`** — launches `LONGPOLL_N` (default 4) concurrent, blocking
+  long-poll requests (`LONGPOLL_CMD`) and checks that at least one is *still in
+  flight* `LONGPOLL_SETTLE` s later, then issues `P HTTPD` while they are parked.
+  This is the only mode that reproduces `#179` / the `SA03`: a worker parked in a
+  long poll cannot drain inside libc370's ~5 s window. Proof-of-scenario is the
+  in-flight count — **not** a fault marker (a clean parked poll faults nothing).
+
+> A green **`abend`** run does **not** establish the `#179` fix — it tests a
+> different path. Use **`longpoll`** to gate `#179` (mvslovers/mvsmf#179).
+
+Example `LONGPOLL_CMD` — one synchronous unsolicited-message detection PUT that
+blocks up to 60 s (mvsMF console **issue-command** endpoint,
+`PUT /zosmf/restconsoles/consoles/{console-name}` — *not* the `/solmsgs` collect
+sub-resource):
+
+```sh
+LONGPOLL_CMD='curl -s -o /dev/null -u USER:PASS -X PUT \
+  -H "Content-Type: application/json" \
+  -d "{\"cmd\":\"D T\",\"unsol-key\":\"IEE136I\",\"unsol-detect-sync\":\"Y\",\"unsol-detect-timeout\":\"60\"}" \
+  http://HOST:PORT/zosmf/restconsoles/consoles/defcn'
+```
+
+The long poll must **still be running when `P HTTPD` is issued** — that is the
+whole point. The in-flight count is measured `LONGPOLL_SETTLE` s after launch,
+but the stop lands later. In `STOP_ADAPTER=cmd` mode the stop follows
+immediately, so a `unsol-detect-timeout` of ~60 s is ample. In `manual` mode the
+operator's reaction time is unbounded: set `unsol-detect-timeout` comfortably
+above how long you expect to take typing `P HTTPD`, or the polls will have
+already returned (no worker parked → INCONCLUSIVE, not a real reproduction).
 
 ### Result
 
@@ -43,11 +81,12 @@ This test observes the symptom in httpd's own address space.
   that still carries the libc370 defect is suspicious — the banner says so.
   `HTTPD002I` / `HTTPD060I` worker-shutdown WTOs corroborate a clean drain but do
   **not** gate the result; a PASS with none of them present emits a CAUTION.
-- **INCONCLUSIVE** — either no fault marker (`HTTPD062E` / `MVSMF99E`) in the
-  window (no handler faulted), or no crash/abnormal signature yet the
-  address-space end was not captured (`$HASP395 ... ENDED` / `IEF404I` both
-  absent — a truncated log looks the same as a clean end). Fix the provocation
-  or extend the capture and re-run.
+- **INCONCLUSIVE** — either the intended scenario didn't run (in `abend`, no
+  fault marker `HTTPD062E` / `MVSMF99E`; in `longpoll`, no long-poll still in
+  flight at `P HTTPD`), or no crash/abnormal signature yet the address-space end
+  was not captured (`$HASP395 ... ENDED` / `IEF404I` both absent — a truncated
+  log looks the same as a clean end). Fix the provocation or extend the capture
+  and re-run.
 
 Exit codes: `0` pass, `1` fail, `2` config error, `3` inconclusive.
 
@@ -102,6 +141,10 @@ Environment variables (or a sourced `.env`):
 | `HTTPD_AUTH` | (unset) | `user:pass` if `LOGIN` gates GET |
 | `WAIT_SECS` | `120` | max wait for the AS to end |
 | `JOBNAME` | `HTTPD` | MVS jobname of the HTTPD STC (scopes the end-capture assertion) |
+| `PROVOKE` | `abend` | pre-stop scenario: `abend` (fault handlers) or `longpoll` (park workers) |
+| `LONGPOLL_CMD` | (required for `longpoll`) | one blocking long-poll request, run `LONGPOLL_N`× concurrently |
+| `LONGPOLL_N` | `4` | `longpoll`: concurrent in-flight long-polls |
+| `LONGPOLL_SETTLE` | `3` | `longpoll`: seconds to let them park before `P HTTPD` |
 | `STOP_ADAPTER` | `manual` | `manual` or `cmd` |
 | `STOP_CMD` | (unset) | command to issue `P HTTPD` when `cmd` |
 | `CONSOLE_LOG` | (required) | captured console/hardcopy log to assert over |
