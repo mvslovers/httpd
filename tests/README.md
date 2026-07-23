@@ -10,7 +10,11 @@ Acceptance criterion for [#122](https://github.com/mvslovers/httpd/issues/122)
 (epic [mvsmf#177](https://github.com/mvslovers/mvsmf/issues/177), Workstream D):
 after a request handler faults, `P HTTPD` must terminate the address space
 cleanly — **no `S33E`**, **no repeated `__CRTGET CRT for TCB(...) was not found
-in PPA(...)`**, **no SVC dump**.
+in PPA(...)`**, **no SVC dump**, and the address space must **end normally**
+(no `IEF450I ... ABEND`, no `$HASP310 ... TERMINATED AT END OF MEMORY`). The
+`$HASP395 ... ENDED` / `IEF404I` end records are used only to confirm the end
+was *captured* in the window — they appear on clean and abnormal ends alike and
+do not themselves prove health.
 
 The code fix lives in libc370 (worker DETACH gating + recovery-exit hardening).
 This test observes the symptom in httpd's own address space.
@@ -28,15 +32,22 @@ This test observes the symptom in httpd's own address space.
 
 ### Result
 
-- **FAIL** — a fault marker is present *and* any of `S33E` / `__CRTGET` spam /
-  SVC dump appears. This is the #122 bug reproduced and is the **expected
-  result on the current build**.
-- **PASS** — a handler faulted but shutdown was clean. The post-fix target.
-  A PASS on a build that still carries the libc370 defect is suspicious — the
-  banner says so.
-- **INCONCLUSIVE** — no fault marker (`HTTPD062E` / `MVSMF99E`) in the window,
-  so no handler actually faulted. The test did not exercise #122; fix the
-  provocation and re-run.
+- **FAIL** — a fault marker is present *and* either a crash signature (`S33E` /
+  `__CRTGET` spam / SVC dump) **or** an abnormal address-space end (`IEF450I ...
+  ABEND`, `$HASP310 ... TERMINATED AT END OF MEMORY`) appears in the window.
+  After the 2026-07-23 recovery-exit relink the residual symptom is the abnormal
+  end (`SA03`), so this class matters even when no crash spam appears.
+- **PASS** — a handler faulted, no crash signature and no abnormal end appeared
+  (`IEF450I` / `$HASP310` / SVC dump all absent), and the address-space end was
+  captured in the window (`$HASP395 ... ENDED` or `IEF404I`). A PASS on a build
+  that still carries the libc370 defect is suspicious — the banner says so.
+  `HTTPD002I` / `HTTPD060I` worker-shutdown WTOs corroborate a clean drain but do
+  **not** gate the result; a PASS with none of them present emits a CAUTION.
+- **INCONCLUSIVE** — either no fault marker (`HTTPD062E` / `MVSMF99E`) in the
+  window (no handler faulted), or no crash/abnormal signature yet the
+  address-space end was not captured (`$HASP395 ... ENDED` / `IEF404I` both
+  absent — a truncated log looks the same as a clean end). Fix the provocation
+  or extend the capture and re-run.
 
 Exit codes: `0` pass, `1` fail, `2` config error, `3` inconclusive.
 
@@ -90,6 +101,7 @@ Environment variables (or a sourced `.env`):
 | `FAULT_MARK` | `HTTPD062E\|MVSMF99E` | proof-of-fault regex |
 | `HTTPD_AUTH` | (unset) | `user:pass` if `LOGIN` gates GET |
 | `WAIT_SECS` | `120` | max wait for the AS to end |
+| `JOBNAME` | `HTTPD` | MVS jobname of the HTTPD STC (scopes the end-capture assertion) |
 | `STOP_ADAPTER` | `manual` | `manual` or `cmd` |
 | `STOP_CMD` | (unset) | command to issue `P HTTPD` when `cmd` |
 | `CONSOLE_LOG` | (required) | captured console/hardcopy log to assert over |

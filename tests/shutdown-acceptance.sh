@@ -3,7 +3,11 @@
 #
 # Verifies that stopping HTTPD (P HTTPD) AFTER a request handler has faulted
 # terminates the address space cleanly — no S33E, no repeated "__CRTGET CRT
-# for TCB(...) was not found in PPA(...)", no SVC dump.
+# for TCB(...) was not found in PPA(...)", no SVC dump, and a NORMAL address-
+# space end: no IEF450I ... ABEND, no "$HASP310 ... TERMINATED AT END OF
+# MEMORY", no SVC-dump (IEA911E). The "$HASP395 ... ENDED" / IEF404I end
+# records only confirm the end was CAPTURED in the window — they appear on
+# clean and abnormal ends alike and do not themselves prove health.
 #
 # Background: on shutdown, worker teardown DETACHes tasks without proving they
 # terminated (S33E), and the worker recovery ESTAE runs the C runtime under a
@@ -16,7 +20,7 @@
 # worker in the post-fault state #122 needs. See the result banner at the end.
 #
 # ---------------------------------------------------------------------------
-# TWO THINGS THAT SILENTLY BREAK THIS TEST — read before editing:
+# THINGS THAT SILENTLY BREAK THIS TEST — read before editing:
 #
 #   1. WINDOWED ASSERTION. CONSOLE_LOG is typically an append-only Hercules
 #      hardcopy log that ALREADY contains S33E / __CRTGET lines from earlier
@@ -31,6 +35,25 @@
 #      caught by mvsMF's inner ESTAE instead and logs MVSMF99E, so the worker
 #      try() returns 0 and HTTPD062E never fires. Accepting either keeps the
 #      test valid whether ABEND_PATH is core (/abend) or a CGI endpoint.
+#
+#   3. ABNORMAL ADDRESS-SPACE END. A clean in-flight run (no S33E/__CRTGET/SVC
+#      dump) is NOT enough. After the 2026-07-23 recovery-exit relink the
+#      symptom moved from S33E to an abnormal address-space end (IEF450I ...
+#      ABEND SA03). This test therefore also fails on "IEF450I ... ABEND",
+#      "$HASP310 ... TERMINATED AT END OF MEMORY", and SVC-dump markers (IEA911E,
+#      via the svcdump group). The "$HASP395 ... ENDED" / IEF404I records do NOT
+#      discriminate health: they appear on clean AND abnormal ends alike (S33E,
+#      SA03, EOM). They are used only to confirm the end was CAPTURED in the
+#      window (end_seen), so a truncated log is not mistaken for a clean shutdown.
+#      The failure patterns are kept LOOSE (not scoped to $JOBNAME) so a stray
+#      match only over-reports FAIL; the end-capture markers are scoped TIGHT to
+#      $JOBNAME so a miss downgrades to INCONCLUSIVE. Both err toward safe.
+#
+#   4. HTTPD060I / HTTPD002I ARE DIAGNOSTIC, NOT A GATE. Worker- and server-
+#      shutdown WTOs corroborate an orderly drain but never decide the verdict:
+#      the authoritative signal is the address-space end (note 3). The SA03 run
+#      produced zero HTTPD060I, so a PASS with zero of them emits a CAUTION, not
+#      a FAIL. Do not turn these into a hard requirement.
 # ---------------------------------------------------------------------------
 # Configuration (override via environment or a sourced .env)
 # ---------------------------------------------------------------------------
@@ -41,6 +64,7 @@
 #   FAULT_MARK     regex proving a handler faulted        (default: HTTPD062E|MVSMF99E)
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
 #   WAIT_SECS      max seconds to wait for the AS to end   (default: 120)
+#   JOBNAME        MVS jobname of the HTTPD started task   (default: HTTPD)
 #
 #   STOP_ADAPTER   how "P HTTPD" is issued: manual | cmd   (default: manual)
 #   STOP_CMD       command line to issue P HTTPD when STOP_ADAPTER=cmd
@@ -68,6 +92,7 @@ ABEND_HITS=${ABEND_HITS:-12}
 FAULT_MARK=${FAULT_MARK:-HTTPD062E|MVSMF99E}
 WAIT_SECS=${WAIT_SECS:-120}
 STOP_ADAPTER=${STOP_ADAPTER:-manual}
+JOBNAME=${JOBNAME:-HTTPD}
 
 fail() { printf '%s\n' "$*" >&2; exit 2; }
 
@@ -148,21 +173,43 @@ tail -c +"$((log_offset + 1))" "$CONSOLE_LOG" > "$window" 2>/dev/null || cp "$CO
 
 # proof the provocation actually faulted a worker — HTTPD062E (core) or MVSMF99E (CGI)
 faultmarks=$(grep -Ec "$FAULT_MARK" "$window" 2>/dev/null || true)
-# failure signatures from #122
+# in-flight crash signatures from #122
 s33e=$(grep -c "S33E" "$window" 2>/dev/null || true)
 crtget=$(grep -Ec "__CRTGET CRT for TCB.*was not found in PPA" "$window" 2>/dev/null || true)
 svcdump=$(grep -Eic "SVC dump|SDUMP|IEA911E|IEA794I" "$window" 2>/dev/null || true)
-# clean-shutdown positive markers (httpd.c:335 / :701)
+# abnormal address-space END — the residual after the 2026-07-23 relink (S33E -> SA03).
+# The svcdump group above (IEA911E/...) is the third abnormal-end discriminator.
+# LOOSE (not scoped to $JOBNAME): a stray match only over-reports FAIL, the safe way. Note 3.
+abend=$(grep -Ec "IEF450I.*ABEND" "$window" 2>/dev/null || true)
+hasp310=$(grep -Ec "[$]HASP310.*TERMINATED AT END OF MEMORY" "$window" 2>/dev/null || true)
+# address-space END records — "$HASP395 ... ENDED" / IEF404I, both for $JOBNAME. These are
+# WINDOW-COMPLETENESS evidence only (see end_seen), NOT health signals — both appear on
+# clean AND abnormal ends. TIGHT to $JOBNAME so a mismatch downgrades to INCONCLUSIVE,
+# not a false PASS. Note 3.
+hasp395=$(grep -Ec "[$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
+ief404=$(grep -Ec "IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
+# clean-shutdown WTOs (httpd.c:335 / :701) — DIAGNOSTIC ONLY, never a gate. Note 4.
 clean=$(grep -Ec "HTTPD002I Server is SHUTDOWN|HTTPD060I SHUTDOWN worker" "$window" 2>/dev/null || true)
 
 : "${faultmarks:=0}" "${s33e:=0}" "${crtget:=0}" "${svcdump:=0}" "${clean:=0}"
+: "${abend:=0}" "${hasp310:=0}" "${hasp395:=0}" "${ief404:=0}"
+
+# end_seen = the address-space END was CAPTURED in the window (NOT that it ended
+# normally). "$HASP395 ... ENDED" and IEF404I both appear on clean AND abnormal ends,
+# so they cannot judge health — IEF450I / $HASP310 / SVC dump do that. OR because either
+# record alone proves the end was captured; requiring both would falsely flag a healthy
+# run when JES config omits one.
+if [ "$hasp395" -ne 0 ] || [ "$ief404" -ne 0 ]; then end_seen=1; else end_seen=0; fi
 
 echo "-- assertion over captured console window --"
 echo "   fault markers ($FAULT_MARK) : $faultmarks"
 echo "   S33E                                  : $s33e"
 echo "   __CRTGET ... not found in PPA         : $crtget"
 echo "   SVC dump markers                      : $svcdump"
-echo "   clean-shutdown markers                : $clean"
+echo "   IEF450I ... ABEND (abnormal AS end)   : $abend"
+echo "   \$HASP310 TERMINATED AT END OF MEMORY  : $hasp310"
+echo "   AS end captured (\$HASP395/IEF404I)    : $end_seen"
+echo "   clean-shutdown WTOs (diagnostic)      : $clean"
 echo
 
 rm -f "$window"
@@ -179,24 +226,52 @@ EOF
     exit 3
 fi
 
-if [ "$s33e" -ne 0 ] || [ "$crtget" -ne 0 ] || [ "$svcdump" -ne 0 ]; then
+if [ "$s33e" -ne 0 ] || [ "$crtget" -ne 0 ] || [ "$svcdump" -ne 0 ] \
+   || [ "$abend" -ne 0 ] || [ "$hasp310" -ne 0 ]; then
     cat <<EOF
 RESULT: FAIL
 The address space did not terminate cleanly after a faulted handler + P HTTPD.
-This is the EXPECTED result on the current (pre-libc370-fix) build — it is the
-#122 bug reproduced. It becomes PASS only after the libc370 recovery/DETACH fix
-relinks into the httpd build.
+A crash signature (S33E / __CRTGET spam / SVC dump) and/or an ABNORMAL address-
+space end (IEF450I ... ABEND, or "\$HASP310 ... TERMINATED AT END OF MEMORY")
+appeared in the window — see the counts above.
+After the recovery-exit fix (libc370#9) the in-flight crash spam is gone, but a
+worker that fails to quiesce can still drive an abnormal end (SA03); that path
+is caught here by the IEF450I / \$HASP310 assertion. Clean requires BOTH no
+crash spam AND a normal address-space end.
 EOF
     exit 1
+fi
+
+if [ "$end_seen" -eq 0 ]; then
+    cat <<EOF
+RESULT: INCONCLUSIVE
+No crash or abnormal-end signature appeared, but the window does not contain the
+address-space END records for $JOBNAME (neither "\$HASP395 ... ENDED" nor
+IEF404I). The end was not captured, so a clean shutdown and a truncated log look
+identical here — PASS cannot be asserted. Likely causes: CONSOLE_LOG was cut
+before the AS ended, WAIT_SECS expired early, or JOBNAME does not match this STC.
+Extend the capture or fix JOBNAME and re-run.
+EOF
+    exit 3
 fi
 
 cat <<EOF
 RESULT: PASS
 A handler faulted ($FAULT_MARK present) yet shutdown was clean: no S33E, no
-__CRTGET spam, no SVC dump.
-CAUTION: a PASS on a build that still carries the #122 libc370 defect is
-suspicious. Confirm this build actually links the libc370 fix; if it does not,
-verify that $ABEND_PATH reproduces #122's post-fault worker state before
-trusting this green.
+__CRTGET spam, no SVC dump, and no abnormal address-space end (no IEF450I ABEND,
+no \$HASP310 EOM). The address-space end was captured in the window, so this is a
+real clean termination and not a truncated log.
+CAUTION: a PASS on a build that still carries the #122 defect is suspicious.
+Confirm this build actually links the libc370 fix; if it does not, verify that
+$ABEND_PATH reproduces #122's post-fault worker state before trusting this green.
 EOF
+if [ "$clean" -eq 0 ]; then
+    cat <<EOF
+CAUTION: not one HTTPD002I/HTTPD060I orderly-shutdown WTO appeared, yet the
+address space ended normally. These corroborate a clean drain but do not gate
+the result (the authoritative gate is the address-space end above). Zero of
+them alongside a normal end is unusual — confirm the workers drained rather
+than being terminated silently.
+EOF
+fi
 exit 0
