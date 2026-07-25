@@ -48,6 +48,19 @@ Which shutdown path the run exercises:
 > A green **`abend`** run does **not** establish the `#179` fix — it tests a
 > different path. Use **`longpoll`** to gate `#179` (mvslovers/mvsmf#179).
 
+The easiest way to drive this is the bundled runner
+(`tests/run-shutdown-longpoll.sh`) — a file, so there is no fragile multi-line
+shell command to mis-paste:
+
+```sh
+CONSOLE_LOG=/path/to/hardcopy.log sh tests/run-shutdown-longpoll.sh check   # setup check, no P HTTPD
+CONSOLE_LOG=/path/to/hardcopy.log sh tests/run-shutdown-longpoll.sh         # real run, prompts for P HTTPD
+```
+
+It reads API credentials from `HTTPD_AUTH` or from `MBT_MVS_USER`/`MBT_MVS_PASS`
+in `./.env`, and uses a non-matching `unsol-key` so the workers stay parked; see
+the script header for all knobs. To build the poll request by hand instead:
+
 Example `LONGPOLL_CMD` — one synchronous unsolicited-message detection PUT that
 blocks up to 60 s (mvsMF console **issue-command** endpoint,
 `PUT /zosmf/restconsoles/consoles/{console-name}` — *not* the `/solmsgs` collect
@@ -56,9 +69,13 @@ sub-resource):
 ```sh
 LONGPOLL_CMD='curl -s -o /dev/null -u USER:PASS -X PUT \
   -H "Content-Type: application/json" \
-  -d "{\"cmd\":\"D T\",\"unsol-key\":\"IEE136I\",\"unsol-detect-sync\":\"Y\",\"unsol-detect-timeout\":\"60\"}" \
+  -d "{\"cmd\":\"D T\",\"unsol-key\":\"ZZNOMATCHZZ\",\"unsol-detect-sync\":\"Y\",\"unsol-detect-timeout\":\"60\"}" \
   http://HOST:PORT/zosmf/restconsoles/consoles/defcn'
 ```
+
+> `unsol-key` must be a token that will **not** appear during the poll — do
+> **not** use one the command's own response emits (`D T` emits `IEE136I`), or
+> detection fires immediately and the worker never parks (→ INCONCLUSIVE).
 
 The long poll must **still be running when `P HTTPD` is issued** — that is the
 whole point. The in-flight count is measured `LONGPOLL_SETTLE` s after launch,

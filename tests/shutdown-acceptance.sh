@@ -100,9 +100,19 @@
 set -u
 
 # --- load .env if present (for HTTPD_HOST default only) ---------------------
-if [ -f "${ENV_FILE:-.env}" ]; then
+# The `.` (dot) builtin searches $PATH when its operand has NO slash — so a bare
+# ".env" is looked up in $PATH, not the CWD. Under dash a not-found `.` is a
+# special-builtin error that ABORTS a non-interactive shell (silent RC 2 once the
+# message is hidden). Force a slash so it is read from the given path, and don't
+# swallow errors. Set ENV_FILE=/dev/null to skip sourcing entirely.
+env_file="${ENV_FILE:-.env}"
+case "$env_file" in
+    */*) : ;;                    # already path-qualified
+    *)   env_file="./$env_file" ;;
+esac
+if [ -f "$env_file" ]; then
     # shellcheck disable=SC1090
-    . "${ENV_FILE:-.env}" 2>/dev/null || true
+    . "$env_file" || true
 fi
 
 HTTPD_HOST=${HTTPD_HOST:-${MBT_MVS_HOST:-127.0.0.1}}
