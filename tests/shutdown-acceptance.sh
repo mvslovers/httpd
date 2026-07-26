@@ -64,6 +64,15 @@
 #      and proves >=1 is still parked at stop. Proof-of-scenario is that in-flight
 #      count, NOT a fault marker -- a clean parked poll faults nothing. A green
 #      abend run does NOT establish the #179 fix; use longpoll for that.
+#
+#   6. RAKF COUNTS ARE DIAGNOSTIC, NEVER A GATE. #27 reported a RAKF0005 /
+#      RAKF000A pair naming HTTPX in FACILITY *after* "HTTPD002I Server is
+#      SHUTDOWN". Since this test already drives P HTTPD, it reports those counts
+#      for free. They must NOT become a FAIL condition: RAKF0004 (failed logon)
+#      is routine in this window and unrelated, RAKF0005 can be raised by any
+#      resource on a shared system, and #27 was never reproduced on a current
+#      build. A blanket RAKF assertion would misfire and mask real results.
+#      Only the specific HTTPX/FACILITY signature raises a CAUTION on a PASS.
 # ---------------------------------------------------------------------------
 # Configuration (override via environment or a sourced .env)
 # ---------------------------------------------------------------------------
@@ -255,9 +264,15 @@ hasp395=$(grep -Ec "[$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window
 ief404=$(grep -Ec "IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
 # clean-shutdown WTOs (httpd.c:335 / :701) — DIAGNOSTIC ONLY, never a gate. Note 4.
 clean=$(grep -Ec "HTTPD002I Server is SHUTDOWN|HTTPD060I SHUTDOWN worker" "$window" 2>/dev/null || true)
+# RAKF security violations (#27) — DIAGNOSTIC ONLY, never a gate. Note 6.
+# rakf5    : any RAKF0005 in the window (context; may be unrelated on a shared system)
+# rakfhttpx: the specific #27 signature — a RAKF000A detail line naming HTTPX in FACILITY
+rakf5=$(grep -Ec "RAKF0005" "$window" 2>/dev/null || true)
+rakfhttpx=$(grep -Ec "RAKF000A.*HTTPX.*FACILITY" "$window" 2>/dev/null || true)
 
 : "${faultmarks:=0}" "${s33e:=0}" "${crtget:=0}" "${svcdump:=0}" "${clean:=0}"
 : "${abend:=0}" "${hasp310:=0}" "${hasp395:=0}" "${ief404:=0}"
+: "${rakf5:=0}" "${rakfhttpx:=0}"
 
 # end_seen = the address-space END was CAPTURED in the window (NOT that it ended
 # normally). "$HASP395 ... ENDED" and IEF404I both appear on clean AND abnormal ends,
@@ -283,6 +298,8 @@ echo "   IEF450I ... ABEND (abnormal AS end)   : $abend"
 echo "   \$HASP310 TERMINATED AT END OF MEMORY  : $hasp310"
 echo "   AS end captured (\$HASP395/IEF404I)    : $end_seen"
 echo "   clean-shutdown WTOs (diagnostic)      : $clean"
+echo "   RAKF0005 in window (diagnostic)       : $rakf5"
+echo "   RAKF HTTPX/FACILITY — #27 (diagnostic): $rakfhttpx"
 echo
 
 rm -f "$window"
@@ -349,6 +366,15 @@ address space ended normally. These corroborate a clean drain but do not gate
 the result (the authoritative gate is the address-space end above). Zero of
 them alongside a normal end is unusual — confirm the workers drained rather
 than being terminated silently.
+EOF
+fi
+if [ "$rakfhttpx" -ne 0 ]; then
+    cat <<EOF
+CAUTION: a RAKF violation naming HTTPX in FACILITY appeared in this window —
+the signature reported in #27. It does NOT affect the verdict above (note 6),
+but #27 was retired as stale precisely because no current build reproduced it.
+This is the recorded re-open trigger: capture the window and re-open #27 with
+it, rather than reasoning from the 2026-03-18 log.
 EOF
 fi
 exit 0
