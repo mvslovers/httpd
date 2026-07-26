@@ -107,6 +107,26 @@ already returned (no worker parked → INCONCLUSIVE, not a real reproduction).
 
 Exit codes: `0` pass, `1` fail, `2` config error, `3` inconclusive.
 
+### RAKF counts (diagnostic only)
+
+Because the test already drives `P HTTPD`, it reports two RAKF counts over the
+same window for free:
+
+| Reported | Meaning |
+|----------|---------|
+| `RAKF0005 in window` | any resource-access violation — context only, and often unrelated on a shared system |
+| `RAKF HTTPX/FACILITY` | the specific signature from [#27](https://github.com/mvslovers/httpd/issues/27) — a `RAKF000A` line naming `HTTPX` in `FACILITY` |
+
+Neither **ever** affects the verdict. A nonzero HTTPX/FACILITY count on an
+otherwise-passing run emits a CAUTION and nothing more.
+
+This is deliberate. `RAKF0004` (failed logon) is routine in this window and
+unrelated; `RAKF0005` can be raised by any resource on a shared system; and #27
+was retired as stale because no current build reproduced it. Turning any of this
+into a FAIL condition would misfire and mask real results. The CAUTION exists so
+that if the #27 signature ever does reappear, it is captured on a current build
+rather than re-argued from the 2026-03-18 log.
+
 ### Windowed assertion (important)
 
 `CONSOLE_LOG` is usually an **append-only** Hercules hardcopy log that already
