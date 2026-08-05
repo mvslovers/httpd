@@ -645,7 +645,7 @@ quit:
 }
 
 static int do_print_sysout_line(const char *line, unsigned linelen, void *arg);
-static const char *do_print_sysout_why(const JESPRST *st);
+static const char *do_print_sysout_why(const JESPRST *st, unsigned records);
 __asm__("\n&FUNC    SETC 'do_print_sysout'");
 static int
 do_print_sysout(HTTPD *httpd, HTTPC *httpc, JES *jes, JESJOB *job, unsigned **dsid)
@@ -673,7 +673,7 @@ do_print_sysout(HTTPD *httpd, HTTPC *httpc, JES *jes, JESJOB *job, unsigned **ds
         rc = jesprint(jes, job, dd->dsid, do_print_sysout_line, httpc, &st);
         if (rc < 0) goto quit;
 
-        why = do_print_sysout_why(&st);
+        why = do_print_sysout_why(&st, dd->records);
         if (why) {
             rc = http_printf(httpc, "*** %-8.8s (DSID %u): %s ***\r\n",
                              dd->ddname, dd->dsid, why);
@@ -709,14 +709,22 @@ do_print_sysout_line(const char *line, unsigned linelen, void *arg)
    still being written ends on a block whose chain points at a track that is
    allocated but not yet written, so it carries a foreign key - HTTPD showing
    its own message log hits that every time.  STOPPED is our own callback
-   giving up (the client went away), which the caller sees as rc.           */
+   giving up (the client went away), which the caller sees as rc.
+
+   records is the count the PDDB advertises, and FOREIGN needs it: "purged"
+   means the checkpoint promises records the spool no longer holds.  A data
+   set nobody ever wrote to promises nothing, yet its allocated-but-unwritten
+   track carries a foreign key just the same - and with no accepted block
+   before it, libc370 cannot call that OPENEND.  Measured on the target:
+   SYSLOG DSID 101 (records=32) is a real loss, while DSID 103 and HTTPD's
+   own HTTPDERR/HTTPDOUT (records=0) are merely empty.                      */
 __asm__("\n&FUNC    SETC 'do_print_sysout_why'");
 static const char *
-do_print_sysout_why(const JESPRST *st)
+do_print_sysout_why(const JESPRST *st, unsigned records)
 {
     switch (st->reason) {
     case JESPR_IOERR:   return "spool read failed";
-    case JESPR_FOREIGN: return "no longer on the spool";
+    case JESPR_FOREIGN: return records ? "no longer on the spool" : NULL;
     case JESPR_DSID:    return "spool block belongs to another data set";
     case JESPR_LOOP:    return "spool block chain loops, output truncated";
     case JESPR_CAP:     return "spool block limit reached, output truncated";
