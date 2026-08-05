@@ -644,12 +644,15 @@ quit:
     return rc;
 }
 
-static int do_print_sysout_line(const char *line, unsigned linelen);
+static int do_print_sysout_line(const char *line, unsigned linelen, void *arg);
+static const char *do_print_sysout_why(const JESPRST *st);
 __asm__("\n&FUNC    SETC 'do_print_sysout'");
 static int
 do_print_sysout(HTTPD *httpd, HTTPC *httpc, JES *jes, JESJOB *job, unsigned **dsid)
 {
     int         rc  = 0;
+    const char  *why;
+    JESPRST     st;
     unsigned    count;
     unsigned    n;
 
@@ -667,8 +670,15 @@ do_print_sysout(HTTPD *httpd, HTTPC *httpc, JES *jes, JESJOB *job, unsigned **ds
 
         if ((dd->flag & FLAG_SYSIN) && !dsid) continue;   /* don't show SYSIN data        */
 
-        rc = jesprint(jes, job, dd->dsid, do_print_sysout_line);
+        rc = jesprint(jes, job, dd->dsid, do_print_sysout_line, httpc, &st);
         if (rc < 0) goto quit;
+
+        why = do_print_sysout_why(&st);
+        if (why) {
+            rc = http_printf(httpc, "*** %-8.8s (DSID %u): %s ***\r\n",
+                             dd->ddname, dd->dsid, why);
+            if (rc < 0) goto quit;
+        }
 
         rc = http_printf(httpc, "- - - - - - - - - - - - - - - - - - - - "
                                 "- - - - - - - - - - - - - - - - - - - - "
@@ -683,16 +693,38 @@ quit:
 
 __asm__("\n&FUNC    SETC 'do_print_sysout_line'");
 static int
-do_print_sysout_line(const char *line, unsigned linelen)
+do_print_sysout_line(const char *line, unsigned linelen, void *arg)
 {
     int         rc      = 0;
-    CLIBGRT     *grt    = __grtget();
-    HTTPD       *httpd  = grt->grtapp1;
-    HTTPC       *httpc  = grt->grtapp2;
+    HTTPC       *httpc  = arg;              /* passed through by jesprint() */
+    HTTPD       *httpd  = httpc->httpd;     /* for the httpx macro          */
 
     rc = http_printf(httpc, "%-*.*s\r\n", linelen, linelen, line);
 
     return rc;
+}
+
+/* Why the block walk stopped, for the reasons the reader should hear about.
+   END and EMPTY are ordinary ends, and so is OPENEND: a data set that is
+   still being written ends on a block whose chain points at a track that is
+   allocated but not yet written, so it carries a foreign key - HTTPD showing
+   its own message log hits that every time.  STOPPED is our own callback
+   giving up (the client went away), which the caller sees as rc.           */
+__asm__("\n&FUNC    SETC 'do_print_sysout_why'");
+static const char *
+do_print_sysout_why(const JESPRST *st)
+{
+    switch (st->reason) {
+    case JESPR_IOERR:   return "spool read failed";
+    case JESPR_FOREIGN: return "no longer on the spool";
+    case JESPR_DSID:    return "spool block belongs to another data set";
+    case JESPR_LOOP:    return "spool block chain loops, output truncated";
+    case JESPR_CAP:     return "spool block limit reached, output truncated";
+    case JESPR_NOBUF:   return "incomplete spanned record, output truncated";
+    case JESPR_NOMEM:   return "out of storage, output truncated";
+    }
+
+    return NULL;
 }
 
 typedef struct findjob {
