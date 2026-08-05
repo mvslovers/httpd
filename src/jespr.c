@@ -5,7 +5,7 @@
 #define httpx   (httpd->httpx)
 
 static int print_sysout(HTTPD *httpd, JES *jes, JESJOB *job, unsigned **dsid);
-static int prtline(const char *line, unsigned linelen);
+static int prtline(const char *line, unsigned linelen, void *arg);
 
 int main(int argc, char **argv)
 {
@@ -163,7 +163,7 @@ print_sysout(HTTPD *httpd, JES *jes, JESJOB *job, unsigned **dsid)
 
         if ((dd->flag & FLAG_SYSIN) && !dsid) continue;   /* don't show SYSIN data        */
 
-        rc = jesprint(jes, job, dd->dsid, prtline);
+        rc = jesprint(jes, job, dd->dsid, prtline, NULL, NULL);
         printf("- - - - - - - - - - - - - - - - - - - - "
                "- - - - - - - - - - - - - - - - - - - - "
                "- - - - - - - - - - - - - - - - - - - - "
@@ -174,7 +174,7 @@ print_sysout(HTTPD *httpd, JES *jes, JESJOB *job, unsigned **dsid)
 }
 
 __asm__("\n&FUNC    SETC 'prtline'");
-static int prtline(const char *line, unsigned linelen)
+static int prtline(const char *line, unsigned linelen, void *arg)
 {
     printf("%-*.*s\n", linelen, linelen, line);
     return 0;

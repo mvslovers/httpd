@@ -5,7 +5,7 @@
 #define httpx   (httpd->httpx)
 
 static int print_dd(HTTPD *httpd, JESJOB *j, const char *in);
-static int prtline(const char *line, unsigned linelen);
+static int prtline(const char *line, unsigned linelen, void *arg);
 
 int main(int argc, char **argv)
 {
@@ -164,11 +164,11 @@ int main(int argc, char **argv)
 
         if (!j) continue;
         if (strcmp(j->jobname, "BSPPILOT")==0) {
-            rc = jesprint(jes, j, 1, prtline);
-            rc = jesprint(jes, j, 2, prtline);
-            rc = jesprint(jes, j, 3, prtline);
-            rc = jesprint(jes, j, 4, prtline);
-            rc = jesprint(jes, j, 5, prtline);
+            rc = jesprint(jes, j, 1, prtline, NULL, NULL);
+            rc = jesprint(jes, j, 2, prtline, NULL, NULL);
+            rc = jesprint(jes, j, 3, prtline, NULL, NULL);
+            rc = jesprint(jes, j, 4, prtline, NULL, NULL);
+            rc = jesprint(jes, j, 5, prtline, NULL, NULL);
             break;
         }
     }
@@ -180,7 +180,7 @@ quit:
     return 0;
 }
 #if 0
-static int prtline(const char *line, unsigned linelen)
+static int prtline(const char *line, unsigned linelen, void *arg)
 {
     printf("%-*.*s\n", linelen, linelen, line);
     return 0;
