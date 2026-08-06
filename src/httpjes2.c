@@ -671,6 +671,16 @@ do_print_sysout(HTTPD *httpd, HTTPC *httpc, JES *jes, JESJOB *job, unsigned **ds
         if ((dd->flag & FLAG_SYSIN) && !dsid) continue;   /* don't show SYSIN data        */
 
         rc = jesprint(jes, job, dd->dsid, do_print_sysout_line, httpc, &st);
+
+        /* Since libc370 #26 rc is a status (0/404/503) and no longer carries
+           the print callback's rc: our own callback giving up - the client
+           went away - arrives as JESPR_STOPPED with its rc in st.prtrc.
+           Reading st also works against a pre-#26 libc370, which additionally
+           returned that rc here.                                            */
+        if (st.reason == JESPR_STOPPED) {
+            rc = st.prtrc;
+            goto quit;
+        }
         if (rc < 0) goto quit;
 
         why = do_print_sysout_why(&st, dd->records);
@@ -709,7 +719,8 @@ do_print_sysout_line(const char *line, unsigned linelen, void *arg)
    still being written ends on a block whose chain points at a track that is
    allocated but not yet written, so it carries a foreign key - HTTPD showing
    its own message log hits that every time.  STOPPED is our own callback
-   giving up (the client went away), which the caller sees as rc.
+   giving up (the client went away); since libc370 #26 the caller sees that in
+   st->reason/st->prtrc, not in jesprint()'s rc.
 
    records is the count the PDDB advertises, and FOREIGN needs it: "purged"
    means the checkpoint promises records the spool no longer holds.  A data
