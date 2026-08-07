@@ -5,11 +5,9 @@
 #define httpx   (httpd->httpx)
 
 static int print_dd(HTTPD *httpd, JESJOB *j, const char *in);
-static int prtline(const char *line, unsigned linelen, void *arg);
 
 int main(int argc, char **argv)
 {
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
@@ -23,8 +21,6 @@ int main(int argc, char **argv)
     double      start   = 0.0;
     double      end     = 0.0;
     unsigned    n;
-    int         i;
-    int         rc;
 #if 0
     struct {
         unsigned short  len;

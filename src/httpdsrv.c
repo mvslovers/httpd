@@ -14,12 +14,7 @@ static int display_file(HTTPD *httpd, HTTPC *httpc);
 static int display_fs(HTTPD *httpd, HTTPC *httpc);
 static int display_mgr(HTTPD *httpd, HTTPC *httpc);
 static int display_task(HTTPD *httpd, HTTPC *httpc);
-static int display_ufsdisks(HTTPD *httpd, HTTPC *httpc);
-static int display_ufsio(HTTPD *httpd, HTTPC *httpc);
-static int display_ufspagers(HTTPD *httpd, HTTPC *httpc);
-static int display_ufssb(HTTPD *httpd, HTTPC *httpc);
 static int display_help(HTTPD *httpd, HTTPC *httpc);
-static int display_ufsvdisks(HTTPD *httpd, HTTPC *httpc);
 static int display_workers(HTTPD *httpd, HTTPC *httpc);
 
 static int display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs);
@@ -44,8 +39,6 @@ static int send_last(HTTPD *httpd, HTTPC *httpc);
 
 int main(int argc, char **argv)
 {
-    int         rc      = 0;
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
@@ -1360,7 +1353,6 @@ static int
 display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs)
 {
     int         rc      = 0;
-    UCHAR       *u;
 
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
@@ -1704,7 +1696,6 @@ display_task(HTTPD *httpd, HTTPC *httpc)
     int         rc      = 0;
     CTHDTASK    *task   = NULL;
     char        *memory = NULL;
-    UCHAR       type;
 
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
@@ -1815,7 +1806,6 @@ display_mgr(HTTPD *httpd, HTTPC *httpc)
     int         rc      = 0;
     CTHDMGR     *mgr    = httpd->mgr;
     char        *s;
-    unsigned    n, count;
 
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 

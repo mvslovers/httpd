@@ -22,7 +22,6 @@ int httpds_xmit(HTTPDS *ds)
 { 
     unsigned    *psa    	= (unsigned *)0;
     void        *ascb   	= (void *)psa[0x224/4];
-    int         rc          = 0;
     int         lockrc      = 8;
 
     http_secs(&ds->start);
@@ -47,8 +46,6 @@ do_xmit(HTTPDS *ds)
 {
     int         rc          = 0;
     FILE        *fp;
-    char        buf[256];
-    char        *p;
 
     // list_xmitout(ds, "do_xmit enter");
 
@@ -255,7 +252,6 @@ link(HTTPDS *ds, const char *pgm)
     int         rc      = -1;   /* link return code     */
     int         prc     = -1;   /* pgm return code      */
     void        *dcb    = NULL; /* no DCB for link      */
-    char 		*query;
     struct {
         unsigned short  len;
         char            buf[512];

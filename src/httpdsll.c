@@ -2,16 +2,13 @@
 #include "httpd.h"
 #include "httpds.h"         /* dataset services common */
 
-static int do_list(HTTPDS *ds);
 static int do_list_hlq_json(HTTPDS *ds, DSLIST **dslist);
 static int do_list_hlq_print(HTTPDS *ds, DSLIST **dslist);
 
-static char *strupper(char *buf);
 
 int httpds_list(HTTPDS *ds)
 { 
     int         rc          = 0;
-    FILE    	*fp     	= 0;
     int         len;
     DSLIST      **dslist    = 0;
 

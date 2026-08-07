@@ -21,8 +21,6 @@ static int try_memory(HTTPD *httpd, HTTPC *httpc, OPTIONS *options);
 
 int main(int argc, char **argv)
 {
-    int         rc      = 0;
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;

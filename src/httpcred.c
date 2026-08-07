@@ -6,12 +6,10 @@
 static int process_get(HTTPD *httpd, HTTPC *httpc);
 static int process_post(HTTPD *httpd, HTTPC *httpc);
 
-static int dump_env(HTTPD *httpd, HTTPC *httpc, int hidden);
 
 int httpcred(HTTPC *httpc)
 {
     HTTPD       *httpd  = httpc->httpd;
-    HTTPV		*env;
     char		*method;
 
 	/* get the request method */
@@ -42,32 +40,6 @@ quit:
 	return 0;
 }
 
-static int 
-dump_env(HTTPD *httpd, HTTPC *httpc, int hidden)
-{
-	int		rc = 0;
-	
-	rc = http_printf(httpc, "<pre%s>\n", hidden ? " hidden" : "");
-	if (rc) goto quit;
-
-    if (httpc->env) {
-        unsigned count = array_count(&httpc->env);
-        unsigned n;
-        for(n=0;n<count;n++) {
-			HTTPV *env = httpc->env[n];
-			
-			if (!env) continue;
-
-			rc = http_printf(httpc, "httpc->env[%u] \"%s\"=\"%s\"\n", n, env->name, env->value);
-			if (rc) goto quit;
-        }
-    }
-    
-    rc = http_printf(httpc, "</pre>\n");
-
-quit:
-	return rc;
-}
 
 static const char *head[] = {
 	"<head>",
@@ -231,7 +203,6 @@ print_body(HTTPD *httpd, HTTPC *httpc, const char *msg)
 {
 	int		i;
 	int		rc;
-	char	*p;
 	char	*uri = http_get_env(httpc, "HTTP_Cookie-Sec-Uri");
 	char	esc[512];
 

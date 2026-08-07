@@ -115,7 +115,6 @@ void
 httpsmf_session(HTTPD *httpd, HTTPC *httpc)
 {
     SMF_HTTPD_SESS rec;
-    double elapsed;
 
     if (!smf_active())
         return;

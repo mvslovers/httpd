@@ -229,7 +229,6 @@ static void
 close_fd_set(void)
 {
     CLIBGRT *grt    = __grtget();
-    int i;
 
     http_enter("close_fd_set()\n");
     if (grt->grtsock) {
@@ -434,12 +433,10 @@ quit:
 static int
 socket_thread(void *arg1, void *arg2)
 {
-	CLIBCRT     *crt    = __crtget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
     CTHDTASK    *task   = cthread_self();
     CTHDMGR     *mgr    = httpd->mgr;
     int         rc;
@@ -640,14 +637,9 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
 static int
 worker_thread(void *udata, CTHDWORK *work)
 {
-    CLIBCRT     *crt    = __crtget();           /* A(CLIBCRT) from TCBUSER  */
-    CLIBGRT     *grt    = __grtget();
-    HTTPD       *httpd  = grt->grtapp1;
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
     CTHDTASK    *task   = cthread_self();
-    CTHDMGR     *mgr    = work->mgr;
     int         rc      = 0;
     char        *data   = NULL;
     HTTPC       *httpc  = NULL;
@@ -855,14 +847,12 @@ static int unauth_setup(const char *name)
 int
 main(int argc, char **argv)
 {
-    CLIBPPA     *ppa    = __ppaget();   /* A(CLIBPPA)               */
     CLIBCRT     *crt    = __crtget();   /* A(CLIBCRT)               */
     CLIBGRT     *grt    = __grtget();   /* A(CLIBGRT)               */
     HTTPD       *httpd  = 0;
 #if 0
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    unsigned    *ascb   = (unsigned *)psa[0x224/4]; /* A(ASCB) from PSAAOLD */
     unsigned    *asxb   = (unsigned *)ascb[0x6C/4]; /* A(ASXB) from ASCBASXB*/
     unsigned    *acee   = (unsigned *)asxb[0xC8/4]; /* A(ACEE) from ASXBSENV*/
 #endif
@@ -872,7 +862,6 @@ main(int argc, char **argv)
     int         rc;
     unsigned    count;
     unsigned    *ecblist[10];
-    char        buf[1024];
     HTTPD       server;
 
     /* If this message has a leading '+' then we're not APF authorized yet. */

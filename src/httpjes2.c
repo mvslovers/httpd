@@ -16,7 +16,6 @@ static int getself(char *jobname, char *jobid);
 int main(int argc, char **argv)
 {
     int         rc      = 0;
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
@@ -126,9 +125,6 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
     unsigned    count   = 0;
     double      start;
     double      end;
-	__64		diff;
-	__64		div;
-	__64		mod;
     unsigned    n;
     int         i;
     char        jesinfo[20] = "unknown";
@@ -482,7 +478,6 @@ do_print(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid)
     int         download= 0;
     unsigned    count   = 0;
     unsigned    n;
-    int         i;
     int         rc;
 
     /* we'll send all job output unless one or more dataset id's are specified */
@@ -777,9 +772,7 @@ do_cancel_ex(HTTPD *httpd, HTTPC *httpc, const char *verb, int purge, int all)
     JES         *jes        = NULL;
     char        **jobids    = NULL;
     JESJOB      **jobs      = NULL;
-    JESJOB      *job        = NULL;
     unsigned    jcount      = 0;
-    unsigned    jn          = 0;
     unsigned    count       = 0;
     unsigned    n           = 0;
     char        *buf        = NULL;

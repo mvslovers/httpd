@@ -386,7 +386,6 @@ d_time(char *buf)
 	int 		minutes 	= buf ? strtol(buf, &next, 10) : 0;
 	time64_t	gmt 		= time64(NULL);
 	time64_t	lot;
-	unsigned    offset;
 	struct tm	tm;
 	char		tbuf[128];
 
@@ -570,7 +569,6 @@ d_thread(char *buf)
     int         rc      = 0;
     CTHDTASK    *task   = cthread_self();
     CTHDMGR     *mgr;
-    CTHDWORK    *work;
     unsigned    count;
     unsigned    n;
 
@@ -634,7 +632,6 @@ s_maxtask(char *buf)
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
-    CTHDTASK    *task   = cthread_self();
     CTHDMGR     *mgr;
 	char		*next = NULL;
 	unsigned    value = strtoul(buf, &next, 10);
@@ -678,7 +675,6 @@ s_mintask(char *buf)
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
-    CTHDTASK    *task   = cthread_self();
     CTHDMGR     *mgr;
 	char		*next = NULL;
 	unsigned    value = strtoul(buf, &next, 10);

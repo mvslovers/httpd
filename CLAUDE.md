@@ -274,3 +274,51 @@ tests/curl-jobs.sh        # Jobs API
 tests/curl-uss.sh         # USS/UFS API
 tests/test.sh             # Top-level runner
 ```
+
+### Display Modules (live storage inspection)
+
+The root `CLAUDE.md` covers when to reach for these; this is the detail. All are
+read-only, all need Basic auth, none is registered unless `DD:HTTPDPRM` says so.
+
+**`/.dsrv` — HTTPDSRV, server control blocks.** `?target=` selects the block and
+each one is shown as hex plus a named field table:
+
+| target | block | needs `&m=` |
+|--------|-------|-------------|
+| `HTTPD` | the server singleton (320 bytes, `0x140`) | no |
+| `MGR` | `CTHDMGR`, the worker pool manager | no |
+| `FS` | `UFSSYS` handle (8 bytes with the libufs stub) | no |
+| `CGI` | one `HTTPCGI` route, or the route array | **yes** |
+| `TASK` | a `CTHDTASK` | **yes** |
+| `FILE` | a `FILE` handle | **yes** |
+
+The addresses the `&m=` targets want come out of the `HTTPD` block:
+`httpcgi` at `+44`, `mgr` at `+34`, `socket_thread` at `+30`, `ufssys` at `+54`.
+
+**`/.dm` — HTTPDM, arbitrary storage.** `?m=<hex>&l=<bytes>&c=<chunk>&t=<title>`
+— only `m` is required; `c` is capped at 64; `t` labels the dump header. Every
+parameter has short and long aliases (`m`/`mem`/`memory`, `l`/`len`/`length`,
+`c`/`s`/`chunk`/`size`, `t`/`title`).
+
+Pointer chasing is the point: read a pointer, feed it back as `m`. `CVTPTR` is
+at `0x10`, so `/.dm?m=10&l=16` yields the CVT, and CVT+`0x130` is `CVTTZ`.
+
+**`/.dmtt` — HTTPDMTT, Master Trace Table.** No parameters needed (`?d=1`
+toggles a raw-data variant). This is the console log, so it is where RAKF
+messages, `HTTPDnnn` WTOs and abends actually show up — check it before
+theorising about why a request failed.
+
+**Legacy, superseded by mvsMF** — only touch when working on them: `/dsl/*`
+(HTTPDSL: `help`, `list?hlq=`, `pds?dsn=`, `print?dsn=&member=`) and `/jes/*`
+(HTTPJES2: `help`, `status`, `ddlist`, `print`/`view`, and POST-only `cancel`,
+`purge`, `purgeall`). `/jes/status?jobname=` and `/jes/ddlist` return JSON.
+
+Note for anyone reading `jesst.c`: its output goes through `printf`, and in a
+module `stdout` reaches the HTTP client — so those `printf`s *are* the response
+body, not log output.
+
+**Known display bug:** the `HTTPCGI` field table in `httpdsrv.c` predates the
+per-route auth policy. It shows `login` (legacy) and omits `auth` / `resattr` /
+`resclass` / `resname`, so on an authorization question it can say the opposite
+of the truth — `/zosmf/info` reports `login 0` while answering 401. Read the hex
+at `+14`. Tracked as issue #146.

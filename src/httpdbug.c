@@ -10,7 +10,6 @@ http_debug(HTTPC *httpc, const char *options)
 	HTTPD 		*httpd 		= httpc->httpd;
 	int			len;
 	char		*opt;
-	char		*next;
 	char		opts[256];
 	
 	if (!options) goto quit;
