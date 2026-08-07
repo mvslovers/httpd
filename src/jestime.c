@@ -51,7 +51,14 @@ jestime(const time64_t *t, char *out, unsigned outlen)
         return;
     }
 
-    snprintf(out, outlen, "%04d-%02d-%02dT%02d:%02d:%02dZ",
+    /* ".000" rather than no fraction: this is the shape real z/OSMF emits for
+    ** exec-submitted / exec-started / exec-ended,
+    **     "exec-started":"2018-11-03T09:05:18.010Z"
+    ** and httpjes2 is the reference mvsMF's own implementation is compared
+    ** against, so the two should be directly comparable.  JES2 gives us second
+    ** resolution here (start_time64 is a time64_t), so the fraction is always
+    ** zero -- which is what z/OSMF itself reports for exec-submitted. */
+    snprintf(out, outlen, "%04d-%02d-%02dT%02d:%02d:%02d.000Z",
              tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
