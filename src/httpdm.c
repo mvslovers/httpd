@@ -84,7 +84,6 @@ int main(int argc, char **argv)
 
     display_memory(httpd, httpc, &options);
 
-quit:
     return 0;
 }
 
@@ -97,35 +96,35 @@ display_memory(HTTPD *httpd, HTTPC *httpc, OPTIONS *options)
     int         len     = options->len;
     int         size    = options->size;
 
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0) goto quit;
-    if (rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!data) {
-        if (rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "<html>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "<html>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<head>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<head>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<title>HTTPDM</title>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<title>HTTPDM</title>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<style>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, ".shadowbox {\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "  width: 45em;\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "  border: 1px solid #333;\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "  box-shadow: 8px 8px 5px #444;\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "  padding: 8px 12px;\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<style>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, ".shadowbox {\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "  width: 45em;\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "  border: 1px solid #333;\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "  box-shadow: 8px 8px 5px #444;\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "  padding: 8px 12px;\n") < 0)) goto quit;
         // if (rc = http_printf(httpc, "  background-image: linear-gradient(180deg, #fff, #ddd 40%%, #ccc);\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "  background-image: linear-gradient(270deg, #eee, #ddd 10%%, #ccc);\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "}\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "</style>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "  background-image: linear-gradient(270deg, #eee, #ddd 10%%, #ccc);\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "}\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "</style>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "</head>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "</head>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<body>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "<div class=\"shadowbox\">\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<body>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "<div class=\"shadowbox\">\n") < 0)) goto quit;
 
         http_printf(httpc, "<form>\n");
         if (options->title && options->title[0]) {

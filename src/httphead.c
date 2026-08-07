@@ -14,7 +14,6 @@ httphead(HTTPC *httpc)
     /* not implemented */
     rc = http_resp_not_implemented(httpc);
 
-quit:
     httpc->state = CSTATE_DONE;
     http_exit("httphead(), rc=%d\n", rc);
     return rc;

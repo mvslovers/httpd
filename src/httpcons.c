@@ -241,7 +241,6 @@ d_login_cred(CRED *cred)
 		id.addr       & 0xFF,
 		cred->acee);
 
-quit:
 	return rc;
 }
 
@@ -272,7 +271,6 @@ d_login(char *buf)
 		unlock(cred, LOCK_SHR);
 	}
 	
-quit:
 	unlock(array, LOCK_SHR);
 	unlock(httpd, LOCK_SHR);
     return rc;
@@ -287,7 +285,6 @@ d_port(char *buf)
 
     wtof("HTTPD102I HTTPD server listening on port %d", httpd->port);
 
-quit:
     return rc;
 }
 
@@ -430,7 +427,6 @@ d_time(char *buf)
 	strftime(tbuf, sizeof(tbuf), "HTTPD143I time %Y/%m/%d %H:%M:%S Local", &tm);
 	wtof("%s TZOFFSET=%s%d", tbuf, sign < 0 ? "-" : "+", minutes);
 
-quit:
 	return 0;
 }
 
@@ -628,7 +624,6 @@ d_thread(char *buf)
         unlock(mgr,1);
     }
 
-quit:
     unlock(httpd,1);
     return rc;
 }
@@ -673,7 +668,6 @@ s_maxtask(char *buf)
         unlock(mgr,1);
     }
 
-quit:
     unlock(httpd,1);
     return rc;
 }
@@ -718,7 +712,6 @@ s_mintask(char *buf)
         unlock(mgr,1);
     }
 
-quit:
     unlock(httpd,1);
     return rc;
 }

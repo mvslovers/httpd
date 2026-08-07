@@ -106,7 +106,6 @@ int main(int argc, char **argv)
         break;
     }
 
-quit:
     return 0;
 }
 
@@ -180,16 +179,16 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
         jesinfo[sizeof(jesinfo)-1]=0;
     }
 
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", "application/json") < 0) goto quit;
-    if (rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "application/json") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     count = array_count(&jobs);
 
-    if (rc = http_printf(httpc, "{\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  \"data\": [\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "{\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "  \"data\": [\n") < 0)) goto quit;
 
     for(n=0; n < count; n++) {
         JESJOB *j = jobs[n];
@@ -516,9 +515,9 @@ do_print(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid)
     }
 
     /* send the headers */
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0)) goto quit;
     if (!download) {
         rc = http_printf(httpc, "\r\n");
         if (rc < 0) goto quit;
@@ -806,10 +805,10 @@ do_cancel_ex(HTTPD *httpd, HTTPC *httpc, const char *verb, int purge, int all)
     }
 
     /* send the headers */
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!jobname && !all) {
         rc = http_printf(httpc, "Jobname: \"null\" <=== missing value\r\n");
@@ -981,13 +980,13 @@ do_help(HTTPD *httpd, HTTPC *httpc)
     int     i;
 
     /* send HTTP headers */
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "text/plain") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     /* Tell them what we are */
-    if (rc = http_printf(httpc, "HTTPJES2 Help\r\n\r\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "HTTPJES2 Help\r\n\r\n") < 0)) goto quit;
     if (http_cmp(verb, "/help")!=0) {
         /* they didn't ask for help, so tell them we don't understand the request */
         rc = http_printf(httpc,

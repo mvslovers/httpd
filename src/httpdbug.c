@@ -75,7 +75,6 @@ dump_cgi(HTTPD *httpd, HTTPC *httpc)
 			p->path, p->pgm ? p->pgm : "(none)", p->login, p->wild);
     }
 
-quit:
     return 0;
 }
 
@@ -92,7 +91,6 @@ dump_help(HTTPD *httpd, HTTPC *httpc)
 		http_printf(httpc, "   %s\n", help_text[i]);
 	}
 	
-quit:
 	return rc;
 }
 

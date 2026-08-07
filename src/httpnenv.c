@@ -25,6 +25,5 @@ httpnenv(const UCHAR *name, const UCHAR *value)
         if (vallen) strcpy(v->value, value);
     }
 
-quit:
     return v;
 }

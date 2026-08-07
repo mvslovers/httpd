@@ -119,7 +119,6 @@ do_list_hlq_json(HTTPDS *ds, DSLIST **dslist)
     /* end of JSON object */
     http_printf(httpc, "}\n");
 
-quit:
     return 0;
 }
 

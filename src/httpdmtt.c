@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 
     display_mtt(httpd, httpc, atoi(data));
 
-quit:
     return 0;
 }
 
@@ -41,21 +40,21 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
     MTENTRY     **mtentry;
     unsigned    n, count;
 
-    if (rc = http_resp(httpc,200) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0) goto quit;
-    if (rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc,200) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!data) {
-        if (rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "<html>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "<html>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<head>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "<title>HTTPDMTT</title>\n") < 0) goto quit;
-        if (rc = http_printf(httpc, "</head>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<head>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "<title>HTTPDMTT</title>\n") < 0)) goto quit;
+        if ((rc = http_printf(httpc, "</head>\n") < 0)) goto quit;
 
-        if (rc = http_printf(httpc, "<body>\n") < 0) goto quit;
+        if ((rc = http_printf(httpc, "<body>\n") < 0)) goto quit;
     }
 
     /* allocate Master Trace Table */

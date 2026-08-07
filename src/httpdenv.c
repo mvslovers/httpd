@@ -14,6 +14,5 @@ httpdenv(HTTPC *httpc, const UCHAR *name)
         array_del(&httpc->env, indx);
     }
 
-quit:
     return rc;
 }

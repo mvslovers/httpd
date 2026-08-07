@@ -19,7 +19,6 @@ httpsndb(HTTPC *httpc)
     rc = http_send_file(httpc, 1);
 #endif
 
-quit:
     http_exit("httpsndb()\n");
     return rc;
 }
