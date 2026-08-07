@@ -1,4 +1,5 @@
 #include "cred.h"
+#include <clibauth.h>	/* __autask() */
 #include <clibb64.h>	/* base64 encode/decode */
 #include <clibssib.h>	/* __jobid() */
 #include <clibtiot.h>	/* __jobname() */

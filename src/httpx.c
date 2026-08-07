@@ -58,7 +58,7 @@ static HTTPX vect = {
     http_resp_not_found,        /* C8 http_resp_not_found()         */
     http_open,                  /* CC http_open()                   */
     http_send_binary,           /* D0 http_send_binary()            */
-    0,  /* httpread,            /* D4 http_read()                   */
+    0,                          /* D4 http_read() -- not exported   */
     http_send_file,             /* D8 http_send_file()              */
     http_send_text,             /* DC http_send_text()              */
     http_is_busy,               /* E0 http_is_busy()                */

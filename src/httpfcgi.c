@@ -1,5 +1,10 @@
 #include "httpd.h"
 
+/* call http_cmp() directly (HTTPCMP), not through the httpx vector -- this is
+   the server's own code path and used to reach it as the bare CSECT name
+   httpcmp(), which had no prototype in scope. */
+#undef http_cmp
+
 HTTPCGI *httpfcgi(HTTPD *httpd, const char *path)
 {
     HTTPCGI     *cgi    = NULL;
@@ -23,7 +28,7 @@ HTTPCGI *httpfcgi(HTTPD *httpd, const char *path)
         }
         else {
             /* use caseless string compare */
-            if (httpcmp(path, p->path)==0) {
+            if (http_cmp(path, p->path)==0) {
                 cgi = p;
                 break;
             }

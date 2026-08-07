@@ -38,7 +38,7 @@ dbgtime(const char *sep)
     if (!tm) goto quit;
 
     strftime(buf, sizeof(buf), "%Y%m%d.%H%M%S", tm);
-    fprintf(httpd->dbg, "%s.%06u%s", buf, tv.tv_usec, sep);
+    fprintf(httpd->dbg, "%s.%06lu%s", buf, tv.tv_usec, sep);
 
 quit:
     return rc;

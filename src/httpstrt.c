@@ -3,7 +3,10 @@
 #include "stdlib.h"
 #include "string.h"
 #include "stddef.h"
+#include "time.h"
 #include "clibcrt.h"
+#include "clibenv.h"                /* loadenv()                        */
+#include "clibwto.h"                /* wtof()                           */
 
 #define MAXPARMS 50 /* maximum number of arguments we can handle */
 
@@ -22,7 +25,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     char        *argv[MAXPARMS + 1];
     int         rc;
     int         parmLen;
-    int         progLen;
+    int         progLen = 0;
     char        parmbuf[310];
 
     /* need to know if this is a TSO environment straight away
