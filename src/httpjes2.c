@@ -1,7 +1,12 @@
 /* HTTPJES2.C - CGI Program, REST style CGI program for access of JES2 resources */
 #include "httpd.h"
 #include "clibjes2.h"   /* JES prototypes */
+#include "jestime.h"   /* ISO 8601 UTC job timestamps */
 #include "clibcp.h"     /* JES checkpoint struct */
+
+/* libc370 ships __tzget() (src/clib/@@tzget.c) but declares it in no header
+   -- see libc370 #70.  Returns crt->crttzoff for the calling task. */
+extern int __tzget(void);
 
 #define httpx   (httpd->httpx)
 
@@ -130,11 +135,24 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
     char        jesinfo[20] = "unknown";
 	time64_t	start_time;
 	time64_t	end_time;
+	char		tbuf[JESTIME_LEN];
 	const char  *smfid;
 
 	httpsecs(&start);
 
-	tzadjust = httpd->tzoffset * -1;	/* change sign as we want to convert local time to GMT */
+	/* JES2 stores its checkpoint timestamps in system local time, so they need
+	** the system's offset to become UTC -- and specifically the SYSTEM's, not
+	** httpd->tzoffset.  That field is a configured preference for httpd's own
+	** local-time rendering (Date: is unaffected, it goes through gmtime64), and
+	** an operator who sets TZOFFSET to their own zone rather than the machine's
+	** would otherwise skew every timestamp this API reports.  These fields are
+	** labelled "Z", so they have to be UTC whatever the Parmlib says.
+	**
+	** __tzget() returns crt->crttzoff for this task, which cgistart's tzset()
+	** filled in from TZ or the system's CVTTZ -- a fact about the machine, not a
+	** setting.  Sign: crttzoff is seconds east of UTC (negative west), and
+	** UTC = local - offset, hence the * -1 to give an addend. */
+	tzadjust = __tzget() * -1;
 
     /* select filtering criteria */
     if (jobname && !jobid) {
@@ -317,21 +335,13 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
 #else
         rc = http_printf(httpc, "      \"start_stamp\": \"%llu\",\n", start_time);
         if (rc < 0) goto quit;
-        if (__64_cmp_u32(&start_time, 0) != __64_EQUAL) {
-            rc = http_printf(httpc, "      \"start_display\": \"%-24.24s\",\n", ctime64(&start_time) );
-        }
-        else {
-            rc = http_printf(httpc, "      \"start_display\": \"...\",\n");
-        }
+        jestime(&start_time, tbuf, sizeof(tbuf));
+        rc = http_printf(httpc, "      \"start_display\": \"%s\",\n", tbuf);
         if (rc < 0) goto quit;
         rc = http_printf(httpc, "      \"end_stamp\": \"%llu\",\n", end_time);
         if (rc < 0) goto quit;
-        if (__64_cmp_u32(&end_time, 0) != __64_EQUAL) {
-            rc = http_printf(httpc, "      \"end_display\": \"%-24.24s\",\n", ctime64(&end_time) );
-        }
-        else {
-            rc = http_printf(httpc, "      \"end_display\": \"...\",\n" );
-        }
+        jestime(&end_time, tbuf, sizeof(tbuf));
+        rc = http_printf(httpc, "      \"end_display\": \"%s\",\n", tbuf);
         if (rc < 0) goto quit;
 #endif
         rc = do_status_ddlist(httpd, httpc, j, "      ");
