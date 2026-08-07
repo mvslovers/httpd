@@ -58,7 +58,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     char        *argv[MAXPARMS + 1];
     int         rc;
     int         parmLen;
-    int         progLen;
+    int         progLen = 0;
     char        parmbuf[310];
 
     /* we're going to process the callers parameter list first so we

@@ -9,6 +9,7 @@
 #include "httpd.h"
 #include "clibgrt.h"
 #include "clibsock.h"
+#include "clibauth.h"               /* __autask/__austep/__uatask/__uastep */
 
 static int socket_thread(void *arg1, void *arg2);
 static int worker_thread(void *udata, CTHDWORK *work);

@@ -22,7 +22,7 @@ dump(FILE *fp, const char *pName, const void *pvArea, int iSize, int iChunk)
 
     fprintf(fp, "%*.*sDump of %08X \"%s\" (%d bytes)\n",
         indent, indent, "",
-        pArea, pName, iSize);
+        (unsigned int)pArea, pName, iSize);
 
     for (i=0, j=0; iSize > 0;i++ ) {
         if ( i==iChunk ) {

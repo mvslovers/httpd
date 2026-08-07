@@ -38,9 +38,9 @@ int main(int argc, char **argv)
 
     /* make sure we're running on the HTTPD server */
     if (!httpd) {
-        wtof("This program %s must be called by the HTTPD web server%s", "");
+        wtof("This program %s must be called by the HTTPD web server%s", argv[0], "");
         /* TSO callers might not see a WTO message, so we send a STDOUT message too */
-        printf("This program %s must be called by the HTTPD web server%s", "\n");
+        printf("This program %s must be called by the HTTPD web server%s", argv[0], "\n");
         return 12;
     }
 
@@ -178,7 +178,7 @@ do_print_binary(HTTPDS *ds)
     int         len;
     int         rc;
     char        dataset[256]= {0};
-    char        *buf;
+    char        *buf = NULL;
 
     if (!ds->dsn) {
         httpds_error(ds, "Missing ?dsn= query variable.\n");
@@ -252,7 +252,7 @@ do_print_text(HTTPDS *ds)
     int         len;
     int         rc;
     char        dataset[256]= {0};
-    char        *buf;
+    char        *buf = NULL;
 
     if (!ds->dsn) {
         httpds_error(ds, "Missing ?dsn= query variable.\n");

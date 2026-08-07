@@ -10,6 +10,13 @@
 #include "httpd.h"
 #include "httpxlat.h"
 
+/* libc370 ships sleep() (src/clib/sleep.c) and __tzset() (src/clib/@@tzset.c)
+** but declares neither in any header, so both were implicit declarations here.
+** Declared locally until libc370 exports them; the signatures are copied from
+** those definitions, so a later header will agree rather than conflict. */
+extern int sleep(unsigned seconds);
+extern int __tzset(int tzoffset);
+
 /* Forward declarations */
 static void set_defaults(HTTPD *httpd);
 static void parse_line(HTTPD *httpd, char *line);

@@ -126,14 +126,14 @@ int main(int argc, char **argv)
             printf("      \"end_display\": \"...\",\n" );
         }
 #else
-        printf("      \"start_stamp\": \"%llu\",\n", j->start_time64 );
+        printf("      \"start_stamp\": \"%llu\",\n", j->start_time64.u64 );
         if (__64_cmp_u32(&j->start_time64, 0) != __64_EQUAL) {
             printf("      \"start_display\": \"%-24.24s\",\n", ctime64(&j->start_time64) );
         }
         else {
             printf("      \"start_display\": \"...\",\n");
         }
-        printf("      \"end_stamp\": \"%llu\",\n", j->end_time64);
+        printf("      \"end_stamp\": \"%llu\",\n", j->end_time64.u64);
         if (__64_cmp_u32(&j->end_time64, 0) != __64_EQUAL) {
             printf("      \"end_display\": \"%-24.24s\",\n", ctime64(&j->end_time64) );
         }
@@ -244,6 +244,6 @@ print_dd(HTTPD *httpd, JESJOB *j, const char *in)
         printf("%s  }%s\n", in, (n+1) < count ? "," : "");
     }
 
-    printf("%s]\n");
+    printf("%s]\n", in);
     return 0;
 }

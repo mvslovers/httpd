@@ -6,8 +6,8 @@ DSLIST *httpds_dslist(const char *dsn)
 { 
     int         rc          = 0;
     char        volser[8]   = {0};
-    LOCWORK     workarea    = {0};
-    DSCB        dscbbuf     = {0};
+    LOCWORK     workarea    = {{0}};
+    DSCB        dscbbuf     = {{0}};
     DSCB        *dscb       = &dscbbuf;
     DSCB1       *dscb1      = &dscb->dscb1;
     DSLIST      *dslist     = NULL;

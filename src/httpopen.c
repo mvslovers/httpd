@@ -7,7 +7,11 @@
 FILE *
 http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
 {
-    UCHAR   *mode;
+    /* Initialized because mode is only assigned inside the if (mime) below and
+       -Wall cannot prove that branch always runs.  It does: http_mime() never
+       answers NULL -- an extension it does not know falls back to default_mime
+       {"txt","text/plain",0}, i.e. exactly this "r".  Defensive, not a fix. */
+    UCHAR   *mode = "r";
     int     len;
     UCHAR   buf[256];
 

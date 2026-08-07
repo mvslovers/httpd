@@ -175,10 +175,10 @@ static int
 print_head(HTTPD *httpd, HTTPC *httpc)
 {
 	int		i;
-	int		rc;
+	int		rc = 0;		/* head[] could be empty -> rc read unwritten */
 
 	for(i=0; head[i]; i++) {
-		if (rc=http_printf(httpc, " %s\n", head[i])) goto quit;
+		if ((rc = http_printf(httpc, " %s\n", head[i]))) goto quit;
 	}
 
 quit:

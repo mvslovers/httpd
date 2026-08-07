@@ -4,6 +4,11 @@
 */
 #include "httpd.h"
 
+/* call http_link() directly (HTTPLINK), not through the httpx vector -- this is
+   the server's own code path and used to reach it as the bare CSECT name
+   httplink(), which had no prototype in scope. */
+#undef http_link
+
 extern int
 httppcgi(HTTPC *httpc, HTTPCGI *cgi)
 {
@@ -12,7 +17,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
     http_enter("httppcgi()\n");
 
     /* link to external program */
-    rc = httplink(httpc, cgi->pgm);
+    rc = http_link(httpc, cgi->pgm);
     if (rc < 0) {
         /* some kind of ABEND occurred */
         unsigned abcode = (unsigned) (rc * -1);   /* make positive again */

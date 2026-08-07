@@ -81,7 +81,7 @@ do_pds_json(HTTPDS *ds, DSLIST *dslist, PDSLIST **pdslist)
     /* start of JSON data array */
     http_printf(httpc, "  \"data\": [\n");
 
-    count    = __arcou(&pdslist);
+    count    = array_count(&pdslist);
 
     if (strcmp(dslist->recfm, "U")!=0) {
         /* not a LOAD/LINK type PDS dataset */
@@ -184,7 +184,7 @@ do_pds_print(HTTPDS *ds, DSLIST *dslist, PDSLIST **pdslist)
     ISPFSTAT    *ispfstat   = (ISPFSTAT *)buf;
     unsigned    n, count;
 
-    count    = __arcou(&pdslist);
+    count    = array_count(&pdslist);
     if (!count) {
         http_resp(httpc, 404);  /* not found */
         http_printf(httpc, "Content-Type: text/plain\r\n");
