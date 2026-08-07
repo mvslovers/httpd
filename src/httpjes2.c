@@ -4,6 +4,10 @@
 #include "jestime.h"   /* ISO 8601 UTC job timestamps */
 #include "clibcp.h"     /* JES checkpoint struct */
 
+/* libc370 ships __tzget() (src/clib/@@tzget.c) but declares it in no header
+   -- see libc370 #70.  Returns crt->crttzoff for the calling task. */
+extern int __tzget(void);
+
 #define httpx   (httpd->httpx)
 
 static int do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, int dd);
@@ -136,7 +140,19 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
 
 	httpsecs(&start);
 
-	tzadjust = httpd->tzoffset * -1;	/* change sign as we want to convert local time to GMT */
+	/* JES2 stores its checkpoint timestamps in system local time, so they need
+	** the system's offset to become UTC -- and specifically the SYSTEM's, not
+	** httpd->tzoffset.  That field is a configured preference for httpd's own
+	** local-time rendering (Date: is unaffected, it goes through gmtime64), and
+	** an operator who sets TZOFFSET to their own zone rather than the machine's
+	** would otherwise skew every timestamp this API reports.  These fields are
+	** labelled "Z", so they have to be UTC whatever the Parmlib says.
+	**
+	** __tzget() returns crt->crttzoff for this task, which cgistart's tzset()
+	** filled in from TZ or the system's CVTTZ -- a fact about the machine, not a
+	** setting.  Sign: crttzoff is seconds east of UTC (negative west), and
+	** UTC = local - offset, hence the * -1 to give an addend. */
+	tzadjust = __tzget() * -1;
 
     /* select filtering criteria */
     if (jobname && !jobid) {
