@@ -547,6 +547,22 @@ struct httpx {
 #define http_get_token(httpc,out,outlen) \
     ((httpx->http_get_token)((httpc),(out),(outlen)))
 
+/* RACF resource check under the client's ACEE.  classname/resource name the
+** profile (e.g. "FACILITY", "MVSMF.ACCESS"), attr is one of
+** RACF_ATTR_READ/UPDATE/CONTROL/ALTER (0 -> READ).
+**
+**    0  access permitted
+**   8+  access refused (the SAF rc)
+**   -1  the request is not authenticated (no credential / no ACEE)
+**
+** SAF answers rc 4 ("no profile covers the resource") for an unprotected
+** resource, which is an *allowed* answer; the server normalizes it to 0 so this
+** contract holds for modules built before that distinction became visible.
+**
+** So `if (http_check_auth(...) == 0)` is correct and stays correct.  Never test
+** `rc <= 4` -- it reads the -1 as allowed and lets unauthenticated callers past
+** the check.
+*/
 #define http_check_auth(httpc,classname,resource,attr) \
     ((httpx->http_check_auth)((httpc),(classname),(resource),(attr)))
 
