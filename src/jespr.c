@@ -9,7 +9,6 @@ static int prtline(const char *line, unsigned linelen, void *arg);
 
 int main(int argc, char **argv)
 {
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
@@ -22,8 +21,6 @@ int main(int argc, char **argv)
     unsigned    **dsid  = NULL;
     unsigned    count   = 0;
     unsigned    n;
-    int         i;
-    int         rc;
 
     if (httpd) {
         http_resp(httpc,200);

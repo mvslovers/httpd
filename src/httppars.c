@@ -23,10 +23,8 @@ httppars(HTTPC *httpc)
     UCHAR   *buf    = httpc->buf;
     int     len     = CBUFSIZE-1;
     int     pos     = 0;
-    UCHAR   *data   = NULL;
     int     datalen = 0;
     int     nparam  = 0;
-    int     i;
     UCHAR   *p;
     int     salen;
     struct sockaddr sa;

@@ -6,7 +6,24 @@ type = "application"
 [build]
 # -DVERSION feeds httpd.c's `#ifndef VERSION` (otherwise it reports
 # "0.0.0-unknown"). v1's mbt injected it automatically; v2 does not.
-cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_VERSION)\"']
+#
+# -Wall -Werror: the root CLAUDE.md has always documented these as enforced,
+# but nothing passed them, so 598 warnings accumulated unseen -- among them a
+# printf with two %s and one argument. Issue #138 cleared the tree; this line
+# is what keeps it clear. Adding a warning now fails the build, which is the
+# point. Do not add -Wno-* here: the trigraph warnings that would have needed
+# one were removed at the source instead (#139).
+cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_VERSION)\"',
+          "-Wall", "-Werror"]
+
+[host]
+# `make test-host` reuses build.cflags (mbt/scripts/mbttesthost.py) but compiles
+# with the developer machine's cc, whose -Wall is a different and far larger set
+# than cc370's -- the pointer-sign warnings alone run into the hundreds, and
+# none of them say anything about the MVS build. -Werror exists here to keep the
+# shipped target build clean; gating the fast host loop on another compiler's
+# opinions would only make that loop unusable. Warnings still print.
+cflags = ["-Wno-error"]
 
 [dependencies]
 "mvslovers/ufsd" = "=1.0.0-dev"

@@ -2,7 +2,6 @@
 
 int httplink(HTTPC *httpc, const char *pgm)
 {
-    void        *ppa    = NULL;
     int         rc      = -1;   /* link return code     */
     int         prc     = -1;   /* pgm return code      */
     void        *dcb    = NULL; /* no DCB for link      */

@@ -38,7 +38,6 @@ int
 http_send_file(HTTPC *httpc, int binary)
 {
     int     rc  = 0;
-    int     rdw = binary ? httpc->rdw : 0;
     int     len = 0;
     int     avail;
 
@@ -266,8 +265,6 @@ quit:
 static int
 ssi_process(HTTPC *httpc, char *ssi)
 {
-    int     rc  		= 0;
-    int     len 		= 0;
     int		newline		= 1;
     char	*p			= NULL;
     char	*next		= NULL;
@@ -414,7 +411,6 @@ quit:
 static int 
 ssi_printenv(HTTPC *httpc)
 {
-    unsigned    indx    = 0;
     HTTPV       *v      = NULL;
     unsigned    count   = array_count(&httpc->env);
     unsigned    n;

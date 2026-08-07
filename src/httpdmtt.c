@@ -4,13 +4,10 @@
 
 #define httpx   (httpd->httpx)
 
-static int getself(char *jobname, char *jobid);
 static int display_mtt(HTTPD *httpd, HTTPC *httpc, int data);
 
 int main(int argc, char **argv)
 {
-    int         rc      = 0;
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
@@ -100,29 +97,3 @@ quit:
 	return 0;
 }
 
-static int
-getself(char *jobname, char *jobid)
-{
-    unsigned    *psa        = (unsigned*)0;
-    unsigned    *tcb        = (unsigned*)psa[540/4];    /* A(current TCB) */
-    unsigned    *jscb       = (unsigned*)tcb[180/4];    /* A(JSCB) */
-    unsigned    *ssib       = (unsigned*)jscb[316/4];   /* A(SSIB) */
-
-    const char  *name       = (const char*)tcb[12/4];   /* A(TIOT), but the job name is first 8 chars of TIOT so we cheat just a bit */
-    const char  *id         = ((const char*)ssib) + 12; /* jobid is in SSIB at offset 12 */
-    int         i;
-
-    for(i=0; i < 8 && name[i] > ' '; i++) {
-        jobname[i] = name[i];
-    }
-    jobname[i] = 0;
-
-    for(i=0; i < 8 && id[i] >= ' '; i++) {
-        jobid[i] = id[i];
-        /* the job id may have space(s) which should be '0' */
-        if (jobid[i]==' ') jobid[i] = '0';
-    }
-    jobid[i] = 0;
-
-    return 0;
-}

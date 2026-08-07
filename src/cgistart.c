@@ -211,7 +211,6 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
 int
 printf(const char *format, ...)
 {
-    CLIBPPA     *ppa    = __ppaget();
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;

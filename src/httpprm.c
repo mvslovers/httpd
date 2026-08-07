@@ -596,7 +596,6 @@ parse_login(HTTPD *httpd, const char *value)
 {
     char *tmp;
     char *tok;
-    char *saveptr;
 
     tmp = strdup(value);
     if (!tmp) return;

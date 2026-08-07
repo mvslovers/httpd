@@ -2,7 +2,6 @@
 
 int http_getc(HTTPC *httpc)
 {
-    int             rc;
     int             i;
     unsigned char   buf[4];
 

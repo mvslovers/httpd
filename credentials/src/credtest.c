@@ -10,8 +10,6 @@ int main(int argc, char **argv)
 {
 	int			rc = 0;
 	CREDID		id = credid_init(NULL);
-	CREDTOK		tok = credtok_gen(&id);
-	ACEE		*acee = (ACEE*)0x12345678;
 	CRED		*cred;
 	CRED		***array;
 	unsigned	addr;

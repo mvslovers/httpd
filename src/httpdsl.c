@@ -9,11 +9,7 @@ static int do_print(HTTPDS *ds);
 static int do_print_binary(HTTPDS *ds);
 static int do_print_text(HTTPDS *ds);
 
-static int isdataset(const char *name);
-static int ismember(const char *name);
-static int ispattern(const char *name, const char *pattern);
 static char *strupper(char *buf);
-static int dump_ds(HTTPDS *ds);
 
 int main(int argc, char **argv)
 {
@@ -352,115 +348,8 @@ do_help(HTTPDS *ds)
     return 0;
 }
 
-static int 
-isdataset(const char *name)
-{
-	int		dataset = 0;
-	int		levels  = 0;
-	int		member  = 0;
-	int		len;
-	char	buf[256];
-	char	*p;
 
-	strcpy(buf, name);
-	
-	if (ismember(buf)) {
-		/* looks like a single high level qualifier */
-		if (!isdigit((unsigned char)buf[0])) {
-			dataset = 1;
-			goto quit;
-		}
-	}
 
-	if (strstr(buf, "..")) goto quit;	/* can't have and empty dataset level name */
-	
-	for(p = strtok(buf, "."); p; p = strtok(NULL, ".")) {
-		char *lparen = strchr(p, '(');
-		char *rparen = strrchr(p, ')');
-	
-		// wtof("   %s: p=\"%s\"", __func__, p ? p : "(null)");
-		if (lparen && rparen) {
-			if (member) goto quit;		/* we've already seen a member so die */
-			member++;
-			*lparen = 0;
-			*rparen = 0;
-		}
-
-		levels++;
-		len = strlen(p);
-		
-		if (len < 1) goto quit;			/* dataset level name too short */
-		if (len > 8) goto quit;			/* dataset level name too long */
-		if (isdigit((unsigned char)p[0])) goto quit;	/* dataset level name can not start with a number */
-		if (!ismember(p)) goto quit;	/* bad character in name */
-
-		if (lparen && rparen) {
-			if (strlen(lparen+1) > 8) goto quit;	/* dataset level name too long */
-			if (!ismember(lparen+1)) goto quit;	/* bad character in name */
-
-			*lparen = '(';
-			*rparen = ')';
-		}
-
-	}
-
-	/* name could be a dataset */
-	if (levels <= 22) {
-		int maxlen = 44;
-		
-		if (member > 1) goto quit;	/* only 1 member allowed */
-		
-		if (member) {
-			maxlen += 10;	/* maxlen += strlen("(12345678)") */
-		}
-
-		if (strlen(name) <= maxlen) {
-			dataset = 1;
-		}
-	}
-
-quit:
-	// wtof("   %s(\"%s\") %s", __func__, name, dataset ? "SUCCESS" : "FAILED");
-	return dataset;
-}
-
-static int 
-ismember(const char *name)
-{
-	int		member = 0;
-	int		len = strlen(name);
-	int		i;
-
-	if (len < 1) goto quit;				/* invalid member name */
-
-	if (len <= 8) {
-		member = 1;	/* assume the name is a valid member name */
-		for(i=0; name[i]; i++) {
-			if (name[i]=='@') continue;
-			if (name[i]=='#') continue;
-			if (name[i]=='$') continue;
-			if (isalnum((unsigned char)name[i])) continue;
-
-			/* not a valid character for a member name */
-			member = 0;
-			break;
-		}
-	}
-	
-quit:
-	// wtof("   %s(\"%s\") %s", __func__, name, member ? "SUCCESS" : "FAILED");
-	return member;
-}
-
-static int 
-ispattern(const char *name, const char *pattern)
-{
-	int	rc = __patmat(name, pattern);
-	
-	// wtof("   %s(\"%s\",\"%s\") %s", __func__, name, pattern, rc ? "MATCHED" : "NOMATCH");
-	
-	return rc;
-}
 
 static char *
 strupper(char *buf)
@@ -479,52 +368,4 @@ quit:
 	return buf;
 }
 
-static int 
-dump_ds(HTTPDS *ds)
-{
-    const char *p;
-    
-    wtodumpf(ds, sizeof(HTTPDS), "%s HTTPDS", __func__);
-    wtof("ppa           %p", ds->_ppa);
-    wtof("grt           %p", ds->_grt);
-    wtof("crt           %p", ds->_crt);
-    wtof("httpd         %p", ds->_httpd);
-    wtof("httpc         %p", ds->_httpc);
-    wtof("pgm           %s", ds->pgm);
-    wtof("path          %s", ds->path);
-    wtof("verb          %s", ds->verb);
-    wtof("hlq           %s", ds->hlq);
-    wtof("dsn           %s", ds->dsn);
-    wtof("dstype        %s", ds->dstype);
-    wtof("member        %s", ds->member);
-    wtof("format        %s", ds->format);
-    wtof("binary        %d", ds->binary);
-    wtof("e2a           %d", ds->e2a);
-    switch(ds->type) {
-    default:
-    case TYPE_UNKNOWN:  p = "UNKNOWN";  break;
-    case TYPE_HLQ:      p = "HLQ";      break;
-    case TYPE_DSN:      p = "DSN";      break;
-    case TYPE_DSNMEM:   p = "DSNMEM";   break;
-    }
-        
-    wtof("type          %d %s", ds->type, p);
-
-    switch(ds->org) {
-    default:
-    case ORG_UNKNOWN:   p = "UNKNOWN";  break;
-    case ORG_PS:        p = "PS";       break;
-    case ORG_PDS:       p = "PDS";      break;
-    }
-    wtof("org           %d %s", ds->org, p);
-
-    wtof("start         %f", ds->start);
-    wtof("end           %f", ds->end);
-    if (ds->start > 0.0 && ds->end > 0.0) {
-        double elapsed = ds->end - ds->start;
-        wtof("elapsed       %f", elapsed);
-    }
-
-    return 0;
-}
 
