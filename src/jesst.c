@@ -1,6 +1,7 @@
 /* JESST.C - CGI Program, display JOE from JES checkpoint */
 #include "httpd.h"
 #include "clibjes2.h"   /* JES prototypes */
+#include "jestime.h"   /* ISO 8601 UTC job timestamps */
 
 #define httpx   (httpd->httpx)
 
@@ -21,6 +22,7 @@ int main(int argc, char **argv)
     double      start   = 0.0;
     double      end     = 0.0;
     unsigned    n;
+    char        tbuf[JESTIME_LEN];
 #if 0
     struct {
         unsigned short  len;
@@ -123,19 +125,11 @@ int main(int argc, char **argv)
         }
 #else
         printf("      \"start_stamp\": \"%llu\",\n", j->start_time64.u64 );
-        if (__64_cmp_u32(&j->start_time64, 0) != __64_EQUAL) {
-            printf("      \"start_display\": \"%-24.24s\",\n", ctime64(&j->start_time64) );
-        }
-        else {
-            printf("      \"start_display\": \"...\",\n");
-        }
+        jestime(&j->start_time64, tbuf, sizeof(tbuf));
+        printf("      \"start_display\": \"%s\",\n", tbuf);
         printf("      \"end_stamp\": \"%llu\",\n", j->end_time64.u64);
-        if (__64_cmp_u32(&j->end_time64, 0) != __64_EQUAL) {
-            printf("      \"end_display\": \"%-24.24s\",\n", ctime64(&j->end_time64) );
-        }
-        else {
-            printf("      \"end_display\": \"...\",\n" );
-        }
+        jestime(&j->end_time64, tbuf, sizeof(tbuf));
+        printf("      \"end_display\": \"%s\",\n", tbuf);
 #endif
         print_dd(httpd, j, "      ");
         printf("    }%s\n", (n+1) < count ? ",":"");

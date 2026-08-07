@@ -1,6 +1,7 @@
 /* HTTPJES2.C - CGI Program, REST style CGI program for access of JES2 resources */
 #include "httpd.h"
 #include "clibjes2.h"   /* JES prototypes */
+#include "jestime.h"   /* ISO 8601 UTC job timestamps */
 #include "clibcp.h"     /* JES checkpoint struct */
 
 #define httpx   (httpd->httpx)
@@ -130,6 +131,7 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
     char        jesinfo[20] = "unknown";
 	time64_t	start_time;
 	time64_t	end_time;
+	char		tbuf[JESTIME_LEN];
 	const char  *smfid;
 
 	httpsecs(&start);
@@ -317,21 +319,13 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
 #else
         rc = http_printf(httpc, "      \"start_stamp\": \"%llu\",\n", start_time);
         if (rc < 0) goto quit;
-        if (__64_cmp_u32(&start_time, 0) != __64_EQUAL) {
-            rc = http_printf(httpc, "      \"start_display\": \"%-24.24s\",\n", ctime64(&start_time) );
-        }
-        else {
-            rc = http_printf(httpc, "      \"start_display\": \"...\",\n");
-        }
+        jestime(&start_time, tbuf, sizeof(tbuf));
+        rc = http_printf(httpc, "      \"start_display\": \"%s\",\n", tbuf);
         if (rc < 0) goto quit;
         rc = http_printf(httpc, "      \"end_stamp\": \"%llu\",\n", end_time);
         if (rc < 0) goto quit;
-        if (__64_cmp_u32(&end_time, 0) != __64_EQUAL) {
-            rc = http_printf(httpc, "      \"end_display\": \"%-24.24s\",\n", ctime64(&end_time) );
-        }
-        else {
-            rc = http_printf(httpc, "      \"end_display\": \"...\",\n" );
-        }
+        jestime(&end_time, tbuf, sizeof(tbuf));
+        rc = http_printf(httpc, "      \"end_display\": \"%s\",\n", tbuf);
         if (rc < 0) goto quit;
 #endif
         rc = do_status_ddlist(httpd, httpc, j, "      ");
