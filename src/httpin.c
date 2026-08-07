@@ -253,7 +253,7 @@ http_in(HTTPC *httpc)
 
     httpc->len += rc;   /* update length of data in buffer */
 
-    if (strstr(httpc->buf, "\x0A\x0A") OR           /* ASCII LF LF */
+    if (strstr(httpc->buf, "\x0A\x0A") ||           /* ASCII LF LF */
         strstr(httpc->buf, "\x0D\x0A\x0D\x0A")) {   /* ASCII CRLF CRLF */
         /* we have a complete request in ASCII */
         httpc->state = CSTATE_PARSE;

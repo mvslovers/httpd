@@ -59,13 +59,11 @@ typedef struct smf_httpd_session SMF_HTTPD_SESS;    /* SMF session  */
 typedef enum   cstate   CSTATE;     /* HTTP Client state            */
 typedef enum   rdw      RDW;        /* RDW option                   */
 
-#ifndef OR
-#define OR ??!??!                   /* logical OR trigraph          */
-#endif
-
-#ifndef BOR
-#define BOR ??!                     /* bitwise OR trigraph          */
-#endif
+/* The OR / BOR trigraph macros (??!??! and ??!) that used to live here are
+** gone: they existed because '|' is not typable on a 3270 keyboard, but the
+** sources are edited on the host now and '||' was already used on 64 lines
+** across 21 files.  Keeping them cost 257 -Wall warnings -- every translation
+** unit including this header -- for two remaining call sites. */
 
 extern UCHAR *ebc2asc;
 extern UCHAR *asc2ebc;
@@ -463,7 +461,7 @@ extern int http_send(HTTPC*,const UCHAR *,int)                          asm("HTT
 extern UCHAR *http_decode(UCHAR*)                                       asm("HTTPDECO");
 extern int http_del_env(HTTPC *, const UCHAR *name)                     asm("HTTPDENV");
 extern unsigned http_find_env(HTTPC *, const UCHAR *name)               asm("HTTPFENV");
-extern http_set_env(HTTPC *, const UCHAR *, const UCHAR *)              asm("HTTPSENV");
+extern int http_set_env(HTTPC *, const UCHAR *, const UCHAR *)          asm("HTTPSENV");
 extern HTTPV *http_new_env(const UCHAR *, const UCHAR *)                asm("HTTPNENV");
 extern int http_set_http_env(HTTPC *, const UCHAR *, const UCHAR *)     asm("HTTPSHEN");
 extern int http_set_query_env(HTTPC *, const UCHAR *, const UCHAR *)    asm("HTTPSQEN");
