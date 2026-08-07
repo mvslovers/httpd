@@ -16,6 +16,7 @@
 ** those definitions, so a later header will agree rather than conflict. */
 extern int sleep(unsigned seconds);
 extern int __tzset(int tzoffset);
+extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff */
 
 /* Forward declarations */
 static void set_defaults(HTTPD *httpd);
@@ -138,6 +139,24 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
     httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
+
+    /* Inherit the offset libc370 already resolved for this task rather than
+    ** defaulting to 0 (issue #145).  __tzget() returns crt->crttzoff, which
+    ** tzset() filled in from the TZ environment variable, or from the system's
+    ** CVTTZ when TZ is absent -- see httpstrt.c, which calls tzset() right
+    ** after loadenv().
+    **
+    ** Leaving this at 0 made httpd carry a second, disagreeing notion of the
+    ** timezone: 0 here against CVTTZ in every task's CRT, so on any system
+    ** whose CVTTZ is not zero the server's own Date: header, SMF timestamps
+    ** and DISPLAY TIME output were offset from what localtime()/ctime64()
+    ** produced in the same address space -- five hours apart on the reference
+    ** system, with nothing configured.  The 0 was never a chosen default; the
+    ** HTTPD block is static storage and nothing wrote the field.
+    **
+    ** A TZOFFSET statement still wins: http_config() calls set_defaults()
+    ** before it parses, and parse_tzoffset() overwrites this. */
+    httpd->tzoffset         = __tzget();
 }
 
 /* ====================================================================
