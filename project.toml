@@ -107,6 +107,13 @@ sources = ["test/tstbody.c", "src/httpbody.c"]
 name = "TSTEXPIRE"
 sources = ["test/tstexpire.c", "credentials/src/credexp.c"]
 
+# httpracf() SAF authorization decision table (issue #135): rc 0 and 4 both
+# allow, -1 must not.  Free of httpd.h -> DUAL (host + MVS); helper source
+# listed for the host link.
+[[test]]
+name = "TSTRACF"
+sources = ["test/tstracf.c", "src/httpracf.c"]
+
 # credid_enc()/credid_dec() round-trip + flag survival across a repeat read of a
 # stored CRED (issue #109: http_get_userid() garbage on a cache-hit read).
 # blowfish_encrypt/decrypt are crent370 (MVS) -> MVS-only test (test-mvs); the

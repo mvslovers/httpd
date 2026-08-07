@@ -374,7 +374,13 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 	}
 
 	/* Stage 2: authorize the resource under the client's ACEE.  Skipped for
-	   AUTH=NONE (a public route has no identity to check -> NONE wins). */
+	   AUTH=NONE (a public route has no identity to check -> NONE wins).
+
+	   != 0 is the whole denial test: http_check_auth() already normalizes the
+	   second SAF "allowed" code (rc 4, resource not protected) to 0, and it
+	   answers -1 for an unauthenticated request.  Do NOT relax this to <= 4 --
+	   that reads -1 as allowed.  See httpxauth.c for why the normalization
+	   lives there and not here. */
 	if (route && route->resclass && route->resname && authed &&
 	    mode != HTTP_AUTH_NONE) {
 		if (http_check_auth(httpc, route->resclass, route->resname,

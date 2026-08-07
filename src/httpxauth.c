@@ -14,6 +14,7 @@
 */
 #define HTTP_PRIVATE
 #include "httpd.h"
+#include "httpracf.h"
 
 /* http_get_userid() - copy the client's userid into the caller's buffer as a
 ** NUL-terminated string.  Returns out on success, or NULL if there is no
@@ -57,7 +58,13 @@ http_get_userid(HTTPC *httpc, UCHAR *out, unsigned outlen)
 
 /* http_get_acee() - the client's RACF ACEE, or NULL when the request is not
 ** authenticated.  A CGI may hand this to racf_set_acee()/racf_auth() to run
-** work under the client's identity. */
+** work under the client's identity.
+**
+** A CGI that calls racf_auth() itself sees the RAW SAF rc, which is NOT the
+** contract http_check_auth() publishes below: an unprotected resource answers
+** 4, not 0, and testing rc == 0 / != 0 turns that allowed access into a denial.
+** Use http_check_auth() unless the raw distinction is actually wanted, and if it
+** is, accept both 0 and 4 (see httpracf()). */
 __asm__("\n&FUNC SETC 'HTTPGACE'");
 #undef http_get_acee
 ACEE *
@@ -84,15 +91,65 @@ http_get_token(HTTPC *httpc, UCHAR *out, unsigned outlen)
 }
 
 /* http_check_auth() - RACF resource check under the client's ACEE.  attr is
-** one of RACF_ATTR_READ/UPDATE/CONTROL/ALTER (0 -> READ).  Returns the
-** racf_auth() rc (0 == access permitted), or -1 when unauthenticated. */
+** one of RACF_ATTR_READ/UPDATE/CONTROL/ALTER (0 -> READ).  Returns 0 when the
+** access is permitted, the racf_auth() rc (8 and up) on a refusal, or -1 when
+** the request is unauthenticated.
+**
+** SAF has two "allowed" answers: rc 0 (a profile permits the access) and rc 4
+** (no profile covers the resource).  We normalize 4 to 0 here, so the contract
+** this vector entry has published since it was added -- 0 == permitted -- keeps
+** holding.  Three reasons that is the right call rather than the information
+** hiding it looks like:
+**
+**   - The rc reaches CGI modules through the HTTPX vector, and modules are
+**     LINKed at runtime.  Widening the contract to "0 or 4" would leave every
+**     not-yet-rebuilt module denying access to unprotected resources, with no
+**     build-time signal that it has to move.
+**   - This function already invents -1 for "unauthenticated", so it was never a
+**     SAF pass-through -- the published contract is ours, not SAF's.  Worse, the
+**     natural widened idiom `rc <= 4` would read -1 as allowed and let
+**     unauthenticated requests straight through the gate.
+**   - rc 4 never means denied (0 permitted, 4 not protected, 8+ refused), so
+**     collapsing it into 0 cannot soften a denial.
+**
+** Until libc370 #63 the distinction was invisible: racf_auth() set RACHECK flag
+** byte 0x10 believing it meant LOG=NONE, when that bit is DSTYPE=V, and with
+** that flag RAKF answered 0 where it should answer 4.  With the flag corrected
+** the 4 becomes visible to every caller -- including httpd's own RES= route gate
+** in auth_gate() (httppc.c), which tests != 0 and would otherwise 403 every
+** request to a route whose resource has no profile.
+**
+** A resource with no profile passing the gate is SAF-correct, but it is also
+** exactly the shape of a misconfigured RES= route, so trace it when DEBUG is on
+** -- it is the only place the distinction is still visible.
+**
+** One caveat on that trace: dbgf() resolves HTTPD through __grtget()->grtapp1
+** and writes httpd->dbg, a FILE* owned by httpd's C runtime, so reached from a
+** CGI it touches another runtime's stdio state.  That is the same thing the
+** vector's own http_dbgf entry does, so it is the sanctioned pattern rather than
+** a new one -- but it has not been exercised from a CGI, and today it cannot be:
+** no CGI calls http_check_auth(), and with DEBUG 0 (the default) dbgf() returns
+** after two loads.  A first CGI consumer plus DEBUG 1 is the combination to
+** verify before trusting it. */
 __asm__("\n&FUNC SETC 'HTTPCKAU'");
 #undef http_check_auth
 int
 http_check_auth(HTTPC *httpc, const char *classname, const char *resource, int attr)
 {
+    int rc;
+
     if (!httpc || !httpc->cred || !httpc->cred->acee) return -1;
-    return racf_auth(httpc->cred->acee, classname, resource, attr);
+
+    rc = racf_auth(httpc->cred->acee, classname, resource, attr);
+
+    if (rc == HTTP_RACF_NOTPROT) {
+        http_dbgf("http_check_auth(%s:%s) rc=4: resource not protected,"
+                  " access allowed\n",
+                  classname ? classname : "(null)",
+                  resource  ? resource  : "(null)");
+    }
+
+    return httpracf(rc) ? HTTP_RACF_PERMITTED : rc;
 }
 
 /* http_logout() - end the client's session: drop the CRED (and its ACEE) from

@@ -513,6 +513,9 @@ extern void *http_cgictx_get(HTTPD *, const char *, unsigned)              asm("
 extern UCHAR *http_get_userid(HTTPC *, UCHAR *out, unsigned outlen)         asm("HTTPGUID");
 extern ACEE *http_get_acee(HTTPC *)                                        asm("HTTPGACE");
 extern int http_get_token(HTTPC *, UCHAR *out, unsigned outlen)            asm("HTTPGTOK");
+/* 0 == permitted (SAF rc 4, "resource not protected", is normalized to 0),
+   8 and up == refused, -1 == the request is not authenticated.  Never test
+   rc <= 4: that reads the -1 as allowed.  See src/httpxauth.c. */
 extern int http_check_auth(HTTPC *, const char *classname,
                            const char *resource, int attr)                asm("HTTPCKAU");
 extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");

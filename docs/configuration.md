@@ -71,6 +71,12 @@ serves a file or dispatches a CGI:
    RACF/RAKF check (RACHECK/FRACHECK) under the client's ACEE. On denial it
    answers **403**.
 
+> **A `RES=` resource with no profile defined permits the access.** That is
+> standard SAF behaviour — an undefined resource is "not protected", not
+> "denied" — so a typo in the class or resource name silently disables stage 2
+> for that route rather than locking it. `DEBUG 1` traces every such check, so
+> verify a new `RES=` route against the debug log before relying on it.
+
 | Option | Values | Description |
 |--------|--------|-------------|
 | `AUTH=` | `NONE` \| `FORM` \| `BASIC` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = redirect to the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. **Omitted** = inherit the global `LOGIN` default (backward compatible). |
