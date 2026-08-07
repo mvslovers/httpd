@@ -174,7 +174,6 @@ int main(int argc, char **argv)
     }
 #endif
 
-quit:
     if (jobs) jesjobfr(&jobs);
     if (jes) jesclose(&jes);
     return 0;

@@ -52,7 +52,6 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
         }
     }
 
-quit:
     httpc->state = CSTATE_DONE;
     http_exit("httppcgi()\n");
     return rc;

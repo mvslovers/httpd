@@ -88,7 +88,6 @@ do_pds_json(HTTPDS *ds, DSLIST *dslist, PDSLIST **pdslist)
         goto text_members;
     }
 
-load_members:
     for(n=0; n < count; n++) {
         PDSLIST *a = pdslist[n];
         if (!a) continue;
@@ -172,7 +171,6 @@ all_members:
     /* end of JSON object */
     http_printf(httpc, "}\n");
 
-quit:
     return 0;
 }
 

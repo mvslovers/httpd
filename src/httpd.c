@@ -380,7 +380,6 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
         if (excp)   FD_SET(httpc->socket, excp);
     }
 
-quit:
     if (maxsock) maxsock++;
 #if 0
     http_exit("build_fd_set(), maxsock=%d\n", maxsock);
@@ -698,7 +697,6 @@ worker_thread(void *udata, CTHDWORK *work)
         }
     }
 
-quit:
 	wtof("HTTPD060I SHUTDOWN worker(%06X)   TCB(%06X) TASK(%06X) STACKSIZE(%u)",
 		work, tcb, task, task->stacksize);
 
@@ -718,7 +716,6 @@ build_ecblist(COM *com, unsigned **ecblist)
         ecblist[pos++] = com->comecbpt;
     }
 
-quit:
     if (pos) {
         ecbp = ecblist[pos-1];
         ecblist[pos-1] = (unsigned*)((unsigned)ecbp | 0x80000000);

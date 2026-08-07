@@ -238,27 +238,27 @@ print_body(HTTPD *httpd, HTTPC *httpc, const char *msg)
 	if (!uri) uri = "/";
 	
 	for(i=0; body1[i]; i++) {
-		if (rc=http_printf(httpc, " %s\n", body1[i])) goto quit;
+		if ((rc=http_printf(httpc, " %s\n", body1[i]))) goto quit;
 	}
 
 	if (msg) {
-		if (rc=http_printf(httpc, "<h2 class=\"message\">%s</h2>\n", msg)) goto quit;
+		if ((rc=http_printf(httpc, "<h2 class=\"message\">%s</h2>\n", msg))) goto quit;
 	}
 
 	for(i=0; body2[i]; i++) {
-		if (rc=http_printf(httpc, " %s\n", body2[i])) goto quit;
+		if ((rc=http_printf(httpc, " %s\n", body2[i]))) goto quit;
 	}
 
 	/* The hidden field carries the client-controlled Sec-Uri cookie back to
 	   the form.  HTML-escape it (reflected XSS) and print it directly -- never
 	   sprintf an unbounded cookie value into a fixed stack buffer (overflow). */
 	http_html_escape((UCHAR *)esc, sizeof(esc), (UCHAR *)uri);
-	if (rc=http_printf(httpc,
-	        "    <input type=\"hidden\" name=\"uri\" value=\"%s\">\n", esc))
+	if ((rc=http_printf(httpc,
+	        "    <input type=\"hidden\" name=\"uri\" value=\"%s\">\n", esc)))
 		goto quit;
 
 	for(i=0; body3[i]; i++) {
-		if (rc=http_printf(httpc, " %s\n", body3[i])) goto quit;
+		if ((rc=http_printf(httpc, " %s\n", body3[i]))) goto quit;
 	}
 
 quit:
@@ -280,8 +280,8 @@ print_login(HTTPD *httpd, HTTPC *httpc, const char *msg)
 
 	http_printf(httpc, "<!DOCTYPE html>\n");
 	http_printf(httpc, "<html lang=\"en-US\">\n");
-	if (rc=print_head(httpd,httpc)) goto quit;
-	if (rc=print_body(httpd,httpc,msg)) goto quit;
+	if ((rc=print_head(httpd,httpc))) goto quit;
+	if ((rc=print_body(httpd,httpc,msg))) goto quit;
 
 #if 0
 	/* debugging only */

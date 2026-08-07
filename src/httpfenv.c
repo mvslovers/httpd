@@ -19,6 +19,5 @@ httpfenv(HTTPC *httpc, const UCHAR *name)
         }
     }
 
-quit:
     return indx;
 }

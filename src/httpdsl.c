@@ -149,7 +149,6 @@ int main(int argc, char **argv)
         http_printf(httpc, "The requested document \"%s\" was not found.\n", ds->path);
     }
 
-quit:
     return 0;
 }
 
@@ -165,7 +164,6 @@ do_print(HTTPDS *ds)
         rc = do_print_text(ds);
     }
     
-quit:
     return rc;
 }
 
@@ -225,7 +223,7 @@ do_print_binary(HTTPDS *ds)
     http_printf(httpc, "Pragma: private\r\n");
     http_printf(httpc, "\r\n");
     
-    while(i=fread(buf, 1, len, fp)) {
+    while((i=fread(buf, 1, len, fp))) {
         // wtof("%s: fread() rc=%d", __func__, i);
         
         /* send buffer to web client */

@@ -20,6 +20,5 @@ int cred_init(void *salt, unsigned saltlen)
 	
 	rc = try(blowfish_key_setup, salt, key, saltlen);
 
-quit:
 	return rc;
 }

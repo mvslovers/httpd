@@ -36,7 +36,6 @@ httpdone(HTTPC *httpc)
 
     httpsecs(&httpc->end);
 
-quit:
     /* transition to next state */
     httpc->state = CSTATE_REPORT;
 

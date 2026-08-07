@@ -536,7 +536,6 @@ ssi_include(HTTPC *httpc, char *next)
         goto quit;
     }
 
-okay:
 	// ssi_printf(httpc, "\n");
 	
 	httpc->state = CSTATE_GET;
@@ -611,7 +610,6 @@ ssi_printv(HTTPC *httpc, const char *fmt, va_list args)
 		ssi_buffer(httpc, buf, len);
     }
 
-quit:
     return rc;
 }
 

@@ -138,34 +138,34 @@ send_resp(HTTPD *httpd, HTTPC *httpc, int resp)
 {
     int     rc;
 
-    if (rc = http_resp(httpc, resp) < 0) goto quit;
-    if (rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "Content-Type: %s\r\n", "text/html") < 0) goto quit;
-    if (rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "\r\n") < 0) goto quit;
+    if ((rc = http_resp(httpc, resp) < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "text/html") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "<html>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "<html>\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "<head>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "<head>\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "<title>HTTPDSRV</title>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "<title>HTTPDSRV</title>\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "<style>\n") < 0) goto quit;
-    if (rc = http_printf(httpc, ".shadowbox {\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  width: 45em;\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  border: 1px solid #333;\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  box-shadow: 8px 8px 5px #444;\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  padding: 8px 12px;\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "<style>\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, ".shadowbox {\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "  width: 45em;\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "  border: 1px solid #333;\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "  box-shadow: 8px 8px 5px #444;\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "  padding: 8px 12px;\n") < 0)) goto quit;
     // if (rc = http_printf(httpc, "  background-image: linear-gradient(180deg, #fff, #ddd 40%%, #ccc);\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "  background-image: linear-gradient(270deg, #eee, #ddd 10%%, #ccc);\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "}\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "</style>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "  background-image: linear-gradient(270deg, #eee, #ddd 10%%, #ccc);\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "}\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "</style>\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "</head>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "</head>\n") < 0)) goto quit;
 
-    if (rc = http_printf(httpc, "<body>\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "<div class=\"shadowbox\">\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "<body>\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "<div class=\"shadowbox\">\n") < 0)) goto quit;
 
  
 quit:
@@ -177,9 +177,9 @@ send_last(HTTPD *httpd, HTTPC *httpc)
 {
     int     rc;
 
-    if (rc = http_printf(httpc, "</div>\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "</body>\n") < 0) goto quit;
-    if (rc = http_printf(httpc, "</html>\n") < 0) goto quit;
+    if ((rc = http_printf(httpc, "</div>\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "</body>\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "</html>\n") < 0)) goto quit;
 
 quit:
     return rc;
@@ -196,7 +196,7 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     int         rc      = 0;
     UCHAR       *u;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>HTTPD Handle %p</h2>\n", httpd);
 
@@ -499,7 +499,6 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%p</td></tr>\n", 
         O(cgictx), httpd->cgictx, (HTTPD_CGICTX_MAX+1)*4, httpd->cgictx);
 
-done:
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);
 	
@@ -556,7 +555,7 @@ display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys)
         sys = httpd->ufssys;
     }
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>UFS System Handle %p</h2>\n", sys);
 
@@ -582,7 +581,6 @@ display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys)
         "Disk and inode state is owned by the UFSD STC."
         "</td></tr>\n");
 
-done:
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);
 
@@ -1364,7 +1362,7 @@ display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs)
     int         rc      = 0;
     UCHAR       *u;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>UFS Handle %p</h2>\n", ufs);
 
@@ -1387,7 +1385,6 @@ display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs)
 
 
 
-done:
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);
 	
@@ -1425,7 +1422,7 @@ display_cgi(HTTPD *httpd, HTTPC *httpc)
     char        *memory = NULL;
     unsigned    n, count;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     /* Get the query variables from the URL */
     if (!memory) memory = http_get_env(httpc, "QUERY_MEMORY");
@@ -1542,7 +1539,7 @@ display_file(HTTPD *httpd, HTTPC *httpc)
     char        *memory = NULL;
     UCHAR       type;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     /* Get the query variables from the URL */
     if (!memory) memory = http_get_env(httpc, "QUERY_MEMORY");
@@ -1709,7 +1706,7 @@ display_task(HTTPD *httpd, HTTPC *httpc)
     char        *memory = NULL;
     UCHAR       type;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     /* Get the query variables from the URL */
     if (!memory) memory = http_get_env(httpc, "QUERY_MEMORY");
@@ -1820,7 +1817,7 @@ display_mgr(HTTPD *httpd, HTTPC *httpc)
     char        *s;
     unsigned    n, count;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>HTTPD Thread Manager %p</h2>", mgr);
 #if 0
@@ -1963,7 +1960,7 @@ display_workers(HTTPD *httpd, HTTPC *httpc)
     CTHDWORK    *worker = NULL;
     unsigned    n, count;
 
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     /* Get the query variables from the URL */
     if (!memory) memory = http_get_env(httpc, "QUERY_MEMORY");
@@ -2268,7 +2265,6 @@ display_memory(HTTPD *httpd, HTTPC *httpc, const char *title, void *memory, int 
 done:
     http_printf(httpc, "</pre>\n");
 	
-quit:
 	return 0;
 }
 
@@ -2365,7 +2361,7 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     if (!host)  host = http_get_env(httpc, "HTTP_HOST");
     if (!host)  host = "unknown";
     
-    if (rc = send_resp(httpd, httpc, 200) < 0) goto quit;
+    if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>HTTPDSRV Help</h2>\n");
     http_printf(httpc, "<h3>Usage: http:/%s%s?target=name[&m=nnnnnnnn]</h3>\n", host, path);

@@ -52,7 +52,6 @@ dump(FILE *fp, const char *pName, const void *pvArea, int iSize, int iChunk)
             iChunk, iChunk, eChar, iChunk, iChunk, aChar);
     }
 
-quit:
     return;
 }
 
