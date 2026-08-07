@@ -55,7 +55,7 @@ int main(int argc, char **argv)
         if (p) {
             if (http_cmp(p, "yes")==0) dd = 1;
             else if (http_cmp(p, "true")==0) dd=1;
-            else if (isdigit(*p)) dd = atoi(p);
+            else if (isdigit((unsigned char)*p)) dd = atoi(p);
         }
     }
     else if (argc > 1) {

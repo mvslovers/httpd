@@ -67,7 +67,7 @@ initialize(int argc, char **argv)
 		// wtof("%s: argv[%d]=\"%s\"", __func__, i, argv[i]);
 		if (memcmp(argv[i], "CONFIG=", 7)==0) {
 			config = &argv[i][7];
-			while(*config=='=' || isspace(*config)) config++; 
+			while(*config=='=' || isspace((unsigned char)*config)) config++; 
 			if (!*config) config = "CONFIG";
 		}
 	}

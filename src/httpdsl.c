@@ -296,7 +296,7 @@ do_print_text(HTTPDS *ds)
     while(fgets(buf, len, fp)) {
         /* map any non-printable characters to spaces */
         for(i=0; i < len; i++) {
-            if (isprint(buf[i])) continue;
+            if (isprint((unsigned char)buf[i])) continue;
             if (buf[i]=='\n' && buf[i+1]==0) {
                 i++;
                 break;
@@ -368,7 +368,7 @@ isdataset(const char *name)
 	
 	if (ismember(buf)) {
 		/* looks like a single high level qualifier */
-		if (!isdigit(buf[0])) {
+		if (!isdigit((unsigned char)buf[0])) {
 			dataset = 1;
 			goto quit;
 		}
@@ -393,7 +393,7 @@ isdataset(const char *name)
 		
 		if (len < 1) goto quit;			/* dataset level name too short */
 		if (len > 8) goto quit;			/* dataset level name too long */
-		if (isdigit(p[0])) goto quit;	/* dataset level name can not start with a number */
+		if (isdigit((unsigned char)p[0])) goto quit;	/* dataset level name can not start with a number */
 		if (!ismember(p)) goto quit;	/* bad character in name */
 
 		if (lparen && rparen) {
@@ -441,7 +441,7 @@ ismember(const char *name)
 			if (name[i]=='@') continue;
 			if (name[i]=='#') continue;
 			if (name[i]=='$') continue;
-			if (isalnum(name[i])) continue;
+			if (isalnum((unsigned char)name[i])) continue;
 
 			/* not a valid character for a member name */
 			member = 0;
@@ -472,8 +472,8 @@ strupper(char *buf)
 	if (!buf) goto quit;
 	
 	for(i=0; buf[i]; i++) {
-		if (islower(buf[i])) {
-			buf[i] = (char) toupper(buf[i]);
+		if (islower((unsigned char)buf[i])) {
+			buf[i] = (char) toupper((unsigned char)buf[i]);
 		}
 	}
 
