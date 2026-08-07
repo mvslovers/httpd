@@ -28,9 +28,15 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     int         progLen = 0;
     char        parmbuf[310];
 
-    /* need to know if this is a TSO environment straight away
-       because it determines how the permanent files will be
-       opened */
+    /* GRTFLAG1_TSO records the SHAPE OF THE PARAMETER LIST, not the
+       environment -- see the longer note at the same point in cgistart.c.  It
+       means "bytes 0-3 are a TSO command-style prefix, the parm starts at byte
+       4", which is what the argv[0] parsing further down needs and all it is
+       used for.  Measured clear in batch, TSO background and TSO foreground on
+       a parameterless call (issue #141), so it cannot answer "am I under TSO".
+
+       The old comment claimed this determines how the permanent files are
+       opened.  It does not; the fopen() calls below never looked at it. */
     parmLen = ((unsigned int)p[0] << 8) | (unsigned int)p[1];
     if ((parmLen > 0) && (p[2] == 0)) {
         grt->grtflag1 |= GRTFLAG1_TSO;

@@ -145,9 +145,22 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
         grt->grtapp1 = httpd;
     }
 
-    /* need to know if this is a TSO environment straight away
-       because it determines how the permanent files will be
-       opened */
+    /* GRTFLAG1_TSO records the SHAPE OF THE PARAMETER LIST, not the
+       environment, despite what its name and libc370's clibgrt.h comment
+       suggest.  It says "byte 2 is zero, so bytes 0-3 are a TSO command-style
+       prefix and the parm starts at byte 4" -- which is what the argv[0]
+       parsing further down needs, and all it is used for here.
+
+       It is NOT a usable "am I under TSO" test.  Measured (issue #141) on a
+       parameterless CALL it comes back clear in batch, in TSO background under
+       IKJEFT01, and in TSO foreground alike, because parmLen is then 0 and the
+       condition never fires.  The PPA flags are the environment ones --
+       PPAFLAG_TSOFG for foreground, TSOFG|TSOBG for "TSO at all" (and see
+       libc370 #72 before trusting those either).
+
+       The old comment here claimed this determines how the permanent files are
+       opened.  It does not, and did not: the fopen() calls below never looked
+       at it. */
     parmLen = ((unsigned int)p[0] << 8) | (unsigned int)p[1];
     if ((parmLen > 0) && (p[2] == 0)) {
         grt->grtflag1 |= GRTFLAG1_TSO;
