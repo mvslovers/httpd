@@ -94,7 +94,7 @@ always reachable so an `AUTH=FORM` challenge can render.
 
 | Keyword | Default | Description |
 |---------|---------|-------------|
-| `TZOFFSET` | +00:00 | UTC offset for the `Date:` response header and SMF record timestamps. Format: `+HH:MM` or `-HH:MM`. |
+| `TZOFFSET` | the system's | UTC offset for the `Date:` response header, SMF record timestamps and `DISPLAY TIME`. Format: `+HH:MM` or `-HH:MM`. Omitted, the server takes the offset libc370 resolved at startup — the `TZ` environment variable if the STC allocates a SYSENV/ENVIRON DD that sets it, otherwise the system's `CVTTZ`. |
 
 ## Debug
 
