@@ -44,6 +44,53 @@ HTTPX *httpx = 0;
 */
 #define httpx   http_get_httpx(httpd)
 
+/* not_a_server_module() - say why this module cannot run, then end the step.
+**
+** Everything below that a server module needs comes from HTTPD: the server
+** context through the GRT, and the DDs the started task allocates.  Reaching
+** __start() without them means somebody ran the module by itself -- a
+** `CALL 'HTTPD.LINKLIB(HTTPDSL)'` from TSO, or an EXEC PGM= in a batch job.
+** That used to end in a bare __exita(): a silent RC 12 with no message
+** anywhere, so the person who made the mistake was told nothing (issue #141).
+**
+** Reporting it needs an output channel, which is the very thing that may be
+** missing -- so open one.  fopen() on a name starting with '*' goes to
+** libc370's __fpstar(), which allocates the destination dynamically via SVC 99
+** and picks it by environment: the terminal under TSO foreground, a SYSOUT
+** dataset in batch and in TSO background.  Measured in all three (#141).
+**
+** Do NOT branch on GRTFLAG1_TSO to choose a destination.  That flag is derived
+** from the shape of the parameter list a few lines below, not from the
+** environment, and it comes back clear for a parameterless CALL in every one
+** of the three -- including TSO foreground.  Letting __fpstar() decide is both
+** correct and less code.
+*/
+static void
+not_a_server_module(const char *pgmname, const char *missing)
+{
+    FILE    *own    = NULL;         /* a channel we had to open ourselves */
+    FILE    *msg    = stdout;       /* prefer one that already works      */
+
+    if (!msg) {
+        own = fopen("*SYSPRINT", "w");
+        msg = own;
+    }
+
+    if (msg) {
+        fprintf(msg, "%-8.8s is an HTTPD server module and cannot run on its"
+                     " own.\n", pgmname ? pgmname : "This module");
+        fprintf(msg, "Start it through the HTTPD server, which passes the"
+                     " server context and\n");
+        fprintf(msg, "allocates the files it needs.\n");
+        fprintf(msg, "Missing here: %s\n", missing);
+
+        if (own) fclose(own);
+        else     fflush(msg);
+    }
+
+    __exita(EXIT_FAILURE);
+}
+
 /* we want the internal label for __start as "cgistart" for use with dumps */
 __asm__("\n&FUNC    SETC 'cgistart'");
 int
@@ -107,26 +154,22 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
         progLen = (unsigned int)p[3];
     }
 
+    /* The server context is what a module cannot substitute for, so test it
+       first: without it no set of DDs would make the module work, and the
+       message should name the real problem rather than the first DD to fail. */
+    if (!httpd && !httpc) {
+        not_a_server_module(pgmname, "the HTTPD server context (GRT)");
+    }
+
     stdout = fopen("DD:HTTPDOUT", "w");
-    if (!stdout && !httpc) __exita(EXIT_FAILURE);
+    if (!stdout && !httpc) not_a_server_module(pgmname, "DD:HTTPDOUT");
 
     stderr = fopen("DD:HTTPDERR", "w");
-    if (!stderr && !httpc) {
-        if (stdout) {
-            printf("HTTPDERR DD not defined\n");
-            fclose(stdout);
-        }
-        __exita(EXIT_FAILURE);
-    }
+    if (!stderr && !httpc) not_a_server_module(pgmname, "DD:HTTPDERR");
 
     stdin = fopen("DD:HTTPDIN", "r");
     if (!stdin) stdin = fopen("'NULLFILE'", "r");
-    if (!stdin && !httpc) {
-        if (stderr) fprintf(stderr, "HTTPDIN DD not defined\n");
-        if (stdout) fclose(stdout);
-        if (stderr) fclose(stderr);
-        __exita(EXIT_FAILURE);
-    }
+    if (!stdin && !httpc) not_a_server_module(pgmname, "DD:HTTPDIN");
 
     /* load any environment variables */
     if (loadenv("dd:SYSENV")) {
