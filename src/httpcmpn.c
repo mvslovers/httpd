@@ -21,7 +21,7 @@ httpcmpn(const UCHAR *s1, const UCHAR *s2, int n)
             c2 = tolower(c2);
         }
         
-        if ((--n == 0) ??!??! (c1 == '\0')) break;
+        if ((--n == 0) || (c1 == '\0')) break;
 
         ++s1;
         ++s2;
