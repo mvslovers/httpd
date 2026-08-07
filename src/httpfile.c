@@ -280,7 +280,7 @@ ssi_process(HTTPC *httpc, char *ssi)
 	save[sizeof(save)-1] = 0;
 
     p = &ssi[5];				/* skip over "<!--#" */
-	while (isspace(*p)) p++;	/* skip any white space */
+	while (isspace((unsigned char)*p)) p++;	/* skip any white space */
 	if (!*p) goto invalid;
 
 	/* isolate the ssi request (split at first space) */
@@ -288,7 +288,7 @@ ssi_process(HTTPC *httpc, char *ssi)
 	while (*next && *next != ' ') next++;
 	if (!*next) goto invalid;
 	*next++ = 0;
-	while (isspace(*next)) next++;
+	while (isspace((unsigned char)*next)) next++;
 	if (!*next) goto invalid;
 
 	if (http_cmp(p, "echo")==0) {
@@ -373,7 +373,7 @@ ssi_echo(HTTPC *httpc, char *next)
 
 	// wtof("%s: enter next=\"%s\"", __func__, next);
 
-	while(isspace(*next)) next++;
+	while(isspace((unsigned char)*next)) next++;
 	
 	p = strchr(next, '=');
 	if (!p) goto bad;
@@ -381,7 +381,7 @@ ssi_echo(HTTPC *httpc, char *next)
 
 	if (http_cmp(next, "var")!=0) goto bad;
 
-	while(isspace(*p)) p++;
+	while(isspace((unsigned char)*p)) p++;
 	
 	/* extract quoted value — skip opening quote */
 	if (*p == '"' || *p == '\'') p++;
@@ -390,7 +390,7 @@ ssi_echo(HTTPC *httpc, char *next)
 	*p = 0;
 	if (!var || !*var) goto quit;
 	
-	while(isspace(*var)) var++;
+	while(isspace((unsigned char)*var)) var++;
 
 	p = http_get_env(httpc, var);
 	if (!p) p = getenv(var);
@@ -497,7 +497,7 @@ ssi_include(HTTPC *httpc, char *next)
 		goto quit;
 	}
 
-	while(isspace(*next)) next++;
+	while(isspace((unsigned char)*next)) next++;
 	
 	p = strchr(next, '=');
 	if (!p) goto bad;
@@ -509,7 +509,7 @@ ssi_include(HTTPC *httpc, char *next)
 	/* we're going to treat virtual and file the same way for now */
 	if (!isvirtual && !isfile) goto bad;
 
-	while(isspace(*p)) p++;
+	while(isspace((unsigned char)*p)) p++;
 	
 	/* extract quoted path — skip opening quote */
 	if (*p == '"' || *p == '\'') p++;
@@ -518,7 +518,7 @@ ssi_include(HTTPC *httpc, char *next)
 	*p = 0;
 	if (!*path) goto bad;
 	
-	while(isspace(*path)) path++;
+	while(isspace((unsigned char)*path)) path++;
 
 	/* save the path as uri in case of failure to open path */
 	strncpy(uri, path, sizeof(uri));

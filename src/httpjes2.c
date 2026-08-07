@@ -171,7 +171,7 @@ do_status(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid, in
 
     if (cp && cp->buf) {
         for(i=0; i < sizeof(jesinfo); i++) {
-            if (!isprint(cp->buf[i]) || cp->buf[i]=='\\' || cp->buf[i]=='"') {
+            if (!isprint((unsigned char)cp->buf[i]) || cp->buf[i]=='\\' || cp->buf[i]=='"') {
                 jesinfo[i] = '.';
                 continue;
             }
@@ -510,7 +510,7 @@ do_print(HTTPD *httpd, HTTPC *httpc, const char *jobname, const char *jobid)
         if (http_cmp(p, "yes")==0 || http_cmp(p, "true")==0) {
             download = 1;
         }
-        else if (isdigit(*p)) {
+        else if (isdigit((unsigned char)*p)) {
             download = atoi(p);
         }
     }
