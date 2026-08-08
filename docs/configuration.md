@@ -92,9 +92,38 @@ always reachable so an `AUTH=FORM` challenge can render.
 
 ## Timezone
 
-| Keyword | Default | Description |
-|---------|---------|-------------|
-| `TZOFFSET` | the system's | UTC offset for the `Date:` response header, SMF record timestamps and `DISPLAY TIME`. Format: `+HH:MM` or `-HH:MM`. Omitted, the server takes the offset libc370 resolved at startup — the `TZ` environment variable if the STC allocates a SYSENV/ENVIRON DD that sets it, otherwise the system's `CVTTZ`. |
+**There is no timezone keyword.** The server takes its offset from the system:
+`tzset()` runs at startup and resolves it from the `TZ` environment variable if
+one is set, otherwise from the system's `CVTTZ`.
+
+To choose a different offset, set `TZ` in the STC's `SYSENV` or `ENVIRON` DD,
+in `[-]HH[:MM[:SS]]` format:
+
+```
+TZ=+02:00
+```
+
+That reaches **every** task — the server, its worker threads and every module —
+because both the server's and the modules' startup code call `tzset()` after
+loading the environment. It is the only supported way to override it.
+
+Timestamps in API responses are unaffected either way: they are returned as
+ISO 8601 instants in UTC (`2026-08-07T17:25:18.000Z`), converted with `gmtime`,
+so the caller localizes them. The `Date:` response header is likewise always
+GMT, as HTTP requires.
+
+> **Retired: `TZOFFSET`.** Up to 4.0.0-dev the Parmlib accepted a `TZOFFSET`
+> keyword. It is now accepted and ignored, with a `HTTPD025W` warning naming the
+> system offset in use, so an existing Parmlib still starts the server — but the
+> statement has no effect and should be deleted.
+>
+> It was removed because it did not do what its name suggested. `TZOFFSET
+> +02:00` reads like a display preference, but it asserted that the machine's
+> TOD clock ran at UTC+2; set on a system at UTC−5 it silently shifted every
+> JES2 timestamp by seven hours. Its documented purposes were never real either
+> — the `Date:` header and the SMF timestamps never read it — and it reached
+> only the one task that parsed the Parmlib, so workers and modules kept the
+> system offset regardless. `TZ` does the job properly. See issue #145.
 
 ## Debug
 
@@ -220,7 +249,6 @@ KEEPALIVE_TIMEOUT=5
 KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
 LOGIN=RACF
-TZOFFSET=+01:00
 MOD=MVSMF /zosmf/*
 SMF=AUTH TYPE=243
 ```

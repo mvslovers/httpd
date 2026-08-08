@@ -189,7 +189,6 @@ CLIENT_TIMEOUT    10
 KEEPALIVE_TIMEOUT 5
 KEEPALIVE_MAX     100
 LOGIN             NONE
-TZOFFSET          +01:00
 DEBUG             0
 CGI    MVSMF      /zosmf/*
 CGI    HTTPDSRV   /.dsrv

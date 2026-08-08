@@ -72,7 +72,7 @@ static char *usage[] = {
     "    displays HTTPD client statistics.",
     "Display Threads (D T)",
     "    displays information about the server threads.",
-    "Display TIme [-|+][tzoffset] (D TI)",
+    "Display TIme [-|+][minutes] (D TI)",
     "    displays current time in GMT and local time.",
     "Display Version (D V)",
     "    displays server version.",
@@ -424,7 +424,11 @@ d_time(char *buf)
 
 	gmtime64_r(&lot, &tm);
 	strftime(tbuf, sizeof(tbuf), "HTTPD143I time %Y/%m/%d %H:%M:%S Local", &tm);
-	wtof("%s TZOFFSET=%s%d", tbuf, sign < 0 ? "-" : "+", minutes);
+	/* "OFFSET=" and not "TZOFFSET=": the Parmlib keyword of that name is
+	   retired (#145), and labelling the value after it suggested a setting that
+	   no longer exists.  What is shown is the offset in minutes -- the system's
+	   unless D TI was given one as an argument. */
+	wtof("%s OFFSET=%s%d", tbuf, sign < 0 ? "-" : "+", minutes);
 
 	return 0;
 }
