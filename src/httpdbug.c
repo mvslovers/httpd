@@ -1,8 +1,11 @@
 #include "httpd.h"
 
-static int dump_cgi(HTTPD *httpd, HTTPC *httpc);
+static int dump_route(HTTPD *httpd, HTTPC *httpc);
 static int dump_help(HTTPD *httpd, HTTPC *httpc);
 static int dump_vars(HTTPD *httpd, HTTPC *httpc);
+
+static const char *auth_text(UCHAR auth);
+static const char *attr_text(UCHAR attr);
 
 int 
 http_debug(HTTPC *httpc, const char *options) 
@@ -30,8 +33,8 @@ http_debug(HTTPC *httpc, const char *options)
 
 		len = strlen(opt);
 
-		if (http_cmpn(opt, "cgi", len)==0) {
-			dump_cgi(httpd, httpc);
+		if (http_cmpn(opt, "mod", len)==0) {
+			dump_route(httpd, httpc);
 		}
 		else if (http_cmpn(opt, "help", len)==0 || http_cmp(opt, "?")==0) {
 			dump_help(httpd, httpc);
@@ -50,28 +53,76 @@ quit:
 }
 
 static char *help_text[] = {
-	"cgi      Display server CGI Table.",
+	"mod      Display the server route table (MOD= and LOC= entries).",
 	"help     This help text is displayed.",
 	"vars     Display variables for this request.",
 	NULL
 };
 
-static int 
-dump_cgi(HTTPD *httpd, HTTPC *httpc)
+/* auth_text() / attr_text() - short forms of the per-route auth policy.  The
+** long explanation of Auth=DEFAULT is printed once in the header rather than
+** on every line: this is a one-line-per-route trace, not a field table. */
+static const char *
+auth_text(UCHAR auth)
+{
+	switch (auth) {
+	case HTTP_AUTH_DEFAULT:	return "DEFAULT";
+	case HTTP_AUTH_NONE:	return "NONE";
+	case HTTP_AUTH_FORM:	return "FORM";
+	case HTTP_AUTH_BASIC:	return "BASIC";
+	default:				return "?";
+	}
+}
+
+static const char *
+attr_text(UCHAR attr)
+{
+	switch (attr) {
+	case 0:					return "READ(assumed)";
+	case RACF_ATTR_READ:	return "READ";
+	case RACF_ATTR_UPDATE:	return "UPDATE";
+	case RACF_ATTR_CONTROL:	return "CONTROL";
+	case RACF_ATTR_ALTER:	return "ALTER";
+	default:				return "?";
+	}
+}
+
+static int
+dump_route(HTTPD *httpd, HTTPC *httpc)
 {
     unsigned    count;
     unsigned    n;
 
-	http_printf(httpc, "\nCGI Table\n");
-	
+	http_printf(httpc, "\nRoute Table\n");
+	http_printf(httpc, "   (Auth=DEFAULT means the route carried no AUTH= keyword"
+		" and inherits the global LOGIN policy)\n");
+
     count = array_count(&httpd->httpcgi);
     for (n=0; n < count; n++) {
         HTTPCGI *p = httpd->httpcgi[n];
 
         if (!p) continue;
-        
-        http_printf(httpc, "   Path=\"%s\" Program=\"%s\" Login=%u Wild=%u\n",
-			p->path, p->pgm ? p->pgm : "(none)", p->login, p->wild);
+
+		/* MOD= carries a program, LOC= is a program-less static prefix */
+		http_printf(httpc, "   %s Path=\"%s\"",
+			p->pgm ? "MOD" : "LOC", p->path ? p->path : "(none)");
+
+		if (p->pgm) {
+			http_printf(httpc, " Program=\"%s\"", p->pgm);
+		}
+
+		http_printf(httpc, " Auth=%s Wild=%u", auth_text(p->auth), p->wild);
+
+		/* RES= resource gate -- only routes that carry one */
+		if (p->resclass) {
+			http_printf(httpc, " Res=%s:%s Attr=%s",
+				p->resclass, p->resname ? p->resname : "(none)",
+				attr_text(p->resattr));
+		}
+
+		/* login is the legacy byte, kept visible but named as such -- the
+		   request is gated on Auth above, not on this */
+		http_printf(httpc, " login=%u(legacy)\n", p->login);
     }
 
     return 0;
