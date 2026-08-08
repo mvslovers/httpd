@@ -10,12 +10,12 @@
 #include "httpd.h"
 #include "httpxlat.h"
 
-/* libc370 ships sleep() (src/clib/sleep.c) and __tzset() (src/clib/@@tzset.c)
+/* libc370 ships sleep() (src/clib/sleep.c) and __tzget() (src/clib/@@tzget.c)
 ** but declares neither in any header, so both were implicit declarations here.
-** Declared locally until libc370 exports them; the signatures are copied from
-** those definitions, so a later header will agree rather than conflict. */
+** Declared locally until libc370 exports them (libc370 #70); the signatures are
+** copied from those definitions, so a later header will agree rather than
+** conflict. */
 extern int sleep(unsigned seconds);
-extern int __tzset(int tzoffset);
 extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff */
 
 /* Forward declarations */
@@ -25,7 +25,7 @@ static void parse_keyvalue(HTTPD *httpd, const char *key, const char *value);
 static void parse_mod(HTTPD *httpd, const char *value);
 static void parse_loc(HTTPD *httpd, const char *value);
 static void parse_login(HTTPD *httpd, const char *value);
-static void parse_tzoffset(HTTPD *httpd, const char *value);
+static void report_tzoffset_retired(HTTPD *httpd);
 static int  do_bind(HTTPD *httpd);
 static void close_stale_port(int port);
 static char *trim(char *s);
@@ -148,14 +148,16 @@ set_defaults(HTTPD *httpd)
     **
     ** Leaving this at 0 made httpd carry a second, disagreeing notion of the
     ** timezone: 0 here against CVTTZ in every task's CRT, so on any system
-    ** whose CVTTZ is not zero the server's own Date: header, SMF timestamps
-    ** and DISPLAY TIME output were offset from what localtime()/ctime64()
-    ** produced in the same address space -- five hours apart on the reference
-    ** system, with nothing configured.  The 0 was never a chosen default; the
-    ** HTTPD block is static storage and nothing wrote the field.
+    ** whose CVTTZ is not zero the server's own DISPLAY TIME output was offset
+    ** from what localtime()/ctime64() produced in the same address space --
+    ** five hours apart on the reference system, with nothing configured.  The
+    ** 0 was never a chosen default; the HTTPD block is static storage and
+    ** nothing wrote the field.
     **
-    ** A TZOFFSET statement still wins: http_config() calls set_defaults()
-    ** before it parses, and parse_tzoffset() overwrites this. */
+    ** This is now the only writer: the TZOFFSET keyword is retired, so nothing
+    ** can override it from the Parmlib.  To choose a different offset, set TZ
+    ** in the STC's SYSENV or ENVIRON DD -- tzset() picks it up in every task,
+    ** and this reads the result.  See report_tzoffset_retired(). */
     httpd->tzoffset         = __tzget();
 }
 
@@ -267,7 +269,9 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         parse_login(httpd, value);
     }
     else if (strcmp(key, "TZOFFSET") == 0) {
-        parse_tzoffset(httpd, value);
+        /* Retired (issue #145).  It is accepted and ignored rather than
+           rejected, so an existing Parmlib still starts the server. */
+        report_tzoffset_retired(httpd);
     }
     else if (strcmp(key, "DEBUG") == 0) {
         i = atoi(value);
@@ -644,47 +648,43 @@ parse_login(HTTPD *httpd, const char *value)
 }
 
 /* ====================================================================
-** Parse TZOFFSET value: integer (hours) or +HH:MM format
+** TZOFFSET is retired (issue #145) -- say so and name the replacement.
+**
+** It had exactly one effect left: the default offset for the DISPLAY TIME
+** command, which takes an offset as an argument anyway.  Its two documented
+** purposes were never real -- the Date: header goes through gmtime64()
+** (http1123.c) and the SMF record through localtime() (httprepo.c), neither of
+** which ever read this field -- and the JES2 API stopped reading it in #151.
+**
+** It was also a trap.  "TZOFFSET +02:00" reads like a display preference, but
+** it asserts that the machine's TOD clock runs at UTC+2; set on a system at
+** UTC-5 it silently skewed every JES2 timestamp by seven hours.  And its side
+** effects were misleading: __tzset() reached only the task that parsed the
+** Parmlib, while setenvi("TZOFFSET") published a name nothing reads, since
+** tzset() looks at TZ.
+**
+** The offset now always comes from __tzget() (set_defaults()), i.e. what
+** tzset() resolved for this task from TZ or the system's CVTTZ.  To override it
+** deliberately, set TZ in the STC's SYSENV or ENVIRON DD: both httpstrt.c and
+** cgistart.c call tzset() after loadenv(), so that reaches every task --
+** server, workers and modules -- which is what this keyword never did.
 ** ================================================================= */
 static void
-parse_tzoffset(HTTPD *httpd, const char *value)
+report_tzoffset_retired(HTTPD *httpd)
 {
-    int  sec, hour, min;
-    int  sign;
+    int  sec  = httpd->tzoffset;
+    int  sign = sec < 0 ? -1 : 1;
+    int  hour, min;
 
-    if (!value || !*value) return;
-
-    /* try simple integer (hours offset) first */
-    httpd->tzoffset = atoi(value) * 60;     /* convert minutes to seconds */
-
-    /* try +HH:MM or -HH:MM format */
-    if (strchr(value, ':')) {
-        sign = 1;
-        if (*value == '-') { sign = -1; value++; }
-        else if (*value == '+') value++;
-
-        hour = atoi(value);
-        value = strchr(value, ':');
-        min = value ? atoi(value + 1) : 0;
-
-        httpd->tzoffset = sign * (hour * 3600 + min * 60);
-    } else {
-        httpd->tzoffset = atoi(value) * 60; /* treat as minutes */
-    }
-
-    __tzset(httpd->tzoffset);
-    setenvi("TZOFFSET", httpd->tzoffset, 1);
-
-    /* log it */
-    sec = httpd->tzoffset;
-    sign = sec < 0 ? -1 : 1;
     sec *= sign;
     hour = sec / 3600;
     sec -= hour * 3600;
-    min = sec / 60;
-    sec -= min * 60;
-    wtof("HTTPD025I Time zone offset set to GMT %s%02d:%02d:%02d",
-         sign < 0 ? "-" : "+", hour, min, sec);
+    min  = sec / 60;
+
+    wtof("HTTPD025W TZOFFSET is no longer used; the system offset "
+         "GMT %s%02d:%02d applies", sign < 0 ? "-" : "+", hour, min);
+    wtof("HTTPD025W Set TZ in the SYSENV or ENVIRON DD to override it for "
+         "all tasks");
 }
 
 /* ====================================================================
