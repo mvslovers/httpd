@@ -115,13 +115,13 @@ httpd.c (main / initialize)
 
 ### Data Structures
 
-**HTTPD (288 bytes, 0x120):** Server-wide singleton. Listener socket, worker pool manager, CGI table, config values, UFS handle, Lua state, FTPD handle, MQTT telemetry handle, stats arrays. (Will shrink as confirmed removals are implemented.)
+**HTTPD (320 bytes, 0x140):** Server-wide singleton. Listener socket, worker pool manager, route table, config values, UFS handle, docroot, codepage, keep-alive settings, credential key/array, stats counters. Slots freed by the 4.0.0 removals are kept as `unused_nn` placeholders so no offset moves.
 
 **HTTPC (4,096 bytes):** Per-client session. Allocated on accept(), freed on close. Fixed layout with 4,008-byte inline buffer (CBUFSIZE). Contains state machine position, socket, environment variables, file handles, credential.
 
 **HTTPX (~270 bytes):** Function vector table. CGI modules call all server functions through this vector — they never link directly to HTTPD code. **Never change existing offsets** — only append new function pointers at the end.
 
-**HTTPCGI (20 bytes):** CGI path-to-program mapping. URL pattern → load module name.
+**HTTPCGI (32 bytes):** One route. URL pattern → load module name (`MOD=`) or NULL for a program-less static prefix (`LOC=`), plus the per-route auth policy (`auth`, `resattr`, `resclass`, `resname`).
 
 ### Request Processing Pipeline
 
@@ -287,7 +287,7 @@ each one is shown as hex plus a named field table:
 | `HTTPD` | the server singleton (320 bytes, `0x140`) | no |
 | `MGR` | `CTHDMGR`, the worker pool manager | no |
 | `FS` | `UFSSYS` handle (8 bytes with the libufs stub) | no |
-| `CGI` | one `HTTPCGI` route, or the route array | **yes** |
+| `MOD` | the route array — every `MOD=` / `LOC=` entry | **yes** |
 | `TASK` | a `CTHDTASK` | **yes** |
 | `FILE` | a `FILE` handle | **yes** |
 
@@ -316,8 +316,8 @@ Note for anyone reading `jesst.c`: its output goes through `printf`, and in a
 module `stdout` reaches the HTTP client — so those `printf`s *are* the response
 body, not log output.
 
-**Known display bug:** the `HTTPCGI` field table in `httpdsrv.c` predates the
-per-route auth policy. It shows `login` (legacy) and omits `auth` / `resattr` /
-`resclass` / `resname`, so on an authorization question it can say the opposite
-of the truth — `/zosmf/info` reports `login 0` while answering 401. Read the hex
-at `+14`. Tracked as issue #146.
+**Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPCGI`,
+so `auth` (`+14`) is named and spelled out — that is the field the request is
+gated on, not `login` (`+09`), which is the legacy byte and is labelled as such.
+`AUTH=DEFAULT` means the route carried no `AUTH=` keyword and falls back to the
+global `LOGIN` policy, which is not the same as "no authentication".

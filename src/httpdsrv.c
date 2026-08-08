@@ -9,7 +9,7 @@ static int getself(char *jobname, char *jobid);
 #endif
 
 static int display_httpd(HTTPD *httpd, HTTPC *httpc);
-static int display_cgi(HTTPD *httpd, HTTPC *httpc);
+static int display_route(HTTPD *httpd, HTTPC *httpc);
 static int display_file(HTTPD *httpd, HTTPC *httpc);
 static int display_fs(HTTPD *httpd, HTTPC *httpc);
 static int display_mgr(HTTPD *httpd, HTTPC *httpc);
@@ -19,7 +19,7 @@ static int display_workers(HTTPD *httpd, HTTPC *httpc);
 
 static int display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs);
 static int display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys);
-static int display_cgi_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *cgi, unsigned n);
+static int display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n);
 static int display_worker_row(HTTPD *httpd, HTTPC *httpc, CTHDWORK *worker, unsigned n);
 static int display_queue_data(HTTPD *httpd, HTTPC *httpc, CTHDQUE *q);
 #if 0 /* ufs370 internal types -- not available with libufs stub */
@@ -58,11 +58,6 @@ int main(int argc, char **argv)
     if (!target) target = "HTTPD";
 
     len = strlen(target);
-    if (http_cmpn(target, "CGI", len)==0) {
-        display_cgi(httpd, httpc);
-        goto quit;
-    }
-    
     if (http_cmpn(target, "FILE", len)==0) {
         display_file(httpd, httpc);
         goto quit;
@@ -75,6 +70,15 @@ int main(int argc, char **argv)
 
     if (http_cmpn(target, "MGR", len)==0) {
         display_mgr(httpd, httpc);
+        goto quit;
+    }
+
+    /* The route array (MOD= programs and LOC= static prefixes).  Was
+       "target=CGI" before the Parmlib keywords replaced that vocabulary.
+       Tested after MGR on purpose: target matches as a prefix, so a bare
+       "?target=M" has always resolved to MGR and still does. */
+    if (http_cmpn(target, "MOD", len)==0) {
+        display_route(httpd, httpc);
         goto quit;
     }
 
@@ -222,6 +226,13 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%p</td></tr>\n", 
         8, httpx, sizeof(HTTPX), httpx);
 
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->httpc</td>"
+        "<td>HTTP Client Array (%u)</td>"
+        "<td>%p</td></tr>\n",
+        O(httpc), array_count(&httpd->httpc), httpd->httpc);
+
     u = (UCHAR*)&httpd->addr;
     http_printf(httpc, 
         "<tr><td>+%04X</td>"
@@ -245,14 +256,28 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         O(listen), httpd->listen);
 
     /* stats file handle removed in 4.0.0 — SMF recording */
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_1c</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_1c), httpd->unused_1c);
 
     if (httpd->dbg) {
-        http_printf(httpc, 
+        http_printf(httpc,
             "<tr><td>+%04X</td>"
             "<td><a href=\"?target=FILE&m=%p\">httpd->dbg</a></td>"
             "<td>HTTP Debug File Handle</td>"
-            "<td>%p</td></tr>\n", 
+            "<td>%p</td></tr>\n",
             O(dbg), httpd->dbg, httpd->dbg);
+    }
+    else {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->dbg</td>"
+            "<td>HTTP Debug File Handle</td>"
+            "<td>%p</td></tr>\n",
+            O(dbg), httpd->dbg);
     }
 
     http_printf(httpc, 
@@ -327,13 +352,28 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     }
     http_printf(httpc, "</td></tr>\n");
 
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused</td>"
+        "<td>(reserved)</td>"
+        "<td>%02X</td></tr>\n",
+        O(unused), httpd->unused);
+
     if (httpd->socket_thread) {
-        http_printf(httpc, 
+        http_printf(httpc,
             "<tr><td>+%04X</td>"
             "<td><a href=\"?target=TASK&m=%p\">httpd->socket_thread</a></td>"
             "<td>Socket Thread Handle</td>"
-            "<td>%p</td></tr>\n", 
+            "<td>%p</td></tr>\n",
             O(socket_thread), httpd->socket_thread, httpd->socket_thread);
+    }
+    else {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->socket_thread</td>"
+            "<td>Socket Thread Handle</td>"
+            "<td>%p</td></tr>\n",
+            O(socket_thread), httpd->socket_thread);
     }
 
     http_printf(httpc, 
@@ -352,8 +392,8 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, 
         "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=CGI&m=%p\">httpd->httpcgi</a></td>"
-        "<td>Common Gateway Interface Array</td>"
+        "<td><a href=\"?target=MOD&m=%p\">httpd->httpcgi</a></td>"
+        "<td>Route Array (MOD= programs, LOC= static prefixes)</td>"
         "<td>%p</td></tr>\n", 
         O(httpcgi), httpd->httpcgi, httpd->httpcgi);
 
@@ -363,6 +403,13 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>Server Up Time</td>"
         "<td>%-24.24s</td></tr>\n", 
         O(uptime), ctime64(&httpd->uptime));
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_50</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_50), httpd->unused_50);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -412,16 +459,69 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>Config Client Timeout Seconds</td>"
         "<td>%u</td></tr>\n", 
         O(cfg_client_timeout), httpd->cfg_client_timeout);
-    
+
     /* cfg_st_*_max removed in 4.0.0 — replaced by SMF + counters */
-    
-    http_printf(httpc, 
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->smf_level</td>"
+        "<td>SMF Recording Level</td>"
+        "<td>%u %s</td></tr>\n",
+        O(smf_level), httpd->smf_level,
+        httpd->smf_level == SMF_LEVEL_NONE  ? "NONE"  :
+        httpd->smf_level == SMF_LEVEL_ERROR ? "ERROR" :
+        httpd->smf_level == SMF_LEVEL_AUTH  ? "AUTH"  :
+        httpd->smf_level == SMF_LEVEL_ALL   ? "ALL"   : "(unknown)");
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->smf_type</td>"
+        "<td>SMF Record Type</td>"
+        "<td>%u</td></tr>\n",
+        O(smf_type), httpd->smf_type);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_69</td>"
+        "<td>(reserved)</td>"
+        "<td>%02X %02X</td></tr>\n",
+        O(unused_69), httpd->unused_69[0], httpd->unused_69[1]);
+
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->cfg_cgictx</td>"
         "<td>Config CGI Context Pointers</td>"
-        "<td>%u</td></tr>\n", 
+        "<td>%u</td></tr>\n",
         O(cfg_cgictx), httpd->cfg_cgictx);
-    
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->ufs_enabled</td>"
+        "<td>UFS Filesystem Enabled</td>"
+        "<td>%u</td></tr>\n",
+        O(ufs_enabled), httpd->ufs_enabled);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->dbg_enabled</td>"
+        "<td>Debug Output Enabled</td>"
+        "<td>%u</td></tr>\n",
+        O(dbg_enabled), httpd->dbg_enabled);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->bind_tries</td>"
+        "<td>Socket Bind Retry Count</td>"
+        "<td>%u</td></tr>\n",
+        O(bind_tries), httpd->bind_tries);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->bind_sleep</td>"
+        "<td>Socket Bind Retry Delay (seconds)</td>"
+        "<td>%u</td></tr>\n",
+        O(bind_sleep), httpd->bind_sleep);
+
     http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->total_requests</td>"
@@ -449,7 +549,14 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>Active Connections</td>"
         "<td>%u</td></tr>\n",
         O(active_connections), httpd->active_connections);
-    
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_80</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_80), httpd->unused_80);
+
     http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->unused_84</td>"
@@ -477,7 +584,14 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>Unix \"like\" File System Handle</td>"
         "<td>%p</td></tr>\n", 
         O(ufs), httpd->ufs);
-    
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_94</td>"
+        "<td>(reserved)</td>"
+        "<td>%p</td></tr>\n",
+        O(unused_94), httpd->unused_94);
+
     http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td><a href=\"?target=TASK&m=%p\">httpd->self</a></td>"
@@ -491,6 +605,84 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>CGI Context Pointers Array</td>"
         "<td>%p</td></tr>\n", 
         O(cgictx), httpd->cgictx, (HTTPD_CGICTX_MAX+1)*4, httpd->cgictx);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->docroot</td>"
+        "<td>UFS Document Root Prefix</td>"
+        "<td>\"%.128s\"</td></tr>\n",
+        O(docroot), httpd->docroot);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->listen_queue</td>"
+        "<td>Listen Backlog</td>"
+        "<td>%u</td></tr>\n",
+        O(listen_queue), httpd->listen_queue);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_121</td>"
+        "<td>(reserved, alignment padding)</td>"
+        "<td>%02X %02X %02X</td></tr>\n",
+        O(unused_121), httpd->unused_121[0], httpd->unused_121[1],
+        httpd->unused_121[2]);
+
+    /* An empty codepage is the default, not "none": set_defaults() leaves it
+    ** empty and http_xlate_init() reads that as CP037.  Say so -- a bare ""
+    ** in the table would not tell a reader which tables are actually loaded. */
+    if (httpd->codepage[0]) {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->codepage</td>"
+            "<td>Codepage Name (CODEPAGE=)</td>"
+            "<td>\"%.16s\"</td></tr>\n",
+            O(codepage), httpd->codepage);
+    }
+    else {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->codepage</td>"
+            "<td>Codepage Name (CODEPAGE=)</td>"
+            "<td>\"\" CP037 (default, no CODEPAGE keyword)</td></tr>\n",
+            O(codepage));
+    }
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->cfg_keepalive_timeout</td>"
+        "<td>Keep-Alive Idle Timeout (seconds)</td>"
+        "<td>%u</td></tr>\n",
+        O(cfg_keepalive_timeout), httpd->cfg_keepalive_timeout);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->cfg_keepalive_max</td>"
+        "<td>Max Requests per Connection</td>"
+        "<td>%u</td></tr>\n",
+        O(cfg_keepalive_max), httpd->cfg_keepalive_max);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->cfg_session_timeout</td>"
+        "<td>Credential Idle TTL (minutes, 0 = off)</td>"
+        "<td>%u</td></tr>\n",
+        O(cfg_session_timeout), httpd->cfg_session_timeout);
+
+    /* credkey is the blowfish key: report the pointer, never a storage link */
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->credkey</td>"
+        "<td>Credential Key Handle</td>"
+        "<td>%p</td></tr>\n",
+        O(credkey), httpd->credkey);
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->credarr</td>"
+        "<td>Credential Array Handle</td>"
+        "<td>%p</td></tr>\n",
+        O(credarr), httpd->credarr);
 
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);
@@ -1403,13 +1595,13 @@ struct ufs {
 #ifdef O
 #undef O
 #endif
-#define O(a) ((unsigned)&(cgi->a) - (unsigned)cgi)
+#define O(a) ((unsigned)&(route->a) - (unsigned)route)
 
 static int
-display_cgi(HTTPD *httpd, HTTPC *httpc)
+display_route(HTTPD *httpd, HTTPC *httpc)
 {
     int         rc      = 0;
-    HTTPCGI     *cgi    = NULL;
+    HTTPCGI     *route  = NULL;
     HTTPCGI     **array = NULL;
     char        *memory = NULL;
     unsigned    n, count;
@@ -1428,20 +1620,20 @@ display_cgi(HTTPD *httpd, HTTPC *httpc)
     array = (HTTPCGI**) strtoul(memory, NULL, 16);
     count = array_count(&array);
 
-    http_printf(httpc, "<h2>CGI Array %p</h2>", array);
+    http_printf(httpc, "<h2>Route Array %p</h2>", array);
 #if 0
-    http_printf(httpc, 
+    http_printf(httpc,
         "<embed type=\"text/html\" src=\"/.dm?t=%s&m=%p&l=%u\" width=\"800\" height=\"140\">\n",
-        "CGI%20Array", array, count*sizeof(HTTPCGI*));
+        "Route%20Array", array, count*sizeof(HTTPCGI*));
 #endif
-    display_memory(httpd, httpc, "CGI Array", array, count*sizeof(HTTPCGI*), 16);
-    
+    display_memory(httpd, httpc, "Route Array", array, count*sizeof(HTTPCGI*), 16);
+
 
     for(n=0; n < count; n++) {
-        cgi = array[n];
-        
-        if (!cgi) continue;
-        display_cgi_row(httpd, httpc, cgi, n);
+        route = array[n];
+
+        if (!route) continue;
+        display_route_row(httpd, httpc, route, n);
     }
 
 done:
@@ -1451,16 +1643,46 @@ quit:
 	return 0;
 }
 
-static int 
-display_cgi_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *cgi, unsigned n)
+/* auth_mode_text() - decode HTTPCGI.auth (HTTP_AUTH_*).  DEFAULT is the value
+** a route carries when it had no AUTH= keyword, so it is not "no auth" -- the
+** request still runs through the legacy global LOGIN policy. */
+static const char *
+auth_mode_text(UCHAR auth)
+{
+    switch (auth) {
+    case HTTP_AUTH_DEFAULT: return "DEFAULT (inherits the global LOGIN policy)";
+    case HTTP_AUTH_NONE:    return "NONE (public, never challenged)";
+    case HTTP_AUTH_FORM:    return "FORM (HTML login form)";
+    case HTTP_AUTH_BASIC:   return "BASIC (401 WWW-Authenticate)";
+    default:                return "(unknown)";
+    }
+}
+
+/* racf_attr_text() - decode HTTPCGI.resattr.  0 is the common value: httpprm
+** only sets resattr when RES= is present, and racf_auth() assumes READ for 0. */
+static const char *
+racf_attr_text(UCHAR attr)
+{
+    switch (attr) {
+    case 0:                 return "READ (assumed, RESATTR not set)";
+    case RACF_ATTR_READ:    return "READ";
+    case RACF_ATTR_UPDATE:  return "UPDATE";
+    case RACF_ATTR_CONTROL: return "CONTROL";
+    case RACF_ATTR_ALTER:   return "ALTER";
+    default:                return "(unknown)";
+    }
+}
+
+static int
+display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n)
 {
     char        title[40];
-    
-    sprintf(title, "CGI #%u", n);
+
+    sprintf(title, "Route #%u (%s)", n, route->pgm ? "MOD" : "LOC");
 
     http_printf(httpc, "<h3>%s</h3>\n", title);
 
-    display_memory(httpd, httpc, title, cgi, sizeof(HTTPCGI), 16);
+    display_memory(httpd, httpc, title, route, sizeof(HTTPCGI), 16);
 
     http_printf(httpc, "<table>\n");
 
@@ -1468,42 +1690,66 @@ display_cgi_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *cgi, unsigned n)
         "<th>Data Name</th>"
         "<th>Description</th>"
         "<th>Contents</th></tr>\n");
-    
+
     http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->eye</td>"
+        "<td>route->eye</td>"
         "<td>Eye Catcher</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(eye), cgi->eye);
-
-    http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->wild</td>"
-        "<td>Is Wildcard</td>"
-        "<td>%u</td></tr>\n", 
-        O(wild), cgi->wild);
-
-    http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->login</td>"
-        "<td>Login Required</td>"
-        "<td>%u</td></tr>\n", 
-        O(login), cgi->login);
-
-    http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->len</td>"
-        "<td>Path Length</td>"
-        "<td>%u</td></tr>\n", 
-        O(len), cgi->len);
-
-    http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->path</td>"
-        "<td>Path Name</td>"
-        "<td>\"%s\"</td></tr>\n", 
-        O(path), cgi->path);
-
-    http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>cgi->pgm</td>"
-        "<td>Program Name</td>"
         "<td>\"%s\"</td></tr>\n",
-        O(pgm), cgi->pgm ? cgi->pgm : "(none)");
+        O(eye), route->eye);
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->wild</td>"
+        "<td>Is Wildcard</td>"
+        "<td>%u</td></tr>\n",
+        O(wild), route->wild);
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->login</td>"
+        "<td>Login Required (legacy -- route->auth decides)</td>"
+        "<td>%u</td></tr>\n",
+        O(login), route->login);
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->len</td>"
+        "<td>Path Length</td>"
+        "<td>%u</td></tr>\n",
+        O(len), route->len);
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->path</td>"
+        "<td>Path Name</td>"
+        "<td>\"%s\"</td></tr>\n",
+        O(path), route->path ? route->path : "(none)");
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->pgm</td>"
+        "<td>Program Name (NULL = LOC static route)</td>"
+        "<td>\"%s\"</td></tr>\n",
+        O(pgm), route->pgm ? route->pgm : "(none)");
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->auth</td>"
+        "<td>Auth Mode (AUTH=)</td>"
+        "<td>%u %s</td></tr>\n",
+        O(auth), route->auth, auth_mode_text(route->auth));
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->resattr</td>"
+        "<td>RACF Access Attribute</td>"
+        "<td>%02X %s</td></tr>\n",
+        O(resattr), route->resattr, racf_attr_text(route->resattr));
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->resclass</td>"
+        "<td>RACF Class (RES=, NULL = no resource gate)</td>"
+        "<td>\"%s\"</td></tr>\n",
+        O(resclass), route->resclass ? route->resclass : "(none)");
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->resname</td>"
+        "<td>RACF Resource Name (RES=)</td>"
+        "<td>\"%s\"</td></tr>\n",
+        O(resname), route->resname ? route->resname : "(none)");
 
 #if 0
     http_printf(httpc, "<tr><td>----------</td>"
@@ -2355,7 +2601,7 @@ display_help(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, "<h2>HTTPDSRV Help</h2>\n");
     http_printf(httpc, "<h3>Usage: http:/%s%s?target=name[&m=nnnnnnnn]</h3>\n", host, path);
-    http_printf(httpc, "<p>This CGI program uses the QUERY variable "
+    http_printf(httpc, "<p>This module uses the QUERY variable "
         "\"target\" value to control which HTTPD storage area to display.<p>\n");
 
     http_printf(httpc, "<dl>\n");
@@ -2363,9 +2609,6 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     http_printf(httpc, "<dt>?target=HTTPD</td>\n");
     http_printf(httpc, "<dd>Display the HTTPD storage areas. "
         "This is the default if ?target is omitted.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=CGI&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the Common Gateway Interface array at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=FILE&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the File Handle at the memory address.</dd><br/>\n");
@@ -2378,6 +2621,10 @@ display_help(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, "<dt>?target=MGR&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Manager Handle at the memory address.</dd><br/>\n");
+
+    http_printf(httpc, "<dt>?target=MOD&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dd>Display the route array (MOD= programs and LOC= static "
+        "prefixes) at the memory address. Was ?target=CGI.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=TASK&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Task Handle at the memory address.</dd><br/>\n");
