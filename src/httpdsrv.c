@@ -628,12 +628,25 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         O(unused_121), httpd->unused_121[0], httpd->unused_121[1],
         httpd->unused_121[2]);
 
-    http_printf(httpc,
-        "<tr><td>+%04X</td>"
-        "<td>httpd->codepage</td>"
-        "<td>Codepage Name</td>"
-        "<td>\"%.16s\"</td></tr>\n",
-        O(codepage), httpd->codepage);
+    /* An empty codepage is the default, not "none": set_defaults() leaves it
+    ** empty and http_xlate_init() reads that as CP037.  Say so -- a bare ""
+    ** in the table would not tell a reader which tables are actually loaded. */
+    if (httpd->codepage[0]) {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->codepage</td>"
+            "<td>Codepage Name (CODEPAGE=)</td>"
+            "<td>\"%.16s\"</td></tr>\n",
+            O(codepage), httpd->codepage);
+    }
+    else {
+        http_printf(httpc,
+            "<tr><td>+%04X</td>"
+            "<td>httpd->codepage</td>"
+            "<td>Codepage Name (CODEPAGE=)</td>"
+            "<td>\"\" CP037 (default, no CODEPAGE keyword)</td></tr>\n",
+            O(codepage));
+    }
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
