@@ -307,14 +307,11 @@ toggles a raw-data variant). This is the console log, so it is where RAKF
 messages, `HTTPDnnn` WTOs and abends actually show up — check it before
 theorising about why a request failed.
 
-**Legacy, superseded by mvsMF** — only touch when working on them: `/dsl/*`
-(HTTPDSL: `help`, `list?hlq=`, `pds?dsn=`, `print?dsn=&member=`) and `/jes/*`
-(HTTPJES2: `help`, `status`, `ddlist`, `print`/`view`, and POST-only `cancel`,
-`purge`, `purgeall`). `/jes/status?jobname=` and `/jes/ddlist` return JSON.
-
-Note for anyone reading `jesst.c`: its output goes through `printf`, and in a
-module `stdout` reaches the HTTP client — so those `printf`s *are* the response
-body, not log output.
+**Gone in 4.0.0:** `/dsl/*` (HTTPDSL, dataset lister) and `/jes/*` (HTTPJES2,
+JES spool) are no longer built — mvsMF's dataset and jobs APIs replace them.
+Their sources sit in `tbd/`, outside the build; see `tbd/README.md`. So the
+three display modules above are the whole set now, and `/jes/status` is not a
+JES2 cross-check any more — use mvsMF's jobs API.
 
 **Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPCGI`,
 so `auth` (`+14`) is named and spelled out — that is the field the request is
