@@ -14,9 +14,17 @@ httpnenv(const UCHAR *name, const UCHAR *value)
     size_t      total   = offsetof(HTTPV, name) + namelen + 1 + vallen + 1;
     HTTPV       *v;
 
-    if (namelen + vallen > 8192) return NULL; /* sanity limit */
+    /* Both rejects return NULL, so set errno to tell the caller which one it
+       was: httpsenv() reports an oversized variable differently from a storage
+       shortage, and since libc370#82 the shortage is a real outcome rather
+       than an S878 (issue #162). */
+    if (namelen + vallen > 8192) {              /* sanity limit */
+        errno = E2BIG;
+        return NULL;
+    }
 
     v = calloc(1, total);
+    if (!v) errno = ENOMEM;
 
     if (v) {
         strcpy(v->eye, HTTPV_EYE);
