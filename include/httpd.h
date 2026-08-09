@@ -267,6 +267,10 @@ struct httpcgi {
 #define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
 #define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
 
+/* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is
+   a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
+#define HTTPD_PARMLIB_DD "HTTPPRM"
+
 /* SMF — HTTP records */
 #define SMF_TYPE_HTTPD_DEFAULT 243
 #define SMF_HTTPD_SUBTYPE_REQ  1	/* Request completed			*/

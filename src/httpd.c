@@ -93,7 +93,10 @@ initialize(int argc, char **argv)
 	/* Get configuration from member/dataset/NULL */
 	rc = http_config(httpd, config);
 	if (rc) {
-		wtof("HTTPD404E Errors occured processing %s", config ? config : "(null)");
+		/* The member is named by HTTPD022I above, and the specific failure by
+		   the message right before this one -- printing the CONFIG= parm here
+		   only ever produced "(null)", since it is not what gets read (#166). */
+		wtof("HTTPD404E Errors occured processing the configuration");
 		if (httpd->listen) {
 			closesocket(httpd->listen);
 			httpd->listen = 0;

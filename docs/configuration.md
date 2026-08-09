@@ -2,6 +2,17 @@
 
 HTTPD is configured through a Parmlib member, referenced by the `HTTPPRM` DD card in the STC JCL procedure.
 
+The STC procedure allocates that DD as `&D(&M)`, so the member is a startup
+choice — `S HTTPD` takes the default, `S HTTPD,M=HTTPPRM1` takes another. The
+server reports which one it read before it parses anything:
+
+```
+HTTPD022I Configuration from SYS2.PARMLIB(HTTPPRM0)
+```
+
+`PARM='CONFIG=...'` is a 3.x leftover and selects nothing; see
+[migration.md](migration.md).
+
 ## Format
 
 ```
