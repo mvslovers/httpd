@@ -31,11 +31,13 @@ httppc(HTTPC *httpc)
 
     /* check for busy client */
     if (http_is_busy(httpc)) {
-        /* DEBUG #217: this exit returns without advancing httpc->state, and
-           serve_client() has no wait -- so whoever reaches it is about to
-           spin.  Name the client and its state so the wedge reports itself. */
+#if HTTPD_DEBUG_217
+        /* This exit returns without advancing httpc->state, and serve_client()
+           has no wait -- so whoever reaches it is about to spin.  Name the
+           client and its state so the wedge reports itself (#159). */
         wtof("HTTPD900D busy-exit client(%08X) state(%d) socket(%d) req(%u)",
             httpc, (int)httpc->state, httpc->socket, httpc->request_count);
+#endif
         goto quit;
     }
 
