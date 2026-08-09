@@ -661,6 +661,12 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
                      "socket(%d) req(%u) worker(%08X) -- forcing close",
                     httpc, (int)httpc->state, httpc->socket,
                     httpc->request_count, work);
+                /* The spin means httppc() kept taking its busy-exit without
+                   ever reaching http_reset_busy(), so this client is still in
+                   httpd->busy -- and http_close() does not clear that array.
+                   Drop the entry here, or the freed HTTPC address stays behind
+                   and wedges the next client allocated at it. */
+                http_reset_busy(httpc);
                 httpc->state = CSTATE_CLOSE;
                 break;
             }
