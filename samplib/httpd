@@ -26,5 +26,7 @@
 //HTTPDBG  DD  SYSOUT=*
 //HTTPSTAT DD  SYSOUT=*
 //HTTPPRM  DD  DSN=&D(&M),DISP=SHR,FREE=CLOSE
-//HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
-//HASPACE1 DD  DISP=SHR,DSN=SYS1.HASPACE,UNIT=3350,VOL=SER=SPOOL1
+//*
+//* HASPCKPT / HASPACE1 were the JES2 spool datasets read by HTTPJES2.
+//* That module is no longer shipped (use mvsMF's jobs API), and nothing
+//* else in the server opens them, so the DDs are gone.

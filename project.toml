@@ -57,12 +57,6 @@ startup = "crt1"
 sources = ["src/httpstrt.c", "src/httpd.c", "src/httpprm.c"]
 ac = 1
 
-# JES2 CGI handler
-[[module]]
-name = "HTTPJES2"
-startup = "crt1"
-sources = ["src/cgistart.c", "src/httpjes2.c"]
-
 # SSI handler modules (CGI programs sharing the cgistart launcher)
 [[module]]
 name = "HTTPDM"
@@ -75,14 +69,16 @@ startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdmtt.c"]
 
 [[module]]
-name = "HTTPDSL"
-startup = "crt1"
-sources = ["src/cgistart.c", "src/httpdsl.c"]
-
-[[module]]
 name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
+
+# HTTPDSL (/dsl/*) and HTTPJES2 (/jes/*) are no longer built.  Both were
+# superseded by mvsMF's dataset and jobs APIs, and the sample Parmlib no longer
+# offers them.  Their sources moved to tbd/ (with stck2tv.c, which nothing ever
+# called) -- outside the src/*.c glob above, so they are not compiled at all
+# rather than merely un-autocalled.  See tbd/README.md; deleting them is a
+# separate step.
 
 # -- Tests --------------------------------------------------------
 # http_cgictx_get() registrar.  Uses lock()/__getm() (MVS SVCs), so it is

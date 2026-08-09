@@ -161,8 +161,11 @@ URL prefix matching is checked first. If no prefix matches, extension matching i
 | HTTPDSRV | `MOD=HTTPDSRV /.dsrv` | Display server status. Debug tool, not for production. |
 | HTTPDM | `MOD=HTTPDM /.dm` | Display memory. Debug tool, not for production. |
 | HTTPDMTT | `MOD=HTTPDMTT /.dmtt` | Display master trace table. Debug tool, not for production. |
-| HTTPDSL | `MOD=HTTPDSL /dsl/*` | Dataset list browser. **Deprecated** — will be replaced by mvsMF. |
-| HTTPJES2 | `MOD=HTTPJES2 /jes/*` | JES2 job browser. **Deprecated** — will be replaced by mvsMF. |
+
+`HTTPDSL` (`/dsl/*`, dataset list) and `HTTPJES2` (`/jes/*`, JES2 job browser)
+were removed in 4.0.0 — mvsMF's dataset and jobs APIs replace them. They are no
+longer built, so a `MOD=` line naming either one parses fine but fails to load
+the program when a request first matches the route.
 
 ### Example
 

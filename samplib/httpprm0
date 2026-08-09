@@ -31,9 +31,6 @@
 # A route without AUTH= inherits the LOGIN default.  /login, /logout and the
 # login-page assets stay reachable so an AUTH=FORM challenge can render.
 #
-# --- Timezone ---
-# TZOFFSET=+01:00
-#
 # --- UFS Filesystem ---
 # DOCROOT=/www
 #
@@ -58,8 +55,6 @@ MOD=MVSMF /zosmf/*
 # MOD=HTTPDSRV /.dsrv  AUTH=FORM                             (browser login)
 # MOD=HTTPDM /.dm
 # MOD=HTTPDMTT /.dmtt
-# MOD=HTTPDSL /dsl/*        (deprecated — use mvsMF dataset API)
-# MOD=HTTPJES2 /jes/*       (deprecated — use mvsMF jobs API)
 #
 # --- Static locations (LOC=) ---
 # A path prefix WITHOUT a program: served statically from DOCROOT but still

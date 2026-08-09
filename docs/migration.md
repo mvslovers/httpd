@@ -70,7 +70,11 @@ The 4-tier time-series statistics (`httpstat.c`, `httprepo.c`) with dataset pers
 
 ### JES2 Browser and Dataset List
 
-The built-in web interfaces for JES2 job browsing (`HTTPJES2`) and dataset listing (`HTTPDSL`) are still present in the code but marked as deprecated. They will be replaced by [mvsMF](https://github.com/mvslovers/mvsmf) REST API endpoints in a future release.
+The built-in web interfaces for JES2 job browsing (`HTTPJES2`) and dataset listing (`HTTPDSL`) are no longer built or shipped. [mvsMF](https://github.com/mvslovers/mvsmf)'s dataset and jobs REST APIs replace them.
+
+Two things to check when migrating a 3.3.x configuration: drop any `CGI=`/`MOD=` line naming `HTTPDSL` or `HTTPJES2` — the route is accepted but the program load fails on the first matching request — and drop the `HASPCKPT` and `HASPACE1` DDs from the STC procedure, which existed only so `HTTPJES2` could read the JES2 spool.
+
+The sources are kept under `tbd/` for reference and are outside the build.
 
 ## New Features
 
