@@ -77,6 +77,18 @@ serves a file or dispatches a CGI:
 > for that route rather than locking it. `DEBUG 1` traces every such check, so
 > verify a new `RES=` route against the debug log before relying on it.
 
+A route that carries an auth policy is registered or the server does not start.
+If the policy cannot be built or the route cannot be added (both only happen when
+the region runs out of storage while the Parmlib is read), the server issues
+`HTTPD418E`/`HTTPD419E` naming the route, then `HTTPD420E` and terminates before
+the listener is bound. Silently dropping the route would serve its requests under
+the global `LOGIN` default instead — for a `LOC=` prefix under `LOGIN NONE` that
+means handing out the whole protected subtree. A route that fails to register
+with no policy at all, or with `AUTH=NONE` only, stays a warning and the server
+continues — the fallback can only be stricter than what it asked for. The one
+exception is a `MOD=`/`LOC=` line the parser could not even tokenize: whether it
+carried a policy is then unknowable, so it is treated as if it did.
+
 | Option | Values | Description |
 |--------|--------|-------------|
 | `AUTH=` | `NONE` \| `FORM` \| `BASIC` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = redirect to the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. **Omitted** = inherit the global `LOGIN` default (backward compatible). |

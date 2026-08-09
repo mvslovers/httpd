@@ -303,6 +303,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     if (httpd->flag & HTTPD_FLAG_INIT)      http_printf(httpc, " INIT");
     if (httpd->flag & HTTPD_FLAG_LISTENER)  http_printf(httpc, " LISTENER");
     if (httpd->flag & HTTPD_FLAG_READY)     http_printf(httpc, " READY");
+    /* CFGERR aborts startup before the listener is bound, so a server that can
+       answer this request never has it set -- listed to keep the decode
+       complete against httpd.h, not because it can show up */
+    if (httpd->flag & HTTPD_FLAG_CFGERR)    http_printf(httpc, " CFGERR");
     if (httpd->flag & HTTPD_FLAG_QUIESCE)   http_printf(httpc, " QUIESCE");
     if (httpd->flag & HTTPD_FLAG_SHUTDOWN)  http_printf(httpc, " SHUTDOWN");
     http_printf(httpc, "</td></tr>\n");
