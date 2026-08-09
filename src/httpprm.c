@@ -58,6 +58,18 @@ http_config(HTTPD *httpd, const char *member)
         fclose(fp);
     }
 
+    /* A route that asked for an auth policy but did not get one is fail-open
+       authorization: the route is simply absent, so its requests fall back to
+       the global LOGIN default -- for a LOC= prefix under LOGIN NONE that
+       serves the whole protected subtree to anyone.  Refuse to start rather
+       than run a server whose gates are not the ones the Parmlib configured.
+       Checked before do_bind() so the port is never opened. */
+    if (httpd->flag & HTTPD_FLAG_CFGERR) {
+        wtof("HTTPD420E Route authorization policy incomplete "
+             "-- HTTPD will not start");
+        return 8;
+    }
+
     /* initialize codepage translation tables */
     http_xlate_init(httpd->codepage[0] ? httpd->codepage : NULL);
 
@@ -397,9 +409,26 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
 typedef struct {
     UCHAR   auth;               /* HTTP_AUTH_* (DEFAULT until AUTH= seen)   */
     UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
+    UCHAR   failed;             /* policy could not be built (no storage)   */
     char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
     char   *resname;            /* strdup'd RACF resource name              */
 } ROUTE_POLICY;
+
+/* policy_binds() - true if this route asked for a gate the fallback cannot
+** supply.  A route that is not registered does not disappear: the request falls
+** back to the global LOGIN policy, and for a LOC= prefix that is exactly the
+** weaker policy the RES= was meant to replace (LOGIN NONE serves the whole
+** subtree unauthenticated).  So a *binding* policy that cannot be built is a
+** configuration error, not a warning -- see the HTTPD_FLAG_CFGERR check in
+** http_config().  AUTH=NONE is the one policy the fallback can only tighten,
+** so a lost AUTH=NONE route is not fail-open and stays a warning. */
+static int
+policy_binds(const ROUTE_POLICY *pol)
+{
+    return pol->failed
+        || pol->resclass != NULL
+        || (pol->auth != HTTP_AUTH_DEFAULT && pol->auth != HTTP_AUTH_NONE);
+}
 
 /* tokenize() - split s in place into whitespace-delimited tokens.  Returns the
 ** count, filling tok[0..count) with pointers into s (each NUL-terminated). */
@@ -457,6 +486,22 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
                 pol->resclass = strdup(v);
                 pol->resname  = strdup(colon + 1);
                 pol->resattr  = RACF_ATTR_READ;
+
+                /* resclass and resname are both-or-neither: auth_gate() needs
+                   resclass to force authentication and both to authorize, so a
+                   half-built pair would authenticate the request and then never
+                   check it against the resource.  Drop the pair and mark the
+                   policy failed -- the route is refused, not weakened. */
+                if (!pol->resclass || !pol->resname) {
+                    free(pol->resclass);
+                    free(pol->resname);
+                    pol->resclass = NULL;
+                    pol->resname  = NULL;
+                    pol->resattr  = 0;
+                    pol->failed   = 1;
+                    wtof("HTTPD418E No storage for RES=%s:%s", v, colon + 1);
+                    break;      /* a later RES= must not clear the failure */
+                }
             }
             else {
                 wtof("HTTPD412W ignoring malformed RES= '%s' "
@@ -478,7 +523,9 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
 
 /* apply_policy() - move the parsed policy onto a freshly registered route
 ** (the strdup'd RES= storage becomes AS-lifetime, like path/pgm), or release
-** it if the route could not be registered. */
+** it if the route could not be registered.  This is the only writer of
+** cgi->resclass/resname, so the both-or-neither invariant parse_kv_tail
+** establishes holds for every registered route. */
 static void
 apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
 {
@@ -492,6 +539,19 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
         free(pol->resclass);
         free(pol->resname);
     }
+}
+
+/* route_policy_lost() - a route that carried (or may have carried) a binding
+** auth policy could not be registered.  Never continue: without the route the
+** request is served under the global LOGIN default, which is the weaker policy
+** the Parmlib asked to replace.  Flag the configuration so http_config()
+** refuses to start the server. */
+static void
+route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
+{
+    wtof("HTTPD419E %s=%s could not be registered -- its auth policy is lost",
+         kind, path ? path : "(null)");
+    httpd->flag |= HTTPD_FLAG_CFGERR;
 }
 
 /* ====================================================================
@@ -509,12 +569,19 @@ parse_mod(HTTPD *httpd, const char *value)
     int   ntok;
     int   ti;
     int   j;
+    int   binds;
     int   login = httpd->login & HTTPD_LOGIN_CGI;
     ROUTE_POLICY pol;
     HTTPCGI *cgi;
 
+    /* the line cannot even be tokenized, so whether it carried an AUTH=/RES=
+       policy is unknowable -- assume it did rather than start a server with a
+       route the Parmlib asked for silently missing */
     tmp = strdup(value);
-    if (!tmp) return;
+    if (!tmp) {
+        route_policy_lost(httpd, "MOD", value);
+        return;
+    }
 
     memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
 
@@ -548,19 +615,28 @@ parse_mod(HTTPD *httpd, const char *value)
     /* remaining tokens = per-route AUTH=/RES= policy */
     parse_kv_tail(httpd, tok, ti, ntok, &pol);
 
-    if (program[0]) {
+    binds = policy_binds(&pol);
+
+    if (pol.failed) {
+        cgi = NULL;                             /* refuse the route outright */
+        apply_policy(NULL, &pol);
+    }
+    else if (program[0]) {
         cgi = http_add_cgi(httpd, program, path, login);
         apply_policy(cgi, &pol);
-        if (!cgi) {
+        if (cgi)
+            wtof("HTTPD036I Module %s registered for %s", program, path);
+        else
             wtof("HTTPD035W Unable to register module %s for %s",
                  program, path);
-        } else {
-            wtof("HTTPD036I Module %s registered for %s", program, path);
-        }
     }
     else {
+        cgi = NULL;
         apply_policy(NULL, &pol);               /* release RES= strings */
     }
+
+    if (!cgi && binds)
+        route_policy_lost(httpd, "MOD", path);
 
     free(tmp);
 }
@@ -579,11 +655,16 @@ parse_loc(HTTPD *httpd, const char *value)
     char *tmp;
     char *path;
     int   ntok;
+    int   binds;
     ROUTE_POLICY pol;
     HTTPCGI *cgi;
 
+    /* see parse_mod(): an untokenizable line is treated as policy-bearing */
     tmp = strdup(value);
-    if (!tmp) return;
+    if (!tmp) {
+        route_policy_lost(httpd, "LOC", value);
+        return;
+    }
 
     memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
 
@@ -599,14 +680,24 @@ parse_loc(HTTPD *httpd, const char *value)
     /* remaining tokens = per-route AUTH=/RES= policy */
     parse_kv_tail(httpd, tok, 1, ntok, &pol);
 
-    /* pgm == NULL registers a program-less (static) route */
-    cgi = http_add_cgi(httpd, NULL, path, 0);
-    apply_policy(cgi, &pol);
-    if (!cgi) {
-        wtof("HTTPD416W Unable to register location %s", path);
-    } else {
-        wtof("HTTPD417I Location %s registered", path);
+    binds = policy_binds(&pol);
+
+    if (pol.failed) {
+        cgi = NULL;                             /* refuse the route outright */
+        apply_policy(NULL, &pol);
     }
+    else {
+        /* pgm == NULL registers a program-less (static) route */
+        cgi = http_add_cgi(httpd, NULL, path, 0);
+        apply_policy(cgi, &pol);
+        if (cgi)
+            wtof("HTTPD417I Location %s registered", path);
+        else
+            wtof("HTTPD416W Unable to register location %s", path);
+    }
+
+    if (!cgi && binds)
+        route_policy_lost(httpd, "LOC", path);
 
     free(tmp);
 }

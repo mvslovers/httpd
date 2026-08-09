@@ -94,6 +94,7 @@ struct httpd {
 #define HTTPD_FLAG_INIT     0x01    /* ... initializing             */
 #define HTTPD_FLAG_LISTENER 0x02    /* ... listener thread created  */
 #define HTTPD_FLAG_READY    0x04    /* ... ready                    */
+#define HTTPD_FLAG_CFGERR   0x08    /* ... fatal Parmlib error      */
 #define HTTPD_FLAG_QUIESCE  0x40    /* ... don't accept new request */
 #define HTTPD_FLAG_SHUTDOWN 0x80    /* ... shutdown now             */
 
