@@ -557,6 +557,34 @@ route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
     httpd->flag |= HTTPD_FLAG_CFGERR;
 }
 
+/* route_malformed() - a MOD=/LOC= line was rejected before a route could be
+** built, because the positional token it needs (program name / path) is missing
+** and an AUTH=/RES= option stands in its place.  A dropped line is not
+** harmless: the prefix it was meant to gate is then served under the global
+** LOGIN default, so `LOC=AUTH=BASIC RES=FACILITY:HTTPD.ADMIN` -- the path
+** forgotten -- publishes exactly the subtree it named (issue #164).  Unlike the
+** allocation failures this shares its reporting with, a typo reaches it.
+**
+** The remaining tokens are parsed only to classify the line: a binding policy
+** makes it a configuration error, AUTH=NONE or no policy stays a warning
+** (see policy_binds()).  Nothing is registered either way, so any RES= storage
+** the parse allocated is released again. */
+static void
+route_malformed(HTTPD *httpd, const char *kind, char **tok, int ntok,
+                const char *value)
+{
+    ROUTE_POLICY pol;
+    int          binds;
+
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+    parse_kv_tail(httpd, tok, 0, ntok, &pol);   /* every token is an option */
+    binds = policy_binds(&pol);
+    apply_policy(NULL, &pol);                   /* release RES= strings */
+
+    if (binds)
+        route_policy_lost(httpd, kind, value);
+}
+
 /* ====================================================================
 ** Parse MOD=PROGRAM [pattern] [AUTH=mode] [RES=class:resource]
 ** If pattern is omitted, derive *.<lowercase program> and use DOCROOT.
@@ -590,6 +618,20 @@ parse_mod(HTTPD *httpd, const char *value)
 
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1) {                             /* no program name */
+        wtof("HTTPD421W MOD= requires a program name "
+             "(e.g. MOD=MVSMF /zosmf/* AUTH=BASIC)");
+        free(tmp);
+        return;
+    }
+
+    /* An AUTH=/RES= option where the program name belongs means the name was
+       omitted.  Without this the option would be folded into an 8-char module
+       name ("AUTH=BAS") and registered against a derived "*.auth=bas" pattern
+       -- a route that can never load, built out of a typo. */
+    if (is_route_kv(tok[0])) {
+        wtof("HTTPD421W MOD= requires a program name "
+             "(e.g. MOD=MVSMF /zosmf/* AUTH=BASIC)");
+        route_malformed(httpd, "MOD", tok, ntok, value);
         free(tmp);
         return;
     }
@@ -674,6 +716,8 @@ parse_loc(HTTPD *httpd, const char *value)
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1 || is_route_kv(tok[0])) {      /* first token must be a path */
         wtof("HTTPD415W LOC= requires a path (e.g. LOC /admin/* AUTH=BASIC)");
+        if (ntok >= 1)
+            route_malformed(httpd, "LOC", tok, ntok, value);
         free(tmp);
         return;
     }

@@ -77,17 +77,33 @@ serves a file or dispatches a CGI:
 > for that route rather than locking it. `DEBUG 1` traces every such check, so
 > verify a new `RES=` route against the debug log before relying on it.
 
-A route that carries an auth policy is registered or the server does not start.
-If the policy cannot be built or the route cannot be added (both only happen when
-the region runs out of storage while the Parmlib is read), the server issues
-`HTTPD418E`/`HTTPD419E` naming the route, then `HTTPD420E` and terminates before
-the listener is bound. Silently dropping the route would serve its requests under
-the global `LOGIN` default instead — for a `LOC=` prefix under `LOGIN NONE` that
-means handing out the whole protected subtree. A route that fails to register
-with no policy at all, or with `AUTH=NONE` only, stays a warning and the server
-continues — the fallback can only be stricter than what it asked for. The one
-exception is a `MOD=`/`LOC=` line the parser could not even tokenize: whether it
-carried a policy is then unknowable, so it is treated as if it did.
+**A route that carries an auth policy is registered or the server does not
+start.** Dropping it is not a safe fallback: the route does not disappear, its
+requests are served under the global `LOGIN` default instead — and for a `LOC=`
+prefix under `LOGIN NONE` that hands out the whole subtree it was protecting. So
+whenever such a route cannot be built, the server issues `HTTPD418E`/`HTTPD419E`
+naming it, then `HTTPD420E`, and terminates before the listener is bound. Three
+things reach that path:
+
+- the policy itself could not be built, or the route could not be added (both
+  only when the region runs out of storage while the Parmlib is read)
+- the line could not be tokenized at all — whether it carried a policy is then
+  unknowable, so it is assumed to have
+- **the positional token is missing and an option stands in its place** — the
+  typo case, no allocation failure needed:
+
+  ```
+  LOC=AUTH=BASIC RES=FACILITY:HTTPD.ADMIN     path forgotten
+  MOD=AUTH=BASIC /zosmf/*                     program name forgotten
+  ```
+
+  The first once published exactly the subtree it named; the second folded the
+  option into an 8-character module name (`AUTH=BAS`) and registered a route
+  that could never load.
+
+A route that fails to register with no policy at all, or with `AUTH=NONE` only,
+stays a warning and the server continues — the fallback can only be stricter
+than what it asked for.
 
 | Option | Values | Description |
 |--------|--------|-------------|
