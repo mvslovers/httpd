@@ -499,7 +499,8 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
                     pol->resname  = NULL;
                     pol->resattr  = 0;
                     pol->failed   = 1;
-                    wtof("HTTPD418E No storage for RES=%s:%s", v, colon + 1);
+                    wtof("HTTPD418E No storage for RES=%.16s:%.40s",
+                         v, colon + 1);
                     break;      /* a later RES= must not clear the failure */
                 }
             }
@@ -549,7 +550,9 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
 static void
 route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
 {
-    wtof("HTTPD419E %s=%s could not be registered -- its auth policy is lost",
+    /* %.40s because the caller in the untokenizable case passes the raw
+       Parmlib line, not a path -- same bound parse_line() uses for HTTPD020W */
+    wtof("HTTPD419E %s=%.40s could not be registered -- its auth policy is lost",
          kind, path ? path : "(null)");
     httpd->flag |= HTTPD_FLAG_CFGERR;
 }
