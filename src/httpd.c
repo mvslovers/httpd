@@ -430,6 +430,13 @@ quit:
     return 0;
 }
 
+/* NOTE: an earlier version of this probe bisected with malloc() to report the
+   largest obtainable block.  It abended the socket thread S878 on its second
+   run -- libc370's malloc goes to @@GETM, which issues GETMAIN **RU**
+   (unconditional): under storage pressure it abends instead of returning
+   NULL.  That is the defect this debugging found, so the probe must never
+   allocate; it only reports counts. */
+
 static int
 socket_thread(void *arg1, void *arg2)
 {
@@ -471,6 +478,15 @@ socket_thread(void *arg1, void *arg2)
                 last_sweep = now;
                 if (httpd->cfg_session_timeout)
                     cred_reap((unsigned)httpd->cfg_session_timeout * 60);
+
+                /* DEBUG #217: report the counts that could be draining the
+                   region.  Deliberately allocation-free -- see the note on
+                   @@GETM above. */
+                wtof("HTTPD903D conns(%u) creds(%u) workers(%u) busy(%u)",
+                    httpd->active_connections,
+                    array_count(httpd->credarr),
+                    array_count(&httpd->mgr->worker),
+                    array_count(&httpd->busy));
             }
         }
 
@@ -627,9 +643,32 @@ quit:
 static int
 serve_client(HTTPC *httpc, CTHDWORK *work)
 {
+    /* DEBUG #217: this loop had no escape.  http_process_client() may return
+       without advancing httpc->state (the busy-exit in httppc.c), and there is
+       no wait anywhere in the loop, so the worker then spins on ENQ/DEQ
+       forever and is lost to the pool.  Count passes that change nothing and
+       break out, loudly, instead of taking the address space down. */
+    int     spin    = 0;
+    short   last    = httpc->state;
+
     while (httpc->state != CSTATE_CLOSE) {
         http_process_client(httpc);
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
+
+        if (httpc->state == last) {
+            if (++spin >= 1000) {
+                wtof("HTTPD901E spin in serve_client: client(%08X) state(%d) "
+                     "socket(%d) req(%u) worker(%08X) -- forcing close",
+                    httpc, (int)httpc->state, httpc->socket,
+                    httpc->request_count, work);
+                httpc->state = CSTATE_CLOSE;
+                break;
+            }
+        }
+        else {
+            spin = 0;
+            last = httpc->state;
+        }
     }
     return 0;
 }
