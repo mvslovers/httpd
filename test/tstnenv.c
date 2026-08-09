@@ -52,5 +52,37 @@ int main(void)
         free(v);
     }
 
+    /* Both rejects return NULL, and httpsenv() tells them apart by errno to
+       decide whether to report a storage shortage (HTTPD904E) or an oversized
+       variable (HTTPD905E) -- issue #162.  The sanity limit is the half that
+       needs no storage shortage to reach, so it is the half a test can pin. */
+    {
+        UCHAR *big = malloc(9000);
+
+        CHECK(big != NULL, "oversize probe buffer allocated");
+        if (big) {
+            memset(big, 'X', 8999);
+            big[8999] = 0;
+
+            errno = 0;
+            v = http_new_env((const UCHAR *)"BIG", big);
+            CHECK(v == NULL, "name+value over the sanity limit is rejected");
+            CHECK(errno == E2BIG, "oversize reject reports E2BIG, not ENOMEM");
+            if (v) free(v);
+
+            /* just under the limit still succeeds -- guards the boundary
+               against the reject swallowing legitimate variables */
+            big[8000] = 0;
+            v = http_new_env((const UCHAR *)"BIG", big);
+            CHECK(v != NULL, "name+value under the sanity limit is accepted");
+            if (v) {
+                CHECK(v->value && strlen(v->value) == 8000,
+                      "under-limit value stored at full length");
+                free(v);
+            }
+            free(big);
+        }
+    }
+
     return mbt_test_summary("TSTNENV");
 }

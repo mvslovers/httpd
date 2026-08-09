@@ -104,7 +104,14 @@ httppc(HTTPC *httpc)
                 char scriptfile[384];
                 snprintf(scriptfile, sizeof(scriptfile), "%s%s",
                          httpd->docroot, path);
-                http_set_env(httpc, "SCRIPT_FILENAME", scriptfile);
+                /* every other http_set_env() caller checks; dispatching the
+                   CGI without SCRIPT_FILENAME would run it against no file at
+                   all, so fail the request instead of guessing (#162) */
+                if (http_set_env(httpc, "SCRIPT_FILENAME", scriptfile)) {
+                    http_resp_internal_error(httpc);
+                    httpc->state = CSTATE_DONE;
+                    goto check_done;
+                }
             }
 
             /* path needs to be processed by external program */

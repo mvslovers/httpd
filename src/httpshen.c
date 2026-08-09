@@ -28,10 +28,11 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 	UCHAR	*value;
 	
 	if (!buf) {
-		wtof("%s: out of memory", __func__);
-		return ENOMEM;
+		wtof("HTTPD904E No storage for environment variable HTTP_Cookie "
+		     "client(%08X)", httpc);
+		return -1;      /* -1, like every other setter in this path */
 	}
-	
+
 	for (name = buf; name && *name; ) {
 		/* skip leading delimiters */
 		while (*name == ';' || *name == ' ') name++;
@@ -49,10 +50,16 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 		else {
 			value = "";
 		}
-		set_cookie(httpc, name, value);
+		/* stop at the first failure: the caller resets the connection
+		   anyway, and carrying on would emit one HTTPD904E per remaining
+		   cookie instead of one per request */
+		if (set_cookie(httpc, name, value)) {
+			free(buf);
+			return -1;
+		}
 		name = end;
 	}
-	
+
 	free(buf);
 	return 0;
 }
