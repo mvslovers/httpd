@@ -5,6 +5,9 @@
 
 # Build artifacts
 *.jcl
+# ...except the operational jobs under tests/jcl/, which are source rather
+# than build output. Same exception mvsmf carries, for the same reason.
+!tests/jcl/*.jcl
 .build-warnings
 
 # IDE
