@@ -38,7 +38,21 @@ Copy `samplib/httpprm0` from the distribution to `SYS2.PARMLIB(HTTPPRM0)` as a s
 
 The `PARM` field on the `EXEC` statement is no longer used for configuration. Remove any `PARM='CONFIG=...'` references. The Parmlib member is read from the `HTTPPRM` DD card instead.
 
+If you leave one in, the server says so rather than pretending it took effect:
+
+```
+HTTPD024W CONFIG=MY.CONFIG(HTTPD) is ignored; the configuration comes from the HTTPPRM DD
+HTTPD024W Use S HTTPD,M=member to select a different member
+```
+
 The `HTTPPRM` DD already exists in the sample JCL procedure (`samplib/httpd`).
+
+Which member is actually in effect is reported on every startup, before anything
+is parsed, so a configuration error is already attributed when it appears:
+
+```
+HTTPD022I Configuration from SYS2.PARMLIB(HTTPPRM0)
+```
 
 ## Removed Features
 

@@ -9,6 +9,9 @@
 */
 #include "httpd.h"
 #include "httpxlat.h"
+#include "clibdsab.h"       /* get_dsab()  -- DD -> DSAB                    */
+#include "ieftiot.h"        /* TIOTDD      -- DSAB -> TIOT entry            */
+#include "osjfcb.h"         /* JFCB        -- TIOT entry -> dsname(member)  */
 
 /* libc370 ships sleep() (src/clib/sleep.c) and __tzget() (src/clib/@@tzget.c)
 ** but declares neither in any header, so both were implicit declarations here.
@@ -17,6 +20,56 @@
 ** conflict. */
 extern int sleep(unsigned seconds);
 extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff */
+
+/* parmlib_name() - resolve what the HTTPPRM DD actually points at, e.g.
+** "SYS2.PARMLIB(HTTPPRM0)".  The STC PROC makes the member a startup choice
+** (S HTTPD,M=HTTPPRM1), so "which member is this server running?" is a real
+** operator question -- and until #166 nothing answered it: HTTPD404E named the
+** CONFIG= parm, which has been ignored since the Parmlib migration.
+**
+** Read-only pointer chasing (DSAB -> TIOT entry -> JFCB), no SVC and no
+** allocation; falls back to the DD name if any link is missing, so a caller
+** always gets something printable.  The 3-byte TIOEJFCB is a SWA address,
+** cast per byte because the field is char and its high bit is data. */
+static const char *
+parmlib_name(char *buf, size_t size)
+{
+    DSAB    *dsab;
+    TIOTDD  *tiotdd;
+    JFCB    *jfcb;
+    char     dsn[45];
+    char     mem[9];
+    int      i;
+
+    dsab = get_dsab(NULL, HTTPD_PARMLIB_DD);    /* NULL == this task's TCB */
+    if (!dsab) goto fallback;
+
+    tiotdd = dsab->dsabtiot;
+    if (!tiotdd) goto fallback;
+
+    jfcb = (JFCB *)(((unsigned)(unsigned char)tiotdd->TIOEJFCB[0] << 16 |
+                     (unsigned)(unsigned char)tiotdd->TIOEJFCB[1] << 8  |
+                     (unsigned)(unsigned char)tiotdd->TIOEJFCB[2]) + 16);
+    if (!jfcb) goto fallback;
+
+    /* JFCB text fields are blank-padded, not NUL-terminated */
+    for (i = 0; i < 44 && jfcb->jfcbdsnm[i] > ' '; i++)
+        dsn[i] = jfcb->jfcbdsnm[i];
+    dsn[i] = '\0';
+    if (!dsn[0]) goto fallback;
+
+    for (i = 0; i < 8 && jfcb->jfcbelnm[i] > ' '; i++)
+        mem[i] = jfcb->jfcbelnm[i];
+    mem[i] = '\0';
+
+    if (mem[0]) snprintf(buf, size, "%s(%s)", dsn, mem);
+    else        snprintf(buf, size, "%s", dsn);
+    return buf;
+
+fallback:
+    snprintf(buf, size, "DD:%s", HTTPD_PARMLIB_DD);
+    return buf;
+}
 
 /* Forward declarations */
 static void set_defaults(HTTPD *httpd);
@@ -37,9 +90,17 @@ http_config(HTTPD *httpd, const char *member)
     CLIBCRT *crt = __crtget();
     FILE    *fp;
     char     line[256];
+    char     name[64];
     int      rc;
 
-    (void)member;   /* CONFIG= parm ignored — we always read DD:HTTPPRM */
+    /* CONFIG= has been read-and-discarded since the Parmlib migration, which
+       is worse than not accepting it: an operator who passes it believes it
+       took effect.  Say it did not, and name the mechanism that does (#166). */
+    if (member && *member) {
+        wtof("HTTPD024W CONFIG=%.32s is ignored; the configuration comes from "
+             "the %s DD", member, HTTPD_PARMLIB_DD);
+        wtof("HTTPD024W Use S HTTPD,M=member to select a different member");
+    }
 
     /* store HTTPD pointer in CRT for CGI modules */
     crt->crtapp1 = httpd;
@@ -48,10 +109,14 @@ http_config(HTTPD *httpd, const char *member)
     set_defaults(httpd);
 
     /* read configuration from DD:HTTPPRM */
-    fp = fopen("DD:HTTPPRM", "r");
+    fp = fopen("DD:" HTTPD_PARMLIB_DD, "r");
     if (!fp) {
-        wtof("HTTPD020W Cannot open DD:HTTPPRM -- using defaults");
+        wtof("HTTPD020W Cannot open DD:%s -- using defaults",
+             HTTPD_PARMLIB_DD);
     } else {
+        /* name it before parsing, so any error below is already attributed */
+        wtof("HTTPD022I Configuration from %s",
+             parmlib_name(name, sizeof(name)));
         while (fgets(line, (int)sizeof(line), fp)) {
             parse_line(httpd, line);
         }
