@@ -8,6 +8,15 @@
 HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
 {
     HTTPCGI *cgi    = NULL;
+    UCHAR   sp;
+
+    /* The route table lives as long as the server, and this is reachable from
+       module context through the httpx vector, so pin every allocation below
+       -- the HTTPCGI, both strdup()s and the array growth -- to subpool 0
+       (issue #154).  On a RECLAIM=YES route the ambient subpool is the
+       module's, and a route freed when that module abends would leave the
+       server matching requests against released storage. */
+    sp = __setsp(0);
 
     if (!httpd) goto quit;
     if (!path) goto quit;
@@ -46,5 +55,6 @@ HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
     }
 
 quit:
+    __setsp(sp);
     return cgi;
 }

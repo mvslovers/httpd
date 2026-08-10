@@ -50,12 +50,19 @@ http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
         if (ufs) {
             UCHAR ufspath[256];
             const char *dr = httpc->httpd->docroot;
+            /* Pin the file handle to subpool 0 (issue #154): httpc->ufp is
+               closed by http_done(), i.e. after the CGI that opened it through
+               the vector has returned or abended. */
+            UCHAR sp = __setsp(0);
+
             if (dr[0]) {
                 snprintf((char *)ufspath, sizeof(ufspath), "%s%s", dr, buf);
                 httpc->ufp = ufs_fopen(ufs, ufspath, mode);
             } else {
                 httpc->ufp = ufs_fopen(ufs, buf, mode);
             }
+
+            __setsp(sp);
         }
     }
 

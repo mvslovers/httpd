@@ -19,9 +19,11 @@
 ** claim this pair measures, because the whole fix is built on it.
 **
 ** Standalone (the runner executes every [[test]] module on its own, batch step
-** and TSO CALL, both without a parm) there is nothing to measure: return 0.
-** TSTSP LINKs us with PARM='PROBE' and reads the measurement out of the return
-** code, which __linkds() hands back as prc:
+** and TSO CALL, both without a parm) there is nothing to do: return 0.  TSTSP
+** LINKs us with a PARM naming one of two jobs, and reads the answer out of the
+** return code, which __linkds() hands back as prc.
+**
+** PARM='PROBE' -- measure, and clean up after yourself:
 **
 **     RC = ambient*100 + header*10 + inherited
 **
@@ -33,23 +35,43 @@
 ** So RC 770 means the mechanism is live.  RC 0 means the module has no usable
 ** PPA either and the whole approach is dead.  RC 9 in the header digit means
 ** the malloc failed and the block byte was not measured.
+**
+** PARM='LEAK' -- behave like an abending CGI: allocate LEAK_KB and return
+** WITHOUT freeing any of it.  RC is the KB actually obtained, so TSTSP can tell
+** "the reclaim gave the storage back" from "the region is full".  Nothing here
+** frees, and nothing else will either unless the caller releases the subpool --
+** which is the whole point of issue #154.
 */
 #include <stdlib.h>
 #include <string.h>
 #include <clibos.h>
 
 #define PROBE_SP    7           /* problem-state range is 1-127             */
+#define LEAK_KB     512         /* per LEAK call -- 64 of these is 32 MB,   */
+#define LEAK_CHUNK  (64*1024)   /* ... unreachable in 24 bits without the   */
+                                /* ... reclaim, so the test cannot pass by  */
+                                /* ... accident on a generous REGION        */
+
+static int probe(void);
+static int leak(void);
 
 int main(int argc, char **argv)
+{
+    if (argc < 2) return 0;             /* standalone runner pass           */
+
+    if (strcmp(argv[1], "PROBE") == 0) return probe();
+    if (strcmp(argv[1], "LEAK")  == 0) return leak();
+
+    return 0;
+}
+
+static int
+probe(void)
 {
     unsigned char   inherited;
     unsigned char   ambient;
     unsigned char   header  = 9;    /* 9 == not measured (malloc failed)    */
     void            *p;
-
-    if (argc < 2 || strcmp(argv[1], "PROBE") != 0) {
-        return 0;                   /* standalone runner pass -- see above  */
-    }
 
     inherited = __setsp(PROBE_SP);
     ambient   = __getsp();
@@ -66,4 +88,27 @@ int main(int argc, char **argv)
     __setsp(inherited);
 
     return (int) ambient * 100 + (int) header * 10 + (int) inherited;
+}
+
+static int
+leak(void)
+{
+    unsigned char   inherited;
+    unsigned        want = (LEAK_KB * 1024) / LEAK_CHUNK;
+    unsigned        got  = 0;
+    unsigned        i;
+    void            *p;
+
+    inherited = __setsp(PROBE_SP);
+
+    for (i = 0; i < want; i++) {
+        p = malloc(LEAK_CHUNK);
+        if (!p) break;
+        memset(p, 0xC1, LEAK_CHUNK);    /* touch it -- prove it is usable   */
+        got++;
+    }
+
+    __setsp(inherited);
+
+    return (int) ((got * LEAK_CHUNK) / 1024);
 }

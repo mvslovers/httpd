@@ -73,6 +73,16 @@ name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
+# Acceptance vehicle for issue #154: allocates, then abends S0C1 without
+# freeing.  Point one route at it with RECLAIM=YES and one without, and the
+# difference between "the abend cost nothing" and "the server degrades until
+# no module loads" is measurable with httpd's own code.  Like every module
+# since 4.0.0 it is inert unless a Parmlib route names it.
+[[module]]
+name = "ABEND0C1"
+startup = "crt1"
+sources = ["src/cgistart.c", "src/abend0c1.c"]
+
 # HTTPDSL (/dsl/*) and HTTPJES2 (/jes/*) are no longer built.  Both were
 # superseded by mvsMF's dataset and jobs APIs, and the sample Parmlib no longer
 # offers them.  Their sources moved to tbd/ (with stck2tv.c, which nothing ever

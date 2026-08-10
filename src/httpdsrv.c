@@ -1744,6 +1744,13 @@ display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n)
         O(resattr), route->resattr, racf_attr_text(route->resattr));
 
     http_printf(httpc, "<tr><td>+%04X</td>"
+        "<td>route->reclaim</td>"
+        "<td>Reclaim CGI Storage on Abend (RECLAIM=)</td>"
+        "<td>%u %s</td></tr>\n",
+        O(reclaim), route->reclaim,
+        route->reclaim ? "YES (subpool released)" : "NO (leaks on abend)");
+
+    http_printf(httpc, "<tr><td>+%04X</td>"
         "<td>route->resclass</td>"
         "<td>RACF Class (RES=, NULL = no resource gate)</td>"
         "<td>\"%s\"</td></tr>\n",

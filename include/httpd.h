@@ -24,6 +24,7 @@
 #include <time.h>
 #include <time64.h>					/* 64 bit time prototypes		*/
 #include <errno.h>
+#include "clibos.h"                 /* __setsp()/__getmsp() subpool */
 #include "clibppa.h"                /* C runtime program properties */
 #include "clibcrt.h"                /* C runtime area for each task */
 #include "clibenv.h"                /* C runtime environment vars   */
@@ -255,6 +256,8 @@ struct httpcgi {
        opaque to CGI modules (httpcgi.h), so appending fields is safe. */
     UCHAR       auth;               /* 14 AUTH mode (HTTP_AUTH_*)   */
     UCHAR       resattr;            /* 15 RACF attr (RACF_ATTR_*)   */
+    UCHAR       reclaim;            /* 16 reclaim CGI storage (#154)*/
+    UCHAR       unused_17;          /* 17 padding (was implicit)    */
     char        *resclass;          /* 18 RACF class (NULL = none)  */
     char        *resname;           /* 1C RACF resource name        */
 };									/* 20 (32 bytes)				*/
@@ -266,6 +269,29 @@ struct httpcgi {
 #define HTTP_AUTH_NONE    1         /* AUTH=NONE  -> public, no challenge   */
 #define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
 #define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
+
+/* HTTPCGI.reclaim -- RECLAIM=YES on the route.  The heap subpool a CGI on this
+** route allocates from, and which httppcgi() releases in one FREEMAIN when the
+** CGI abends, so the cost of the abend is bounded by the request instead of by
+** the life of the address space (issue #154).  Default 0: routes behave exactly
+** as they did, and nothing about the storage model changes for them.
+**
+** The subpool is set by cgistart INSIDE the module, not around the LINK: a
+** worker is a cthread and CTHREAD builds no CLIBPPA, so __setsp() there is a
+** no-op (measured -- see test/mvs/tstsp.c).  The module's own @@CRT0 does own a
+** PPA, and @@EXITA pops it on return, which is the bracket this needs.
+**
+** Enabling it on a route is a statement about the MODULE: everything it
+** allocates while it runs becomes request-lifetime storage.  A module that
+** keeps storage across invocations (mvsMF anchors an NT_STORE off its cgictx
+** block, for one) must pin that storage with __getmsp(size, 0) FIRST -- it is
+** not enough that no reclaim has fired yet, because subpool n is per-task and
+** MVS releases it when the worker TCB ends.
+**
+** Range 1-127 is what problem state can obtain; 0 means "off" and must stay
+** the disabled value, since it is also the shared default every allocation
+** lands in today. */
+#define HTTP_CGI_SUBPOOL  5         /* keep in sync with httpcgi.h          */
 
 /* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
@@ -307,7 +333,8 @@ struct httpx {
     char        eye[8];             /* 00 eye catcher               */
 #define HTTPX_EYE   "*HTTPX*"       /* ...                          */
     HTTPD       *httpd;             /* 08 => HTTPD (server)         */
-    char        *unused2;           /* 0C available                 */
+    UCHAR       (*http_cgi_subpool)(HTTPC *);
+                                    /* 0C heap subpool for this CGI */
 
     int         (*http_in)(HTTPC*); /* 10 read input from client    */
     int         (*http_parse)(HTTPC*);
@@ -516,6 +543,7 @@ extern int http_console(CIB *cib)                                       asm("HTT
 extern int http_process_client(HTTPC *)                                 asm("HTTPPC");
 extern int http_link(HTTPC *, const char *)                             asm("HTTPLINK");
 extern HTTPCGI *http_find_cgi(HTTPD *httpd, const char *path)           asm("HTTPFCGI");
+extern UCHAR http_cgi_subpool(HTTPC *)                                  asm("HTTPCGSP");
 extern HTTPCGI *http_add_cgi(HTTPD *httpd, const char *pgm, const char *path, int login) asm("HTTPACGI");
 extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTTPPCGI");
 extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
@@ -744,6 +772,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_find_cgi(httpd,path) \
     ((httpx->http_find_cgi)((httpd),(path)))
+
+#define http_cgi_subpool(httpc) \
+    ((httpx->http_cgi_subpool)((httpc)))
 
 #define http_add_cgi(httpd,pgm,path,login) \
     ((httpx->http_add_cgi)((httpd),(pgm),(path),(login)))
