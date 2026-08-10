@@ -15,6 +15,7 @@
 #include <time.h>
 #include <time64.h>					/* 64 bit time prototypes		*/
 #include <errno.h>
+#include <clibos.h>					/* __setsp()/__getmsp() subpool		*/
 #include "clibppa.h"                /* C runtime program properties */
 #include "clibcrt.h"                /* C runtime area for each task */
 #include "clibenv.h"                /* C runtime environment vars   */

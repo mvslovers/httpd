@@ -69,7 +69,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
             int frc = reclaim(HTTP_CGI_SUBPOOL);
 
             if (frc) {
-                wtof("HTTPD905W Storage reclaim for %s failed, rc=%d",
+                wtof("HTTPD906W Storage reclaim for %s failed, rc=%d",
                      cgi->pgm, frc);
             }
         }

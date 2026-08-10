@@ -583,7 +583,7 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             if (http_cmp(v, "YES") == 0)     pol->reclaim = 1;
             else if (http_cmp(v, "NO") == 0) pol->reclaim = 0;
             else
-                wtof("HTTPD415W ignoring unknown RECLAIM value '%s' "
+                wtof("HTTPD422W ignoring unknown RECLAIM value '%s' "
                      "(need YES or NO)", v);
         }
         else {
@@ -617,7 +617,7 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
            to reclaim -- say so rather than record a flag that never fires */
         cgi->reclaim  = (cgi->pgm && pol->reclaim) ? 1 : 0;
         if (pol->reclaim && !cgi->pgm) {
-            wtof("HTTPD416W LOC=%.40s ignores RECLAIM=YES (no program)",
+            wtof("HTTPD423W LOC=%.40s ignores RECLAIM=YES (no program)",
                  cgi->path);
         }
     }

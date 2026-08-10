@@ -36,8 +36,18 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
 #endif
     /* add the new variable to the array.  http_del_env() already removed any
        old value, so on an array_add OOM the variable would silently vanish and
-       the new HTTPV would be an unreachable orphan -- free it and report. */
-    if (array_add(&httpc->env, v)) {
+       the new HTTPV would be an unreachable orphan -- free it and report.
+       Pinned to subpool 0 for the same reason httpnenv() pins the HTTPV
+       itself (issue #154): http_set_env() is vector-reachable, but the array
+       is emptied by http_reset() after the module has returned. */
+    {
+        UCHAR   sp  = __setsp(0);
+        int     arc = array_add(&httpc->env, v);
+
+        __setsp(sp);
+        rc = arc;
+    }
+    if (rc) {
         free(v);
         wtof("HTTPD904E No storage for environment variable %.32s "
              "client(%08X)", name, httpc);

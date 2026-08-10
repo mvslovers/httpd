@@ -10,10 +10,18 @@ unsigned cred_free_array(void)
 	int		 lockrc;
 	unsigned count;
 	int		 rc;
-	
+	unsigned char sp;
+
 	if (!array) 	return 0;	/* no pointer to array of CRED */
-	
+
 	lockrc = lock(array, LOCK_EXC);
+
+	/* Both array_add()s below put a CRED the teardown could not free back into
+	   the store, which outlives this call -- pinned to subpool 0 like every
+	   other writer of it (issue #154).  The bracket covers the whole loop
+	   rather than each put-back: nothing in here should allocate anywhere but
+	   subpool 0, and cred_free() is a cross-TCB free by nature. */
+	sp = __setsp(0);
 
 	for(count = array_count(array); count; count--) {
 		CRED *c = array_del(array, count);
@@ -51,7 +59,9 @@ unsigned cred_free_array(void)
 
 quit:
 	count = array_count(array);
-	
+
+	__setsp(sp);
+
 	if (lockrc==0) unlock(array, LOCK_EXC);
 	
 	return count;

@@ -91,8 +91,17 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
 		goto cleanup;
 	}
 
-	/* save the cred in our array */
-	rc = array_add(array, cred);
+	/* save the cred in our array.  Pinned like cred_new()'s CRED itself
+	   (issue #154): cred_login() is reached from the auth path, which a module
+	   can enter through http_check_auth(), and the store is emptied on another
+	   TCB. */
+	{
+		unsigned char sp = __setsp(0);
+
+		rc = array_add(array, cred);
+
+		__setsp(sp);
+	}
 	if (rc) {
 		wtof("%s: array_add() failed, rc=%d", __func__, rc);
 		cred_free(&cred);
