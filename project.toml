@@ -170,6 +170,24 @@ name = "TSTNENV"
 sources = ["test/tstnenv.c"]
 host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
+# Where the CGI heap subpool (libc370#89) can be set at all -- the measurement
+# issue #154's stage 2 is built on.  TSTSP is the driver: it runs the probe on
+# the main task, on a cthread (the shape of an httpd worker) and inside a
+# module reached by LINK.  TSTSPM is the LINKed target, not a test of its own:
+# run standalone it returns 0, and it reports its measurement through the
+# return code __linkds() hands back.  The runner's STEPLIB is TESTLIB+LINKLIB,
+# so TSTSP finds TSTSPM in the TESTLIB it was just deployed to.
+[[test]]
+name = "TSTSP"
+sources = ["test/mvs/tstsp.c"]
+host = false            # cthreads + LINK + GETMAIN are SVCs -> test-mvs
+
+[[test]]
+name = "TSTSPM"
+startup = "crt1"        # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
+sources = ["test/mvs/tstspm.c"]
+host = false            # LINK target for TSTSP -> test-mvs
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the
