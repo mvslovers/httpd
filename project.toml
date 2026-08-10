@@ -73,6 +73,16 @@ name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
+# Acceptance vehicle for issue #154: allocates, then abends S0C1 without
+# freeing.  Point one route at it with RECLAIM=YES and one without, and the
+# difference between "the abend cost nothing" and "the server degrades until
+# no module loads" is measurable with httpd's own code.  Like every module
+# since 4.0.0 it is inert unless a Parmlib route names it.
+[[module]]
+name = "ABEND0C1"
+startup = "crt1"
+sources = ["src/cgistart.c", "src/abend0c1.c"]
+
 # HTTPDSL (/dsl/*) and HTTPJES2 (/jes/*) are no longer built.  Both were
 # superseded by mvsMF's dataset and jobs APIs, and the sample Parmlib no longer
 # offers them.  Their sources moved to tbd/ (with stck2tv.c, which nothing ever
@@ -169,6 +179,24 @@ host = false            # crent370 SVCs are MVS-only -> test-mvs
 name = "TSTNENV"
 sources = ["test/tstnenv.c"]
 host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
+
+# Where the CGI heap subpool (libc370#89) can be set at all -- the measurement
+# issue #154's stage 2 is built on.  TSTSP is the driver: it runs the probe on
+# the main task, on a cthread (the shape of an httpd worker) and inside a
+# module reached by LINK.  TSTSPM is the LINKed target, not a test of its own:
+# run standalone it returns 0, and it reports its measurement through the
+# return code __linkds() hands back.  The runner's STEPLIB is TESTLIB+LINKLIB,
+# so TSTSP finds TSTSPM in the TESTLIB it was just deployed to.
+[[test]]
+name = "TSTSP"
+sources = ["test/mvs/tstsp.c"]
+host = false            # cthreads + LINK + GETMAIN are SVCs -> test-mvs
+
+[[test]]
+name = "TSTSPM"
+startup = "crt1"        # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
+sources = ["test/mvs/tstspm.c"]
+host = false            # LINK target for TSTSP -> test-mvs
 
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares

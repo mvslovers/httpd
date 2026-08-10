@@ -475,6 +475,7 @@ typedef struct {
     UCHAR   auth;               /* HTTP_AUTH_* (DEFAULT until AUTH= seen)   */
     UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
     UCHAR   failed;             /* policy could not be built (no storage)   */
+    UCHAR   reclaim;            /* RECLAIM=YES -- bound CGI storage (#154)  */
     char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
     char   *resname;            /* strdup'd RACF resource name              */
 } ROUTE_POLICY;
@@ -512,12 +513,14 @@ tokenize(char *s, char **tok, int max)
     return n;
 }
 
-/* is_route_kv() - true if tok is a trailing route option (AUTH=.../RES=...)
-** rather than a positional path token. */
+/* is_route_kv() - true if tok is a trailing route option
+** (AUTH=.../RES=.../RECLAIM=...) rather than a positional path token. */
 static int
 is_route_kv(const char *tok)
 {
-    return http_cmpn(tok, "AUTH=", 5) == 0 || http_cmpn(tok, "RES=", 4) == 0;
+    return http_cmpn(tok, "AUTH=", 5) == 0
+        || http_cmpn(tok, "RES=", 4) == 0
+        || http_cmpn(tok, "RECLAIM=", 8) == 0;
 }
 
 /* parse_kv_tail() - parse the trailing AUTH=/RES= tokens (tok[start..ntok)),
@@ -574,6 +577,15 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
                      "(need class:resource)", v);
             }
         }
+        else if (http_cmpn(t, "RECLAIM=", 8) == 0) {
+            char *v = t + 8;
+
+            if (http_cmp(v, "YES") == 0)     pol->reclaim = 1;
+            else if (http_cmp(v, "NO") == 0) pol->reclaim = 0;
+            else
+                wtof("HTTPD422W ignoring unknown RECLAIM value '%s' "
+                     "(need YES or NO)", v);
+        }
         else {
             wtof("HTTPD413W ignoring unknown route option '%s'", t);
         }
@@ -600,6 +612,14 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
         cgi->resattr  = pol->resattr;
         cgi->resclass = pol->resclass;
         cgi->resname  = pol->resname;
+
+        /* RECLAIM= is about a program's storage, so a LOC= prefix has nothing
+           to reclaim -- say so rather than record a flag that never fires */
+        cgi->reclaim  = (cgi->pgm && pol->reclaim) ? 1 : 0;
+        if (pol->reclaim && !cgi->pgm) {
+            wtof("HTTPD423W LOC=%.40s ignores RECLAIM=YES (no program)",
+                 cgi->path);
+        }
     }
     else {
         free(pol->resclass);

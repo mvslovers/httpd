@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <clibgrt.h>
+#include <clibos.h>     /* __setsp() -- heap subpool (issue #154)   */
 #include <clibppa.h>
 #include <clibary.h>
 #include <clibenv.h>
@@ -107,6 +108,8 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     int         parmLen;
     int         progLen = 0;
     char        parmbuf[310];
+    UCHAR       cgisp;              /* heap subpool for main() (#154)   */
+    UCHAR       prevsp  = 0;        /* ... what it replaced             */
 
     /* we're going to process the callers parameter list first so we
        can decide is we'll bypass the opens for the permanent datasets.
@@ -258,7 +261,37 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
 	printf("HTTP/1.0 200 OK\n\n");
 	printf("{ \"%s\" }\n", "cgistart");
 #else
+    /* Everything main() allocates belongs to this request when the route says
+    ** RECLAIM=YES -- httppcgi() releases the subpool in one FREEMAIN if we
+    ** abend, so the cost of the abend is bounded by the request instead of by
+    ** the life of the address space (issue #154).
+    **
+    ** It is set HERE and not around the LINK in httppcgi(), because a worker is
+    ** a cthread and CTHREAD builds no CLIBPPA: __setsp() there is a no-op
+    ** (measured, test/mvs/tstsp.c).  Our own @@CRT0 does own a PPA, so from
+    ** inside the module it bites, and @@EXITA pops it on the way out.
+    **
+    ** And it is set around main() ONLY, not from the top of __start: the
+    ** stdout/stderr/stdin FILEs above must stay in subpool 0.  Their DCBs are
+    ** subpool 0 by libc370#89's scope decision and are still open and chained
+    ** to a surviving TCB when a reclaim runs -- freeing the FILE out from under
+    ** an open DCB would turn a bounded leak into corruption.
+    **
+    ** A server built before #154 has 0 in this vector slot, so there is nothing
+    ** to call, no subpool is set, and the module behaves exactly as it did. */
+    cgisp = 0;
+    if (httpc && httpx && httpx->http_cgi_subpool) {
+        cgisp = http_cgi_subpool(httpc);
+    }
+    if (cgisp) prevsp = __setsp(cgisp);
+
     rc = main(argc, argv);
+
+    /* Only on the way back from a NORMAL return -- an abend never gets here,
+    ** and does not need to: __linkds()'s ESTAE restores the caller's runtime
+    ** anchors on the retry path, so httppcgi() is already on its own PPA when
+    ** it issues the FREEMAIN. */
+    if (cgisp) __setsp(prevsp);
 #endif
     __exit(rc);
     return (rc);

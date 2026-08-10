@@ -1,11 +1,21 @@
+#include <clibos.h>		/* __getmsp() -- subpool pin (issue #154)	*/
 #include "cred.h"
 
 CRED *
 cred_new(CREDID *id, CREDTOK *token, ACEE *acee, unsigned char flags)
 {
-	CRED	*cred = calloc(sizeof(CRED), 1);
-	
+	/* Pinned to subpool 0 rather than calloc'd (issue #154).  This is the
+	   unconditional half of the pin audit, not the RECLAIM=YES half: a CRED
+	   is created on whichever TCB served the login -- a worker, and on a
+	   RECLAIM=YES route under the module's ambient subpool -- but it is freed
+	   on a DIFFERENT one, by the session reaper and by http_logout() from
+	   module context (#113).  A non-zero subpool is per-task, and @@FREEM
+	   issues the R form of FREEMAIN, which has no return code to refuse a
+	   cross-task free with: it would abend rather than be rejected. */
+	CRED	*cred = __getmsp(sizeof(CRED), 0);
+
 	if (cred) {
+		memset(cred, 0, sizeof(CRED));
 		strncpy(cred->eye, CRED_EYE, sizeof(cred->eye));
 		cred->last = time64(NULL);
 		if (id) 	cred->id = *id;

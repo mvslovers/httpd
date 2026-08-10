@@ -8,7 +8,7 @@
 static HTTPX vect = {
     HTTPX_EYE,                  /* 00 eye catcher                   */
     0,                          /* 08 available                     */
-    0,                          /* 0C available                     */
+    http_cgi_subpool,           /* 0C http_cgi_subpool()            */
     http_in,                    /* 10 http_in()                     */
     http_parse,                 /* 14 http_parse()                  */
     http_get,                   /* 18 http_get()                    */

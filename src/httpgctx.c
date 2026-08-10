@@ -18,12 +18,20 @@ __asm__("\n&FUNC SETC 'HTTPGCTX'");
 ** and ignored on a hit (caller contract: always pass the same size for the
 ** same eyecatcher).
 **
-** The block is allocated with __getm() (raw GETMAIN, subpool 0).  SP0 is
-** shared address-space wide (SZERO=YES on the worker ATTACH), so the block
-** outlives the LINK return that started the CGI and the worker shrink, and
-** lives until the address space ends.  __getm() bypasses the malloc memmgr,
-** so @@exit never reclaims it -- exactly why __getm() and not malloc().  A
-** context block is therefore never freed individually.
+** The block is allocated with __getmsp(size, 0) -- a raw GETMAIN with the
+** subpool named EXPLICITLY.  SP0 is shared address-space wide (SZERO=YES on
+** the worker ATTACH), so the block outlives the LINK return that started the
+** CGI and the worker shrink, and lives until the address space ends.
+** __getmsp() bypasses the malloc memmgr, so @@exit never reclaims it --
+** exactly why this is not malloc().  A context block is never freed
+** individually.
+**
+** The explicit 0 is the whole point since #154: this registrar is called from
+** MODULE context by definition, and on a RECLAIM=YES route the module's
+** ambient subpool is set.  A plain __getm() would put an address-space-lifetime
+** block into a request-lifetime subpool, leave the dangling pointer in
+** httpd->cgictx[], and hand it to every later invocation.  Do not "simplify"
+** this back to __getm().
 **
 ** The whole find-or-create runs under one lock on the array address
 ** (CLIBLOCK ENQ, STEP scope), so concurrent workers cannot race and there is
@@ -52,7 +60,7 @@ http_cgictx_get(HTTPD *httpd, const char *eye, unsigned size)
     }
     if (!slot) goto done;               /* array full -> NULL                 */
 
-    ctx = __getm(size);                 /* SP0 shared -> AS lifetime          */
+    ctx = __getmsp(size, 0);            /* SP0 shared -> AS lifetime          */
     if (!ctx) goto done;
     memset(ctx, 0, size);
     memcpy(ctx, eye, 8);                /* stamp eyecatcher                   */

@@ -159,7 +159,8 @@ struct httpx {
     char        eye[8];             /* 00 eye catcher                   */
 #define HTTPX_EYE   "*HTTPX*"       /* ...                              */
     HTTPD       *httpd;             /* 08 => HTTPD (server)             */
-    char        *unused2;           /* 0C available                     */
+    UCHAR       (*http_cgi_subpool)(HTTPC *);
+                                    /* 0C heap subpool for this CGI     */
 
     int         (*http_in)(HTTPC*);
                                     /* 10 read input from client        */
@@ -522,6 +523,27 @@ struct httpx {
 
 #define http_find_cgi(httpd,path) \
     ((httpx->http_find_cgi)((httpd),(path)))
+
+/* http_cgi_subpool() -- the heap subpool this CGI's storage belongs to, or 0.
+**
+** Called by cgistart, not by module code: it brackets main() with
+** __setsp(subpool) so everything the module allocates while it runs can be
+** released in one FREEMAIN when the module abends (issue #154).  Nonzero only
+** for a route configured RECLAIM=YES; 0 -- every route by default, and every
+** older server, whose vector has 0 in this slot -- means the bracket is not
+** entered and nothing changes.
+**
+** WHAT THIS MEANS FOR A MODULE ON SUCH A ROUTE: everything it allocates is
+** request-lifetime storage.  Storage meant to outlive the invocation must be
+** obtained with __getmsp(size, 0) (clibos.h), not malloc()/__getm() -- the
+** subpool is per-task, so MVS releases it when the worker TCB ends even if no
+** abend ever happens.  Storage httpd itself allocates through this vector is
+** already pinned server-side; this is about the module's own allocations. */
+#define http_cgi_subpool(httpc) \
+    ((httpx->http_cgi_subpool)((httpc)))
+
+/* The subpool used when a route has RECLAIM=YES.  Keep in sync with httpd.h. */
+#define HTTP_CGI_SUBPOOL  5
 
 #define http_add_cgi(httpd,pgm,path,login) \
     ((httpx->http_add_cgi)((httpd),(pgm),(path),(login)))
