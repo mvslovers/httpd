@@ -68,4 +68,10 @@
   SELECT MEMBER=HTTPDM
   SELECT MEMBER=HTTPDMTT
   SELECT MEMBER=HTTPDSRV
+  SELECT MEMBER=ABEND0C1
 /*
+//*
+//* ABEND0C1 allocates and then abends S0C1 on purpose -- the probe for
+//* the per-route storage reclaim (issue #154).  Copying it in is
+//* harmless: like every module since 4.0.0 it does nothing at all
+//* unless a Parmlib route names it.
