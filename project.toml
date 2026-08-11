@@ -13,8 +13,15 @@ type = "application"
 # is what keeps it clear. Adding a warning now fails the build, which is the
 # point. Do not add -Wno-* here: the trigraph warnings that would have needed
 # one were removed at the source instead (#139).
-cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_VERSION)\"',
-          "-Wall", "-Werror"]
+cflags = [
+	"-I",
+	"include",
+	"-I",
+	"credentials/include",
+	'-DVERSION=\"$(PROJECT_VERSION)\"',
+	"-Wall",
+	"-Werror",
+]
 
 [host]
 # `make test-host` reuses build.cflags (mbt/scripts/mbttesthost.py) but compiles
@@ -26,7 +33,7 @@ cflags = ["-I", "include", "-I", "credentials/include", '-DVERSION=\"$(PROJECT_V
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = "=1.0.0-dev"
+"mvslovers/ufsd" = "=1.1.0-dev"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
@@ -97,7 +104,7 @@ sources = ["src/cgistart.c", "src/abend0c1.c"]
 [[test]]
 name = "TSTGCTX"
 sources = ["test/mvs/tstgctx.c"]
-host = false            # uses lock()/__getm() SVCs -> MVS-only (test-mvs)
+host = false                     # uses lock()/__getm() SVCs -> MVS-only (test-mvs)
 
 # http_decode() / httpdeco() URI percent+plus decoder.  MVS-target like
 # TSTGCTX: httpdeco pulls no SVCs, but it is reached through httpd.h (crent370
@@ -107,7 +114,7 @@ host = false            # uses lock()/__getm() SVCs -> MVS-only (test-mvs)
 [[test]]
 name = "TSTDECO"
 sources = ["test/tstdeco.c"]
-host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
+host = false                 # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
@@ -143,7 +150,7 @@ sources = ["test/tstracf.c", "src/httpracf.c"]
 [[test]]
 name = "TSTCRED"
 sources = ["test/mvs/tstcred.c"]
-host = false            # blowfish_* are MVS-only (crent370) -> test-mvs
+host = false                     # blowfish_* are MVS-only (crent370) -> test-mvs
 
 # http_get_userid() end-to-end on a live HTTPC (issue #109): real cred_login()
 # + cache hit + the real HTTPGUID export.  MVS-only (blowfish + RACF SVCs);
@@ -151,7 +158,7 @@ host = false            # blowfish_* are MVS-only (crent370) -> test-mvs
 [[test]]
 name = "TSTGUID"
 sources = ["test/mvs/tstguid.c"]
-host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
+host = false                     # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
 # http_get_password() end-to-end on a live HTTPC (issue #111): decrypts the
 # caller's password from httpc->cred->id via the key pointer cached in the HTTPD
@@ -160,7 +167,7 @@ host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 [[test]]
 name = "TSTGPWD"
 sources = ["test/mvs/tstgpwd.c"]
-host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
+host = false                     # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
 # credtok_logout_arr() + wrapper (issue #113): logout must find, unlink and free
 # the CRED in the supplied array so the token stops resolving.  Guards the split
@@ -169,7 +176,7 @@ host = false            # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 [[test]]
 name = "TSTLOUT"
 sources = ["test/mvs/tstlout.c"]
-host = false            # crent370 SVCs are MVS-only -> test-mvs
+host = false                     # crent370 SVCs are MVS-only -> test-mvs
 
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
@@ -177,7 +184,7 @@ host = false            # crent370 SVCs are MVS-only -> test-mvs
 [[test]]
 name = "TSTNENV"
 sources = ["test/tstnenv.c"]
-host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
+host = false                 # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
 # Where the CGI heap subpool (libc370#89) can be set at all -- the measurement
 # issue #154's stage 2 is built on.  TSTSP is the driver: it runs the probe on
@@ -189,13 +196,13 @@ host = false            # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 [[test]]
 name = "TSTSP"
 sources = ["test/mvs/tstsp.c"]
-host = false            # cthreads + LINK + GETMAIN are SVCs -> test-mvs
+host = false                   # cthreads + LINK + GETMAIN are SVCs -> test-mvs
 
 [[test]]
 name = "TSTSPM"
-startup = "crt1"        # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
+startup = "crt1"                # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
 sources = ["test/mvs/tstspm.c"]
-host = false            # LINK target for TSTSP -> test-mvs
+host = false                    # LINK target for TSTSP -> test-mvs
 
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
