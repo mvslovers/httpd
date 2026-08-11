@@ -659,6 +659,24 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
 
         if (httpc->state == last) {
+            /* No progress.  In worker mode this client has exactly one owner
+               -- this loop; it came off the work queue and nothing else
+               processes it.  So if the no-progress pass was httppc()'s
+               busy-exit, the httpd->busy entry is stale by definition (#159:
+               left behind by an earlier failure on this worker, or by a freed
+               client that occupied the same storage).  Clear it on the FIRST
+               such pass and keep serving: the request proceeds normally and
+               the wedge never forms.  If the client is NOT in busy, the stall
+               has another cause (e.g. http_set_busy() failing on a full
+               region) -- nothing to repair here, let the spin guard below end
+               it.  The guard stays as the last resort either way. */
+            if (spin == 0 && http_is_busy(httpc)) {
+                wtof("HTTPD907W stale busy entry for client(%08X) state(%d) "
+                     "socket(%d) req(%u) -- cleared, resuming",
+                    httpc, (int)httpc->state, httpc->socket,
+                    httpc->request_count);
+                http_reset_busy(httpc);
+            }
             if (++spin >= 1000) {
                 wtof("HTTPD901E spin in serve_client: client(%08X) state(%d) "
                      "socket(%d) req(%u) worker(%08X) -- forcing close",
