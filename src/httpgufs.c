@@ -12,7 +12,7 @@ http_get_ufs(HTTPC *httpc)
 {
     if (!httpc->ufs && httpc->httpd->ufssys) {
         /* Pin the session to subpool 0 (issue #154).  A CGI reaches this
-           through the httpx vector, so on a RECLAIM=YES route ufsnew() would
+           through the httpx vector, so during a module window ufsnew() would
            allocate under the module's ambient subpool -- but the session hangs
            off httpc->ufs and is released by http_close(), after the module has
            returned or abended.  libufs allocates it, so the bracket has to sit

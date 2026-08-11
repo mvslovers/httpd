@@ -73,11 +73,10 @@ name = "HTTPDSRV"
 startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
-# Acceptance vehicle for issue #154: allocates, then abends S0C1 without
-# freeing.  Point one route at it with RECLAIM=YES and one without, and the
-# difference between "the abend cost nothing" and "the server degrades until
-# no module loads" is measurable with httpd's own code.  Like every module
-# since 4.0.0 it is inert unless a Parmlib route names it.
+# Acceptance vehicle for issues #154/#174: allocates, then abends S0C1
+# without freeing.  Drive it a few hundred times and every other CGI must
+# still load at its original speed -- measurable with httpd's own code.
+# Like every module since 4.0.0 it is inert unless a Parmlib route names it.
 [[module]]
 name = "ABEND0C1"
 startup = "crt1"

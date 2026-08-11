@@ -27,8 +27,8 @@ __asm__("\n&FUNC SETC 'HTTPGCTX'");
 ** individually.
 **
 ** The explicit 0 is the whole point since #154: this registrar is called from
-** MODULE context by definition, and on a RECLAIM=YES route the module's
-** ambient subpool is set.  A plain __getm() would put an address-space-lifetime
+** MODULE context by definition, and a module runs with its ambient subpool
+** set (#174: the reclaim is the default).  A plain __getm() would put an address-space-lifetime
 ** block into a request-lifetime subpool, leave the dangling pointer in
 ** httpd->cgictx[], and hand it to every later invocation.  Do not "simplify"
 ** this back to __getm().

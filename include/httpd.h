@@ -256,7 +256,8 @@ struct httpcgi {
        opaque to CGI modules (httpcgi.h), so appending fields is safe. */
     UCHAR       auth;               /* 14 AUTH mode (HTTP_AUTH_*)   */
     UCHAR       resattr;            /* 15 RACF attr (RACF_ATTR_*)   */
-    UCHAR       reclaim;            /* 16 reclaim CGI storage (#154)*/
+    UCHAR       unused_16;          /* 16 (was: reclaim -- #174 made
+                                          the reclaim unconditional) */
     UCHAR       unused_17;          /* 17 padding (was implicit)    */
     char        *resclass;          /* 18 RACF class (NULL = none)  */
     char        *resname;           /* 1C RACF resource name        */
@@ -270,27 +271,26 @@ struct httpcgi {
 #define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
 #define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
 
-/* HTTPCGI.reclaim -- RECLAIM=YES on the route.  The heap subpool a CGI on this
-** route allocates from, and which httppcgi() releases in one FREEMAIN when the
-** CGI abends, so the cost of the abend is bounded by the request instead of by
-** the life of the address space (issue #154).  Default 0: routes behave exactly
-** as they did, and nothing about the storage model changes for them.
+/* HTTP_CGI_SUBPOOL -- the heap subpool every CGI allocates from, and which
+** httppcgi() releases in one FREEMAIN when the CGI abends, so the cost of an
+** abend is bounded by the request instead of by the life of the address space
+** (#154).  Since #174 this is unconditional -- the retired RECLAIM= keyword
+** briefly made it per-route while the module fleet was audited.
+**
+** The storage contract for server modules is one sentence: malloc() is
+** request storage; storage that must outlive the request is obtained with
+** __getmsp(size, 0).  The subpool is per-task, so MVS also releases it when
+** the worker TCB ends -- unpinned "persistent" storage does not merely risk
+** the abend path, it cannot survive at all.
 **
 ** The subpool is set by cgistart INSIDE the module, not around the LINK: a
 ** worker is a cthread and CTHREAD builds no CLIBPPA, so __setsp() there is a
-** no-op (measured -- see test/mvs/tstsp.c).  The module's own @@CRT0 does own a
-** PPA, and @@EXITA pops it on return, which is the bracket this needs.
+** no-op (measured -- see test/mvs/tstsp.c).  The module's own @@CRT0 does own
+** a PPA, and @@EXITA pops it on return, which is the bracket this needs.
 **
-** Enabling it on a route is a statement about the MODULE: everything it
-** allocates while it runs becomes request-lifetime storage.  A module that
-** keeps storage across invocations (mvsMF anchors an NT_STORE off its cgictx
-** block, for one) must pin that storage with __getmsp(size, 0) FIRST -- it is
-** not enough that no reclaim has fired yet, because subpool n is per-task and
-** MVS releases it when the worker TCB ends.
-**
-** Range 1-127 is what problem state can obtain; 0 means "off" and must stay
-** the disabled value, since it is also the shared default every allocation
-** lands in today. */
+** Range 1-127 is what problem state can obtain; 0 is the shared default and
+** means "no subpool set" in the cgistart handshake, so it must never be the
+** value here. */
 #define HTTP_CGI_SUBPOOL  5         /* keep in sync with httpcgi.h          */
 
 /* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is

@@ -475,7 +475,6 @@ typedef struct {
     UCHAR   auth;               /* HTTP_AUTH_* (DEFAULT until AUTH= seen)   */
     UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
     UCHAR   failed;             /* policy could not be built (no storage)   */
-    UCHAR   reclaim;            /* RECLAIM=YES -- bound CGI storage (#154)  */
     char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
     char   *resname;            /* strdup'd RACF resource name              */
 } ROUTE_POLICY;
@@ -514,7 +513,8 @@ tokenize(char *s, char **tok, int max)
 }
 
 /* is_route_kv() - true if tok is a trailing route option
-** (AUTH=.../RES=.../RECLAIM=...) rather than a positional path token. */
+** (AUTH=.../RES=..., or the retired RECLAIM=) rather than a positional path
+** token. */
 static int
 is_route_kv(const char *tok)
 {
@@ -578,13 +578,11 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             }
         }
         else if (http_cmpn(t, "RECLAIM=", 8) == 0) {
-            char *v = t + 8;
-
-            if (http_cmp(v, "YES") == 0)     pol->reclaim = 1;
-            else if (http_cmp(v, "NO") == 0) pol->reclaim = 0;
-            else
-                wtof("HTTPD422W ignoring unknown RECLAIM value '%s' "
-                     "(need YES or NO)", v);
+            /* Retired (#174): the reclaim is unconditional now.  Accepted so
+               existing members keep loading, warned so the member gets
+               cleaned up -- the value is ignored either way. */
+            wtof("HTTPD422W %s is retired -- CGI storage reclaim is "
+                 "always on", t);
         }
         else {
             wtof("HTTPD413W ignoring unknown route option '%s'", t);
@@ -612,14 +610,6 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
         cgi->resattr  = pol->resattr;
         cgi->resclass = pol->resclass;
         cgi->resname  = pol->resname;
-
-        /* RECLAIM= is about a program's storage, so a LOC= prefix has nothing
-           to reclaim -- say so rather than record a flag that never fires */
-        cgi->reclaim  = (cgi->pgm && pol->reclaim) ? 1 : 0;
-        if (pol->reclaim && !cgi->pgm) {
-            wtof("HTTPD423W LOC=%.40s ignores RECLAIM=YES (no program)",
-                 cgi->path);
-        }
     }
     else {
         free(pol->resclass);

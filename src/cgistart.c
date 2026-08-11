@@ -261,10 +261,12 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
 	printf("HTTP/1.0 200 OK\n\n");
 	printf("{ \"%s\" }\n", "cgistart");
 #else
-    /* Everything main() allocates belongs to this request when the route says
-    ** RECLAIM=YES -- httppcgi() releases the subpool in one FREEMAIN if we
-    ** abend, so the cost of the abend is bounded by the request instead of by
-    ** the life of the address space (issue #154).
+    /* Everything main() allocates belongs to this request: httppcgi()
+    ** releases the subpool in one FREEMAIN if we abend, so the cost of the
+    ** abend is bounded by the request instead of by the life of the address
+    ** space (issue #154; unconditional since #174).  A module that must keep
+    ** storage across requests pins it with __getmsp(size, 0) -- see
+    ** http_cgi_subpool() in httpcgi.h for the contract.
     **
     ** It is set HERE and not around the LINK in httppcgi(), because a worker is
     ** a cthread and CTHREAD builds no CLIBPPA: __setsp() there is a no-op
