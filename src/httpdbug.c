@@ -113,12 +113,6 @@ dump_route(HTTPD *httpd, HTTPC *httpc)
 
 		http_printf(httpc, " Auth=%s Wild=%u", auth_text(p->auth), p->wild);
 
-		/* RECLAIM=YES -- only routes that carry it, so the common line stays
-		   the length it was */
-		if (p->reclaim) {
-			http_printf(httpc, " Reclaim=YES");
-		}
-
 		/* RES= resource gate -- only routes that carry one */
 		if (p->resclass) {
 			http_printf(httpc, " Res=%s:%s Attr=%s",

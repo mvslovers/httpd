@@ -62,10 +62,13 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
         ** the UFS session and any file handle httpd holds for this request are
         ** pinned to subpool 0.
         **
-        ** Only when the route asked for it (RECLAIM=YES).  cgistart sets the
-        ** subpool from the same flag, so on every other route the module never
-        ** allocated here and there is nothing to release. */
-        if (cgi->reclaim) {
+        ** Unconditional since #174 (the RECLAIM= route option is retired):
+        ** cgistart set the subpool for this module, so everything it malloc'd
+        ** belongs to this request -- module storage that must survive is
+        ** pinned with __getmsp(size, 0) by contract.  Releasing an empty
+        ** subpool (a module built before #154, whose cgistart never asked)
+        ** is a no-op with rc 0. */
+        {
             int frc = reclaim(HTTP_CGI_SUBPOOL);
 
             if (frc) {

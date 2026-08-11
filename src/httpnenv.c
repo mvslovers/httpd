@@ -25,7 +25,7 @@ httpnenv(const UCHAR *name, const UCHAR *value)
 
     /* Pinned to subpool 0, not calloc'd (issue #154): http_set_env() is
        reached through the httpx vector, so this runs under the MODULE's
-       ambient subpool on a RECLAIM=YES route -- but the HTTPV hangs off
+       module's ambient subpool (#174) -- but the HTTPV hangs off
        httpc->env and is freed by http_reset() AFTER the module returned.  In
        the module's subpool it would be freed twice: once by the abend-path
        reclaim, once by http_reset(). */

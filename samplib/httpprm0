@@ -31,24 +31,16 @@
 # A route without AUTH= inherits the LOGIN default.  /login, /logout and the
 # login-page assets stay reachable so an AUTH=FORM challenge can render.
 #
-# --- Storage reclaim (RECLAIM=YES on a MOD= route) ---
-# When a CGI abends, nothing reclaims the storage it held: no @@EXITA runs, the
-# worker survives by design, and libc370's malloc has no memmgr behind it.  The
-# storage is gone until the server is restarted, and enough of it means NO
-# module can be loaded any more (S80A on every request).
+# --- Storage lifetime for modules (no configuration) ---
+# Every MOD= module runs with its heap in a request subpool: when the module
+# abends, httpd releases the subpool in one FREEMAIN, so the cost of an abend
+# is bounded by the request instead of by the life of the address space.
+# There is nothing to configure.  The rule a module must follow:
 #
-# RECLAIM=YES puts that module's allocations in their own heap subpool and
-# releases the subpool in one FREEMAIN when it abends, so the cost of an abend
-# is bounded by the request.  Default is NO -- every route behaves as before.
+#     malloc() is request storage.  Storage that must outlive the request
+#     is obtained with __getmsp(size, 0)  (clibos.h).
 #
-# ENABLE IT ONLY FOR A MODULE THAT KEEPS NO STORAGE ACROSS REQUESTS.  The
-# subpool is per worker task, so MVS also releases it when a worker ends, abend
-# or not: a module that caches something in storage it allocated with
-# malloc()/__getm() would be left holding a freed pointer.  Storage meant to
-# outlive one invocation must come from __getmsp(size, 0) instead.
-#
-# mvsMF is NOT ready for this today (it anchors a cursor store off its CGI
-# context), which is why the /zosmf/* routes below do not carry it.
+# The retired RECLAIM= route option is accepted and ignored with a warning.
 #
 # --- UFS Filesystem ---
 # DOCROOT=/www
@@ -61,8 +53,7 @@
 #         MOD=PROGRAM *.ext          (explicit extension — uses DOCROOT)
 #         MOD=PROGRAM                (extension derived from module name,
 #                                     e.g. MOD=LUA → *.lua, MOD=REXX → *.rexx)
-#         any MOD= may add trailing  AUTH=mode, RES=class:resource
-#                                    and/or RECLAIM=YES (see above)
+#         any MOD= may add trailing  AUTH=mode  and/or  RES=class:resource
 #
 # Public z/OSMF endpoints must precede the gated /zosmf/* catch-all (first
 # match wins): the anonymous reachability probe (/zosmf/info) and the token
@@ -77,12 +68,10 @@ MOD=MVSMF /zosmf/*
 # MOD=HTTPDMTT /.dmtt
 #
 # ABEND0C1 allocates (?kb=n, default 128) and then abends S0C1 without freeing
-# -- the acceptance probe for the reclaim.  Drive /.abend a few hundred times
-# and every other CGI still loads at its original speed; do the same against
-# /.abendleak and the server degrades until none of them does.  Both are
-# commented out: this is a diagnostic, not something to leave reachable.
-# MOD=ABEND0C1 /.abend       AUTH=BASIC RECLAIM=YES
-# MOD=ABEND0C1 /.abendleak   AUTH=BASIC
+# -- the acceptance probe for the storage reclaim.  Drive it a few hundred
+# times and every other CGI must still load at its original speed.  Commented
+# out: this is a diagnostic, not something to leave reachable.
+# MOD=ABEND0C1 /.abend       AUTH=BASIC
 #
 # --- Static locations (LOC=) ---
 # A path prefix WITHOUT a program: served statically from DOCROOT but still

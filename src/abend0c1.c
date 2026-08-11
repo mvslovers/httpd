@@ -10,15 +10,14 @@
 ** This module makes that measurable with httpd's own code, so the acceptance
 ** test needs neither mvsMF nor MVSMF_ABEND_TEST=1 on a live server.  It
 ** allocates a known amount of storage, reports it, and then abends without
-** freeing any of it -- the exact shape of the defect.  Point one route at it
-** with RECLAIM=YES and another with RECLAIM=NO and the difference is the fix:
+** freeing any of it -- the exact shape of the defect:
 **
-**     MOD=ABEND0C1  /.abend       RECLAIM=YES
-**     MOD=ABEND0C1  /.abendleak
+**     MOD=ABEND0C1  /.abend
 **
-** Drive either a few hundred times and then load any other CGI.  With the
-** reclaim the server is as fast as it was on the first request; without it,
-** response times climb and eventually every module fails to load.
+** Drive it a few hundred times and then load any other CGI.  With the
+** reclaim (unconditional since #174) the server is as fast as it was on the
+** first request; a regression shows up as climbing response times and
+** eventually S80A on every module load.
 **
 ** ?kb=n picks the amount (default 128 KB, capped at 1 MB).  A single request
 ** cannot take the server down at the default size, which is deliberate: this
@@ -68,8 +67,8 @@ int main(int argc, char **argv)
          (got * CHUNK) / 1024, got);
 
     /* Nothing is freed on purpose: this is what an abending CGI leaves
-       behind.  On a RECLAIM=YES route httppcgi() releases the subpool it all
-       came from; otherwise it is gone until the address space ends. */
+       behind.  httppcgi() releases the subpool it all came from (#174);
+       before that existed, it was gone until the address space ended. */
     __asm("DC\tH'0'");                      /* S0C1                         */
 
     return 1234;                            /* not reached                  */

@@ -527,22 +527,26 @@ struct httpx {
 /* http_cgi_subpool() -- the heap subpool this CGI's storage belongs to, or 0.
 **
 ** Called by cgistart, not by module code: it brackets main() with
-** __setsp(subpool) so everything the module allocates while it runs can be
-** released in one FREEMAIN when the module abends (issue #154).  Nonzero only
-** for a route configured RECLAIM=YES; 0 -- every route by default, and every
-** older server, whose vector has 0 in this slot -- means the bracket is not
-** entered and nothing changes.
+** __setsp(subpool) so everything the module allocates while it runs is
+** released in one FREEMAIN when the module abends (#154), and by MVS when the
+** worker task ends.  Since #174 this is how every module runs -- there is no
+** per-route option.  0 means an older server (its vector has 0 in this slot):
+** the bracket is not entered and the module behaves as it always did there.
 **
-** WHAT THIS MEANS FOR A MODULE ON SUCH A ROUTE: everything it allocates is
-** request-lifetime storage.  Storage meant to outlive the invocation must be
-** obtained with __getmsp(size, 0) (clibos.h), not malloc()/__getm() -- the
-** subpool is per-task, so MVS releases it when the worker TCB ends even if no
-** abend ever happens.  Storage httpd itself allocates through this vector is
-** already pinned server-side; this is about the module's own allocations. */
+** THE STORAGE CONTRACT FOR SERVER MODULES, in one sentence:
+**
+**     malloc() is request storage.  Storage that must outlive the request
+**     is obtained with __getmsp(size, 0) (clibos.h).
+**
+** This is not advice but a lifetime rule: the request subpool is per-task,
+** so MVS releases it when the worker TCB ends even if nothing ever abends --
+** unpinned "persistent" storage cannot survive at all.  Storage httpd itself
+** allocates through this vector is already pinned server-side; this is about
+** the module's own allocations. */
 #define http_cgi_subpool(httpc) \
     ((httpx->http_cgi_subpool)((httpc)))
 
-/* The subpool used when a route has RECLAIM=YES.  Keep in sync with httpd.h. */
+/* The request heap subpool.  Keep in sync with httpd.h. */
 #define HTTP_CGI_SUBPOOL  5
 
 #define http_add_cgi(httpd,pgm,path,login) \
