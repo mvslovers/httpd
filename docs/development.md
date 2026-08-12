@@ -221,10 +221,15 @@ into the block and are ABI commitments, asserted at compile time in httpd's
 
 A handler that blocks — a long poll, a retry loop, anything waiting on an
 external event — has to notice that the server is going down and return
-promptly. It is not interrupted for you, and the deadline is short: when the
-operator issues `P HTTPD`, libc370's worker shutdown gives each task only about
-five seconds before a force-DETACH. A worker still parked at that point takes
-the teardown down with it.
+promptly. It is not interrupted for you, and the window is bounded.
+
+On `P HTTPD` the thread manager first posts a quiesce and waits for the workers
+to drain on their own. That graceful window is sized from `maxtask`
+(`20 + 10 × maxtask` units of 0.10 s in libc370's `cthread_manager_term()`, so
+roughly 11 seconds at the default `maxtask 9`). If a worker is still parked when
+it expires, the manager escalates to an immediate shutdown and force-DETACHes
+the task. A worker that never returns can wedge the teardown entirely — libc370
+then deliberately leaks the manager storage rather than risk a use-after-free.
 
 Poll the flag and abandon the work:
 
