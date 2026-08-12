@@ -206,6 +206,49 @@ Server modules call server functions through the HTTPX function vector. Key func
 **Cross-request context:**
 - `http_cgictx_get(httpd, eye, size)` — find or create one context block per 8-byte eyecatcher. A module that needs a single, address-space-lifetime block (shared across requests and workers) registers it here. The block begins with the 8-byte eyecatcher (`char eye[8]`, stamped on create); `size` is used only on create and ignored on a hit, so always pass the same size for the same eyecatcher. The block is zeroed on create, lives until the address space ends, and is never freed individually. Returns the block, or `NULL` if the context array is full or storage is exhausted. Example: `http_cgictx_get(httpd, "MVSMFCTX", sizeof(MVSMF_CTX))`.
 
+### Direct Accessors (not HTTPX entries)
+
+`HTTPD` is opaque to a module — you hold the pointer and never dereference it.
+Two macros in `httpcgi.h` are the documented exception. Both read a fixed offset
+into the block and are ABI commitments, asserted at compile time in httpd's
+`src/httpx.c`, so you may rely on them:
+
+- `http_get_httpx(httpd)` — the HTTPX function vector. Needed once per function
+  before any of the macros above will compile: `HTTPX *httpx = http_get_httpx(httpd);`
+- `http_get_flag(httpd)` — the server's processing flags.
+
+### Long-Running Handlers Must Drain on Shutdown
+
+A handler that blocks — a long poll, a retry loop, anything waiting on an
+external event — has to notice that the server is going down and return
+promptly. It is not interrupted for you, and the deadline is short: when the
+operator issues `P HTTPD`, libc370's worker shutdown gives each task only about
+five seconds before a force-DETACH. A worker still parked at that point takes
+the teardown down with it.
+
+Poll the flag and abandon the work:
+
+```c
+if (http_get_flag(httpd) & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
+    http_resp(httpc, 503);
+    return 0;
+}
+```
+
+`HTTPD_FLAG_QUIESCE` means the server has stopped accepting new requests;
+`HTTPD_FLAG_SHUTDOWN` means it is going down now. A draining handler should
+treat both the same way. Check on every iteration of the wait loop, not once on
+entry — the byte is `volatile` precisely because the operator-command thread
+sets it while your loop is running.
+
+Return a response rather than simply returning: the client has an open
+connection, and 503 tells it the work was abandoned rather than completed. Make
+clear it must not be blindly retried if the request had a side effect (issuing a
+console command, for instance).
+
+This is not hypothetical — a poll loop that ignored the flag is what produced
+the `SA03` shutdown crash in issue #122.
+
 ### Building a Server Module
 
 Create a `project.toml` with dependencies on `crent370` and `httpd`:
