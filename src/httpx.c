@@ -4,6 +4,29 @@
 #define HTTP_PRIVATE
 #include "httpd.h"
 
+/* ABI guard (issue #125).  httpcgi.h publishes two struct httpd offsets to
+** external CGI modules as macros -- httpx at 0x08 and flag at 0x2C -- so a
+** CGI reads those bytes without ever seeing the struct definition.  Moving
+** either field breaks every CGI silently: the wrong byte is still readable,
+** so there is no abend and no message, only a quiesce check that fires when
+** it should not or never fires at all.  The declaration below has a negative
+** array size when an offset moves, which fails the build here instead.  It
+** declares no storage (extern, never defined) and costs nothing at runtime.
+** _Static_assert is C11 and unavailable to cc370.
+**
+** Skipped under clang, which only ever sees this file through clangd: the
+** offsets hold for the 32-bit MVS target, but clangd parses with the host's
+** 64-bit pointers, where every field after eye[8] sits somewhere else and the
+** assert would fail on a perfectly good struct.  cc370 is the compiler that
+** matters here, and it is what CI builds with.  (cc370's sysroot offsetof is
+** (size_t)&(((x *)0)->y) -- gcc folds that to a constant in an array bound,
+** clang rejects it as a VLA, and gcc 3.4.6 predates __builtin_offsetof, so
+** there is no one spelling both accept anyway.) */
+#ifndef __clang__
+extern char httpd_abi_offsets[(offsetof(struct httpd, httpx) == 0x08 &&
+                               offsetof(struct httpd, flag)  == 0x2C) ? 1 : -1];
+#endif
+
 /* static execution vector */
 static HTTPX vect = {
     HTTPX_EYE,                  /* 00 eye catcher                   */

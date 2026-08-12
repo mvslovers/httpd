@@ -91,6 +91,12 @@ struct httpd {
     FILE        *dbg;               /* 20 debug/trace output        */
     int         tzoffset;           /* 24 time zone offset in secs  */
     HTTPC       **busy;             /* 28 busy clients              */
+    /* Frozen: httpcgi.h publishes offset 0x2C plus the QUIESCE and SHUTDOWN
+    ** masks to CGI modules as an ABI commitment (issue #125).  Do not move
+    ** the field or renumber those two bits.  The offset is asserted at
+    ** compile time in src/httpx.c; the mask values cannot be cross-checked
+    ** -- the two headers can never be included together -- so they are only
+    ** kept in step by this note. */
     volatile UCHAR flag;            /* 2C processing flags          */
 #define HTTPD_FLAG_INIT     0x01    /* ... initializing             */
 #define HTTPD_FLAG_LISTENER 0x02    /* ... listener thread created  */

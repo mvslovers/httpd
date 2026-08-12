@@ -318,14 +318,30 @@ struct httpx {
 #define HTTPD_EYE   "*HTTPD*"
 
 /* ------------------------------------------------------------------ */
-/* Accessor: get the HTTPX function vector from an HTTPD pointer.      */
+/* Accessors into the opaque HTTPD — the documented exception to the   */
+/* "CGI modules hold pointers, never dereference" rule above.          */
 /*                                                                     */
-/* httpx is always at offset 0x08 in struct httpd — this is an ABI    */
-/* commitment.  Using a macro avoids any link-time dependency on       */
-/* httpd's NCALIB.                                                     */
+/* Both offsets are ABI commitments: httpx at 0x08, flag at 0x2C.      */
+/* Macros avoid any link-time dependency on httpd's NCALIB.  The       */
+/* offsets are enforced at compile time in httpd's src/httpx.c, and    */
+/* the mask values are mirrored from include/httpd.h — see #125.       */
 /* ------------------------------------------------------------------ */
 
 #define http_get_httpx(h)  (*(HTTPX **)((char *)(h) + 8))
+
+/* Server processing flags.  A long-running handler polls these so it   */
+/* drains promptly at P HTTPD instead of parking a worker:              */
+/*                                                                      */
+/*   if (http_get_flag(httpd) & (HTTPD_FLAG_QUIESCE|HTTPD_FLAG_SHUTDOWN))*/
+/*       return 503;                                                    */
+/*                                                                      */
+/* volatile: the byte is set by the operator-command thread, so it must */
+/* be re-read on every poll and never hoisted out of the loop.          */
+
+#define http_get_flag(h)   (*(volatile unsigned char *)((char *)(h) + 0x2C))
+
+#define HTTPD_FLAG_QUIESCE  0x40    /* ... don't accept new request     */
+#define HTTPD_FLAG_SHUTDOWN 0x80    /* ... shutdown now                 */
 
 /* ------------------------------------------------------------------ */
 /* Macro layer — all http_* calls go through the httpx vector.         */
