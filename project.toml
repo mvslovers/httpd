@@ -33,7 +33,7 @@ cflags = [
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = "=1.1.0-dev"
+"mvslovers/ufsd" = ">=1.1.0"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
