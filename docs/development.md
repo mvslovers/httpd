@@ -192,6 +192,20 @@ Server modules call server functions through the HTTPX function vector. Key func
 - `http_resp(httpc, code)` — set HTTP status code
 - `http_printf(httpc, fmt, ...)` — send formatted output (headers or body)
 
+`http_resp()` can only send a code it has a reason phrase for (`src/httpstat.c`):
+
+```
+200 201 202 204 206
+301 302 303 304
+400 401 403 404 405 409 410 412 413 414 429
+500 501 502 503 505 507
+```
+
+Anything else goes out as **500 Internal Server Error** — in front of whatever
+body the module then writes — and logs `HTTPD054E` to the console. A module
+needing a code that is not on the list should have it added to `httpstat()`
+rather than work around it; the table is covered by `TSTSTAT`.
+
 **Environment:**
 - `http_get_env(httpc, name)` — get request environment variable (e.g. `REQUEST_METHOD`, `REQUEST_PATH`, `HTTP_Host`)
 - `http_set_env(httpc, name, value)` — set environment variable

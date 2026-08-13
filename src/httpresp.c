@@ -15,35 +15,22 @@ httpresp(HTTPC *httpc, int resp)
 	UCHAR		*jobname = (UCHAR*)__jobname(); /* 8 character JOB NAME */
     int     	rc  = 0;
     UCHAR   	*p;
+    const char	*status;
     UCHAR    	date[40];
     time64_t	now;
 
     http_enter("httpresp(%d)\n", resp);
 
-    switch(resp) {
-    case 200: p = "200 OK";                     break;
-    case 201: p = "201 Created";                break;
-    case 202: p = "202 Accepted";               break;
-    case 204: p = "204 No Content";             break;
-    case 301: p = "301 Moved Permanently";      break;
-    case 302: p = "302 Moved Temporarily";      break;
-	case 303: p = "303 See Other";				break;
-    case 304: p = "304 Not Modified";           break;
-    case 400: p = "400 Bad Request";            break;
-    case 401: p = "401 Unauthorized";           break;
-    case 403: p = "403 Forbidden";              break;
-    case 404: p = "404 Not Found";              break;
-    case 405: p = "405 Method Not Allowed";     break;
-    case 409: p = "409 Conflict";               break;
-    case 410: p = "410 Gone";                   break;
-    case 413: p = "413 Payload Too Large";      break;
-    case 414: p = "414 URI Too Long";           break;
-    case 500: p = "500 Internal Server Error";  break;
-    case 507: p = "507 Insufficient Storage";   break;
-    case 501: p = "501 Not Implemented";        break;
-    case 502: p = "502 Bad Gateway";            break;
-    case 503: p = "503 Service Unavailable";    break;
-    default : p = "500 Internal Server Error";  break;
+    /* The table is in httpstat.c -- free of httpd.h, so it unit-tests dual. */
+    status = httpstat(resp);
+    if (!status) {
+        /* A code we have no phrase for.  Answering it with 500 is what this
+        ** has always done; the WTO is what keeps the next gap from hiding.
+        ** Silently, "server does not know this code" is indistinguishable on
+        ** the wire from "server failed" -- that is how 505, which httpin.c
+        ** emits, went out as a 500 unnoticed (issue #181). */
+        wtof("HTTPD054E Unsupported HTTP status %d requested, sent 500", resp);
+        status = httpstat(500);
     }
 
     httpc->resp = resp;
@@ -52,9 +39,9 @@ httpresp(HTTPC *httpc, int resp)
     {
         UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
         if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
-            rc = http_printf(httpc, "HTTP/1.1 %s\r\n", p);
+            rc = http_printf(httpc, "HTTP/1.1 %s\r\n", status);
         } else {
-            rc = http_printf(httpc, "HTTP/1.0 %s\r\n", p);
+            rc = http_printf(httpc, "HTTP/1.0 %s\r\n", status);
         }
     }
     if (rc) goto quit;

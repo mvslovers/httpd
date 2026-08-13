@@ -54,6 +54,7 @@
 #include "cred.h"					/* Credentials					*/
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 #include "httpbody.h"               /* request body classification  */
+#include "httpstat.h"               /* status code -> status line   */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
 

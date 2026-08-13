@@ -143,6 +143,14 @@ sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 name = "TSTRACF"
 sources = ["test/tstracf.c", "src/httpracf.c"]
 
+# httpstat() status code -> status line table (issue #181).  A code the table
+# does not know is answered with 500, so a gap is silent on the wire -- the
+# test pins every code httpd itself emits.  Free of httpd.h -> DUAL (host +
+# MVS); helper source listed for the host link.
+[[test]]
+name = "TSTSTAT"
+sources = ["test/tststat.c", "src/httpstat.c"]
+
 # credid_enc()/credid_dec() round-trip + flag survival across a repeat read of a
 # stored CRED (issue #109: http_get_userid() garbage on a cache-hit read).
 # blowfish_encrypt/decrypt are crent370 (MVS) -> MVS-only test (test-mvs); the
