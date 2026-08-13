@@ -3,7 +3,7 @@
 ** credential has been idle and the configured TTL, has it expired?
 **
 ** Kept free of project headers (plain integers only) so the boundary logic
-** unit-tests on the host as well as on MVS (see test/tstexpire.c).  The C name
+** unit-tests on the host as well as on MVS (see test/tstexpir.c).  The C name
 ** is <= 8 chars, so cc370 maps it to CSECT CREDEXP.
 */
 
