@@ -320,6 +320,21 @@ struct httpcgi {
 #define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
 #define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
 
+/* A module that ran to completion and returned a NEGATIVE rc of its own.
+** It cannot be passed through raw: -5 from the module and the negated abend
+** code of a U0005 are the same integer, and reporting the one as the other is
+** the whole of #131.  The rc is folded into a reserved range instead, so
+** httppcgi() can report what happened without claiming an abend.
+**
+** Only a module with its own __start can get here -- cgistart clamps a
+** negative main() rc to 0, because a CGI reports failures through the HTTP
+** response and R15 is not that channel.  The fold is bounded to the abend
+** range on the way in, so it cannot overflow. */
+#define HTTP_LINK_EPGMRC_BASE (-0x02000000)
+#define HTTP_LINK_EPGMRC(rc)  (HTTP_LINK_EPGMRC_BASE + (rc))
+#define HTTP_LINK_IS_PGMRC(v) ((v) <= HTTP_LINK_EPGMRC_BASE)
+#define HTTP_LINK_PGMRC(v)    ((v) - HTTP_LINK_EPGMRC_BASE)
+
 /* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
 #define HTTPD_PARMLIB_DD "HTTPPRM"

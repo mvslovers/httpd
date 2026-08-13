@@ -20,6 +20,14 @@
 **       -1, which is what used to surface as U0001
 **   T3  a route dispatched without a program name reports itself as such
 **   T4  no sentinel can collide with a real abend code
+**   T5  a module that RUNS and returns a negative rc (TSTLNKM, rc -5) comes
+**       back folded, not as the negated abend code of a U0005
+**
+** The cgistart clamp (a negative main() rc becomes 0) is deliberately NOT
+** tested here.  cgistart refuses to run without a server context -- RC 12 from
+** not_a_server_module() before main() is called (#141) -- so neither a
+** standalone step nor a LINK driven from the fabricated HTTPC below ever
+** reaches the clamp.  It needs a live server, which is where it was checked.
 **
 ** MVS-only (LINK SVC, httpd.h -> crent370 internals).  HTTP_PRIVATE is defined
 ** so http_link() resolves to the real HTTPLINK entry (called directly) instead
@@ -31,6 +39,10 @@
 
 /* a module name that is not in any STEPLIB, LINKLIST or LPA */
 #define NOSUCH  "NOSUCHXX"
+
+/* the LINK target that returns a negative rc; keep in sync with tstlnkm.c */
+#define PGMRC_MOD   "TSTLNKM"
+#define PGMRC_VALUE (-5)
 
 int main(void)
 {
@@ -65,6 +77,20 @@ int main(void)
     rc = http_link(httpc, "");
     CHECK_EQ(rc, HTTP_LINK_ENOPGM, "empty program name reports ENOPGM");
 
+    /* --- T5: a module that runs and returns a negative rc.  TSTLNKM only
+       answers with PGMRC_VALUE when it gets a parm, and httplink() builds the
+       parm from REQUEST_PATH -- without it the module takes its standalone
+       path and returns 0, which would make this test pass for a reason that
+       has nothing to do with the fold. */
+    rc = http_set_env(httpc, "REQUEST_PATH", "/tstlnkm");
+    CHECK_EQ(rc, 0, "REQUEST_PATH set (TSTLNKM needs a parm)");
+
+    rc = http_link(httpc, PGMRC_MOD);
+    CHECK(HTTP_LINK_IS_PGMRC(rc), "negative module rc comes back folded");
+    CHECK_EQ(HTTP_LINK_PGMRC(rc), PGMRC_VALUE, "the folded rc decodes back");
+    CHECK(rc != PGMRC_VALUE,
+          "negative module rc is not the negated abend code of a U0005");
+
     free(httpc);
 
     /* --- T4: the safety argument for the sentinels.  ___try() formats an
@@ -76,6 +102,19 @@ int main(void)
           "ENOPGM is outside the abend code range");
     CHECK((unsigned)(-HTTP_LINK_EESTAE) > 0x00FFFFFF,
           "EESTAE is outside the abend code range");
+
+    /* the folded module-rc range must clear the abend range too, and must not
+       swallow the three sentinels */
+    CHECK(HTTP_LINK_IS_PGMRC(HTTP_LINK_EPGMRC(-1)),
+          "the smallest folded module rc is recognized as one");
+    CHECK(!HTTP_LINK_IS_PGMRC(-0x00FFFFFF),
+          "the largest abend code is not read as a folded module rc");
+    CHECK(!HTTP_LINK_IS_PGMRC(HTTP_LINK_ENOLOAD) &&
+          !HTTP_LINK_IS_PGMRC(HTTP_LINK_ENOPGM) &&
+          !HTTP_LINK_IS_PGMRC(HTTP_LINK_EESTAE),
+          "no sentinel is read as a folded module rc");
+    CHECK_EQ(HTTP_LINK_PGMRC(HTTP_LINK_EPGMRC(-0x00FFFFFF)), -0x00FFFFFF,
+             "the clamp boundary round-trips through the fold");
 
     return mbt_test_summary("TSTLINK");
 }

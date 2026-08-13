@@ -545,6 +545,14 @@ struct httpx {
 #define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
 #define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
 
+/* A module that ran and returned a negative rc of its own, folded into its own
+   range so it cannot be read as a negated abend code.  cgistart clamps a
+   negative main() rc to 0, so only a module with its own __start gets here. */
+#define HTTP_LINK_EPGMRC_BASE (-0x02000000)
+#define HTTP_LINK_EPGMRC(rc)  (HTTP_LINK_EPGMRC_BASE + (rc))
+#define HTTP_LINK_IS_PGMRC(v) ((v) <= HTTP_LINK_EPGMRC_BASE)
+#define HTTP_LINK_PGMRC(v)    ((v) - HTTP_LINK_EPGMRC_BASE)
+
 #define http_find_cgi(httpd,path) \
     ((httpx->http_find_cgi)((httpd),(path)))
 

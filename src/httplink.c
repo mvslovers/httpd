@@ -62,6 +62,13 @@ int httplink(HTTPC *httpc, const char *pgm)
         ** here, and no dump to go looking for. */
         prc = HTTP_LINK_ENOLOAD;
     }
+    else if (prc < 0) {
+        /* The module ran and returned a negative rc of its own.  Fold it into
+        ** its own range so httppcgi() does not read it as a negated abend
+        ** code; clamp first, so the fold stays inside an int. */
+        if (prc < -0x00FFFFFF) prc = -0x00FFFFFF;
+        prc = HTTP_LINK_EPGMRC(prc);
+    }
 
 quit:
     return prc;

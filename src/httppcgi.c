@@ -50,7 +50,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
         ** reason text is common to all of them (#131). */
         const char  *pgm    = cgi->pgm ? cgi->pgm : "(none)";
         const char  *reason = NULL;
-        char        abtext[32];
+        char        detail[32];
 
         /* Release the CGI's storage FIRST, before anything else on this path
         ** (issue #154).  Until this existed, an abending CGI kept everything it
@@ -94,23 +94,30 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
         case HTTP_LINK_EESTAE:
             reason = "could not be started, ESTAE create failed";
             break;
-        default: {
-            /* an abend after all; rc is the negated 0x00sssuuu code */
-            unsigned abcode = (unsigned) (rc * -1);   /* make positive again */
-
-            if (abcode > 4095) {
-                /* system abend occurred */
-                snprintf(abtext, sizeof(abtext),
-                         "failed with S%03X ABEND", abcode >> 12);
+        default:
+            if (HTTP_LINK_IS_PGMRC(rc)) {
+                /* the module ran and returned a negative rc of its own -- a
+                ** failure worth reporting, but not an abend and not a dump */
+                snprintf(detail, sizeof(detail),
+                         "returned rc %d", HTTP_LINK_PGMRC(rc));
             }
             else {
-                /* user abend code */
-                snprintf(abtext, sizeof(abtext),
-                         "failed with U%04d ABEND", abcode);
+                /* an abend after all; rc is the negated 0x00sssuuu code */
+                unsigned abcode = (unsigned) (rc * -1);  /* positive again */
+
+                if (abcode > 4095) {
+                    /* system abend occurred */
+                    snprintf(detail, sizeof(detail),
+                             "failed with S%03X ABEND", abcode >> 12);
+                }
+                else {
+                    /* user abend code */
+                    snprintf(detail, sizeof(detail),
+                             "failed with U%04d ABEND", abcode);
+                }
             }
-            reason = abtext;
+            reason = detail;
             break;
-        }
         }
 
         if (httpx) {
