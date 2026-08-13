@@ -1,4 +1,4 @@
-/* TSTEXPIRE.C
+/* TSTEXPIR.C
 ** Tests for credexp() -- the credential-reaper expiry decision (M2,
 ** credentials/src/credexp.c).
 **
@@ -31,5 +31,5 @@ int main(void)
     CHECK(credexp(-1, 30) == 0,      "negative elapsed (skew) -> live");
     CHECK(credexp(-100000, 30) == 0, "large negative elapsed -> live");
 
-    return mbt_test_summary("TSTEXPIRE");
+    return mbt_test_summary("TSTEXPIR");
 }

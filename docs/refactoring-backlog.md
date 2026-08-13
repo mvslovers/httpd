@@ -364,7 +364,7 @@ RACF ACEE per login was removed only by explicit `/logout` or shutdown.
 >   `LOCK_EXC`, `array_del`s entries idle > TTL (skipping any `testlock` shows
 >   in-use), and `cred_free`s them (RACF logout) **after releasing** the array
 >   lock. The decision is a pure `credexp(elapsed,ttl)` helper — dual-tested
->   (`TSTEXPIRE`).
+>   (`TSTEXPIR`).
 > - **Sweep** runs in the `socket_thread` select loop, throttled ~60 s — **no
 >   new thread** (`cred_array()` is AS-wide, so the socket_thread sees the
 >   workers' creds).
@@ -669,7 +669,7 @@ for frequently-called endpoints and enable mvsMF integration.
 | SSI echo var guard (S12) | **Resolved (2026-07-03)** | `!var \|\| !*var` — `httpfile.c`, PR #93 / issue #92 |
 | `crt->crtufs` dangling after `ufsfree` (M6) | **Resolved (2026-07-03)** | clear alias before free — `httpclos.c`, PR #93 / issue #92 |
 | `cgictx` array not freed at `terminate()` (M11) | **Resolved (2026-07-03)** | `free(httpd->cgictx)` — `httpd.c`, PR #93 / issue #92 |
-| Credential reaper / session timeout (M2) | **Resolved (2026-07-03)** | `cred_reap` + refresh + `SESSION_TIMEOUT` + cap + `TSTEXPIRE` — `credentials/`+`httpd.c`+`httpprm.c`, PR #95 / issue #94 |
+| Credential reaper / session timeout (M2) | **Resolved (2026-07-03)** | `cred_reap` + refresh + `SESSION_TIMEOUT` + cap + `TSTEXPIR` — `credentials/`+`httpd.c`+`httpprm.c`, PR #95 / issue #94 |
 
 ---
 
@@ -703,7 +703,7 @@ EBCDIC.
   §3.3.3). **Dual** (host + MVS); 16 assertions over the decision table
   (absent/zero/valid/oversize/negative/junk/OWS/`Transfer-Encoding`).
   *(PR #89 / issue #88.)*
-- `TSTEXPIRE` — `credexp()` credential-reaper expiry decision (**M2**). **Dual**
+- `TSTEXPIR` — `credexp()` credential-reaper expiry decision (**M2**). **Dual**
   (host + MVS); 9 assertions (`ttl==0`, strict `>` boundary, clock skew). The
   reaper's real risk is `cred_reap()`'s concurrency — behavioural/MVS-only.
   *(PR #95 / issue #94.)*
@@ -874,6 +874,6 @@ disproportionate to their Low severity).
 `httpd.h` (`cfg_session_timeout` in reused padding). Reviewed design: reject-on-
 full cap (no eviction), free-after-unlock in the sweep, refresh-at-lookup + the
 `SESSION_TIMEOUT >> longest-request` invariant as the UAF guard. Pure `credexp`
-dual-tested (`TSTEXPIRE`, 9, native). PR #95, issue #94. Counts M&S 4→3.
+dual-tested (`TSTEXPIR`, 9, native). PR #95, issue #94. Counts M&S 4→3.
 **Also filed:** the *credential-package unification* item (httpd creds vs mvsMF's
 own auth — two tracks to converge) under *Security architecture*.

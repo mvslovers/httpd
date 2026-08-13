@@ -133,8 +133,8 @@ sources = ["test/tstbody.c", "src/httpbody.c"]
 # credexp() credential-reaper expiry decision (M2 session timeout).  Free of
 # project headers -> DUAL (host + MVS); helper source listed for the host link.
 [[test]]
-name = "TSTEXPIRE"
-sources = ["test/tstexpire.c", "credentials/src/credexp.c"]
+name = "TSTEXPIR"
+sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 
 # httpracf() SAF authorization decision table (issue #135): rc 0 and 4 both
 # allow, -1 must not.  Free of httpd.h -> DUAL (host + MVS); helper source
