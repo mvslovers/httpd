@@ -294,6 +294,21 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     ** anchors on the retry path, so httppcgi() is already on its own PPA when
     ** it issues the FREEMAIN. */
     if (cgisp) __setsp(prevsp);
+
+    /* A negative rc collides with __link()'s own failure marker: -1 from main()
+    ** and "the module could not be loaded" are the same value in prc, and -5
+    ** and the negated abend code of a U0005 are the same integer after that
+    ** (issue #131).  A CGI reports failures through the HTTP response, so R15
+    ** carries nothing worth that ambiguity and is clamped.  httplink() still
+    ** handles a negative module rc, because a module with its own __start has
+    ** no clamp -- this only takes CGIs out of that case.
+    **
+    ** Only negatives.  Nothing needs a positive rc zeroed: it is unambiguous on
+    ** the way back, httppcgi() passes it through, and clamping the sign is the
+    ** whole of the problem.  (It cannot reach a job step's COND CODE either --
+    ** not_a_server_module() above ends a direct EXEC with RC 12 before main()
+    ** ever runs -- so there is nothing to preserve there.) */
+    if (rc < 0) rc = 0;
 #endif
     __exit(rc);
     return (rc);

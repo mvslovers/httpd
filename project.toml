@@ -204,6 +204,33 @@ startup = "crt1"                # like a CGI module: @@CRT0 without the CTHREAD 
 sources = ["test/mvs/tstspm.c"]
 host = false                    # LINK target for TSTSP -> test-mvs
 
+# http_link() failure reporting (issue #131): a module that cannot be loaded
+# must not come out as an abend code.  Rests on a libc370 contract -- __linkds()
+# on a missing module returns 0 with prc == -1 -- which the test pins first, so
+# a change there fails here instead of resurfacing as "U0001 ABEND" in a 503.
+# MVS-only (LINK SVC); httplink resolves from the [internal] autocall archive.
+[[test]]
+name = "TSTLINK"
+sources = ["test/mvs/tstlink.c"]
+host = false                    # LINK SVC + httpd.h internals -> test-mvs
+
+# TSTLNKM is the LINK target for TSTLINK's T5, not a test of its own: it runs
+# to completion and returns a negative rc, the case httppcgi() used to report
+# as an abend.  crt1 on purpose -- cgistart clamps a negative main() rc to 0,
+# so a module with its own __start is the only thing that can still produce
+# one.  Run standalone by the runner (no parm) it returns 0.
+[[test]]
+name = "TSTLNKM"
+startup = "crt1"                # own __start, i.e. no cgistart clamp
+sources = ["test/mvs/tstlnkm.c"]
+host = false                    # LINK target for TSTLINK -> test-mvs
+
+# There is deliberately no counterpart built with cgistart.  A cgistart module
+# refuses to run without a server context (#141: RC 12 from
+# not_a_server_module before main() is ever called), so the clamp it applies to
+# a negative main() rc is unreachable from a bare test module -- both as a
+# standalone step and as a LINK target driven from a fabricated HTTPC.
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the

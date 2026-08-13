@@ -45,8 +45,12 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
     /* link to external program */
     rc = http_link(httpc, cgi->pgm);
     if (rc < 0) {
-        /* some kind of ABEND occurred */
-        unsigned abcode = (unsigned) (rc * -1);   /* make positive again */
+        /* The module did not run to completion.  Which of the possible
+        ** reasons it was decides the wording only -- everything below the
+        ** reason text is common to all of them (#131). */
+        const char  *pgm    = cgi->pgm ? cgi->pgm : "(none)";
+        const char  *reason = NULL;
+        char        detail[32];
 
         /* Release the CGI's storage FIRST, before anything else on this path
         ** (issue #154).  Until this existed, an abending CGI kept everything it
@@ -73,38 +77,63 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
 
             if (frc) {
                 wtof("HTTPD906W Storage reclaim for %s failed, rc=%d",
-                     cgi->pgm, frc);
+                     pgm, frc);
             }
+        }
+
+        /* Say what actually went wrong.  Only a real abend carries a code, and
+        ** only a real abend leaves a dump worth looking for -- everything else
+        ** here means the module never ran (#131). */
+        switch (rc) {
+        case HTTP_LINK_ENOLOAD:
+            reason = "could not be loaded (not found in STEPLIB?)";
+            break;
+        case HTTP_LINK_ENOPGM:
+            reason = "was dispatched without a program name";
+            break;
+        case HTTP_LINK_EESTAE:
+            reason = "could not be started, ESTAE create failed";
+            break;
+        default:
+            if (HTTP_LINK_IS_PGMRC(rc)) {
+                /* the module ran and returned a negative rc of its own -- a
+                ** failure worth reporting, but not an abend and not a dump */
+                snprintf(detail, sizeof(detail),
+                         "returned rc %d", HTTP_LINK_PGMRC(rc));
+            }
+            else {
+                /* an abend after all; rc is the negated 0x00sssuuu code */
+                unsigned abcode = (unsigned) (rc * -1);  /* positive again */
+
+                if (abcode > 4095) {
+                    /* system abend occurred */
+                    snprintf(detail, sizeof(detail),
+                             "failed with S%03X ABEND", abcode >> 12);
+                }
+                else {
+                    /* user abend code */
+                    snprintf(detail, sizeof(detail),
+                             "failed with U%04d ABEND", abcode);
+                }
+            }
+            reason = detail;
+            break;
         }
 
         if (httpx) {
             /* we're running in the HTTPD server */
             if (!httpc->resp) {
                 /* no response header was issued by CGI program */
-                http_resp(httpc,503);   
+                http_resp(httpc,503);
                 http_printf(httpc, "Content-Type: %s\r\n", "text/plain");
                 http_printf(httpc, "\r\n");
             }
 
-            if (abcode > 4095) {
-                /* system abend occurred */
-                http_printf(httpc, "External program %s failed with S%03X ABEND", cgi->pgm, abcode >> 12);
-            }
-            else {
-                /* user abend code */
-                http_printf(httpc, "External program %s failed with U%04d ABEND", cgi->pgm, abcode);
-            }
+            http_printf(httpc, "External program %s %s", pgm, reason);
             http_printf(httpc, "\n");
         }
 
-        if (abcode > 4095) {
-            /* system abend occurred */
-            wtof("External program %s failed with S%03X ABEND", cgi->pgm, abcode >> 12);
-        }
-        else {
-            /* user abend code */
-            wtof("External program %s failed with U%04d ABEND", cgi->pgm, abcode);
-        }
+        wtof("HTTPD908E External program %s %s", pgm, reason);
     }
 
     httpc->state = CSTATE_DONE;
