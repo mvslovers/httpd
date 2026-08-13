@@ -50,9 +50,9 @@
 #
 # --- Modules ---
 # Format: MOD=PROGRAM /url/pattern   (URL prefix match)
-#         MOD=PROGRAM *.ext          (explicit extension — uses DOCROOT)
+#         MOD=PROGRAM *.ext          (explicit extension - uses DOCROOT)
 #         MOD=PROGRAM                (extension derived from module name,
-#                                     e.g. MOD=LUA → *.lua, MOD=REXX → *.rexx)
+#                                     e.g. MOD=LUA -> *.lua, MOD=REXX -> *.rexx)
 #         any MOD= may add trailing  AUTH=mode  and/or  RES=class:resource
 #
 # Public z/OSMF endpoints must precede the gated /zosmf/* catch-all (first
