@@ -204,6 +204,16 @@ startup = "crt1"                # like a CGI module: @@CRT0 without the CTHREAD 
 sources = ["test/mvs/tstspm.c"]
 host = false                    # LINK target for TSTSP -> test-mvs
 
+# http_link() failure reporting (issue #131): a module that cannot be loaded
+# must not come out as an abend code.  Rests on a libc370 contract -- __linkds()
+# on a missing module returns 0 with prc == -1 -- which the test pins first, so
+# a change there fails here instead of resurfacing as "U0001 ABEND" in a 503.
+# MVS-only (LINK SVC); httplink resolves from the [internal] autocall archive.
+[[test]]
+name = "TSTLINK"
+sources = ["test/mvs/tstlink.c"]
+host = false                    # LINK SVC + httpd.h internals -> test-mvs
+
 # -- Public CGI SDK export ----------------------------------------
 # What httpd ships for consumers (e.g. mvsmf, which declares
 # "mvslovers/httpd" in its [dependencies]).  The client library is the

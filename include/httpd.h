@@ -299,6 +299,27 @@ struct httpcgi {
 ** value here. */
 #define HTTP_CGI_SUBPOOL  5         /* keep in sync with httpcgi.h          */
 
+/* http_link() failure codes (#131).
+**
+** http_link() returns the linked module's own return code, or a negative
+** value when the module did not run to completion.  Historically EVERY
+** negative value was read as an abend code, so a module that could not be
+** loaded at all -- __link() returns -1 on its LINK error-return path, no
+** abend involved -- was reported to the client as "U0001 ABEND", sending the
+** reader looking for a dump that does not exist.
+**
+** An abend code from ___try() is formatted 0x00sssuuu (clibtry.h), so it can
+** never exceed 0x00FFFFFF.  Anything of greater magnitude is therefore free
+** as a sentinel and cannot collide with a real abend, however the module
+** failed.  httppcgi() maps these to their own text.
+**
+** Residual ambiguity, by design: a module that deliberately returns -1 is
+** indistinguishable from one that could not be loaded, because __link()
+** collapses both into *prc = -1.  Server modules return 0. */
+#define HTTP_LINK_ENOLOAD (-0x01000001) /* module not found, LINK failed    */
+#define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
+#define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
+
 /* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
 #define HTTPD_PARMLIB_DD "HTTPPRM"

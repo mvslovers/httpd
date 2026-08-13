@@ -537,6 +537,14 @@ struct httpx {
 #define http_link(httpc,pgm) \
     ((httpx->http_link)((httpc),(pgm)))
 
+/* http_link() failure codes.  Keep in sync with httpd.h.  A negative rc that
+   is NOT one of these is a negated abend code, formatted 0x00sssuuu; these sit
+   above that range so they can never be mistaken for one.  Anything here means
+   the module never ran, so there is no dump to go looking for. */
+#define HTTP_LINK_ENOLOAD (-0x01000001) /* module not found, LINK failed    */
+#define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
+#define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
+
 #define http_find_cgi(httpd,path) \
     ((httpx->http_find_cgi)((httpd),(path)))
 
