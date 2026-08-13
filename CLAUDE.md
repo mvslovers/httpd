@@ -22,14 +22,14 @@ Implications:
 - VLAs are still forbidden (stack constraints)
 - All variable declarations should still prefer top-of-block for readability
 
-Cross-compiled for MVS/370 using the `c2asm370` compiler (GCC 3.2.3 fork). All other platform constraints from the root CLAUDE.md still apply (24-bit addressing, EBCDIC, no POSIX, memory efficiency, etc.).
+Cross-compiled for MVS/370 with the `cc370` toolchain (GCC 3.4.6 fork; c2asm370 is its unmaintained predecessor and is not used here). All other platform constraints from the root CLAUDE.md still apply (24-bit addressing, EBCDIC, no POSIX, memory efficiency, etc.).
 
 ## HTTPD 4.0.0 — Confirmed Changes
 
 These decisions are final:
 
 - **HTTP/1.1 support** — Chunked Transfer Encoding, Content-Length, Persistent Connections (Keep-Alive)
-- **Parmlib configuration** — Replace Lua config engine with line-based Parmlib parser (DD:HTTPDPRM, FB-80)
+- **Parmlib configuration** — Replace Lua config engine with line-based Parmlib parser (DD:HTTPPRM, FB-80)
 - **UFSD-only docroot** — Remove DD-based file serving (`/DD:HTML(...)` paths), static files only from UFS
 - **Remove embedded FTPD** — FTP functionality available separately
 - **Remove MQTT telemetry** — HTTPT struct, telemetry_thread, mqtt370 dependency
@@ -38,20 +38,28 @@ These decisions are final:
 
 ## HTTPD 4.0.0 — Open Items
 
-1. **TSK-112 CGI Chunked Bug** (M, High) — CGI responses with chunked transfer encoding
-2. **TSK-110 Fehlende Status-Codes** (XS, High) — Missing HTTP status codes
-3. **TSK-108 HTTP Parsing härten** (L, High) — Harden HTTP request parsing
-4. **TSK-10 Doku + Version Bump** (M, Medium) — Documentation and version bump to 4.0.0
+Not tracked here. The four Notion tasks this section used to list (TSK-112,
+TSK-110, TSK-108, TSK-10) are all **Done**, and the list sat stale for months
+because nothing updates it when work lands. Read the live trackers instead:
+
+```
+gh issue list --repo mvslovers/httpd
+```
+
+plus the *Issues & Tasks* database in Notion. Do not restore a task list here —
+a copy of a tracker is wrong the first time someone closes something.
 
 ## Dependencies (from project.toml)
 
 ```toml
 [dependencies]
-"mvslovers/crent370" = ">=1.0.6"
-"mvslovers/ufs370" = ">=1.0.0"
+"mvslovers/ufsd" = ">=1.1.0"
 ```
 
-**Note:** mqtt370 dependency will be removed (MQTT telemetry confirmed for removal).
+That is the whole list. `libc370` is the cc370 sysroot (`-lc`), not a declared
+dependency. crent370 was superseded by libc370; ufs370 by ufsd; the lua370 and
+mqtt370 entries went with the Lua engine and the MQTT telemetry. Resolved
+versions are pinned in `mbt.lock` (committed).
 
 ## Development Workflow
 
@@ -84,16 +92,29 @@ HTTPD uses [mbt](https://github.com/mvslovers/mbt) as its build tool (Git submod
 
 ### Build Commands
 
+mbt **v2**: the whole build runs on the host with the cc370 toolchain, and only
+`make deploy` touches MVS. `make help` lists every target; the root CLAUDE.md
+documents the full set. The ones used most here:
+
 ```bash
+make               # build the load modules
+make modules       # production modules only
+make test          # cross-compile the [[test]] modules
+make test-host     # build + run the dual tests natively — the fast inner loop
+make test-mvs      # deploy to TESTLIB + run the suite on MVS
 make doctor        # verify environment (MVS connectivity, tools)
-make bootstrap     # resolve dependencies, allocate MVS datasets
-make build         # cross-compile C → ASM, assemble on MVS, NCAL link
-make link          # final linkedit into load module
-make install       # copy load module to install dataset
 make compiledb     # generate compile_commands.json for clangd
-make clean         # remove .s, .o files, build stamps
-make distclean     # deep clean (also removes contrib/ and .mbt/)
+make clean         # remove build/ and dist/ (keeps staged deps)
+make distclean     # clean + remove all of .mbt/ (incl. deps)
 ```
+
+`make bootstrap` / `build` / `link` / `install` were mbt v1 and no longer exist.
+
+**`make test-host` cannot catch a `-Werror` regression.** `[host] cflags =
+["-Wno-error"]` in project.toml, deliberately — the host compiler's `-Wall` is a
+different and much larger set. The target build is the gate, so run `make` or
+`make modules` before calling a change clean. CI only *compiles* `make test`, it
+never runs an assertion.
 
 ### Configuration
 
@@ -109,7 +130,7 @@ httpd.c (main / initialize)
   ├── worker_thread × N (64 KB stack) — full request lifecycle per client
   │     CSTATE_IN → CSTATE_PARSE → CSTATE_GET/POST/PUT/DELETE
   │       → CSTATE_DONE → CSTATE_REPORT → CSTATE_RESET
-  │         → CSTATE_IN (keep-alive, planned) or CSTATE_CLOSE
+  │         → CSTATE_IN (keep-alive) or CSTATE_CLOSE
   └── CTHDMGR worker pool (mintask..maxtask, default 3..9)
 ```
 
@@ -130,11 +151,11 @@ httpin.c     → Read request line + headers from socket
 httppars.c   → Parse method, URI, query string, POST body
 httppc.c     → CGI matching, auth check, method dispatch
 httpget.c    → Static file serving with MIME detection
-httpresp.c   → HTTP response line + headers (currently HTTP/1.0)
+httpresp.c   → HTTP response line + headers (version matches the request)
 httpsend.c   → Binary/text data delivery
 httpdone.c   → Close files
 httprepo.c   → Write SMF record, update counters
-httprese.c   → Reset for next request or close (currently always closes)
+httprese.c   → Reset for next request (keep-alive) or close
 httpclos.c   → Release HTTPC, close socket
 ```
 
@@ -154,7 +175,7 @@ httpx->http_printf(httpc, "Content-Type: text/html\r\n\r\n");
 
 In HTTPD 4.0.0, CGI registration moves from Lua defaults to Parmlib-only. No CGIs are active unless explicitly configured.
 
-### HTTP/1.1 Design (to be implemented)
+### HTTP/1.1 Design (implemented)
 
 **Response body framing — decision logic:**
 0. If the status is body-less (`1xx`, `204`, `304`) → never set Content-Length or
@@ -175,9 +196,9 @@ When `httpc->chunked == 1`, every `http_send()` call is automatically wrapped in
 
 **Impact on CGI modules (mvsMF):** Zero changes needed. mvsMF already sets Content-Length via `sendDefaultHeaders()` for JSON responses. Streaming responses get chunked encoding transparently.
 
-### Parmlib Configuration (to replace Lua)
+### Parmlib Configuration
 
-Read from `DD:HTTPDPRM` (FB-80 dataset). Lines starting with `#` or `*` are comments. Format: `KEYWORD VALUE [VALUE...]`.
+Read from `DD:HTTPPRM` (FB-80 dataset). Lines starting with `#` or `*` are comments. Format: `KEYWORD VALUE [VALUE...]`.
 
 ```
 # HTTPD 4.0.0 Configuration
@@ -194,7 +215,7 @@ CGI    MVSMF      /zosmf/*
 CGI    HTTPDSRV   /.dsrv
 ```
 
-Missing `DD:HTTPDPRM` → server starts with defaults (port 8080, no CGIs).
+Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no CGIs).
 
 ### Key Source Files
 
@@ -206,34 +227,35 @@ Missing `DD:HTTPDPRM` → server starts with defaults (port 8080, no CGIs).
 - **httpget.c**: Static file serving. MIME detection via httpmime.c.
 - **httpresp.c**: HTTP response line + standard headers.
 - **httpsend.c**: Low-level socket send.
-- **httprese.c**: Reset between requests (currently always closes; keep-alive planned).
+- **httprese.c**: Reset for the next request on a kept-alive connection, or close.
 - **httpclos.c**: Release client handle, close socket, free UFS handles.
-- **httpopen.c**: File open — UFS and DD paths (DD path to be removed).
+- **httpopen.c**: File open — UFS only; the DD path is gone (4.0.0).
 - **httpmime.c**: MIME type detection from file extension.
 - **httpauth.c / httpcred.c**: RACF authentication and credential management.
 - **httplink.c**: CGI module loading via MVS LINK SVC.
 
 **Configuration:**
-- **httpconf.c**: Lua-based config loader (to be replaced with Parmlib parser).
+- **httpprm.c**: Parmlib parser — reads `DD:HTTPPRM` (`HTTPD_PARMLIB_DD` in httpd.h). Replaced the Lua-based httpconf.c, which is gone.
 
 **CGI infrastructure:**
-- **cgistart.c / cgxstart.c**: Custom `__start` for CGI modules.
+- **cgistart.c**: Custom `__start` for CGI modules.
 - **httpx.c**: HTTPX vector table initialization.
 
-**Built-in CGI modules (all optional via config, status to be finalized):**
-- **httpdsrv.c**: Server status display (2,675 LOC)
-- **httpjes2.c**: JES2 spool browser (975 LOC)
-- **httpdsl.c + helpers**: Dataset list/download (1,540 LOC total)
-- **httplua.c**: Extracted → mvslovers/httplua
-- **httprexx.c**: Extracted → mvslovers/httprexx
-- **httpdm.c / httpdmtt.c**: Device manager display (440 LOC)
-- **hello.c, abend0c1.c, test.c**: Demo/test CGIs
+**Built-in CGI modules** — the four `[[module]]` entries besides HTTPD itself:
+- **httpdsrv.c**: Server + control-block display (`/.dsrv`)
+- **httpdm.c / httpdmtt.c**: Storage display (`/.dm`) and Master Trace Table (`/.dmtt`)
+- **abend0c1.c**: Deliberate-abend test CGI
+
+None is registered unless the Parmlib says so.
 
 **Subsystems:**
-- **httprepo.c**: SMF Type 243 recording + simple counters (~90 LOC)
-- **Lua runtime**: Extracted → mvslovers/httplua
-- **FTP daemon**: ftp*.c (3,290 LOC) — confirmed for removal
-- **MQTT telemetry**: HTTPT struct, telemetry_thread — confirmed for removal
+- **httprepo.c**: SMF recording + simple counters (format in `docs/smf-records.md`)
+
+**Gone, do not look for them:** httpconf.c and the Lua runtime (→
+mvslovers/httplua), httprexx.c (→ mvslovers/httprexx), the FTP daemon (`ftp*.c`
+→ mvslovers/ftpd), the MQTT telemetry (HTTPT, telemetry_thread), and the
+hello.c / test.c demos. httpjes2.c and httpdsl.c live in `tbd/`, outside the
+build — mvsMF's jobs and dataset APIs replaced them.
 
 ### Conventions
 
@@ -264,20 +286,29 @@ The mvsMF CGI module has its own additional ESTAE layer in `router.c` (via `try(
 
 ### Testing
 
-Tests are shell scripts using `curl` against the live HTTPD + mvsMF:
+The suite is a set of mbt `[[test]]` modules in `test/`, declared in
+project.toml and written against `<mbtcheck.h>` (`CHECK` / `CHECK_EQ` /
+`mbt_test_summary`, RC 0 = all passed). `make test-host` runs the DUAL ones
+natively in seconds; `make test-mvs` runs every one on MVS as a batch **and** a
+TSO step and prints a per-test matrix.
 
-```bash
-# From the mvsMF repo:
-tests/curl-datasets.sh   # Dataset API
-tests/curl-jobs.sh        # Jobs API
-tests/curl-uss.sh         # USS/UFS API
-tests/test.sh             # Top-level runner
-```
+A test is DUAL only if the code under test is free of httpd.h. That is worth
+arranging: pull the pure decision out into its own small source with its own
+header — `httpbody.c`, `httpracf.c`, `httpesc.c`, `httpstat.c` all exist for
+this reason — and list that source in the `[[test]]` alongside the test for the
+host link. Everything reaching a control block, an SVC or a socket stays
+`host = false` and runs only under `make test-mvs`.
+
+Test names are MVS member names: **8 characters, uppercase**. A 9-character name
+builds fine and then kills the entire runner job with a JCL error (#180).
+
+End-to-end checks against a live HTTPD + mvsMF are `curl` scripts in the mvsMF
+repo (`tests/test.sh` and friends) — integration, not a substitute for the above.
 
 ### Display Modules (live storage inspection)
 
 The root `CLAUDE.md` covers when to reach for these; this is the detail. All are
-read-only, all need Basic auth, none is registered unless `DD:HTTPDPRM` says so.
+read-only, all need Basic auth, none is registered unless `DD:HTTPPRM` says so.
 
 **`/.dsrv` — HTTPDSRV, server control blocks.** `?target=` selects the block and
 each one is shown as hex plus a named field table:
