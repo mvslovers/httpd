@@ -340,6 +340,14 @@ struct httpcgi {
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
 #define HTTPD_PARMLIB_DD "HTTPPRM"
 
+/* The identity the STC logs on to at startup, replacing the STC/STCGROUP one
+   RAKF hands out -- which holds ALTER on every data set (issue #177).  These
+   are defaults; S HTTPD,STCUSER=x,STCGROUP=y overrides them.  They come from
+   the JCL PARM and not the Parmlib because the logon happens before the
+   Parmlib member is opened; see stc_identity() in httpd.c. */
+#define HTTPD_STC_USER   "HTTPD"
+#define HTTPD_STC_GROUP  "USER"
+
 /* SMF — HTTP records */
 #define SMF_TYPE_HTTPD_DEFAULT 243
 #define SMF_HTTPD_SUBTYPE_REQ  1	/* Request completed			*/

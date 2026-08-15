@@ -49,6 +49,45 @@ close_stale_port(int port)
 }
 #endif
 
+/* Replace the default STC security environment with a dedicated, low
+** privilege identity.  Called once, from initialize(), before anything opens
+** a data set.  See the block comment at the call site for why this exists.
+**
+** The new ACEE is deliberately not freed: it becomes the address space's
+** resting identity for the life of the server, and RTM releases it with the
+** address space. */
+static void
+stc_identity(const char *user, const char *group)
+{
+	unsigned char	savekey;
+	ACEE			*old_acee;
+	ACEE			*new_acee;
+	int				racf_rc	= 0;
+
+	if (__super(PSWKEY0, &savekey)) {
+		wtof(MSG_STCID_NOKEY);
+		return;
+	}
+
+	/* Drop the inherited environment first.  Leaving it and letting
+	** racf_set_acee() overwrite ASXBSENV would strand the old ACEE's
+	** storage for the life of the address space. */
+	old_acee = racf_get_acee();
+	if (old_acee)
+		racf_logout(&old_acee);
+
+	new_acee = racf_login(user, NULL, group, &racf_rc);
+	if (new_acee) {
+		racf_set_acee(new_acee);
+		wtof(MSG_STCID_SET, user, group);
+	}
+	else {
+		wtof(MSG_STCID_FAILED, user, group, racf_rc);
+	}
+
+	__prob(savekey, NULL);
+}
+
 static void
 initialize(int argc, char **argv)
 {
@@ -62,19 +101,55 @@ initialize(int argc, char **argv)
     int					i;
     CTHDTASK            *task;
     const char 			*config		= NULL;
+    const char			*stcuser	= HTTPD_STC_USER;
+    const char			*stcgroup	= HTTPD_STC_GROUP;
 
     /* if something goes all wrong, capture it! */
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
 
-	/* look for "CONFIG=" parm */
+	/* look for "CONFIG=", "STCUSER=" and "STCGROUP=" parms.
+	**
+	** The identity keywords are read from the JCL PARM rather than from the
+	** Parmlib on purpose: the logon below has to happen BEFORE http_config(),
+	** which opens the Parmlib member and initializes UFS, and those are
+	** exactly the file accesses that should no longer run under STC/STCGROUP.
+	** Reading them from the member being opened would be circular. */
 	for(i=0; i < argc; i++) {
-		// wtof("%s: argv[%d]=\"%s\"", __func__, i, argv[i]);
 		if (memcmp(argv[i], "CONFIG=", 7)==0) {
 			config = &argv[i][7];
-			while(*config=='=' || isspace((unsigned char)*config)) config++; 
+			while(*config=='=' || isspace((unsigned char)*config)) config++;
 			if (!*config) config = "CONFIG";
 		}
+		else if (memcmp(argv[i], "STCUSER=", 8)==0) {
+			stcuser = &argv[i][8];
+			while(*stcuser=='=' || isspace((unsigned char)*stcuser)) stcuser++;
+			if (!*stcuser) stcuser = HTTPD_STC_USER;
+		}
+		else if (memcmp(argv[i], "STCGROUP=", 9)==0) {
+			stcgroup = &argv[i][9];
+			while(*stcgroup=='=' || isspace((unsigned char)*stcgroup)) stcgroup++;
+			if (!*stcgroup) stcgroup = HTTPD_STC_GROUP;
+		}
 	}
+
+	/* STC identity switch: RACINIT ENVIR=CREATE for the configured userid.
+	**
+	** RAKF has no started-procedures table: its RACINIT path uses the started
+	** procedure name only to decide THAT the caller is an STC, never WHICH
+	** one, and assigns one hardcoded account -- STC/STCGROUP.  On a stock RAKF
+	** profile set STCGROUP holds ALTER on every data set on the system, so the
+	** server's resting identity, the one every RACF decision falls back to when
+	** the caller passes no ACEE, is the most privileged one there is.  Any CGI
+	** that does not establish an ACEE of its own inherits it (issue #177).
+	**
+	** racf_login() with pass == NULL bypasses password checking, so nothing has
+	** to be stored anywhere; the STC is already APF authorized by this point.
+	**
+	** A failure warns and continues rather than refusing to start: #177 left
+	** the policy open, and refusing turns a profile typo into an outage, while
+	** continuing only leaves the identity where it already was.  Both paths say
+	** so loudly -- what must not happen is a silent fallback. */
+	stc_identity(stcuser, stcgroup);
 
     /* initialize our server data area */
     memset(httpd, 0, sizeof(HTTPD));

@@ -79,6 +79,15 @@
 /** HTTPD001W as MSG_READY, but no document root is configured */
 #define MSG_READY_NODOC		"HTTPD001W HTTPD %s READY - NO DOCUMENT ROOT"
 
+/** HTTPD003W RACINIT needs key 0 and the STC could not get there */
+#define MSG_STCID_NOKEY		"HTTPD003W RACINIT SKIPPED, CANNOT ENTER SUPERVISOR STATE"
+
+/** HTTPD004I the STC dropped its default STC/STCGROUP identity (issue #177) */
+#define MSG_STCID_SET		"HTTPD004I STC IDENTITY SET TO %s/%s VIA RACINIT"
+
+/** HTTPD004W logon failed; the server keeps the inherited STC identity */
+#define MSG_STCID_FAILED	"HTTPD004W RACINIT ENVIR=CREATE FAILED FOR %s/%s RC=%d"
+
 /** HTTPD005I which C runtime this module actually linked against */
 #define MSG_LIBC_VERSION	"HTTPD005I %s"
 
