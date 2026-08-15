@@ -573,14 +573,21 @@ socket_thread(void *arg1, void *arg2)
                 if (httpd->cfg_session_timeout)
                     cred_reap((unsigned)httpd->cfg_session_timeout * 60);
 
+#if HTTPD_DEBUG_217
                 /* DEBUG #217: report the counts that could be draining the
                    region.  Deliberately allocation-free -- see the note on
-                   @@GETM above. */
+                   @@GETM above.
+
+                   This was the one 217 probe NOT behind the switch, so it wrote
+                   a line to the console every 60 seconds of a healthy server's
+                   life -- forever, on a channel the server also reads back as
+                   its own trace table. */
                 wtof(MSG_DBG_CENSUS,
                     httpd->active_connections,
                     array_count(httpd->credarr),
                     array_count(&httpd->mgr->worker),
                     array_count(&httpd->busy));
+#endif
             }
         }
 
@@ -951,8 +958,6 @@ static int auth_setup(const char *name)
 {
     int     rc = 0;
 
-    wtof(MSG_APF_AUTHORIZED, name);
-
     return rc;
 }
 
@@ -966,12 +971,13 @@ static int unauth_setup(const char *name)
     /* wtof("%s __autask() rc=%d", __func__, rc); */
     if (rc==0) {
         if (crt->crtauth & CRTAUTH_ON) {
-            wtof(MSG_APF_VIA_SVC244, name);
+            /* Silent on the healthy path (UFSD/FTPD do the same): that APF was
+            ** obtained is only interesting when it FAILS, and HTTPD012E covers
+            ** that. */
             /* we want the STEPLIB APF authorized as well */
             rc = __austep();    /* APF authorize the STEPLIB */
             if (rc==0) {
                 if (crt->crtauth & CRTAUTH_STEPLIB) {
-                    wtof(MSG_APF_STEPLIB);
                     rc = auth_name(name);
                     /* wtof("%s auth_name(%s) rc=%d", __func__, name, rc); */
                     rc = identify_cthread();
@@ -980,7 +986,6 @@ static int unauth_setup(const char *name)
             }
         }
         else {
-            wtof(MSG_APF_AUTHORIZED, name);
             rc = auth_name(name);
             /* wtof("%s auth_name(%s) rc=%d", __func__, name, rc); */
             rc = identify_cthread();
@@ -1015,6 +1020,29 @@ main(int argc, char **argv)
     HTTPD       server;
     char        vers[24];           /* MBT_VERSION, upper case: 000I/001I */
 
+    grt->grtapp1    = &server;
+    httpd           = grt->grtapp1;
+
+    if (crt->crtopts & CRTOPTS_AUTH) {
+        /* this task was previously authorized */
+        rc = auth_setup(argv[0]);
+    }
+    else {
+        /* this task has not been authorized yet */
+        rc = unauth_setup(argv[0]);
+    }
+    /* Startup banner, AFTER the APF setup above and deliberately so: an
+    ** unauthorized WTO is prefixed '+' by the system, and the first two lines
+    ** an operator reads should not be decorated with a diagnostic about a
+    ** state that is about to change anyway.  It is still before the `rc`
+    ** check, so a build that FAILS to authorize is identified in the log too
+    ** -- with the '+', which at that point is the truth.
+    **
+    ** Which HTTPD, built from which source, against which C runtime: a
+    ** deploy/relink mismatch (sysroot says X, the STC runs Y) then cannot
+    ** hide, and a build carrying uncommitted changes says so instead of
+    ** passing itself off as the commit it was branched from.  The buffers are
+    ** scoped: they are dead the moment the banner is out. */
     /* Startup banner.  Which HTTPD, built from which source, against which C
     ** runtime.  A deploy/relink mismatch (sysroot says X, the STC runs Y) then
     ** cannot hide, and a build carrying uncommitted changes says so instead of
@@ -1037,17 +1065,6 @@ main(int argc, char **argv)
 #endif
     }
 
-    grt->grtapp1    = &server;
-    httpd           = grt->grtapp1;
-
-    if (crt->crtopts & CRTOPTS_AUTH) {
-        /* this task was previously authorized */
-        rc = auth_setup(argv[0]);
-    }
-    else {
-        /* this task has not been authorized yet */
-        rc = unauth_setup(argv[0]);
-    }
     if (rc) goto quit;
 
 #if 0

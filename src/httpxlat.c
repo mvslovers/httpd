@@ -419,7 +419,6 @@ http_xlate_init(const char *codepage)
     asc2ebc = (unsigned char *)atoe;
     ebc2asc = (unsigned char *)etoa;
 
-    wtof(MSG_CODEPAGE, codepage ? codepage : "CP037");
     return 0;
 }
 

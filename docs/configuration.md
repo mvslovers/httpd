@@ -3,12 +3,8 @@
 HTTPD is configured through a Parmlib member, referenced by the `HTTPPRM` DD card in the STC JCL procedure.
 
 The STC procedure allocates that DD as `&D(&M)`, so the member is a startup
-choice — `S HTTPD` takes the default, `S HTTPD,M=HTTPPRM1` takes another. The
-server reports which one it read before it parses anything:
-
-```
-HTTPD022I CONFIGURATION FROM SYS2.PARMLIB(HTTPPRM0)
-```
+choice — `S HTTPD` takes the default, `S HTTPD,M=HTTPPRM1` takes another. Which
+one is in effect is reported by `F HTTPD,D CONFIG`, below.
 
 `PARM='CONFIG=...'` is a 3.x leftover and selects nothing; see
 [migration.md](migration.md).
@@ -127,10 +123,29 @@ system**. Adding `USER=` to the PROC changes nothing, because that path
 consults nothing. So HTTPD logs on to a dedicated identity instead and installs
 it as the address space's resting one (issue #177).
 
-The userid needs read access to whatever HTTPD itself opens before a client
-identity exists: the Parmlib member, the document root, and the log DDs. A CGI
-that establishes its own ACEE per request — as mvsMF does — is unaffected; one
-that does not now inherits this identity rather than `STCGROUP`.
+The userid needs:
+
+- **READ** on whatever HTTPD itself opens before a client identity exists — the
+  Parmlib member, the document root, the log DDs
+- **READ on `FACILITY SVC244`**
+
+A CGI that establishes its own ACEE per request — as mvsMF does — is unaffected;
+one that does not now inherits this identity rather than `STCGROUP`.
+
+`SVC244` is not optional and is easy to miss, because the symptom appears only
+at shutdown. HTTPD uses SVC 244 both to acquire APF authorization at start and
+to release it at end. The acquire runs *before* the identity switch — RACINIT
+needs key 0, which needs APF, so that order is forced — and is covered by the
+STC account. The release at `P HTTPD` runs as `STCUSER`. Without the profile the
+server runs normally for its whole life and then logs this on every stop:
+
+```
+RAKF0005 INVALID ATTEMPT TO ACCESS RESOURCE
+RAKF000A  HTTPD   ,HTTPD   ,FACILITY,SVC244
+```
+
+Harmless — the address space is ending and RTM releases the authorization
+anyway — but it is a real permission the userid is missing, not noise to filter.
 
 If the logon fails the server **continues** on the inherited identity and says
 so with `HTTPD004W`, so a profile typo is not an outage. Watch for that message

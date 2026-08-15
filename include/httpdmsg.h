@@ -29,8 +29,10 @@
  *    libc370_version()) go through http_upcase() at the call site.
  *
  * 4. Severity is I, W or E.  The D suffix on HTTPD900D/902D/903D is not a
- *    severity -- those are debug counters behind HTTPD_DEBUG_217 and never
- *    reach a production console.
+ *    severity -- those are debug counters behind HTTPD_DEBUG_217.  (903D was
+ *    NOT behind it until #184's follow-up, so it wrote a census line every 60
+ *    seconds of a healthy server's life.  Anything claiming to be a debug
+ *    probe has to actually be compiled out, or the claim is decoration.)
  *
  * 5. No trailing "\n".  wtof() writes one console line; the newline was a
  *    stray character on a 3270 and is gone from every format here.
@@ -110,6 +112,14 @@
 
 /** HTTPD008W logout for a credential that was not found */
 #define MSG_LOGOUT_FAILED	"HTTPD008W USER %-8.8s IP %u.%u.%u.%u LOGOUT FAILED"
+
+/*
+ * HTTPD010I/011I/013I are no longer written on the healthy path (#184
+ * follow-up): that APF was obtained is only interesting when it FAILS, and
+ * HTTPD012E covers that.  UFSD and FTPD report the same way.  The ids stay
+ * defined -- httpauth.c still references them, and reserving them costs
+ * nothing next to reusing one for something else later.
+ */
 
 /** HTTPD010I %s is the module name; it was already authorized */
 #define MSG_APF_AUTHORIZED	"HTTPD010I %s IS APF AUTHORIZED"
@@ -196,9 +206,6 @@
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
 
-/** HTTPD071I the codepage in effect for EBCDIC/ASCII translation */
-#define MSG_CODEPAGE		"HTTPD071I CODEPAGE: %s"
-
 /** HTTPD090E no console interface means no MODIFY and no STOP */
 #define MSG_CONSOLE_FAILED	"HTTPD090E UNABLE TO INITIALIZE CONSOLE INTERFACE"
 
@@ -214,9 +221,6 @@
 ** Everything here is written because an operator asked for it, so rule 1
 ** does not apply: the console line IS the answer.
 ** ================================================================== */
-
-/** HTTPD100I console interface state change (START/STOP/MOUNT) */
-#define MSG_CONS_STATE		"HTTPD100I CONS(%u) %s"
 
 /** HTTPD100I the MODIFY text as received, echoed before it is parsed */
 #define MSG_CONS_MODIFY		"HTTPD100I CONS(%u) \"%-*.*s\""
@@ -380,9 +384,6 @@
 
 /** HTTPD021I where the debug/trace output went instead */
 #define MSG_CFG_DBG_STDERR	"HTTPD021I DEBUG/TRACE OUTPUT WILL BE TO DD:SYSTERM"
-
-/** HTTPD022I which member the configuration was read from */
-#define MSG_CFG_SOURCE		"HTTPD022I CONFIGURATION FROM %s"
 
 /** HTTPD023E PORT outside 1-65535; the default is kept */
 #define MSG_CFG_BAD_PORT	"HTTPD023E INVALID PORT VALUE (%d)"

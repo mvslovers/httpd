@@ -47,11 +47,13 @@ HTTPD024I USE S HTTPD,M=MEMBER TO SELECT A DIFFERENT MEMBER
 
 The `HTTPPRM` DD already exists in the sample JCL procedure (`samplib/httpd`).
 
-Which member is actually in effect is reported on every startup, before anything
-is parsed, so a configuration error is already attributed when it appears:
+Which member is actually in effect is reported on demand, along with everything
+else the server parsed:
 
 ```
-HTTPD022I CONFIGURATION FROM SYS2.PARMLIB(HTTPPRM0)
+F HTTPD,D CONFIG
+
+HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
 ```
 
 ## Removed Features

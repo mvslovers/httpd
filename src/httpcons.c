@@ -33,9 +33,12 @@ httpcons(CIB *cib)
 
     if (!cib) goto quit;
 
+    /* CIBSTART/CIBSTOP/CIBMOUNT are not announced: S HTTPD and P HTTPD are
+    ** already in the log twice over (IEF403I/IEF404I and HTTPD000I/098I), and
+    ** a console attaching says nothing an operator acts on.  The MODIFY echo
+    ** below stays -- that one records what was actually typed. */
     switch(cib->cibverb) {
     case CIBSTART:
-        wtof(MSG_CONS_STATE, cib->cibconid, "START");
         break;
     case CIBMODFY:
         wtof(MSG_CONS_MODIFY,
@@ -47,11 +50,9 @@ httpcons(CIB *cib)
         }
         break;
     case CIBSTOP:
-        wtof(MSG_CONS_STATE, cib->cibconid, "STOP");
         rc = 1;
         break;
     case CIBMOUNT:
-        wtof(MSG_CONS_STATE, cib->cibconid, "MOUNT");
         break;
     }
 

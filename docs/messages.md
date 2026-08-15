@@ -57,7 +57,6 @@ that does is either a warning below or a misconfiguration.
 HTTPD000I HTTPD 4.0.0-DEV (A69A370) STARTING
 HTTPD005I LIBC370 1.0.2 (58767B3)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
-HTTPD022I CONFIGURATION FROM SYS2.PARMLIB(HTTPPRM0)
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/*
 HTTPD036I MODULE HTTPDSRV REGISTERED FOR /.dsrv
@@ -77,8 +76,10 @@ HTTPD416I STATS: 3302 REQUESTS, 858 ERRORS, 31887467 BYTES
 HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
-The configuration is **not** echoed at start. `F HTTPD,D CONFIG` reports it on
-demand, at any point in the server's life.
+The configuration is **not** echoed at start — not the member, not the codepage,
+not the task limits. `F HTTPD,D CONFIG` reports all of it on demand, at any point
+in the server's life. Nor is APF status: that it was obtained is only interesting
+when it fails, and `HTTPD012E` covers that.
 
 ## HTTPD0xx — server lifecycle
 
@@ -95,10 +96,10 @@ demand, at any point in the server's life.
 | `HTTPD007I` | `USER u IP a.b.c.d LOGIN SUCCESSFUL ACEE(x)` | A client completed the form login. |
 | `HTTPD008I` | `USER u IP a.b.c.d LOGOUT SUCCESSFUL` | The credential was released. |
 | `HTTPD008W` | `USER u IP a.b.c.d LOGOUT FAILED` | Logout for a credential that was not found — normally a session that had already expired. |
-| `HTTPD010I` | `pgm IS APF AUTHORIZED` | Normal on a correctly installed system. |
-| `HTTPD011I` | `pgm WAS APF AUTHORIZED VIA SVC 244` | Authorization was obtained dynamically. Also normal; it means the library is not in the APF list but SVC 244 is installed. |
+| `HTTPD010I` | `pgm IS APF AUTHORIZED` | **No longer written on the healthy path.** Reserved; `httpauth.c` still references it. |
+| `HTTPD011I` | `pgm WAS APF AUTHORIZED VIA SVC 244` | **No longer written on the healthy path.** Reserved, as above. |
 | `HTTPD012E` | `pgm UNABLE TO DYNAMICALLY OBTAIN APF AUTHORIZATION` | Without APF the LINK SVC and the RACF services are unavailable: CGIs will not load and the identity switch is skipped. APF-authorize the LINKLIB. |
-| `HTTPD013I` | `STEPLIB IS NOW APF AUTHORIZED` | Follows `HTTPD011I` so CGI modules can be linked from the STEPLIB. |
+| `HTTPD013I` | `STEPLIB IS NOW APF AUTHORIZED` | **No longer written on the healthy path.** Reserved, as above. |
 | `HTTPD014E` | `SYSPRINT DD NOT ALLOWED, HTTPD USES HTTPDOUT FOR STDOUT` | The PROC allocates a DD HTTPD reserves. Remove it; the server refuses to start. |
 | `HTTPD015E` | `SYSTERM DD NOT ALLOWED, HTTPD USES HTTPDERR FOR STDERR` | As above. |
 | `HTTPD016E` | `SYSIN DD NOT ALLOWED, HTTPD USES HTTPDIN FOR STDIN` | As above. |
@@ -121,7 +122,7 @@ demand, at any point in the server's life.
 | `HTTPD061I` | `STARTING name TCB(x) TASK(x) STACKSIZE(n)` | One server thread started. At start you should see the socket thread plus `MINTASK` workers. |
 | `HTTPD062E` | `ABEND xxxxxxxx IN WORKER(w) CLIENT(c) SOCKET(s)` | A worker's ESTAE caught an abend. Only that request dies; the worker is recycled and the server continues. Always worth a bug report — include the abend code and the request. |
 | `HTTPD070E` | `UNKNOWN CODEPAGE "name", USING CP037` | The `CODEPAGE` value is not one this build knows. Check the spelling. |
-| `HTTPD071I` | `CODEPAGE: name` | The translation table in effect. |
+| `HTTPD071I` | *(retired)* | The codepage in effect is a `D CONFIG` value (`HTTPD134I`), not a startup line. |
 | `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. |
 | `HTTPD098I` | `HTTPD SHUTTING DOWN` | `P HTTPD` was accepted and the quiesce has begun. |
 | `HTTPD099I` | `HTTPD SHUTDOWN COMPLETE` | Everything was released. If the address space ends without this line, shutdown did not finish cleanly. |
@@ -133,7 +134,7 @@ Everything in this range is written because an operator asked for it, so the
 
 | Id | Command | Shows |
 |---|---|---|
-| `HTTPD100I` | — | Console state (`START`/`STOP`/`MOUNT`) and the MODIFY text as received. |
+| `HTTPD100I` | — | The MODIFY text as received. Console attach/detach is no longer announced — `S`/`P HTTPD` are already in the log twice over. |
 | `HTTPD101E` | — | The verb or operand was not recognized. `F HTTPD,?` lists the set. |
 | `HTTPD102I` | `D PORTS` | The listener port. |
 | `HTTPD103I`–`HTTPD120I`, `HTTPD141I`, `HTTPD199I` | `D THREADS` | Per-thread control block dump: `CTHDTASK`, `CTHDMGR`, worker state, connected client. `HTTPD199I` is the separator between blocks. |
@@ -157,7 +158,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD020W` | `CANNOT OPEN DD:HTTPPRM -- USING DEFAULTS` | No Parmlib member. The server starts on port 8080 with **no CGI routes at all**. Almost always a PROC problem. |
 | `HTTPD020E` | `FOPEN FOR DD:HTTPDBG FAILED, ERRNO=n` | `DEBUG 1` is set but the DD is unusable. |
 | `HTTPD021I` | `DEBUG/TRACE OUTPUT WILL BE TO DD:SYSTERM` | Where the trace went instead. |
-| `HTTPD022I` | `CONFIGURATION FROM dsn(member)` | Which member was actually read — the PROC makes this a startup choice (`S HTTPD,M=…`). |
+| `HTTPD022I` | *(retired)* | Which member was read is a `D CONFIG` value (`HTTPD133I`). Every parse error names its own offending line, so nothing depended on this being announced first. |
 | `HTTPD023E` | `INVALID PORT VALUE (n)` | Outside 1–65535. The default is kept. |
 | `HTTPD024W` | `CONFIG=x IS IGNORED, CONFIGURATION COMES FROM THE HTTPPRM DD` | A parameter from the retired Lua engine. |
 | `HTTPD024I` | `USE S HTTPD,M=MEMBER TO SELECT A DIFFERENT MEMBER` | How to do what `CONFIG=` used to do. |

@@ -94,7 +94,6 @@ http_config(HTTPD *httpd, const char *member)
     CLIBCRT *crt = __crtget();
     FILE    *fp;
     char     line[256];
-    char     name[64];
     int      rc;
 
     /* CONFIG= has been read-and-discarded since the Parmlib migration, which
@@ -116,8 +115,10 @@ http_config(HTTPD *httpd, const char *member)
     if (!fp) {
         wtof(MSG_CFG_NO_PARMLIB, HTTPD_PARMLIB_DD);
     } else {
-        /* name it before parsing, so any error below is already attributed */
-        wtof(MSG_CFG_SOURCE, parmlib_name(name, sizeof(name)));
+        /* The member is NOT announced here.  It used to be, so a parse error
+        ** below would already be attributed -- but every error this loop can
+        ** raise names the offending line itself, and F HTTPD,D CONFIG reports
+        ** the member on demand (HTTPD133I). */
         while (fgets(line, (int)sizeof(line), fp)) {
             parse_line(httpd, line);
         }
