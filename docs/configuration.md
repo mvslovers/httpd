@@ -7,11 +7,33 @@ choice — `S HTTPD` takes the default, `S HTTPD,M=HTTPPRM1` takes another. The
 server reports which one it read before it parses anything:
 
 ```
-HTTPD022I Configuration from SYS2.PARMLIB(HTTPPRM0)
+HTTPD022I CONFIGURATION FROM SYS2.PARMLIB(HTTPPRM0)
 ```
 
 `PARM='CONFIG=...'` is a 3.x leftover and selects nothing; see
 [migration.md](migration.md).
+
+## Reading back what the server parsed
+
+Startup does not echo the configuration — the banner stays short. To see what
+the running server actually settled on, ask it:
+
+```
+F HTTPD,D CONFIG
+
+HTTPD128I PORT 8080  MINTASK 3  MAXTASK 9
+HTTPD129I CLIENT_TIMEOUT 10  KEEPALIVE 5/100
+HTTPD130I SESSION_TIMEOUT 60 MIN
+HTTPD131I DOCROOT /wwwroot
+HTTPD134I CODEPAGE CP037
+HTTPD132I SMF TYPE 128 LEVEL ALL
+HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
+```
+
+That answers "which member is this server running, and did my change take
+effect" at any point in its life, rather than only at the top of the job log.
+`F HTTPD,?` lists the rest of the console commands, and
+[messages.md](messages.md) documents every message the server can write.
 
 ## Format
 
@@ -66,6 +88,38 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 
 `LOGIN` remains the global default. Individual routes can override it and add a
 resource check with the per-route `AUTH=` / `RES=` options (see below).
+
+### The server's own identity (`STCUSER=`, `STCGROUP=`)
+
+These are **startup parameters, not Parmlib keywords** — they are read before
+the Parmlib member is opened, because the logon has to happen before anything
+opens a data set.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `STCUSER` | `HTTPD` | Userid the STC logs on to at startup |
+| `STCGROUP` | `USER` | Its connect group |
+
+```
+S HTTPD                                  /* HTTPD/USER          */
+S HTTPD,STCUSER=WEBSRV,STCGROUP=WEBGRP   /* something else      */
+```
+
+RAKF has no started-procedures table: it decides only *that* a caller is an
+STC, never *which* one, and hands every started task the same `STC/STCGROUP`
+account — which on a stock profile set holds **ALTER on every data set on the
+system**. Adding `USER=` to the PROC changes nothing, because that path
+consults nothing. So HTTPD logs on to a dedicated identity instead and installs
+it as the address space's resting one (issue #177).
+
+The userid needs read access to whatever HTTPD itself opens before a client
+identity exists: the Parmlib member, the document root, and the log DDs. A CGI
+that establishes its own ACEE per request — as mvsMF does — is unaffected; one
+that does not now inherits this identity rather than `STCGROUP`.
+
+If the logon fails the server **continues** on the inherited identity and says
+so with `HTTPD004W`, so a profile typo is not an outage. Watch for that message
+on a system where you expect `HTTPD004I`.
 
 ### Per-route authentication policy (`AUTH=`, `RES=`)
 
@@ -152,7 +206,7 @@ so the caller localizes them. The `Date:` response header is likewise always
 GMT, as HTTP requires.
 
 > **Retired: `TZOFFSET`.** Up to 4.0.0-dev the Parmlib accepted a `TZOFFSET`
-> keyword. It is now accepted and ignored, with a `HTTPD025W` warning naming the
+> keyword. It is now accepted and ignored, with a `HTTPD025W`/`HTTPD025I` warning naming the
 > system offset in use, so an existing Parmlib still starts the server — but the
 > statement has no effect and should be deleted.
 >

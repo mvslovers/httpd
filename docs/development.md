@@ -202,7 +202,7 @@ Server modules call server functions through the HTTPX function vector. Key func
 ```
 
 Anything else goes out as **500 Internal Server Error** — in front of whatever
-body the module then writes — and logs `HTTPD054E` to the console. A module
+body the module then writes — and logs `HTTPD909E` to the console. A module
 needing a code that is not on the list should have it added to `httpstat()`
 rather than work around it; the table is covered by `TSTSTAT`.
 

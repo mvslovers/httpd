@@ -235,7 +235,8 @@ Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no CGIs).
 - **httplink.c**: CGI module loading via MVS LINK SVC.
 
 **Configuration:**
-- **httpprm.c**: Parmlib parser — reads `DD:HTTPPRM` (`HTTPD_PARMLIB_DD` in httpd.h). Replaced the Lua-based httpconf.c, which is gone.
+- **httpprm.c**: Parmlib parser — reads `DD:HTTPPRM` (`HTTPD_PARMLIB_DD` in httpd.h). Replaced the Lua-based httpconf.c, which is gone. Startup does not echo the settled configuration; `F HTTPD,D CONFIG` reports it on demand.
+- **httpdmsg.h**: the operator message catalog. Every WTO literal, once. See *Conventions*.
 
 **CGI infrastructure:**
 - **cgistart.c**: Custom `__start` for CGI modules.
@@ -262,10 +263,22 @@ build — mvsMF's jobs and dataset APIs replaced them.
 - Headers use `asm("SYMBOL")` annotations for MVS external symbol naming.
 - ASM entry points use `__asm__("\n&FUNC SETC '...'")` for 8-char MVS CSECT names.
 - Manual memory management — watch for malloc/free pairing on ALL error paths.
-- Tab indentation, 4-space width, LF line endings.
+- Tab indentation, 4-space width. Line endings are **whatever the file already
+  has** — most of `src/` is CRLF, newer files are LF. Do not convert a file as a
+  side effect of editing it: a whole-file line-ending flip buries the real diff
+  (it turned a 950-line change into 4,500 once already). Beware tools that
+  rewrite files wholesale — Python's `read_text`/`write_text` silently
+  normalizes CRLF to LF.
 - HTTPC is exactly 4,096 bytes. Do not grow it.
 - HTTPX vector table: **append-only**. Never change existing offsets.
-- WTO message IDs follow the pattern `HTTPDnnnX` where nnn is numeric and X is severity (I/W/E).
+- **Every WTO literal lives in `include/httpdmsg.h`**, once, upper case, behind
+  an `MSG_*` macro — never inline at the call site. The header states the rules;
+  `docs/messages.md` is its operator-facing form, and the two must stay in step.
+  Values keep their original case (`http_upcase()` folds the ones that arrive
+  lower case at runtime). Message IDs are `HTTPDnnnX`, severity I/W/E.
+- A WTO is for **what an operator can act on**. Anything the client caused
+  belongs in the HTTP response and nowhere else — every console line also lands
+  in the Master Trace Table, which is the server's own diagnostic channel.
 
 ### Known Platform Bugs
 
