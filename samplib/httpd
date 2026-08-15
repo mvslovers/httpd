@@ -21,16 +21,9 @@
 //* (issue #177).  If it is not defined the server writes HTTPD004W and keeps
 //* running on the inherited identity.
 //*
-//* The userid needs:
-//*   READ on the parmlib member and on the document root
-//*   READ on FACILITY SVC244
-//*
-//* SVC244 is not optional.  HTTPD uses it to acquire APF authorization at
-//* start and to release it at end.  The acquire runs before the identity
-//* switch (RACINIT needs key 0, which needs APF, so the order is forced) and
-//* is therefore covered by the STC account -- but the release at shutdown
-//* runs as STCUSER.  Without the profile the server works normally and then
-//* logs RAKF0005/RAKF000A on every P HTTPD.
+//* The userid needs READ on the parmlib member and on the document root.
+//* It does NOT need FACILITY SVC244: HTTPD gives APF authorization back under
+//* the account it took it out with, not under STCUSER.
 //*
 //* The symbolic is STCGRP, not STCGROUP: a JCL symbolic parameter name is at
 //* most 7 characters.  The PARM keyword the program parses is STCGROUP=.

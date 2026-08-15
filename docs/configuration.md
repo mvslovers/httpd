@@ -141,29 +141,20 @@ it as the address space's resting one (issue #177).
 > measurement is evidence for its conclusion: a shared, address-space-wide field
 > cannot be made correct by choosing who writes it.
 
-The userid needs:
+The userid needs **READ** on whatever HTTPD itself opens before a client
+identity exists: the Parmlib member, the document root, the log DDs.
 
-- **READ** on whatever HTTPD itself opens before a client identity exists — the
-  Parmlib member, the document root, the log DDs
-- **READ on `FACILITY SVC244`**
+It does **not** need `FACILITY SVC244`. HTTPD uses SVC 244 to acquire APF
+authorization at start and to release it at `P HTTPD`, and the two run under
+different identities unless something puts that right — the acquire happens
+before the switch (RACINIT needs key 0, which needs APF, so that order is
+forced), the release long after it. Rather than requiring the profile on every
+system, HTTPD retains the STC account it started under and restores it
+immediately before releasing the authorization, so both SVC 244 calls are made
+by the same account.
 
 A CGI that establishes its own ACEE per request — as mvsMF does — is unaffected;
 one that does not now inherits this identity rather than `STCGROUP`.
-
-`SVC244` is not optional and is easy to miss, because the symptom appears only
-at shutdown. HTTPD uses SVC 244 both to acquire APF authorization at start and
-to release it at end. The acquire runs *before* the identity switch — RACINIT
-needs key 0, which needs APF, so that order is forced — and is covered by the
-STC account. The release at `P HTTPD` runs as `STCUSER`. Without the profile the
-server runs normally for its whole life and then logs this on every stop:
-
-```
-RAKF0005 INVALID ATTEMPT TO ACCESS RESOURCE
-RAKF000A  HTTPD   ,HTTPD   ,FACILITY,SVC244
-```
-
-Harmless — the address space is ending and RTM releases the authorization
-anyway — but it is a real permission the userid is missing, not noise to filter.
 
 If the logon fails the server **continues** on the inherited identity and says
 so with `HTTPD004W`, so a profile typo is not an outage. Watch for that message

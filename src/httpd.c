@@ -49,6 +49,13 @@ close_stale_port(int port)
 }
 #endif
 
+/* The security environment the STC started under -- the STC/STCGROUP account
+** RAKF hands out.  Retained by stc_identity() rather than released, so that
+** shutdown can put it back before it gives APF authorization up.  NULL until
+** the switch succeeds, which is what makes the restore a no-op on every path
+** that never got that far. */
+static ACEE *stc_prev_acee = NULL;
+
 /* Replace the default STC security environment with a dedicated, low
 ** privilege identity.  Called once, from initialize(), before anything opens
 ** a data set.  See the block comment at the call site for why this exists.
@@ -69,30 +76,31 @@ stc_identity(const char *user, const char *group)
 		return;
 	}
 
-	/* Order matters, and the obvious order is wrong.  Logging the inherited
-	** environment out FIRST would leave nothing to fall back on when the logon
-	** below fails: racf_logout() does not merely free the block, it __cas()es
-	** ASXBSENV to zero when the field still points at what it deleted
-	** (libc370 raclgout.c, measured -- RAKF leaves the dead pointer other-
-	** wise).  A failed logon would then leave the address space with NO
-	** resting identity at all, which is not what HTTPD004W promises and is
-	** worse than the privileged identity #177 set out to replace.
+	/* The inherited environment is RETAINED, not released.
 	**
-	** So: log on, install, and only then release the old one.  On the failure
-	** path nothing has been released and the inherited identity is genuinely
-	** still in place, which is what the message says.
+	** Releasing it would be tidier but breaks shutdown.  HTTPD uses SVC 244 to
+	** acquire APF authorization at start and to release it at end (__uatask()).
+	** The acquire runs before this function -- RACINIT needs key 0, which needs
+	** APF, so that order is forced -- and is covered by the STC account.  The
+	** release at P HTTPD would run as the new identity, which has no
+	** FACILITY SVC244 profile, and RAKF logs RAKF0005/RAKF000A on every single
+	** stop.  stc_identity_restore() puts this ACEE back first, so the SVC 244
+	** at the end runs under the same account that took the authorization out.
 	**
-	** Releasing last is safe: RACINIT ENVIR=DELETE takes the ACEE from its
-	** parameter list, not from ASXBSENV, and raclgout's __cas() only clears
-	** the field if it still holds the ACEE being deleted -- by then it holds
-	** the new one, so the compare fails and the new identity stands. */
+	** Order also matters within this function, and the obvious order is wrong.
+	** Releasing the inherited environment FIRST would leave nothing to fall
+	** back on when the logon fails: racf_logout() does not merely free the
+	** block, it __cas()es ASXBSENV to zero when the field still points at what
+	** it deleted (libc370 raclgout.c does it by hand because RAKF leaves the
+	** dead pointer).  A failed logon would then leave the address space with NO
+	** resting identity at all -- not what HTTPD004W promises, and worse than the
+	** privileged identity #177 set out to replace.  So: log on, then install. */
 	old_acee = racf_get_acee();
 
 	new_acee = racf_login(user, NULL, group, &racf_rc);
 	if (new_acee) {
 		racf_set_acee(new_acee);
-		if (old_acee)
-			racf_logout(&old_acee);
+		stc_prev_acee = old_acee;       /* for stc_identity_restore() */
 		wtof(MSG_STCID_SET, user, group);
 	}
 	else {
@@ -100,6 +108,31 @@ stc_identity(const char *user, const char *group)
 	}
 
 	__prob(savekey, NULL);
+}
+
+/* Put the STC account back, immediately before APF authorization is released.
+**
+** __uatask() issues SVC 244, which RAKF gates on FACILITY SVC244.  The task
+** took the authorization out under the STC account and must give it back under
+** the same one, or every P HTTPD ends with RAKF0005/RAKF000A -- harmless, since
+** the address space is ending anyway, but a permission failure logged on the
+** healthy path teaches operators to ignore RAKF messages.
+**
+** Note this deliberately overwrites whatever ASXBSENV happens to hold, which by
+** shutdown is often a CLIENT's ACEE rather than HTTPD/USER (measured: RAKF's
+** RACINIT ENVIR=CREATE appears to plant the ACEE it creates, so every logon
+** displaces the server identity -- see issue #176).  Restoring unconditionally
+** is right precisely because the field cannot be trusted to still hold ours.
+**
+** racf_set_acee() does its own supervisor/key switching, so no __super() here.
+** It does need APF, which is why this runs BEFORE the release, not after. */
+static void
+stc_identity_restore(void)
+{
+	if (!stc_prev_acee) return;
+
+	racf_set_acee(stc_prev_acee);
+	stc_prev_acee = NULL;
 }
 
 static void
@@ -1159,6 +1192,11 @@ cleanup:
     if (i) wtof(MSG_TERM_FAILED, i);
 
 quit:
+    /* Back to the account that took the authorization out, before giving it
+       back -- see stc_identity_restore().  A no-op if the switch never ran, so
+       the early-failure paths that reach this label are unaffected. */
+    stc_identity_restore();
+
     if (crt) {
         if (crt->crtauth & CRTAUTH_STEPLIB) {
             __uastep();    /* reset STEPLIB APF authorization  */
