@@ -29,14 +29,6 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
     }
 
     int saw_cr = 0;
-#if HTTPD_DEBUG_217
-    /* Separates the two hang shapes (#159).  Each poll pass is ~0.5 s, so a
-       client that has not timed out after seconds*4 passes means the wait is
-       returning but the deadline test never fires.  A worker that hangs with
-       no such message never came back out of cthread_timed_wait() at all. */
-    unsigned polls = 0;
-    unsigned limit = (seconds + 1) * 4;
-#endif
 
     for(i=0; i < max; ) {
         /* get one character from client socket */
@@ -46,12 +38,6 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
                 /* check for timeout */
                 time64(&now);
                 if (__64_cmp(&now, &timeout) == __64_SMALLER) {
-#if HTTPD_DEBUG_217
-                    if (++polls == limit) {
-                        wtof(MSG_DBG_POLL_OVERRUN,
-                            httpc, httpc->socket, polls, seconds);
-                    }
-#endif
                     /* no timeout, sleep for 0.50 seconds */
                     errno = ecb = 0;
                     cthread_timed_wait(&ecb, 50, 0);

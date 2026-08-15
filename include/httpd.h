@@ -5,14 +5,6 @@
 ** Copyright (c) 2016, 2024 Mike Rayborn. All rights reserved.
 */
 
-/* Temporary diagnostics for the worker wedge under investigation (#159).
-   Set to 0 to silence them, or delete this define together with the two
-   `#if HTTPD_DEBUG_217` blocks (httppc.c, httpgets.c) to drop them entirely --
-   they are self-contained and touch nothing else.  The spin guard in
-   serve_client() is deliberately NOT behind this switch: that one is a fix,
-   not a diagnostic, and is meant to stay. */
-#define HTTPD_DEBUG_217 1
-
 /* crent370 headers */
 #include <stddef.h>
 #include <limits.h>

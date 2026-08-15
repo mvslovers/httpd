@@ -606,21 +606,6 @@ socket_thread(void *arg1, void *arg2)
                 if (httpd->cfg_session_timeout)
                     cred_reap((unsigned)httpd->cfg_session_timeout * 60);
 
-#if HTTPD_DEBUG_217
-                /* DEBUG #217: report the counts that could be draining the
-                   region.  Deliberately allocation-free -- see the note on
-                   @@GETM above.
-
-                   This was the one 217 probe NOT behind the switch, so it wrote
-                   a line to the console every 60 seconds of a healthy server's
-                   life -- forever, on a channel the server also reads back as
-                   its own trace table. */
-                wtof(MSG_DBG_CENSUS,
-                    httpd->active_connections,
-                    array_count(httpd->credarr),
-                    array_count(&httpd->mgr->worker),
-                    array_count(&httpd->busy));
-#endif
             }
         }
 
