@@ -42,6 +42,12 @@ Ranges:
 | `HTTPD4xx` | configuration (`DD:HTTPPRM`), routes and SMF |
 | `HTTPD9xx` | diagnostics: abends, recovery, storage, internal faults |
 
+One wart, stated rather than tidied away: configuration **also** occupies
+`HTTPD020`–`HTTPD048`, which predate the `4xx` block. Renumbering them would
+churn every id an operator has ever seen in a log for no gain, so both halves
+are listed under *HTTPD4xx — configuration* below. When looking an id up,
+search the page rather than trusting the range.
+
 ## A healthy start and stop
 
 This is what a normal start looks like. Nothing else should appear; anything
@@ -80,10 +86,10 @@ demand, at any point in the server's life.
 |---|---|---|
 | `HTTPD000I` | `HTTPD vers (commit) STARTING` | First line of every start. `commit` is the short git hash the module was built from. If it does not match what you deployed, the STC is running an older load module. |
 | `HTTPD001I` | `HTTPD vers READY - SERVING path` | The listener is up and requests are being accepted. |
-| `HTTPD001W` | `HTTPD vers READY - NO DOCUMENT ROOT` | As above, but no `DOCROOT` is configured. CGI routes work; static files 404. |
+| `HTTPD001I` | `HTTPD vers READY - NO DOCUMENT ROOT` | As above, but no `DOCROOT` is configured. CGI routes work; static files 404. Informational, not a warning — a CGI-only server is an ordinary deployment. |
 | `HTTPD003W` | `RACINIT SKIPPED, CANNOT ENTER SUPERVISOR STATE` | The identity switch needs key 0 and could not get it — the STC is not APF authorized (see `HTTPD012E`). It keeps the inherited `STC/STCGROUP` identity. |
 | `HTTPD004I` | `STC IDENTITY SET TO user/group VIA RACINIT` | The server dropped the default `STC/STCGROUP` identity, which holds ALTER on every data set (issue #177). |
-| `HTTPD004W` | `RACINIT ENVIR=CREATE FAILED FOR user/group RC=n` | The userid is not defined to RAKF, or the group is wrong. The server **continues** on the inherited identity — define the userid, or pass `STCUSER=`/`STCGROUP=`. |
+| `HTTPD004W` | `RACINIT ENVIR=CREATE FAILED FOR user/group RC=n` | The userid is not defined to RAKF, or the group is wrong. The server **continues** on the inherited identity — define the userid, or start with `S HTTPD,STCUSER=x,STCGRP=y`. |
 | `HTTPD005I` | `LIBC370 v (commit)` | Which C runtime this module linked against. A sysroot/STC mismatch shows here. |
 | `HTTPD006W` | `BUILT FROM A MODIFIED WORKING TREE` | The build carried uncommitted tracked changes, so `HTTPD000I`'s commit does not fully describe it. Never expected from a release artifact. |
 | `HTTPD007I` | `USER u IP a.b.c.d LOGIN SUCCESSFUL ACEE(x)` | A client completed the form login. |
