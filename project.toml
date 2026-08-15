@@ -3,6 +3,18 @@ name = "httpd"
 version = "4.0.0-dev"
 type = "application"
 
+[toolchain]
+# Pins the refs release.yml builds the published artifacts against; build.yml
+# deliberately keeps floating on main so a cc370/libc370 regression surfaces
+# in a PR build (mbt#68). cc370 is omitted -- it defaults to main and has no
+# releases to pin to yet.
+#
+# Without this the release CI builds against libc370 main, which is how ftpd's
+# first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
+# reproduce from a tag. HTTPD005I names the runtime it linked against, so an
+# unpinned release build makes that line unreproducible in exactly the same way.
+libc370 = "1.0.2"
+
 [build]
 # -DVERSION feeds httpd.c's `#ifndef VERSION` (otherwise it reports
 # "0.0.0-unknown"). v1's mbt injected it automatically; v2 does not.
@@ -33,7 +45,7 @@ cflags = [
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = ">=1.1.0"
+"mvslovers/ufsd" = ">=1.2.0"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
