@@ -1,4 +1,5 @@
 #include "httpd.h"
+#include "httpdmsg.h"
 
 int
 httpd048(HTTPD *httpd)
@@ -7,7 +8,7 @@ httpd048(HTTPD *httpd)
 	char		buf[40] = "";
 
 	if (!(httpd->login & HTTPD_LOGIN_ALL)) {
-		wtof("HTTPD048I Login not required for any request");
+		wtof(MSG_LOGIN_NONE);
 		goto quit;
 	}
 
@@ -28,7 +29,7 @@ httpd048(HTTPD *httpd)
 			strcat(buf, buf[0] ? ",POST" : "POST");
 		}
 	}
-	wtof("HTTPD048I Login required for (%s) request", buf);
+	wtof(MSG_LOGIN_POLICY, buf);
 
 quit:
 	return rc;

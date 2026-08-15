@@ -1,4 +1,5 @@
 #include "httpd.h"
+#include "httpdmsg.h"
 
 int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
 {
@@ -47,8 +48,7 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
                 if (__64_cmp(&now, &timeout) == __64_SMALLER) {
 #if HTTPD_DEBUG_217
                     if (++polls == limit) {
-                        wtof("HTTPD902D poll overrun client(%08X) socket(%d) "
-                             "polls(%u) limit(%us) -- deadline not firing",
+                        wtof(MSG_DBG_POLL_OVERRUN,
                             httpc, httpc->socket, polls, seconds);
                     }
 #endif

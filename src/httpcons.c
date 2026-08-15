@@ -1,10 +1,13 @@
 /* HTTPCONS.C
 */
 #include "httpd.h"
+#include "httpdmsg.h"     /* operator message catalog */
+#include <buildstamp.h>     /* MBT_COMMIT for DISPLAY VERSION */
 
 static int process(char *buf);
 
 static int display(char *buf);
+static int d_config(char *buf);
 static int d_login(char *buf);
 static int d_port(char *buf);
 static int d_thread(char *buf);
@@ -19,9 +22,6 @@ static int s_mintask(char *buf);
 static int s_login(char *buf);
 static int s_stats(char *in);
 
-#define HTTPD199I \
-    "HTTPD199I -------------------------------------------------------"
-
 /* http_console() */
 int
 httpcons(CIB *cib)
@@ -35,10 +35,10 @@ httpcons(CIB *cib)
 
     switch(cib->cibverb) {
     case CIBSTART:
-        wtof("HTTPD100I CONS(%u) START", cib->cibconid);
+        wtof(MSG_CONS_STATE, cib->cibconid, "START");
         break;
     case CIBMODFY:
-        wtof("HTTPD100I CONS(%u) \"%-*.*s\"",
+        wtof(MSG_CONS_MODIFY,
             cib->cibconid, cib->cibdatln, cib->cibdatln, cib->cibdata);
         buf = calloc(1, cib->cibdatln + 2);
         if (buf) {
@@ -47,11 +47,11 @@ httpcons(CIB *cib)
         }
         break;
     case CIBSTOP:
-        wtof("HTTPD100I CONS(%u) STOP", cib->cibconid);
+        wtof(MSG_CONS_STATE, cib->cibconid, "STOP");
         rc = 1;
         break;
     case CIBMOUNT:
-        wtof("HTTPD100I CONS(%u) MOUNT", cib->cibconid);
+        wtof(MSG_CONS_STATE, cib->cibconid, "MOUNT");
         break;
     }
 
@@ -61,32 +61,38 @@ quit:
     return rc;
 }
 
+/* The help text is console output, so it follows the same upper case rule as
+** every other WTO.  Abbreviations keep the capital/lower split that shows how
+** far a command can be shortened -- "DISPLAY MAXTASK" is matched on "MA", so
+** printing it MAxtask is the only way the line says so. */
 static char *usage[] = {
-	"Display Login",
-	"    display users that are logged into the HTTPD server",
-	"Display Memory xxxxxx[,nnn] (D M xxxxxx)",
-	"    displays memory at given address xxxxxx",
-    "Display Ports (D P)",
-    "    displays the port number this server is listening on.",
-    "Display Stats n [Months|Days|Hours|Minutes|all]",
-    "    displays HTTPD client statistics.",
-    "Display Threads (D T)",
-    "    displays information about the server threads.",
-    "Display TIme [-|+][minutes] (D TI)",
-    "    displays current time in GMT and local time.",
-    "Display Version (D V)",
-    "    displays server version.",
+    "DISPLAY Config (D C)",
+    "    DISPLAYS THE CONFIGURATION THIS SERVER IS RUNNING",
+	"DISPLAY Login (D L)",
+	"    DISPLAYS USERS THAT ARE LOGGED INTO THE HTTPD SERVER",
+	"DISPLAY Memory xxxxxx[,nnn] (D M xxxxxx)",
+	"    DISPLAYS MEMORY AT THE GIVEN ADDRESS xxxxxx",
+    "DISPLAY Ports (D P)",
+    "    DISPLAYS THE PORT NUMBER THIS SERVER IS LISTENING ON",
+    "DISPLAY Stats (D S)",
+    "    DISPLAYS HTTPD CLIENT STATISTICS",
+    "DISPLAY Threads (D T)",
+    "    DISPLAYS INFORMATION ABOUT THE SERVER THREADS",
+    "DISPLAY TIme [-|+][minutes] (D TI)",
+    "    DISPLAYS THE CURRENT TIME IN GMT AND LOCAL TIME",
+    "DISPLAY Version (D V)",
+    "    DISPLAYS THE SERVER VERSION AND BUILD",
     " ",
-    "Set Login [all,cgi,get,head,post,none] (S L ...)",
-    "    set the login option.",
-    "Set MAxtask n (S MAxtask n)",
-    "    set the worker maximum thread count.",
-    "Set MIntask n (S MIntask n)",
-    "    set the worker minimum thread count.",
-    "Set Stats ON|OFF [Save|Clear|Free|Reset]",
-    "    set client statistics recording ON or OFF.",
+    "SET Login [ALL,CGI,GET,HEAD,POST,NONE] (S L ...)",
+    "    SETS THE LOGIN OPTION",
+    "SET MAxtask n (S MA n)",
+    "    SETS THE WORKER MAXIMUM THREAD COUNT",
+    "SET MIntask n (S MI n)",
+    "    SETS THE WORKER MINIMUM THREAD COUNT",
+    "SET Stats NONE|ERROR|AUTH|ALL [RESET]",
+    "    SETS THE SMF RECORDING LEVEL",
     " ",
-    "Example: /F HTTPD,D P",
+    "EXAMPLE: /F HTTPD,D C",
     NULL
 };
 
@@ -117,12 +123,12 @@ process(char *buf)
     if (http_cmpn(token, "?", len)==0) goto help;
     if (http_cmpn(token, "HELP", len)==0) goto help;
 
-    wtof("HTTPD101E unknown console command \"%s\"", token);
+    wtof(MSG_CONS_UNKNOWN, token);
 
 help:
-    wtof("HTTPD000I MODIFY commands are:");
+    wtof(MSG_HELP_HEADER);
     for(i=0; usage[i]; i++) {
-        wtof("HTTPD000I %s", usage[i]);
+        wtof(MSG_HELP_LINE, usage[i]);
     }
 
 quit:
@@ -163,7 +169,7 @@ set(char *buf)
 		goto quit;
 	}
 
-    wtof("HTTPD101E unknown console command \"SET %s\"", token);
+    wtof(MSG_CONS_UNKNOWN_S, token);
 
 quit:
     return rc;
@@ -184,11 +190,19 @@ display(char *buf)
     len     = strlen(token);
     rest    = strtok(NULL, "");
 
+    /* CONFIG before LOGIN: both are unique at one character in the operator's
+       mind but "C" only matches this one, so the order is cosmetic -- keep the
+       list alphabetical so a new command has an obvious home. */
+    if (http_cmpn(token, "CONFIG", len)==0) {
+        rc = d_config(rest);
+        goto quit;
+    }
+
 	if (http_cmpn(token, "LOGIN", len)==0) {
 		rc = d_login(rest);
 		goto quit;
 	}
-	
+
     if (http_cmpn(token, "MEMORY", len)==0) {
         rc = d_memory(rest);
         goto quit;
@@ -219,10 +233,48 @@ display(char *buf)
         goto quit;
     }
 
-    wtof("HTTPD101E unknown console command \"DISPLAY %s\"", token);
+    wtof(MSG_CONS_UNKNOWN_D, token);
 
 quit:
     return rc;
+}
+
+/* DISPLAY CONFIG -- the settled configuration, on demand.
+**
+** Startup used to echo all of this whether anyone wanted it or not.  It is
+** here instead (#184): UFSD and FTPD both keep the banner short and answer
+** questions when asked, and an operator who wants to know what the server
+** actually parsed can now ask at any point in its life, not only by finding
+** the start of the job log.
+**
+** Values keep their case -- the document root is a UFS path and the codepage
+** name is a value; only the labels are upper case (httpdmsg.h rule 3). */
+static int
+d_config(char *buf)
+{
+    CLIBGRT     *grt    = __grtget();
+    HTTPD       *httpd  = grt->grtapp1;
+    static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
+    char        name[64];
+
+    lock(httpd, LOCK_SHR);
+
+    wtof(MSG_D_CFG_TASKS, httpd->port,
+        (int)httpd->cfg_mintask, (int)httpd->cfg_maxtask);
+    wtof(MSG_D_CFG_TIMES, (int)httpd->cfg_client_timeout,
+        (int)httpd->cfg_keepalive_timeout, (int)httpd->cfg_keepalive_max);
+    wtof(MSG_D_CFG_SESSION, (int)httpd->cfg_session_timeout,
+        httpd->cfg_session_timeout ? "" : " (REAPER DISABLED)");
+    wtof(MSG_D_CFG_DOCROOT,
+        httpd->docroot[0] ? httpd->docroot : "(NONE)");
+    wtof(MSG_D_CFG_CODEPAGE,
+        httpd->codepage[0] ? httpd->codepage : "CP037");
+    wtof(MSG_D_CFG_SMF, (int)httpd->smf_type, levels[httpd->smf_level]);
+    wtof(MSG_D_CFG_SOURCE, parmlib_name(name, sizeof(name)));
+
+    unlock(httpd, LOCK_SHR);
+
+    return 0;
 }
 
 static int
@@ -233,7 +285,7 @@ d_login_cred(CRED *cred)
 
 	credid_dec(&cred->id, &id);
 	
-	wtof("HTTPD071I User:%-8.8s IP:%u.%u.%u.%u ACEE(%06X)",
+	wtof(MSG_D_LOGIN_USER,
 		id.userid, 
 		id.addr >> 24 & 0xFF,
 		id.addr >> 16 & 0xFF,
@@ -260,7 +312,7 @@ d_login(char *buf)
 	lock(array, LOCK_SHR);
 
 	count = array_count(array);
-	wtof("HTTPD070I Users Logged In: %u", count);
+	wtof(MSG_D_LOGIN_COUNT, count);
 
 	for(n=1; n <= count; n++) {
 		cred = array_get(array, n);
@@ -283,7 +335,7 @@ d_port(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
 
-    wtof("HTTPD102I HTTPD server listening on port %d", httpd->port);
+    wtof(MSG_D_PORT, httpd->port);
 
     return rc;
 }
@@ -295,9 +347,9 @@ d_stats(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
 	static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
 
-	wtof("HTTPD411I SMF: %s (Type %d)",
+	wtof(MSG_D_STATS_SMF,
 		levels[httpd->smf_level], (int)httpd->smf_type);
-	wtof("HTTPD412I Requests: %u  Errors: %u  Bytes: %u  Active: %u",
+	wtof(MSG_D_STATS_COUNT,
 		httpd->total_requests, httpd->total_errors,
 		httpd->total_bytes_sent, httpd->active_connections);
 
@@ -310,8 +362,12 @@ d_version(char *buf)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
+    char        vers[24];
+    char        commit[24];
 
-    wtof("HTTPD140I HTTPD Server version %s", httpd->version);
+    wtof(MSG_D_VERSION,
+        http_upcase(vers, sizeof(vers), httpd->version),
+        http_upcase(commit, sizeof(commit), MBT_COMMIT));
     
 	return 0;
 }
@@ -327,7 +383,7 @@ d_memory(char *buf)
 	/* D M with no address would strtoul(NULL) -> deref NULL on the console
 	   thread; an address is required */
 	if (!buf) {
-		wtof("HTTPD000I usage: Display Memory xxxxxx[,nnn] (D M xxxxxx)");
+		wtof(MSG_D_MEM_USAGE);
 		return 0;
 	}
 
@@ -340,7 +396,7 @@ d_memory(char *buf)
 	
 	/* sanity check memory address */
 	if (mem > (char*)0x00FFFFFF){
-		wtof("Invalid memory address 0x%08X", mem);
+		wtof(MSG_D_MEM_INVALID, mem);
 		goto quit;
 	}
 
@@ -348,25 +404,23 @@ d_memory(char *buf)
 	try(wtodumpf, mem, len, "DISPLAY MEMORY");
 	rc = tryrc();
 	if (rc==0) {
-		wtof("End of memory dump for 0x%06X", mem);
+		wtof(MSG_D_MEM_END, mem);
 		goto quit;
 	}
 	
 	if (rc < 0) {
 		rc *= -1;	/* make rc positive value */
-		wtof("ESTAE CREATE failure, RC=0x%08X", rc);
+		wtof(MSG_D_MEM_ESTAE, rc);
 		goto quit;
 	}
 	
 	if (rc > 0xFFF) {
 		/* system ABEND occured */
-		wtof("ABEND S%03X occured for DISPLAY MEMORY 0x%06X", 
-			(rc >> 12) & 0xFFF, mem);
+		wtof(MSG_D_MEM_ABEND_S, (rc >> 12) & 0xFFF, mem);
 	}
 	else {
 		/* user ABEND occured */
-		wtof("ABEND U%04d occured for DISPLAY MEMORY 0x%06X", 
-			rc & 0xFFF, mem);
+		wtof(MSG_D_MEM_ABEND_U, rc & 0xFFF, mem);
 	}
 	
 quit:
@@ -419,11 +473,11 @@ d_time(char *buf)
 	}
 	
 	gmtime64_r(&gmt, &tm);
-	strftime(tbuf, sizeof(tbuf), "HTTPD142I time %Y/%m/%d %H:%M:%S GMT", &tm);
+	strftime(tbuf, sizeof(tbuf), MSG_D_TIME_GMT, &tm);
 	wtof("%s", tbuf);
 
 	gmtime64_r(&lot, &tm);
-	strftime(tbuf, sizeof(tbuf), "HTTPD143I time %Y/%m/%d %H:%M:%S Local", &tm);
+	strftime(tbuf, sizeof(tbuf), MSG_D_TIME_LOCAL, &tm);
 	/* "OFFSET=" and not "TZOFFSET=": the Parmlib keyword of that name is
 	   retired (#145), and labelling the value after it suggested a setting that
 	   no longer exists.  What is shown is the offset in minutes -- the system's
@@ -438,11 +492,11 @@ d_cthdtask(CTHDTASK *task)
 {
     if (!task) goto quit;
 
-    wtof("HTTPD104I .....EYE %-8.8s  .....TCB %08X  ..OWNTCB %08X",
+    wtof(MSG_D_TASK1,
         task->eye, task->tcb, task->owntcb);
-    wtof("HTTPD105I .TERMECB %08X  ......RC %08X  STACKSZE %08X",
+    wtof(MSG_D_TASK2,
         task->termecb, task->rc, task->stacksize);
-    wtof("HTTPD106I ....FUNC %08X  ....ARG1 %08X  ....ARG2 %08X",
+    wtof(MSG_D_TASK3,
         task->func, task->arg1, task->arg2);
 
 quit:
@@ -463,15 +517,15 @@ d_cthdmgr(CTHDMGR *mgr)
     case CTHDMGR_STATE_WAITING:     state = "WAITING";      break;
     }
 
-    wtof("HTTPD107I .....EYE %-8.8s  ....TASK %08X  .WAITECB %08X",
+    wtof(MSG_D_MGR1,
         mgr->eye, mgr->task, mgr->wait);
-    wtof("HTTPD108I ....FUNC %08X  ...UDATA %08X  STACKSZE %08X",
+    wtof(MSG_D_MGR2,
         mgr->func, mgr->udata, mgr->stacksize);
-    wtof("HTTPD109I ..WORKER %08X  ...QUEUE %08X  ...STATE %08X %s",
+    wtof(MSG_D_MGR3,
         mgr->worker, mgr->queue, mgr->state, state);
-    wtof("HTTPD110I .MINTASK %8u  .MAXTASK %8u",
+    wtof(MSG_D_MGR4,
         mgr->mintask, mgr->maxtask);
-    wtof("HTTPD111I .WORKERS %8u  .DISPCNT %llu",
+    wtof(MSG_D_MGR5,
         array_count(&mgr->worker), mgr->dispatched);
 
 quit:
@@ -512,13 +566,13 @@ d_queue(CTHDWORK *work)
 				}
             }
             ntoa(httpc->addr, ip);
-            wtof("HTTPD118I PROTOCOL HTTP      ....USER %-9.9s ...GROUP %s", user, group);
-            wtof("HTTPD119I ..REMOTE CLIENT    ....PORT %8d  ......IP %s",
+            wtof(MSG_D_CLIENT, user, group);
+            wtof(MSG_D_REMOTE,
                 httpc->port, ip);
             addrlen = sizeof(addr);
             getpeername(httpc->socket, &addr, &addrlen);
             ntoa(in->sin_addr.s_addr, ip);
-            wtof("HTTPD120I ..SOCKET %8d  ....PORT %8d  ......IP %s",
+            wtof(MSG_D_SOCKET,
                 httpc->socket, in->sin_port, ip);
         }
     }
@@ -541,19 +595,19 @@ d_cthdwork(CTHDWORK *work)
     case CTHDWORK_STATE_STOPPED:    state = "STOPPED";      break;
     }
 
-    wtof("HTTPD112I ..WORKER %08X  .....EYE %-8.8s  .WAITECB %08X",
+    wtof(MSG_D_WORK1,
         work, work->eye, work->wait);
-    wtof("HTTPD113I .....MGR %08X  ....TASK %08X  ...QUEUE %08X",
+    wtof(MSG_D_WORK2,
         work->mgr, work->task, work->queue);
-    wtof("HTTPD114I ...STATE %08X %s",
+    wtof(MSG_D_WORK3,
         work->state, state);
-    wtof("HTTPD115I ...START %016llX  %s",
+    wtof(MSG_D_WORK4,
         work->start_time, work->start_time.u64 ? ctime64(&work->start_time) : "");
-    wtof("HTTPD116I ....WAIT %016llX  %s",
+    wtof(MSG_D_WORK5,
         work->wait_time, work->wait_time.u64 ? ctime64(&work->wait_time) : "");
-    wtof("HTTPD117I ....DISP %016llX  %s",
+    wtof(MSG_D_WORK6,
         work->disp_time, work->disp_time.u64 ? ctime64(&work->disp_time) : "");
-    wtof("HTTPD141I .DISPCNT %llu",
+    wtof(MSG_D_DISPCNT,
         work->dispatched);
 
     if (work->state==CTHDWORK_STATE_RUNNING && work->queue) {
@@ -580,19 +634,17 @@ d_thread(char *buf)
     lock(httpd,1);
 
     if (task) {
-        wtof("HTTPD103I ..THREAD %08X main server thread", task);
+        wtof(MSG_D_THREAD, task, "MAIN SERVER THREAD");
         d_cthdtask(task);
-        wtof("HTTPD120I ...RNAME %-28.28s",
-            httpd->rname);
-        wtof(HTTPD199I);
+        wtof(MSG_D_RNAME, httpd->rname);
+        wtof(MSG_SEPARATOR);
     }
 
-    wtof("HTTPD103I ..THREAD %08X socket thread", httpd->socket_thread);
+    wtof(MSG_D_THREAD, httpd->socket_thread, "SOCKET THREAD");
     if (httpd->socket_thread) {
         d_cthdtask(httpd->socket_thread);
-        wtof("HTTPD119I ..SOCKET %8d  ....PORT %8d  (HTTP Protocol)",
-            httpd->listen, httpd->port);
-        wtof(HTTPD199I);
+        wtof(MSG_D_LISTENER, httpd->listen, httpd->port);
+        wtof(MSG_SEPARATOR);
     }
 
     if (httpd->mgr) {
@@ -602,11 +654,11 @@ d_thread(char *buf)
 
         task = mgr->task;
         if (task) {
-            wtof("HTTPD103I ..THREAD %08X dispatcher thread", task);
+            wtof(MSG_D_THREAD, task, "DISPATCHER THREAD");
             d_cthdtask(task);
         }
         d_cthdmgr(mgr);
-        wtof(HTTPD199I);
+        wtof(MSG_SEPARATOR);
 
         count = array_count(&mgr->worker);
         for(n=0; n < count; n++) {
@@ -617,10 +669,10 @@ d_thread(char *buf)
             task = work->task;
             if (!task) continue;
 
-            wtof("HTTPD103I ..THREAD %08X worker thread", task);
+            wtof(MSG_D_THREAD, task, "WORKER THREAD");
             d_cthdtask(task);
             d_cthdwork(work);
-            wtof(HTTPD199I);
+            wtof(MSG_SEPARATOR);
         }
 
         unlock(mgr,1);
@@ -659,12 +711,12 @@ s_maxtask(char *buf)
 #if 0		
         task = mgr->task;
         if (task) {
-            wtof("HTTPD103I ..THREAD %08X dispatcher thread", task);
+            wtof(MSG_D_THREAD, task, "DISPATCHER THREAD");
             d_cthdtask(task);
         }
 #endif
         d_cthdmgr(mgr);
-        wtof(HTTPD199I);
+        wtof(MSG_SEPARATOR);
 
         unlock(mgr,1);
     }
@@ -702,12 +754,12 @@ s_mintask(char *buf)
 #if 0		
         task = mgr->task;
         if (task) {
-            wtof("HTTPD103I ..THREAD %08X dispatcher thread", task);
+            wtof(MSG_D_THREAD, task, "DISPATCHER THREAD");
             d_cthdtask(task);
         }
 #endif
         d_cthdmgr(mgr);
-        wtof(HTTPD199I);
+        wtof(MSG_SEPARATOR);
 
         unlock(mgr,1);
     }
@@ -729,7 +781,7 @@ s_login(char *in)
     lock(httpd,LOCK_SHR);
 
 	if (!in) {
-		wtof("HTTPD048W Missing LOGIN (all,cgi,head,get,post,none) value");
+		wtof(MSG_LOGIN_MISSING);
 		goto quit;
 	}
 
@@ -767,7 +819,7 @@ s_login(char *in)
 			continue;
 		}
 		/* not one of our LOGIN= values */
-		wtof("HTTPD048E Invalid SET LOGIN value \"%s\"", p);
+		wtof(MSG_S_LOGIN_INVALID, p);
         break;
 	}
 
@@ -797,13 +849,13 @@ s_stats(char *in)
     lock(httpd,LOCK_EXC);
 
 	if (!in) {
-		wtof("HTTPD048W Missing STATS NONE|ERROR|AUTH|ALL [RESET]");
+		wtof(MSG_S_STATS_MISSING);
 		goto quit;
 	}
 
 	p = strtok(in, " ,");
 	if (!p) {
-		wtof("HTTPD048W Missing STATS NONE|ERROR|AUTH|ALL [RESET]");
+		wtof(MSG_S_STATS_MISSING);
 		goto quit;
 	}
 
@@ -823,14 +875,14 @@ s_stats(char *in)
 		httpd->total_requests = 0;
 		httpd->total_errors = 0;
 		httpd->total_bytes_sent = 0;
-		wtof("HTTPD411I Statistics counters reset");
+		wtof(MSG_S_STATS_RESET);
 		goto quit;
 	}
 	else {
-		wtof("HTTPD411E Invalid SET STATS value \"%s\"", p);
+		wtof(MSG_S_STATS_INVALID, p);
 		goto quit;
 	}
-	wtof("HTTPD411I SMF level set to %s", levels[httpd->smf_level]);
+	wtof(MSG_S_STATS_LEVEL, levels[httpd->smf_level]);
 
 	// Check for RESET option
 	next = strtok(NULL, " ,");
@@ -838,7 +890,7 @@ s_stats(char *in)
 		httpd->total_requests = 0;
 		httpd->total_errors = 0;
 		httpd->total_bytes_sent = 0;
-		wtof("HTTPD411I Statistics counters reset");
+		wtof(MSG_S_STATS_RESET);
 	}
 
 quit:

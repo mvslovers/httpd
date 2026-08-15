@@ -3,6 +3,7 @@
 ** Transitions to next state as needed.
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 typedef enum ctype  CTYPE;
 enum ctype {
@@ -147,7 +148,7 @@ known:
         rc = http_send_text(httpc);
         break;
     default:
-        wtof("Unexpected subtype %d in httpget()", httpc->subtype);
+        wtof(MSG_BAD_SUBTYPE, httpc->subtype);
         rc = http_resp_internal_error(httpc);
         if (!rc) {
             rc = http_printf(httpc,

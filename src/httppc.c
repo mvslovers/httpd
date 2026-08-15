@@ -2,6 +2,7 @@
 ** Process client
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 /* Basic-auth realm advertised in the WWW-Authenticate challenge (fixed for now;
    a per-route / Parmlib realm is a later step of the auth redesign). */
@@ -35,7 +36,7 @@ httppc(HTTPC *httpc)
         /* This exit returns without advancing httpc->state, and serve_client()
            has no wait -- so whoever reaches it is about to spin.  Name the
            client and its state so the wedge reports itself (#159). */
-        wtof("HTTPD900D busy-exit client(%08X) state(%d) socket(%d) req(%u)",
+        wtof(MSG_DBG_BUSY_EXIT,
             httpc, (int)httpc->state, httpc->socket, httpc->request_count);
 #endif
         goto quit;
@@ -43,7 +44,7 @@ httppc(HTTPC *httpc)
 
     /* mark this client as busy */
     if (http_set_busy(httpc)) {
-        wtof("http_set_busy() failed");
+        wtof(MSG_SET_BUSY_FAILED);
         goto quit;
     }
 

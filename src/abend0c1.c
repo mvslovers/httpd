@@ -27,6 +27,7 @@
 ** 4.0.0.
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 #define httpx   (httpd->httpx)
 
@@ -63,8 +64,7 @@ int main(int argc, char **argv)
         got++;
     }
 
-    wtof("ABEND0C1 allocated %u KB in %u blocks, abending without freeing",
-         (got * CHUNK) / 1024, got);
+    wtof(MSG_ABEND_TEST, (got * CHUNK) / 1024, got);
 
     /* Nothing is freed on purpose: this is what an abending CGI leaves
        behind.  httppcgi() releases the subpool it all came from (#174);

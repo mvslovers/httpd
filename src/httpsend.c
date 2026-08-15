@@ -3,6 +3,7 @@
 ** Returns number of bytes sent, or -1 on error
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 /* send_raw() - send raw bytes to socket without chunk framing */
 static int
@@ -13,7 +14,7 @@ send_raw(HTTPC *httpc, const UCHAR *buf, int len)
 
     for(pos=0; pos < len; pos+=rc) {
         if (pos < 0) {
-            wtof("httpsend() pos underflow %d", pos);
+            wtof(MSG_SEND_UNDERFLOW, pos);
             break;
         }
         rc = send(httpc->socket, &buf[pos], len-pos, 0);

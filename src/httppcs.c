@@ -2,6 +2,7 @@
 ** Process clients
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 /* http_process_clients() */
 int
@@ -17,7 +18,7 @@ httppcs(void)
     lockrc = lock(httpd,0);
     if (lockrc==0) goto locked; /* we have the lock */
     if (lockrc==8) goto locked; /* we already had the lock */
-    wtof("%s lock failure", __func__);
+    wtof(MSG_LOCK_FAILED, __func__);
     goto quit;
 
 locked:

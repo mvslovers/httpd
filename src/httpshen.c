@@ -2,6 +2,7 @@
 ** Set HTTP environment variable
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 static int parse_cookies(HTTPC *httpc, const UCHAR *in);
 static int set_cookie(HTTPC *httpc, const UCHAR *name, const UCHAR *value);
@@ -28,8 +29,7 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 	UCHAR	*value;
 	
 	if (!buf) {
-		wtof("HTTPD904E No storage for environment variable HTTP_Cookie "
-		     "client(%08X)", httpc);
+		wtof(MSG_ENV_NO_STORAGE, "HTTP_Cookie", httpc);
 		return -1;      /* -1, like every other setter in this path */
 	}
 

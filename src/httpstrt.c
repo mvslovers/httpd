@@ -7,6 +7,7 @@
 #include "clibcrt.h"
 #include "clibenv.h"                /* loadenv()                        */
 #include "clibwto.h"                /* wtof()                           */
+#include "httpdmsg.h"               /* MSG_DD_* operator messages       */
 
 #define MAXPARMS 50 /* maximum number of arguments we can handle */
 
@@ -47,11 +48,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     fp = fopen("DD:SYSPRINT", "w");
     if (fp) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   SYSPRINT DD not allowed for HTTPD program.        *");
-        wtof("*                                                     *");
-        wtof("*   HTTPD uses HTTPDOUT DD for its STDOUT dataset.    *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_SYSPRINT);
         fclose(fp);
     }
 
@@ -59,11 +56,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     fp = fopen("DD:SYSTERM", "w");
     if (fp) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   SYSTERM DD not allowed for HTTPD program.         *");
-        wtof("*                                                     *");
-        wtof("*   HTTPD uses HTTPDERR DD for its STDERR dataset.    *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_SYSTERM);
         fclose(fp);
     }
 
@@ -71,11 +64,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     fp = fopen("DD:SYSIN", "r");
     if (fp) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   SYSIN DD not allowed for HTTPD program.           *");
-        wtof("*                                                     *");
-        wtof("*   HTTPD uses HTTPDIN DD for its STDIN dataset.      *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_SYSIN);
         fclose(fp);
     }
 
@@ -85,26 +74,20 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     stdout = fopen("DD:HTTPDOUT", "w");
     if (!stdout) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   HTTPDOUT DD not defined, unable to open STDOUT.   *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_NO_STDOUT);
     }
 
     stderr = fopen("DD:HTTPDERR", "w");
     if (!stderr) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   HTTPDERR DD not defined. unable to open STDERR.   *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_NO_STDERR);
     }
 
     stdin = fopen("DD:HTTPDIN", "r");
     if (!stdin) stdin = fopen("'NULLFILE'", "r");
     if (!stdin) {
         errors++;
-        wtof("*******************************************************");
-        wtof("*   HTTPDIN DD not defined, unable to open STDIN.     *");
-        wtof("*******************************************************");
+        wtof(MSG_DD_NO_STDIN);
     }
     
     if (errors) {

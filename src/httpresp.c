@@ -3,6 +3,7 @@
 ** Transitions to next state as needed.
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 #include "clibsmf.h"
 #include "clibtiot.h"
 #include "clibssib.h"
@@ -29,7 +30,7 @@ httpresp(HTTPC *httpc, int resp)
         ** Silently, "server does not know this code" is indistinguishable on
         ** the wire from "server failed" -- that is how 505, which httpin.c
         ** emits, went out as a 500 unnoticed (issue #181). */
-        wtof("HTTPD054E Unsupported HTTP status %d requested, sent 500", resp);
+        wtof(MSG_BAD_STATUS, resp);
         status = httpstat(500);
     }
 
