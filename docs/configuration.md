@@ -123,6 +123,24 @@ system**. Adding `USER=` to the PROC changes nothing, because that path
 consults nothing. So HTTPD logs on to a dedicated identity instead and installs
 it as the address space's resting one (issue #177).
 
+> **This holds until the first client authenticates, and no further.** Measured
+> on mvsdev with `/.dm`: after startup `ASXBSENV` held the `HTTPD/USER` ACEE as
+> intended, and after one Basic-auth request it held the *client's*
+> `IBMUSER/ADMIN` ACEE instead. The `HTTPD/USER` ACEE was still allocated and
+> intact — it had simply been displaced.
+>
+> Nothing in HTTPD does that: `racf_set_acee()` is called in exactly one place,
+> the startup switch. The likely mechanism is RAKF's own `RACINIT ENVIR=CREATE`
+> planting the new ACEE into `ASXBSENV` as it creates it, which would make every
+> client logon displace the server identity.
+>
+> So this narrows the window rather than closing it: HTTPD runs privileged-free
+> from start until the first login, which covers Parmlib, UFS init and the docroot
+> open — the accesses the switch was aimed at. It does **not** mean an
+> ACEE-unaware CGI is safe at request time. That is issue #176, and this
+> measurement is evidence for its conclusion: a shared, address-space-wide field
+> cannot be made correct by choosing who writes it.
+
 The userid needs:
 
 - **READ** on whatever HTTPD itself opens before a client identity exists — the
