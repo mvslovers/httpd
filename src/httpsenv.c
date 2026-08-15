@@ -2,6 +2,7 @@
 ** Set environment variable
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 extern int
 httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
@@ -20,11 +21,9 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
            caller passes through, and it still knows which variable failed,
            which the reset sites no longer do. */
         if (errno == E2BIG)
-            wtof("HTTPD905E Environment variable %.32s too large "
-                 "client(%08X)", name, httpc);
+            wtof(MSG_ENV_TOO_LARGE, name, httpc);
         else
-            wtof("HTTPD904E No storage for environment variable %.32s "
-                 "client(%08X)", name, httpc);
+            wtof(MSG_ENV_NO_STORAGE, name, httpc);
         rc = -1;
         goto quit;
     }
@@ -49,8 +48,7 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
     }
     if (rc) {
         free(v);
-        wtof("HTTPD904E No storage for environment variable %.32s "
-             "client(%08X)", name, httpc);
+        wtof(MSG_ENV_NO_STORAGE, name, httpc);
         rc = -1;
     }
 

@@ -1,5 +1,6 @@
 /* HTTPCRED.C - process login request */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 #define httpx   (httpd->httpx)
 
@@ -318,7 +319,7 @@ process_get(HTTPD *httpd, HTTPC *httpc)
 
 		if (logged_out) {
 			http_printf(httpc, "You have been logged out.\n");
-			wtof("HTTPD008I User:%-8.8s IP:%u.%u.%u.%u Logout Successful",
+			wtof(MSG_LOGOUT_OK,
 				id.userid, 
 				id.addr >> 24 & 0xFF,
 				id.addr >> 16 & 0xFF,
@@ -327,7 +328,7 @@ process_get(HTTPD *httpd, HTTPC *httpc)
 		}
 		else if (cred) {
 			http_printf(httpc, "Logout failed.\n");
-			wtof("HTTPD008W User:%-8.8s IP:%u.%u.%u.%u Logout Failed",
+			wtof(MSG_LOGOUT_FAILED,
 				id.userid, 
 				id.addr >> 24 & 0xFF,
 				id.addr >> 16 & 0xFF,
@@ -406,7 +407,7 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 
 		credid_dec(&cred->id, &id);
 
-		wtof("HTTPD007I User:%-8.8s IP:%u.%u.%u.%u Login Successful ACEE(%06X)",
+		wtof(MSG_LOGIN_OK,
 			id.userid, 
 			id.addr >> 24 & 0xFF,
 			id.addr >> 16 & 0xFF,

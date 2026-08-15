@@ -8,6 +8,7 @@
 ** Follows the same pattern as FTPD (ftpd#cfg.c) and UFSD (ufsd#cfg.c).
 */
 #include "httpd.h"
+#include "httpdmsg.h"       /* operator message catalog                    */
 #include "httpxlat.h"
 #include "clibdsab.h"       /* get_dsab()  -- DD -> DSAB                    */
 #include "ieftiot.h"        /* TIOTDD      -- DSAB -> TIOT entry            */
@@ -30,8 +31,11 @@ extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff *
 ** Read-only pointer chasing (DSAB -> TIOT entry -> JFCB), no SVC and no
 ** allocation; falls back to the DD name if any link is missing, so a caller
 ** always gets something printable.  The 3-byte TIOEJFCB is a SWA address,
-** cast per byte because the field is char and its high bit is data. */
-static const char *
+** cast per byte because the field is char and its high bit is data.
+**
+** No longer static: F HTTPD,D CONFIG reports the same value on demand, and
+** re-deriving the DD there would have been the identical 40 lines (#184). */
+const char *
 parmlib_name(char *buf, size_t size)
 {
     DSAB    *dsab;
@@ -90,16 +94,14 @@ http_config(HTTPD *httpd, const char *member)
     CLIBCRT *crt = __crtget();
     FILE    *fp;
     char     line[256];
-    char     name[64];
     int      rc;
 
     /* CONFIG= has been read-and-discarded since the Parmlib migration, which
        is worse than not accepting it: an operator who passes it believes it
        took effect.  Say it did not, and name the mechanism that does (#166). */
     if (member && *member) {
-        wtof("HTTPD024W CONFIG=%.32s is ignored; the configuration comes from "
-             "the %s DD", member, HTTPD_PARMLIB_DD);
-        wtof("HTTPD024W Use S HTTPD,M=member to select a different member");
+        wtof(MSG_CFG_IGNORED, member, HTTPD_PARMLIB_DD);
+        wtof(MSG_CFG_USE_MEMBER);
     }
 
     /* store HTTPD pointer in CRT for CGI modules */
@@ -111,12 +113,12 @@ http_config(HTTPD *httpd, const char *member)
     /* read configuration from DD:HTTPPRM */
     fp = fopen("DD:" HTTPD_PARMLIB_DD, "r");
     if (!fp) {
-        wtof("HTTPD020W Cannot open DD:%s -- using defaults",
-             HTTPD_PARMLIB_DD);
+        wtof(MSG_CFG_NO_PARMLIB, HTTPD_PARMLIB_DD);
     } else {
-        /* name it before parsing, so any error below is already attributed */
-        wtof("HTTPD022I Configuration from %s",
-             parmlib_name(name, sizeof(name)));
+        /* The member is NOT announced here.  It used to be, so a parse error
+        ** below would already be attributed -- but every error this loop can
+        ** raise names the offending line itself, and F HTTPD,D CONFIG reports
+        ** the member on demand (HTTPD133I). */
         while (fgets(line, (int)sizeof(line), fp)) {
             parse_line(httpd, line);
         }
@@ -130,8 +132,7 @@ http_config(HTTPD *httpd, const char *member)
        than run a server whose gates are not the ones the Parmlib configured.
        Checked before do_bind() so the port is never opened. */
     if (httpd->flag & HTTPD_FLAG_CFGERR) {
-        wtof("HTTPD420E Route authorization policy incomplete "
-             "-- HTTPD will not start");
+        wtof(MSG_ROUTE_POLICY_BAD);
         return 8;
     }
 
@@ -142,11 +143,11 @@ http_config(HTTPD *httpd, const char *member)
     if (httpd->ufs_enabled) {
         httpd->ufssys = ufs_sys_new();
         if (!httpd->ufssys) {
-            wtof("HTTPD044W Unable to initialize file system");
-        } else {
-            if (httpd->docroot[0])
-                wtof("HTTPD047I Document root: %s", httpd->docroot);
+            wtof(MSG_UFS_FAILED);
         }
+        /* The document root is not announced here: HTTPD001I names it when
+           the server is actually ready to serve it, and F HTTPD,D CONFIG
+           reports it on demand (#184). */
     }
 
     /* Stats counters initialized to zero by calloc */
@@ -155,25 +156,21 @@ http_config(HTTPD *httpd, const char *member)
     if (httpd->dbg_enabled && !httpd->dbg) {
         httpd->dbg = fopen("DD:HTTPDBG", "w");
         if (!httpd->dbg) {
-            wtof("HTTPD020E fopen for DD:HTTPDBG failed, error=%d", errno);
-            wtof("HTTPD021I DEBUG/TRACE output will be to DD:SYSTERM");
+            wtof(MSG_CFG_DBG_FAILED, errno);
+            wtof(MSG_CFG_DBG_STDERR);
             httpd->dbg = stderr;
         }
     }
 
-    /* bind HTTP listener socket */
+    /* bind HTTP listener socket.  do_bind() writes HTTPD054I on success. */
     rc = do_bind(httpd);
     if (rc) return rc;
 
-    /* log final configuration */
-    wtof("HTTPD032I Listening for HTTP request on port %d", httpd->port);
-    wtof("HTTPD033I MINTASK=%d MAXTASK=%d CLIENT_TIMEOUT=%d",
-         httpd->cfg_mintask, httpd->cfg_maxtask,
-         httpd->cfg_client_timeout);
-    wtof("HTTPD034I KEEPALIVE_TIMEOUT=%d KEEPALIVE_MAX=%d",
-         httpd->cfg_keepalive_timeout, httpd->cfg_keepalive_max);
-    wtof("HTTPD035I SESSION_TIMEOUT=%d min%s", httpd->cfg_session_timeout,
-         httpd->cfg_session_timeout ? "" : " (reaper disabled)");
+    /* The settled configuration used to be echoed here in four lines nobody
+       had asked for.  It is available on demand as F HTTPD,D CONFIG instead
+       (#184) -- the UFSD/FTPD shape: a quiet banner, full detail when the
+       operator wants it.  What stays is the one line below, because it is not
+       a value report but a warning about a combination that loses data. */
 
     /* the reaper must not free a credential still borrowed by an in-flight
        request: SESSION_TIMEOUT (min) must exceed the longest request
@@ -181,8 +178,7 @@ http_config(HTTPD *httpd, const char *member)
        config (M2). */
     if (httpd->cfg_session_timeout &&
         (long)httpd->cfg_session_timeout * 60 <= httpd->cfg_client_timeout) {
-        wtof("HTTPD035W SESSION_TIMEOUT (%d min) <= CLIENT_TIMEOUT (%d sec); "
-             "raise it well above the longest request",
+        wtof(MSG_CFG_SESSION_UNSAFE,
              httpd->cfg_session_timeout, httpd->cfg_client_timeout);
     }
 
@@ -279,7 +275,7 @@ parse_line(HTTPD *httpd, char *line)
     key = p;
     value = strchr(p, '=');
     if (!value) {
-        wtof("HTTPD020W Unrecognized config line: %.40s", p);
+        wtof(MSG_CFG_BAD_LINE, p);
         return;
     }
 
@@ -307,7 +303,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     if (strcmp(key, "PORT") == 0) {
         i = atoi(value);
         if (i < 1 || i > 65535) {
-            wtof("HTTPD023E Invalid PORT value (%d)", i);
+            wtof(MSG_CFG_BAD_PORT, i);
         } else {
             httpd->port = i;
         }
@@ -396,7 +392,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         parse_mod(httpd, value);
     }
     else if (strcmp(key, "CGI") == 0) {
-        wtof("HTTPD410W CGI= is deprecated, use MOD= instead");
+        wtof(MSG_ROUTE_CGI_DEPR);
         parse_mod(httpd, value);
     }
     else if (strcmp(key, "LOC") == 0) {
@@ -432,7 +428,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
             httpd->smf_level = SMF_LEVEL_ALL;
         }
         else {
-            wtof("HTTPD028W Invalid SMF level \"%s\"", value);
+            wtof(MSG_SMF_BAD_LEVEL, value);
         }
         // Check for TYPE=nnn option
         type_arg = strstr(value, "TYPE=");
@@ -441,7 +437,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
             if (t >= 128 && t <= 255)
                 httpd->smf_type = (UCHAR)t;
             else
-                wtof("HTTPD028W Invalid SMF TYPE=%d (128-255)", t);
+                wtof(MSG_SMF_BAD_TYPE, t);
         }
     }
     else if (strcmp(key, "KEEPALIVE_TIMEOUT") == 0) {
@@ -464,7 +460,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         }
     }
     else {
-        wtof("HTTPD020W Unknown config key: %s", key);
+        wtof(MSG_CFG_BAD_KEY, key);
     }
 }
 
@@ -541,7 +537,7 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             else if (http_cmp(v, "FORM") == 0)  pol->auth = HTTP_AUTH_FORM;
             else if (http_cmp(v, "BASIC") == 0) pol->auth = HTTP_AUTH_BASIC;
             else
-                wtof("HTTPD411W ignoring unknown AUTH mode '%s'", v);
+                wtof(MSG_ROUTE_BAD_AUTH, v);
         }
         else if (http_cmpn(t, "RES=", 4) == 0) {
             char *v     = t + 4;                /* class:resource */
@@ -567,33 +563,29 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
                     pol->resname  = NULL;
                     pol->resattr  = 0;
                     pol->failed   = 1;
-                    wtof("HTTPD418E No storage for RES=%.16s:%.40s",
-                         v, colon + 1);
+                    wtof(MSG_ROUTE_NO_RES_MEM, v, colon + 1);
                     break;      /* a later RES= must not clear the failure */
                 }
             }
             else {
-                wtof("HTTPD412W ignoring malformed RES= '%s' "
-                     "(need class:resource)", v);
+                wtof(MSG_ROUTE_BAD_RES, v);
             }
         }
         else if (http_cmpn(t, "RECLAIM=", 8) == 0) {
             /* Retired (#174): the reclaim is unconditional now.  Accepted so
                existing members keep loading, warned so the member gets
                cleaned up -- the value is ignored either way. */
-            wtof("HTTPD422W %s is retired -- CGI storage reclaim is "
-                 "always on", t);
+            wtof(MSG_ROUTE_RETIRED, t);
         }
         else {
-            wtof("HTTPD413W ignoring unknown route option '%s'", t);
+            wtof(MSG_ROUTE_BAD_OPT, t);
         }
     }
 
     /* AUTH=NONE with a resource is contradictory: a public route has no ACEE
        to check against.  Warn and let NONE win -- the gate skips authz. */
     if (pol->auth == HTTP_AUTH_NONE && pol->resclass) {
-        wtof("HTTPD414W AUTH=NONE ignores RES=%s:%s (public route)",
-             pol->resclass, pol->resname);
+        wtof(MSG_ROUTE_NONE_RES, pol->resclass, pol->resname);
     }
 }
 
@@ -627,8 +619,7 @@ route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
 {
     /* %.40s because the caller in the untokenizable case passes the raw
        Parmlib line, not a path -- same bound parse_line() uses for HTTPD020W */
-    wtof("HTTPD419E %s=%.40s could not be registered -- its auth policy is lost",
-         kind, path ? path : "(null)");
+    wtof(MSG_ROUTE_LOST, kind, path ? path : "(NULL)");
     httpd->flag |= HTTPD_FLAG_CFGERR;
 }
 
@@ -693,8 +684,7 @@ parse_mod(HTTPD *httpd, const char *value)
 
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1) {                             /* no program name */
-        wtof("HTTPD421W MOD= requires a program name "
-             "(e.g. MOD=MVSMF /zosmf/* AUTH=BASIC)");
+        wtof(MSG_MOD_NO_PGM);
         free(tmp);
         return;
     }
@@ -704,8 +694,7 @@ parse_mod(HTTPD *httpd, const char *value)
        name ("AUTH=BAS") and registered against a derived "*.auth=bas" pattern
        -- a route that can never load, built out of a typo. */
     if (is_route_kv(tok[0])) {
-        wtof("HTTPD421W MOD= requires a program name "
-             "(e.g. MOD=MVSMF /zosmf/* AUTH=BASIC)");
+        wtof(MSG_MOD_NO_PGM);
         route_malformed(httpd, "MOD", tok, ntok, value);
         free(tmp);
         return;
@@ -745,10 +734,9 @@ parse_mod(HTTPD *httpd, const char *value)
         cgi = http_add_cgi(httpd, program, path, login);
         apply_policy(cgi, &pol);
         if (cgi)
-            wtof("HTTPD036I Module %s registered for %s", program, path);
+            wtof(MSG_MOD_REGISTERED, program, path);
         else
-            wtof("HTTPD035W Unable to register module %s for %s",
-                 program, path);
+            wtof(MSG_MOD_NOT_REG, program, path);
     }
     else {
         cgi = NULL;
@@ -790,7 +778,7 @@ parse_loc(HTTPD *httpd, const char *value)
 
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1 || is_route_kv(tok[0])) {      /* first token must be a path */
-        wtof("HTTPD415W LOC= requires a path (e.g. LOC /admin/* AUTH=BASIC)");
+        wtof(MSG_LOC_NO_PATH);
         if (ntok >= 1)
             route_malformed(httpd, "LOC", tok, ntok, value);
         free(tmp);
@@ -813,9 +801,9 @@ parse_loc(HTTPD *httpd, const char *value)
         cgi = http_add_cgi(httpd, NULL, path, 0);
         apply_policy(cgi, &pol);
         if (cgi)
-            wtof("HTTPD417I Location %s registered", path);
+            wtof(MSG_LOC_REGISTERED, path);
         else
-            wtof("HTTPD416W Unable to register location %s", path);
+            wtof(MSG_LOC_NOT_REG, path);
     }
 
     if (!cgi && binds)
@@ -853,7 +841,7 @@ parse_login(HTTPD *httpd, const char *value)
         else if (http_cmp(tok, "NONE") == 0)
             httpd->login = 0;
         else
-            wtof("HTTPD048W Invalid LOGIN value: %s", tok);
+            wtof(MSG_LOGIN_INVALID, tok);
     }
 
     httpd048(httpd);
@@ -894,10 +882,8 @@ report_tzoffset_retired(HTTPD *httpd)
     sec -= hour * 3600;
     min  = sec / 60;
 
-    wtof("HTTPD025W TZOFFSET is no longer used; the system offset "
-         "GMT %s%02d:%02d applies", sign < 0 ? "-" : "+", hour, min);
-    wtof("HTTPD025W Set TZ in the SYSENV or ENVIRON DD to override it for "
-         "all tasks");
+    wtof(MSG_CFG_TZOFFSET, sign < 0 ? "-" : "+", hour, min);
+    wtof(MSG_CFG_TZ_HOWTO);
 }
 
 /* ====================================================================
@@ -917,7 +903,7 @@ do_bind(HTTPD *httpd)
     /* create listener socket */
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        wtof("HTTPD028E socket() failed, rc=%d, error=%d", sock, errno);
+        wtof(MSG_CFG_SOCKET, sock, errno);
         return 8;
     }
 
@@ -930,20 +916,17 @@ do_bind(HTTPD *httpd)
     rc = bind(sock, &serv_addr, sizeof(serv_addr));
     if (rc < 0) {
         int error = errno;
-        wtof("HTTPD030E bind() failed for HTTP port, rc=%d, error=%d",
-             rc, errno);
+        wtof(MSG_CFG_BIND, rc, errno);
         if (error == EADDRINUSE) {
             for (i = 0; i < httpd->bind_tries; i++) {
-                wtof("HTTPD030I EADDRINUSE, waiting for TCPIP to "
-                     "release HTTP port=%d", httpd->port);
+                wtof(MSG_CFG_BIND_RETRY, httpd->port);
                 sleep(httpd->bind_sleep);
                 rc = bind(sock, &serv_addr, sizeof(serv_addr));
                 if (rc >= 0) break;
             }
         }
         if (rc < 0) {
-            wtof("HTTPD030E bind() failed for HTTP port, rc=%d, error=%d",
-                 rc, errno);
+            wtof(MSG_CFG_BIND, rc, errno);
             closesocket(sock);
             close_stale_port(httpd->port);
             return 8;
@@ -953,12 +936,17 @@ do_bind(HTTPD *httpd)
     /* listen for connections */
     rc = listen(sock, httpd->listen_queue);
     if (rc < 0) {
-        wtof("HTTPD031E listen() failed, rc=%d, error=%d", rc, errno);
+        wtof(MSG_CFG_LISTEN, rc, errno);
         closesocket(sock);
         return 8;
     }
 
     httpd->listen = sock;
+
+    /* The bind is unconditionally INADDR_ANY, so there is no interface to
+       name -- "ANY" is the literal truth rather than a placeholder. */
+    wtof(MSG_LISTENING, "ANY", httpd->port);
+
     return 0;
 }
 
@@ -979,8 +967,7 @@ close_stale_port(int port)
         if (rc == 0) {
             struct sockaddr_in *in = (struct sockaddr_in *)&addr;
             if (in->sin_port == port) {
-                wtof("HTTPD027I Closing stale socket %d on port:%u",
-                     i, in->sin_port);
+                wtof(MSG_STALE_SOCKET, i, in->sin_port);
                 closesocket(i);
                 sleep(2);
                 break;

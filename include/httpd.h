@@ -340,6 +340,14 @@ struct httpcgi {
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
 #define HTTPD_PARMLIB_DD "HTTPPRM"
 
+/* The identity the STC logs on to at startup, replacing the STC/STCGROUP one
+   RAKF hands out -- which holds ALTER on every data set (issue #177).  These
+   are defaults; S HTTPD,STCUSER=x,STCGROUP=y overrides them.  They come from
+   the JCL PARM and not the Parmlib because the logon happens before the
+   Parmlib member is opened; see stc_identity() in httpd.c. */
+#define HTTPD_STC_USER   "HTTPD"
+#define HTTPD_STC_GROUP  "USER"
+
 /* SMF — HTTP records */
 #define SMF_TYPE_HTTPD_DEFAULT 243
 #define SMF_HTTPD_SUBTYPE_REQ  1	/* Request completed			*/
@@ -562,6 +570,12 @@ extern int http_cmpn(const UCHAR *, const UCHAR *, int)                 asm("HTT
 /* internal string-safety helpers (not CGI-facing, so no HTTPX vector) */
 extern UCHAR *http_html_escape(UCHAR *, size_t, const UCHAR *)          asm("HTTPESC");
 extern int http_safe_redirect(const UCHAR *)                           asm("HTTPSRDR");
+/* upper case into a caller buffer, for the runtime-lower-case strings that
+** reach a WTO (build stamp, libc370 version) -- see include/httpdmsg.h */
+extern const char *http_upcase(char *, unsigned, const char *)          asm("HTTPUPCS");
+/* what DD:HTTPPRM resolves to, e.g. "SYS2.PARMLIB(HTTPPRM0)" (httpprm.c);
+** written once at startup and again for every F HTTPD,D CONFIG */
+extern const char *parmlib_name(char *, size_t);
 extern int http_dbgw(const char *, int)                                 asm("DBGW");
 extern int http_dbgs(const char *)                                      asm("DBGS");
 extern int http_dbgf(const char *fmt, ...)                              asm("DBGF");

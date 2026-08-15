@@ -1,5 +1,6 @@
 /* HTTPDMTT.C - CGI Program, Display Master Trace Table */
 #include "httpd.h"
+#include "httpdmsg.h"
 #include "clibmtt.h"
 
 #define httpx   (httpd->httpx)
@@ -14,7 +15,7 @@ int main(int argc, char **argv)
     char        *data   = NULL;
 
     if (!httpd) {
-        wtof("This program %s must be called by the HTTPD web server%s", argv[0], "");
+        wtof(MSG_NOT_UNDER_HTTPD, argv[0]);
         /* TSO callers might not see a WTO message, so we send a STDOUT message too */
         printf("This program %s must be called by the HTTPD web server%s", argv[0], "\n");
         return 12;

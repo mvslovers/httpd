@@ -1,22 +1,41 @@
 //HTTPD    PROC M=HTTPPRM0,
-//            D='SYS2.PARMLIB'
+//            D='SYS2.PARMLIB',
+//            STCUSER=HTTPD,
+//            STCGRP=USER
 //*
 //* HTTPD - HTTP Server STC Procedure
 //*
 //* Installation:
 //*   Copy to SYS2.PROCLIB(HTTPD)
 //*   Copy config member to SYS2.PARMLIB(HTTPPRM0)
+//*   Define the STCUSER userid to RAKF (see below)
 //*
 //* Starting:    /S HTTPD
 //*              /S HTTPD,M=HTTPPRM1     (alternate config member)
 //*              /S HTTPD,D='MY.PARMLIB'  (alternate parmlib dataset)
+//*              /S HTTPD,STCUSER=WEBSRV,STCGRP=WEBGRP
+//*
+//* STCUSER/STCGRP is the identity the server logs on to at startup.  RAKF
+//* hands every started task the same STC/STCGROUP account, which holds ALTER
+//* on every data set on the system, so HTTPD replaces it with one of its own
+//* (issue #177).  If it is not defined the server writes HTTPD004W and keeps
+//* running on the inherited identity.
+//*
+//* The userid needs READ on the parmlib member and on the document root.
+//* It does NOT need FACILITY SVC244: HTTPD gives APF authorization back under
+//* the account it took it out with, not under STCUSER.
+//*
+//* The symbolic is STCGRP, not STCGROUP: a JCL symbolic parameter name is at
+//* most 7 characters.  The PARM keyword the program parses is STCGROUP=.
 //* Commands:    /F HTTPD,DISPLAY CONFIG
 //*              /F HTTPD,DISPLAY STATS
 //*              /F HTTPD,HELP
 //*              /F HTTPD,SHUTDOWN
 //* Stopping:    /P HTTPD
 //*
-//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440
+//* PARM is space-separated: __start() splits argv on blanks, not commas.
+//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440,
+//            PARM='STCUSER=&STCUSER STCGROUP=&STCGRP'
 //STEPLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
 //SYSUDUMP DD  SYSOUT=*
 //HTTPDERR DD  SYSOUT=*

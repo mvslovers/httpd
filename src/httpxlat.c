@@ -12,6 +12,7 @@
 */
 #define HTTP_PRIVATE
 #include "httpd.h"
+#include "httpdmsg.h"
 
 /* ------------------------------------------------------------------ */
 /* Codepage pair struct                                                */
@@ -405,7 +406,7 @@ http_xlate_init(const char *codepage)
         etoa = legacy_etoa;
     }
     else {
-        wtof("HTTPD070E Unknown codepage \"%s\", using CP037", codepage);
+        wtof(MSG_CODEPAGE_UNKNOWN, codepage);
         atoe = cp037_atoe;
         etoa = cp037_etoa;
         return -1;
@@ -418,7 +419,6 @@ http_xlate_init(const char *codepage)
     asc2ebc = (unsigned char *)atoe;
     ebc2asc = (unsigned char *)etoa;
 
-    wtof("HTTPD071I Codepage: %s", codepage ? codepage : "CP037");
     return 0;
 }
 

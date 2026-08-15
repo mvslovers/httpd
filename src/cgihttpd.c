@@ -1,4 +1,5 @@
 #include "httpd.h"
+#include "httpdmsg.h"
 
 HTTPD *cgihttpd(void)
 {
@@ -25,7 +26,7 @@ HTTPD *cgihttpd(void)
 
 quit:	
 	if (!httpd) {
-		wtof("%s: HTTPD not found", __func__);
+		wtof(MSG_NO_HTTPD, __func__);
 		wto_traceback(NULL);
 	}
 	return httpd;

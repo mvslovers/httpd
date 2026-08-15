@@ -3,9 +3,26 @@ name = "httpd"
 version = "4.0.0-dev"
 type = "application"
 
+[toolchain]
+# Pins the refs release.yml builds the published artifacts against; build.yml
+# deliberately keeps floating on main so a cc370/libc370 regression surfaces
+# in a PR build (mbt#68). cc370 is omitted -- it defaults to main and has no
+# releases to pin to yet.
+#
+# Without this the release CI builds against libc370 main, which is how ftpd's
+# first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
+# reproduce from a tag. HTTPD005I names the runtime it linked against, so an
+# unpinned release build makes that line unreproducible in exactly the same way.
+libc370 = "1.0.2"
+
 [build]
-# -DVERSION feeds httpd.c's `#ifndef VERSION` (otherwise it reports
-# "0.0.0-unknown"). v1's mbt injected it automatically; v2 does not.
+# The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
+# generates .mbt/buildstamp.h and puts it on the include path, so httpd.c gets
+# MBT_VERSION / MBT_COMMIT / MBT_COMMIT_DIRTY from `#include <buildstamp.h>`
+# (mbt#59). As a header it is a real prerequisite via -MMD, so a new commit
+# recompiles the banner TU instead of leaving it stamped with the previous
+# hash. The -DVERSION that used to be here fed a `#ifndef VERSION` block in
+# httpd.c that no longer exists.
 #
 # -Wall -Werror: the root CLAUDE.md has always documented these as enforced,
 # but nothing passed them, so 598 warnings accumulated unseen -- among them a
@@ -18,7 +35,6 @@ cflags = [
 	"include",
 	"-I",
 	"credentials/include",
-	'-DVERSION=\"$(PROJECT_VERSION)\"',
 	"-Wall",
 	"-Werror",
 ]
@@ -33,7 +49,7 @@ cflags = [
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = ">=1.1.0"
+"mvslovers/ufsd" = ">=1.2.0"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module

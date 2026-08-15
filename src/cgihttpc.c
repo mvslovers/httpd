@@ -1,4 +1,5 @@
 #include "httpd.h"
+#include "httpdmsg.h"
 
 HTTPC *cgihttpc(void)
 {
@@ -25,7 +26,7 @@ HTTPC *cgihttpc(void)
 quit:	
 #if 0
 	if (!httpc) {
-		wtof("%s: HTTPC not found", __func__);
+		wtof(MSG_NO_HTTPC, __func__);
 		wto_traceback(NULL);
 	}
 #endif

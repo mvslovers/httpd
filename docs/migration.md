@@ -41,17 +41,19 @@ The `PARM` field on the `EXEC` statement is no longer used for configuration. Re
 If you leave one in, the server says so rather than pretending it took effect:
 
 ```
-HTTPD024W CONFIG=MY.CONFIG(HTTPD) is ignored; the configuration comes from the HTTPPRM DD
-HTTPD024W Use S HTTPD,M=member to select a different member
+HTTPD024W CONFIG=MY.CONFIG(HTTPD) IS IGNORED, CONFIGURATION COMES FROM THE HTTPPRM DD
+HTTPD024I USE S HTTPD,M=MEMBER TO SELECT A DIFFERENT MEMBER
 ```
 
 The `HTTPPRM` DD already exists in the sample JCL procedure (`samplib/httpd`).
 
-Which member is actually in effect is reported on every startup, before anything
-is parsed, so a configuration error is already attributed when it appears:
+Which member is actually in effect is reported on demand, along with everything
+else the server parsed:
 
 ```
-HTTPD022I Configuration from SYS2.PARMLIB(HTTPPRM0)
+F HTTPD,D CONFIG
+
+HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
 ```
 
 ## Removed Features

@@ -1,6 +1,7 @@
 /* HTTPAUTH.C - Authorize our environment dynamically
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 static void authorize(void);
 
@@ -15,18 +16,17 @@ httpauth(const char *id)
     /* check for APF authorization */
     __asm__("TESTAUTH\tFCTN=1\n\tST\t15,0(,%0)" : : "r"(&rc));
     if (rc==0) {
-        wtof("HTTPD010I %s is APF authorized", id);
+        wtof(MSG_APF_AUTHORIZED, id);
     }
     else {
         /* get APF authorization */
         try(authorize,0);
         __asm__("TESTAUTH\tFCTN=1\n\tST\t15,0(,%0)" : : "r"(&rc));
         if (rc==0) {
-            wtof("HTTPD011I %s was APF authorized via SVC 244", id);
+            wtof(MSG_APF_VIA_SVC244, id);
         }
         else {
-            wtof("HTTPD012E %s unable to dynamically obtain APF authorization",
-                id);
+            wtof(MSG_APF_FAILED, id);
             rc = -1;
             goto quit;
         }
@@ -48,7 +48,7 @@ httpauth(const char *id)
 "         MODESET KEY=NZERO,MODE=PROB" : "=m"(steplib));
 
     if (steplib) {
-        wtof("HTTPD013I STEPLIB is now APF authorized");
+        wtof(MSG_APF_STEPLIB);
     }
 
 quit:

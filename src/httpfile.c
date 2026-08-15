@@ -2,6 +2,7 @@
 ** Send file, file handle is already open.
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 typedef enum sstate     SSTATE;
 enum sstate {
@@ -598,8 +599,7 @@ ssi_printv(HTTPC *httpc, const char *fmt, va_list args)
     if (len >= (int)sizeof(buf))
         len = sizeof(buf) - 1;
     if (len < 0) {
-		wtof("%s: looks like a bug to me, len=%d, httpc->len=%d", 
-			__func__, len, httpc->len);
+		wtof(MSG_FILE_LENGTH, __func__, len, httpc->len);
         rc = -1;
     }
     else {

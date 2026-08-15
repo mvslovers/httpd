@@ -3,6 +3,7 @@
 ** Transitions to next state as needed.
 */
 #include "httpd.h"
+#include "httpdmsg.h"
 
 /* call http_link() directly (HTTPLINK), not through the httpx vector -- this is
    the server's own code path and used to reach it as the bare CSECT name
@@ -76,8 +77,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
             int frc = reclaim(HTTP_CGI_SUBPOOL);
 
             if (frc) {
-                wtof("HTTPD906W Storage reclaim for %s failed, rc=%d",
-                     pgm, frc);
+                wtof(MSG_RECLAIM_FAILED, pgm, frc);
             }
         }
 
@@ -133,7 +133,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
             http_printf(httpc, "\n");
         }
 
-        wtof("HTTPD908E External program %s %s", pgm, reason);
+        wtof(MSG_CGI_FAILED, pgm, reason);
     }
 
     httpc->state = CSTATE_DONE;
