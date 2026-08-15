@@ -95,15 +95,30 @@ These are **startup parameters, not Parmlib keywords** — they are read before
 the Parmlib member is opened, because the logon has to happen before anything
 opens a data set.
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `STCUSER` | `HTTPD` | Userid the STC logs on to at startup |
-| `STCGROUP` | `USER` | Its connect group |
+| PROC symbolic | PARM keyword | Default | Description |
+|---------------|--------------|---------|-------------|
+| `STCUSER` | `STCUSER=` | `HTTPD` | Userid the STC logs on to at startup |
+| `STCGRP` | `STCGROUP=` | `USER` | Its connect group |
 
 ```
-S HTTPD                                  /* HTTPD/USER          */
-S HTTPD,STCUSER=WEBSRV,STCGROUP=WEBGRP   /* something else      */
+S HTTPD                                /* HTTPD/USER     */
+S HTTPD,STCUSER=WEBSRV,STCGRP=WEBGRP   /* something else */
 ```
+
+The START symbolic is `STCGRP` while the keyword the program parses is
+`STCGROUP=` — a JCL symbolic parameter name is at most seven characters. The
+supplied PROC (`samplib/httpd`) bridges the two:
+
+```
+//            STCUSER=HTTPD,
+//            STCGRP=USER
+//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440,
+//            PARM='STCUSER=&STCUSER STCGROUP=&STCGRP'
+```
+
+Note the blank: `__start()` splits the PARM into `argv` on blanks, not commas.
+A PROC of your own that joins them with a comma will hand the whole string to
+`STCUSER=` and the group will be silently wrong.
 
 RAKF has no started-procedures table: it decides only *that* a caller is an
 STC, never *which* one, and hands every started task the same `STC/STCGROUP`

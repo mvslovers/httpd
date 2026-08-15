@@ -69,16 +69,30 @@ stc_identity(const char *user, const char *group)
 		return;
 	}
 
-	/* Drop the inherited environment first.  Leaving it and letting
-	** racf_set_acee() overwrite ASXBSENV would strand the old ACEE's
-	** storage for the life of the address space. */
+	/* Order matters, and the obvious order is wrong.  Logging the inherited
+	** environment out FIRST would leave nothing to fall back on when the logon
+	** below fails: racf_logout() does not merely free the block, it __cas()es
+	** ASXBSENV to zero when the field still points at what it deleted
+	** (libc370 raclgout.c, measured -- RAKF leaves the dead pointer other-
+	** wise).  A failed logon would then leave the address space with NO
+	** resting identity at all, which is not what HTTPD004W promises and is
+	** worse than the privileged identity #177 set out to replace.
+	**
+	** So: log on, install, and only then release the old one.  On the failure
+	** path nothing has been released and the inherited identity is genuinely
+	** still in place, which is what the message says.
+	**
+	** Releasing last is safe: RACINIT ENVIR=DELETE takes the ACEE from its
+	** parameter list, not from ASXBSENV, and raclgout's __cas() only clears
+	** the field if it still holds the ACEE being deleted -- by then it holds
+	** the new one, so the compare fails and the new identity stands. */
 	old_acee = racf_get_acee();
-	if (old_acee)
-		racf_logout(&old_acee);
 
 	new_acee = racf_login(user, NULL, group, &racf_rc);
 	if (new_acee) {
 		racf_set_acee(new_acee);
+		if (old_acee)
+			racf_logout(&old_acee);
 		wtof(MSG_STCID_SET, user, group);
 	}
 	else {

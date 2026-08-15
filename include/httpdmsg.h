@@ -45,6 +45,12 @@
  *   HTTPD4xx   configuration (DD:HTTPPRM), routes and SMF
  *   HTTPD9xx   diagnostics: abends, recovery, storage, internal faults
  *
+ * With one wart, stated rather than tidied away: configuration ALSO occupies
+ * HTTPD020-HTTPD048, which predate the 4xx block.  Renumbering them would
+ * churn every id an operator has ever seen in a log for no gain, so they stay
+ * where they are and both halves are filed under "configuration" below.  If
+ * you are looking an id up, search the file -- do not trust the range.
+ *
  * The catalog is documented for operators in docs/messages.md; keep the two
  * in step.
  *
@@ -76,8 +82,10 @@
 /** HTTPD001I the listener is up and the server is accepting requests */
 #define MSG_READY		"HTTPD001I HTTPD %s READY - SERVING %s"
 
-/** HTTPD001W as MSG_READY, but no document root is configured */
-#define MSG_READY_NODOC		"HTTPD001W HTTPD %s READY - NO DOCUMENT ROOT"
+/** HTTPD001I as MSG_READY, but no document root: a CGI-only server (mvsMF
+ *  and nothing else) is an ordinary deployment, so this is not a warning --
+ *  a W on a healthy configuration only teaches operators to ignore Ws. */
+#define MSG_READY_NODOC		"HTTPD001I HTTPD %s READY - NO DOCUMENT ROOT"
 
 /** HTTPD003W RACINIT needs key 0 and the STC could not get there */
 #define MSG_STCID_NOKEY		"HTTPD003W RACINIT SKIPPED, CANNOT ENTER SUPERVISOR STATE"
