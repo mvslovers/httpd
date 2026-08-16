@@ -23,9 +23,9 @@ out. A chatty server pollutes its own diagnostic channel.
 - **Ids are `HTTPDnnn` + a severity letter**, three digits, one text per id.
   Two call sites that need different wording need different ids; a varying
   detail becomes an argument.
-- **Severity is `I`, `W` or `E`.** The `D` on `HTTPD900D`/`902D`/`903D` is not a
-  severity — those are debug counters behind `HTTPD_DEBUG_217` and never reach a
-  production console.
+- **Severity is `I`, `W` or `E`.** No `D`, no `T`. The `D` on
+  `HTTPD900D`/`902D`/`903D` was never a severity — they were #159's debug
+  counters, retired with it (#186).
 - **Literals are uppercase** — 3270 console convention. Substituted values are
   passed through unchanged: most are MVS names and already uppercase, but URL
   paths, UFS paths and free user text must not be folded.
@@ -204,7 +204,7 @@ surrounding log and what the client was doing.
 
 | Id | Text | Meaning |
 |---|---|---|
-| `HTTPD900D` `HTTPD902D` `HTTPD903D` | busy-exit, poll overrun, pool census | Debug counters behind `HTTPD_DEBUG_217` (#159). Not present in a normal build. |
+| `HTTPD900D` `HTTPD902D` `HTTPD903D` | *(retired)* | Probes for #159, removed with it (#186). `HTTPD903D` wrote a census line every 60 seconds on an idle server. The ids are reserved, not reused. |
 | `HTTPD901E` | `SPIN IN SERVE_CLIENT: … -- FORCING CLOSE` | A client sat in one state past every deadline. The connection is closed so the worker is not lost. |
 | `HTTPD904E` | `NO STORAGE FOR ENVIRONMENT VARIABLE v CLIENT(c)` | The request cannot be completed. Region too small, or a leak. |
 | `HTTPD905E` | `ENVIRONMENT VARIABLE v TOO LARGE CLIENT(c)` | The value exceeds what an `HTTPV` holds. |

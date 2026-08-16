@@ -28,11 +28,11 @@
  *    Runtime strings that arrive lower case (MBT_VERSION, MBT_COMMIT,
  *    libc370_version()) go through http_upcase() at the call site.
  *
- * 4. Severity is I, W or E.  The D suffix on HTTPD900D/902D/903D is not a
- *    severity -- those are debug counters behind HTTPD_DEBUG_217.  (903D was
- *    NOT behind it until #184's follow-up, so it wrote a census line every 60
- *    seconds of a healthy server's life.  Anything claiming to be a debug
- *    probe has to actually be compiled out, or the claim is decoration.)
+ * 4. Severity is I, W or E.  No D, no T.  HTTPD900D/902D/903D were debug
+ *    counters for issue #159 and are gone with it (#186) -- 903D wrote a
+ *    census line every 60 seconds of a healthy server's life, because the
+ *    switch it claimed to be behind was on.  Anything claiming to be a debug
+ *    probe has to actually be compiled out, or the claim is decoration.
  *
  * 5. No trailing "\n".  wtof() writes one console line; the newline was a
  *    stray character on a 3270 and is gone from every format here.
@@ -511,17 +511,15 @@
 ** own code did not expect, and every one of them is worth a bug report.
 ** ================================================================== */
 
-/** HTTPD900D busy-list debug counter (HTTPD_DEBUG_217) */
-#define MSG_DBG_BUSY_EXIT	"HTTPD900D BUSY-EXIT CLIENT(%08X) STATE(%d) SOCKET(%d) REQ(%u)"
-
 /** HTTPD901E a client sat in the same state past every deadline */
 #define MSG_SPIN			"HTTPD901E SPIN IN SERVE_CLIENT: CLIENT(%08X) STATE(%d) SOCKET(%d) REQ(%u) WORKER(%08X) -- FORCING CLOSE"
 
-/** HTTPD902D receive poll overrun debug counter (HTTPD_DEBUG_217) */
-#define MSG_DBG_POLL_OVERRUN	"HTTPD902D POLL OVERRUN CLIENT(%08X) SOCKET(%d) POLLS(%u) LIMIT(%uS) -- DEADLINE NOT FIRING"
-
-/** HTTPD903D pool census debug counter (HTTPD_DEBUG_217) */
-#define MSG_DBG_CENSUS		"HTTPD903D CONNS(%u) CREDS(%u) WORKERS(%u) BUSY(%u)"
+/*
+ * HTTPD900D/902D/903D are retired (#186).  They were #159's probes; that issue
+ * is closed, and 903D was writing a console line a minute on an idle server.
+ * The ids stay reserved rather than reused -- a log from an older build still
+ * means what it meant.
+ */
 
 /** HTTPD904E the request cannot be completed without the variable */
 #define MSG_ENV_NO_STORAGE	"HTTPD904E NO STORAGE FOR ENVIRONMENT VARIABLE %.32s CLIENT(%08X)"
