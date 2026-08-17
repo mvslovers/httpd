@@ -603,9 +603,9 @@ socket_thread(void *arg1, void *arg2)
             time64_t now = time64(NULL);
             if (difftime64(now, last_sweep) >= 60.0) {
                 last_sweep = now;
-                if (httpd->cfg_session_timeout)
-                    cred_reap((unsigned)httpd->cfg_session_timeout * 60);
-
+                if (httpd->cfg_session_timeout || httpd->cfg_session_maxage)
+                    cred_reap((unsigned)httpd->cfg_session_timeout * 60,
+                              (unsigned)httpd->cfg_session_maxage * 60);
             }
         }
 

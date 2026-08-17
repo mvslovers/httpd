@@ -141,7 +141,7 @@ Everything in this range is written because an operator asked for it, so the
 | `HTTPD121I`, `HTTPD122I` | `D LOGIN` | Logged-in users and their ACEE addresses. |
 | `HTTPD123I`, `HTTPD124I` | `D STATS` | SMF level and the request/error/byte/active counters. |
 | `HTTPD125I`, `HTTPD126I`, `HTTPD126E`, `HTTPD127W` | `S STATS` | Counter reset, level change, and the two operand errors. |
-| `HTTPD128I`–`HTTPD134I` | `D CONFIG` | Port, task limits, timeouts, document root, codepage, SMF, and which Parmlib member was read. |
+| `HTTPD128I`–`HTTPD135I` | `D CONFIG` | Port, task limits, timeouts, session lifetime (idle and max-age), document root, codepage, SMF, and which Parmlib member was read. |
 | `HTTPD140I` | `D VERSION` | Version and build commit. |
 | `HTTPD142I`, `HTTPD143I` | `D TIME` | GMT and local time with the offset in minutes. |
 | `HTTPD144E`–`HTTPD148I` | `D MEMORY` | Address out of range, end of dump, ESTAE failure, an abend while reading, and the usage line. Reading storage is done under recovery, so a bad address is caught rather than fatal. |
@@ -166,6 +166,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD025I` | `SET TZ IN THE SYSENV OR ENVIRON DD TO OVERRIDE IT FOR ALL TASKS` | How to set the timezone instead. |
 | `HTTPD026W` | `UNRECOGNIZED CONFIGURATION LINE: …` | The line is not `KEYWORD VALUE`. Skipped. |
 | `HTTPD026E` | `SESSION_TIMEOUT (n MIN) <= CLIENT_TIMEOUT (n SEC), RAISE IT` | The credential reaper could free a credential a request still holds. Raise `SESSION_TIMEOUT` well above the longest request. |
+| `HTTPD032E` | `SESSION_MAXAGE (n MIN) <= CLIENT_TIMEOUT (n SEC), RAISE IT` | The same hazard as `HTTPD026E`, reached through the hard max-age: it reaps on the same path. Raise `SESSION_MAXAGE` well above the longest request. |
 | `HTTPD028E` | `SOCKET() FAILED, RC=n ERRNO=e` | The listener socket could not be created; the server does not start. |
 | `HTTPD029W` | `UNKNOWN CONFIGURATION KEYWORD: k` | Correctly shaped line, unknown keyword. Usually a typo or a keyword from an older release. |
 | `HTTPD030E` | `BIND() FAILED FOR HTTP PORT, RC=n ERRNO=e` | The port is taken. Retried per `BIND_TRIES`, then fatal. |

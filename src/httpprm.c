@@ -182,6 +182,14 @@ http_config(HTTPD *httpd, const char *member)
              httpd->cfg_session_timeout, httpd->cfg_client_timeout);
     }
 
+    /* the max-age reaps on the same path and so carries the same invariant
+       (#118) */
+    if (httpd->cfg_session_maxage &&
+        (long)httpd->cfg_session_maxage * 60 <= httpd->cfg_client_timeout) {
+        wtof(MSG_CFG_MAXAGE_UNSAFE,
+             httpd->cfg_session_maxage, httpd->cfg_client_timeout);
+    }
+
     return 0;
 }
 
@@ -212,6 +220,14 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
     httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
+
+    /* Hard max-age (#118): an actively used session outlives the idle TTL
+       forever, so without this a credential cached at login stays valid --
+       and with it a RACF identity that may since have been REVOKEd or had its
+       password changed.  8 hours is deliberately generous: every reap calls
+       racf_logout(), which clears ASXBSENV (see docs/identity-redesign.md §1),
+       so reaping often is its own hazard until that plank lands. */
+    httpd->cfg_session_maxage    = 480;     /* credential max-age (min), 0=off */
 
     /* Inherit the offset libc370 already resolved for this task rather than
     ** defaulting to 0 (issue #145).  __tzget() returns crt->crttzoff, which
@@ -337,6 +353,14 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         if (i < 0) i = 0;
         if (i > 65535) i = 65535;
         httpd->cfg_session_timeout = (USHRT)i;
+    }
+    else if (strcmp(key, "SESSION_MAXAGE") == 0) {
+        /* credential hard max-age in minutes, counted from login and never
+           refreshed by activity; 0 disables it (#118) */
+        i = atoi(value);
+        if (i < 0) i = 0;
+        if (i > 65535) i = 65535;
+        httpd->cfg_session_maxage = (USHRT)i;
     }
     else if (strcmp(key, "LOGIN") == 0) {
         parse_login(httpd, value);

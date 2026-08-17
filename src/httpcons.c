@@ -266,6 +266,8 @@ d_config(char *buf)
         (int)httpd->cfg_keepalive_timeout, (int)httpd->cfg_keepalive_max);
     wtof(MSG_D_CFG_SESSION, (int)httpd->cfg_session_timeout,
         httpd->cfg_session_timeout ? "" : " (REAPER DISABLED)");
+    wtof(MSG_D_CFG_MAXAGE, (int)httpd->cfg_session_maxage,
+        httpd->cfg_session_maxage ? "" : " (NO MAX-AGE)");
     wtof(MSG_D_CFG_DOCROOT,
         httpd->docroot[0] ? httpd->docroot : "(NONE)");
     wtof(MSG_D_CFG_CODEPAGE,

@@ -26,8 +26,12 @@ cred_new(CREDID *id, CREDTOK *token, ACEE *acee, unsigned char flags)
 			cred->token = credtok_gen(&cred->id);
 		}
 		if (acee)	cred->acee = acee;
+		/* creation stamp for the hard max-age (#118).  Unlike cred->last it is
+		   never refreshed -- that is the whole point: activity must not be able
+		   to extend a session past the configured maximum. */
+		cred->created = cred->last;
 		cred->len   = sizeof(CRED);
-		cred->version = 1;
+		cred->version = CRED_VERSION;
 		cred->flags = flags;
 
 #if 0		

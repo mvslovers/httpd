@@ -31,5 +31,15 @@ int main(void)
     CHECK(credexp(-1, 30) == 0,      "negative elapsed (skew) -> live");
     CHECK(credexp(-100000, 30) == 0, "large negative elapsed -> live");
 
+    /* The hard max-age (#118) reuses this same decision with a different
+       clock: the age since cred->created instead of the idle time, and
+       SESSION_MAXAGE instead of SESSION_TIMEOUT.  These cases exist so the
+       reuse is documented by a test rather than only by a comment -- a change
+       to the boundary would break both callers, not just the reaper. */
+    CHECK(credexp(3600, 0) == 0,      "maxage 0 -> no max-age (age 1h)");
+    CHECK(credexp(28799, 28800) == 0, "age 8h-1s < maxage 8h -> live");
+    CHECK(credexp(28800, 28800) == 0, "age 8h == maxage 8h -> live (strict >)");
+    CHECK(credexp(28801, 28800) == 1, "age 8h+1s > maxage 8h -> expired");
+
     return mbt_test_summary("TSTEXPIR");
 }
