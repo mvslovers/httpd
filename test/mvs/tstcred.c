@@ -84,6 +84,36 @@ int main(void)
     CHECK((cred->id.userflg & CREDID_USER_ENCRYPT) != 0,
           "stored CRED still flagged after two decrypts");
 
+    /* 6. token minting (#188): credtok_rand() must NOT be a function of the
+          CREDID, and credtok_gen() must still be, so the two cannot be
+          confused at a call site.  The determinism of credtok_gen() is what
+          made a leaked token an offline oracle for the password; the whole
+          point of the replacement is that the same credentials do not
+          reproduce the same token. */
+    {
+        CREDTOK r1 = credtok_rand(credkey(), &id);
+        CREDTOK r2 = credtok_rand(credkey(), &id);
+        CREDTOK d1 = credtok_gen(&id);
+        CREDTOK d2 = credtok_gen(&id);
+
+        CHECK(memcmp(&r1, &r2, sizeof(CREDTOK)) != 0,
+              "credtok_rand twice on the same CREDID -> DIFFERENT tokens");
+        CHECK(memcmp(&d1, &d2, sizeof(CREDTOK)) == 0,
+              "credtok_gen twice on the same CREDID -> same token (still deterministic)");
+        CHECK(memcmp(&r1, &d1, sizeof(CREDTOK)) != 0,
+              "a random token is not the derived one");
+
+        /* a NULL key must not make it deterministic either -- that is the
+           cred_new() fallback path, which has no key to pass */
+        {
+            CREDTOK n1 = credtok_rand(NULL, &id);
+            CREDTOK n2 = credtok_rand(NULL, &id);
+
+            CHECK(memcmp(&n1, &n2, sizeof(CREDTOK)) != 0,
+                  "credtok_rand(NULL key) still yields DIFFERENT tokens");
+        }
+    }
+
     /* diagnostic dumps: on a failing MVS run the stored ciphertext can be
        eyeballed against mvsMF's fn=userid "hex" field, and the flag byte
        against the CREDID_USER_ENCRYPT (0x80) hypothesis in the issue. */

@@ -6,8 +6,11 @@
 ** reached the store via credtok_logout() -> cred_array(), which reads the
 ** credential array out of the *current* GRT's WSA.  A CGI runs under its own
 ** GRT, where that slot is empty, so the token scan found nothing, the CRED
-** stayed in httpd's real store, and the deterministic CREDTOK kept resolving --
-** logout returned "success" but never invalidated the session.  The fix splits
+** stayed in httpd's real store, and the token kept resolving -- logout returned
+** "success" but never invalidated the session.  (At the time the token was
+** derived from the CREDID, so re-presenting the credentials reproduced it too;
+** since #188 it is random, and this test mints its own with credtok_gen() only
+** because it needs a value it can look up again.)  The fix splits
 ** out credtok_logout_arr(array, token), which operates on a caller-supplied
 ** array pointer (httpd caches its own in HTTPD.credarr at cred_init() time), so
 ** logout reaches httpd's real store from any GRT.  Same class as #109/#111.

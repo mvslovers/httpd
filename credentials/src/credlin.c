@@ -10,7 +10,7 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 	CREDKEY	*key	= credkey();
 	CRED	*cred 	= NULL;
 	CREDID	id 		= credid_init(NULL);
-	CREDTOK	tok		= credtok_gen(&id);
+	CREDTOK	tok;
 	ACEE	*acee	= NULL;
 	int		rc		= 0;
 	int		lockrc	= 0;
@@ -56,14 +56,22 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 	/* encrypt the CREDID info */
 	credid_enc(&id, &id);
 
-	/* generate CREDTOK for this CREDID */
-	tok = credtok_gen(&id);
-
 	/* lock the array for exclusive access */
 	lockrc = lock(array, LOCK_EXC);
-	
-	/* do we already have a CRED for this CREDTOK? */
-	cred = cred_find_by_token(&tok);
+
+	/* Do we already have a CRED for these credentials?  The lookup is by
+	   CREDID, not by token (#188).  It used to derive CREDTOK = SHA-256(CREDID)
+	   and look that up, which is what made the token deterministic and turned a
+	   leaked token into an offline oracle for the password.  The CREDID compare
+	   keeps both properties that mattered: the cache hit still costs no RACF
+	   call, and the session is still bound to the client address, because addr
+	   is CREDID+0.
+
+	   cred_find_by_id() compares the ENCRYPTED CREDID, so it relies on Blowfish
+	   ECB being deterministic under a fixed key.  It is, and this was already
+	   load-bearing: the old token was a hash over these same encrypted bytes, so
+	   an unstable byte would have made every cache hit miss. */
+	cred = cred_find_by_id(&id);
 	if (cred) {
 		/* A cached hit answers without touching RACF, so the ACEE stays the
 		   snapshot taken at the original login.  Past the hard max-age (#118)
@@ -82,10 +90,13 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 		   Merely rejecting it is not an option here: cred_login() would keep
 		   returning the same entry, and the client would loop between login and
 		   rejection until the next sweep.  credtok_logout_arr() re-locks the
-		   array, which is the same nesting cred_find_by_token() above already
-		   relies on. */
+		   array, which is the same nesting cred_find_by_id() above already
+		   relies on -- and it is given the credential's OWN token, which since
+		   #188 is a random value we cannot re-derive from the CREDID. */
 		if (credexp((long) difftime64(time64(NULL), cred->created), maxage_secs)) {
-			credtok_logout_arr(array, &tok);
+			CREDTOK dead = cred->token;
+
+			credtok_logout_arr(array, &dead);
 			cred = NULL;
 		}
 		else {
@@ -101,6 +112,14 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 	if (!acee) {
 		goto cleanup;
 	}
+
+	/* Mint the session token only now that RACF has accepted the credentials.
+	   Random, not derived from the CREDID (#188), so it carries no information
+	   about the password and cannot be re-created by presenting the same
+	   credentials again -- which is what makes logout and SESSION_MAXAGE bind a
+	   token-presenting client.  The key comes from our own credkey() above, not
+	   from inside credtok_rand(), which must stay GRT-independent. */
+	tok = credtok_rand(key, &id);
 
 	/* allocate new CRED structure */
 	cred = cred_new(&id, &tok, acee, 0);
