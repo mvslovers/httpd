@@ -4,9 +4,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 
-/* Basic-auth realm advertised in the WWW-Authenticate challenge (fixed for now;
-   a per-route / Parmlib realm is a later step of the auth redesign). */
-#define HTTP_AUTH_REALM "MVS"
+#include "httprlm.h"   /* realm from the SMF ID (#191) */
 
 static int  needs_login(HTTPC *httpc, HTTPCGI *cgi);
 static void resolve_credential(HTTPC *httpc);
@@ -500,8 +498,14 @@ auth_required_response(HTTPC *httpc, UCHAR mode)
 
 	http_resp(httpc, 401);
 	if (challenge) {
+		char realm[HTTP_REALM_MAX];
+
+		/* The realm names the system, not the product (#191).  It is what the
+		   browser shows the user, and together with the origin it is the key it
+		   caches the credentials under -- so a constant would make every httpd
+		   on the network one shared protection space. */
 		http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
-		            HTTP_AUTH_REALM);
+		            httprlm((const char *)__smfid(), realm, sizeof(realm)));
 	}
 	http_printf(httpc, "Cache-Control: no-store\r\n");
 	http_printf(httpc, "Content-Type: text/plain\r\n");
