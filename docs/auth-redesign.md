@@ -288,11 +288,16 @@ the token-model note in §4.
   request and simply re-establishes a session, so for it the max-age is a
   *revalidation interval* that bounds RACF revocation lag (a `REVOKE`d userid, a
   changed password and a stale ACEE snapshot otherwise survive indefinitely).
-- **Crypto:** Blowfish (64-bit) + weak salt (`cred_init` uses the HTTPD struct /
-  object code). This is no longer a stand-alone "revisit" item: #188 mixes the
-  secret `credkey` into the random token, and that key is what defeats guessing
-  inside an observable login window — so the salt is now a **dependency of the
-  token design**.
+- **Crypto:** Blowfish (64 bit) for the in-memory CREDID — adequate for
+  transient storage, dated as a standard. ~~Weak salt~~ **fixed with #188:**
+  `cred_init()` was called with the HTTPD block as key material, of which only a
+  few GETMAIN addresses varied — and MVS 3.8j has no ASLR, so the key
+  reproduced on every start and was derivable from the load module plus the
+  Parmlib. It is now SHA-256 over the HTTPD block *plus STCK, the HTTPD address,
+  the ASCB and the TCB*, so it differs per start. That had to come first: the
+  secret key is what makes the random token unguessable inside an observable
+  login window. (The object-code salt in `credinit.c` is the `salt == NULL`
+  branch and only ever runs in the tests.)
 - **Realm** source (fixed vs Parmlib) — unticketed, low.
 - **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**
   `CREDTOK` (Zowe/SPA replay it as-is). We do **not** emulate real WebSphere

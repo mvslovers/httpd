@@ -92,9 +92,22 @@ credid_dec(CREDID *in, CREDID *out)															asm("CREDIDDE");
 extern CREDID *
 credid_enc(CREDID *in, CREDID *out)															asm("CREDIDEN");
 
-/* credtok_gen() returns CREDTOK struct for id parm. id parm may be NULL */
-extern CREDTOK 
+/* credtok_gen() returns CREDTOK struct for id parm. id parm may be NULL.
+ *
+ * DETERMINISTIC -- the same CREDID always yields the same token.  No longer
+ * used for live sessions (#188): that made a leaked token an offline oracle for
+ * the password, and meant logout/expiry did not bind a token client, because
+ * re-presenting the same credentials minted the identical token.  Kept for
+ * tests that need a reproducible token value; use credtok_rand() for a
+ * session. */
+extern CREDTOK
 credtok_gen(CREDID *id)																		asm("CREDTOKG");
+
+/* credtok_rand() - mint an unpredictable session token (#188).  The key must be
+ * passed in, never read via credkey(): that is GRT-relative and reads back zero
+ * outside httpd's own GRT (#109/#111).  id may be NULL. */
+extern CREDTOK
+credtok_rand(CREDKEY *key, CREDID *id)														asm("CREDTOKR");
 
 /* logout CRED for this CREDTOK (uses cred_array() -- caller must run in the
    GRT where the credential store was initialized, i.e. httpd's own core) */

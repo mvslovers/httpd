@@ -23,7 +23,15 @@ cred_new(CREDID *id, CREDTOK *token, ACEE *acee, unsigned char flags)
 			*(&cred->token) = *token;
 		}
 		else {
-			cred->token = credtok_gen(&cred->id);
+			/* No token supplied -- mint a random one rather than deriving it
+			   from the CREDID (#188).  The BLOWFISH key is not mixed in here:
+			   cred_new() has no key to hand and must not call credkey(), which
+			   is GRT-relative (#109).  A caller that wants the key's secrecy in
+			   the token mints it itself and passes it in, the way cred_login()
+			   does; what is left here (STCK + CREDID + a storage address) is
+			   still never deterministic, which is the property that matters for
+			   the in-tree callers -- all of them tests. */
+			cred->token = credtok_rand(NULL, &cred->id);
 		}
 		if (acee)	cred->acee = acee;
 		/* creation stamp for the hard max-age (#118).  Unlike cred->last it is

@@ -294,17 +294,22 @@ the parse buffer, so the original NULL-deref was not reachable.
   max-age independent of activity) was **decided 2026-08-17** and is tracked as
   **#118** (`SESSION_MAXAGE`, checked in the lookup path as well as the reaper —
   the sweep only runs every ~60 s).
-- **Deterministic `CREDTOK`** = `SHA-256(addr,user,pass)` — an *offline
-  verification oracle* over a low-entropy input, so a leaked `LtpaToken2` lets an
-  attacker hash password candidates until one matches. **Decided 2026-08-17:**
-  replace it with a random session token — **#188**. See `docs/auth-redesign.md`
-  §4 *Token model*.
+- ~~**Deterministic `CREDTOK`**~~ **✔ delivered by #188.** It was
+  `SHA-256(addr,user,pass)` — an *offline verification oracle* over a
+  low-entropy input, so a leaked `LtpaToken2` let an attacker hash password
+  candidates until one matched, and expiry/logout did not bind a token client
+  because re-presenting the credentials minted an identical token (measured:
+  #188). Now `credtok_rand()`, keyed on the per-start `credkey`; the Basic
+  cache hit resolves through `cred_find_by_id()` instead.
 - **No login rate-limiting** — brute force possible.
 - **Blowfish** (64-bit block) for in-memory CREDID — adequate for transient
-  storage, dated as a standard. Its **weak salt** (`cred_init` seeds from the
-  HTTPD struct / object code) stopped being cosmetic with #188: the secret
-  `credkey` is what makes the random token unguessable inside an observable login
-  window, so the salt is now a dependency of the token design.
+  storage, dated as a standard. ~~Weak salt~~ **fixed with #188:** the key was
+  seeded from the HTTPD block alone, of which only a few GETMAIN addresses
+  varied — and with no ASLR on 3.8j it reproduced on every start, so it was
+  derivable from the load module plus the Parmlib, and a dump's encrypted
+  CREDIDs with it. Now SHA-256 over that block plus STCK, the HTTPD address, the
+  ASCB and the TCB, so it differs per start — which is also what makes
+  `credtok_rand()` unguessable.
 - **Binary authorization only** (login-or-not). For per-endpoint/RACF-resource
   authorization, see *Architecture* (HTTPX auth helper).
 - **`DOCROOT` unset ⇒ no docroot confinement** (`httpopen.c:48-54`). With no
@@ -368,12 +373,12 @@ for the dump. This also contains S9b and the other core derefs.
 RACF ACEE per login was removed only by explicit `/logout` or shutdown.
 
 > **Resolved — this is the session timeout.**
-> - **Refresh:** `cred_find_by_token()` (the only per-request lookup — verified;
->   `by_id`/`by_acee` unused) stamps `cred->last = time64(NULL)` on every hit.
->   **#188 invalidates the parenthesis:** the random session token moves the
->   Basic source's per-request lookup to `cred_find_by_id()`, which does *not*
->   stamp — it must gain the same refresh, or an actively used Basic session is
->   reaped `SESSION_TIMEOUT` after its creation.
+> - **Refresh:** `cred_find_by_token()` stamps `cred->last = time64(NULL)` on
+>   every hit. It was once *the* per-request lookup (`by_id`/`by_acee` unused);
+>   **#188 changed that** — the random session token moved the Basic source's
+>   per-request lookup to `cred_find_by_id()`, so that function stamps too.
+>   Both are per-request now, and a new lookup path must refresh or an actively
+>   used session gets reaped `SESSION_TIMEOUT` after its *creation*.
 > - **Reaper:** `cred_reap(ttl_secs)` (`credreap.c`) walks the WSA array under
 >   `LOCK_EXC`, `array_del`s entries idle > TTL (skipping any `testlock` shows
 >   in-use), and `cred_free`s them (RACF logout) **after releasing** the array
