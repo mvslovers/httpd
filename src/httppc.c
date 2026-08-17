@@ -410,7 +410,8 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 	if (mode == HTTP_AUTH_NONE) {
 		need_authn = 0;
 	}
-	else if (mode == HTTP_AUTH_FORM || mode == HTTP_AUTH_BASIC) {
+	else if (mode == HTTP_AUTH_FORM || mode == HTTP_AUTH_BASIC ||
+	         mode == HTTP_AUTH_TOKEN) {
 		need_authn = 1;
 	}
 	else {
@@ -449,22 +450,29 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 /*
 ** auth_required_response() - the request needs a login but isn't authenticated.
 ** The challenge follows the route's AUTH mode:
+**   TOKEN   -> bare 401, never a challenge, whatever the client sent (#121)
 **   BASIC   -> 401 + WWW-Authenticate: Basic (suppressed for XHR clients that
 **              send the z/OSMF CSRF marker -- see the emit below)
 **   FORM    -> the interactive HTML login form
 **   DEFAULT -> legacy heuristic: a client that sent an Authorization header is
 **              a REST/Basic client (401); a browser gets the form.
 ** Always ends with httpc->state == CSTATE_DONE so the pipeline stops.
+**
+** None of this decides which credentials are ACCEPTED -- resolve_credential()
+** has already tried every source before the route was even looked up.  A
+** TOKEN route still authenticates a plain `curl -u user:pass` exactly like a
+** BASIC one; it just never advertises that it would.
 */
 static int
 auth_required_response(HTTPC *httpc, UCHAR mode)
 {
 	int	use_basic;
+	int	challenge;
 
 	if (mode == HTTP_AUTH_FORM) {
 		return httpcred(httpc);              /* renders the form, sets DONE */
 	}
-	else if (mode == HTTP_AUTH_BASIC) {
+	else if (mode == HTTP_AUTH_BASIC || mode == HTTP_AUTH_TOKEN) {
 		use_basic = 1;
 	}
 	else {
@@ -476,15 +484,22 @@ auth_required_response(HTTPC *httpc, UCHAR mode)
 		return httpcred(httpc);              /* interactive client -> form */
 	}
 
+	/* Whether to advertise a challenge at all.
+	   TOKEN is the server-declared API marker (#121): never challenge, and do
+	   NOT consult the request -- an operator marked this route as machine-facing
+	   and that must not depend on what a client happens to send.
+	   For BASIC and DEFAULT the older heuristic from #120 still applies: omit
+	   the challenge for XHR clients identifying via the z/OSMF CSRF marker.  A
+	   WWW-Authenticate makes the browser pop its native credential dialog, and
+	   the Basic credentials it then caches outlive the token session, defeating
+	   token logout (#119).  Genuine Basic clients (curl -u, Zowe) send
+	   credentials preemptively and never needed the challenge; a plain browser
+	   navigation (no marker) still gets it. */
+	challenge = (mode != HTTP_AUTH_TOKEN) &&
+	            (http_get_env(httpc, "HTTP_X-CSRF-ZOSMF-HEADER") == NULL);
+
 	http_resp(httpc, 401);
-	/* Omit the Basic challenge for XHR/API clients that identify via the
-	   z/OSMF CSRF marker.  A WWW-Authenticate makes the browser pop its native
-	   credential dialog, and the Basic credentials it then caches outlive the
-	   token session -- defeating token logout (#119).  A challenge-less 401
-	   lets the SPA's own "session expired" handling see the 401.  Genuine
-	   Basic clients (curl -u, Zowe) send credentials preemptively and do not
-	   need the challenge; a plain browser navigation (no marker) still gets it. */
-	if (http_get_env(httpc, "HTTP_X-CSRF-ZOSMF-HEADER") == NULL) {
+	if (challenge) {
 		http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
 		            HTTP_AUTH_REALM);
 	}

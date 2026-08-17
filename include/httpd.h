@@ -271,6 +271,22 @@ struct httpcgi {
 #define HTTP_AUTH_NONE    1         /* AUTH=NONE  -> public, no challenge   */
 #define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
 #define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
+#define HTTP_AUTH_TOKEN   4         /* AUTH=TOKEN -> bare 401, no challenge */
+
+/* AUTH= selects TWO things, and neither of them is the credential source:
+   whether the route needs authentication at all, and how an unauthenticated
+   request is challenged.  The source is not per-route -- resolve_credential()
+   runs in httppc() BEFORE the route is even looked up, so every route already
+   accepts every source (Sec-Token, LtpaToken2, Bearer, Basic).
+
+   That is why the fourth mode is a challenge and not a source (#121).  TOKEN
+   means "authentication required, but never advertise a challenge": the 401 is
+   bare.  A WWW-Authenticate makes a browser pop its native credential dialog,
+   and the Basic credentials it then caches outlive the token session and defeat
+   token logout (#119) -- an API route must never trigger that, regardless of
+   what the client sent.  #120's X-CSRF-ZOSMF-HEADER suppression does the same
+   job by guessing from a request header; TOKEN is the server-declared form and
+   does not consult that header at all. */
 
 /* HTTP_CGI_SUBPOOL -- the heap subpool every CGI allocates from, and which
 ** httppcgi() releases in one FREEMAIN when the CGI abends, so the cost of an

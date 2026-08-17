@@ -248,13 +248,44 @@ than what it asked for.
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `AUTH=` | `NONE` \| `FORM` \| `BASIC` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = redirect to the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. **Omitted** = inherit the global `LOGIN` default (backward compatible). |
+| `AUTH=` | `NONE` \| `FORM` \| `BASIC` \| `TOKEN` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. `TOKEN` = a bare `401`, never a challenge. **Omitted** = inherit the global `LOGIN` default (backward compatible). |
 | `RES=` | `class:resource` | Optional RACF/RAKF resource for stage 2, e.g. `RES=FACILITY:MVSMF.ACCESS`. Checked for `READ`. A resource always requires an identity, so it implies authentication even without `AUTH=`. |
 
-The credential resolver always tries every source, so `AUTH=` only selects the
-*challenge* shown when authentication is missing — it does not restrict which
-source a client may use. `AUTH=NONE` combined with `RES=` is contradictory (a
-public route has no ACEE to check) — the server warns and `NONE` wins.
+**`AUTH=` does not select the credential source.** The resolver runs before the
+route is even matched, so *every* route already accepts every source — the
+`Sec-Token` and `LtpaToken2` cookies, `Authorization: Bearer`, and
+`Authorization: Basic`. What `AUTH=` selects is whether the route needs a login
+at all, and how an unauthenticated request is challenged.
+
+`AUTH=NONE` combined with `RES=` is contradictory (a public route has no ACEE to
+check) — the server warns and `NONE` wins.
+
+#### When to use `AUTH=TOKEN`
+
+Use it wherever the client is a **program that handles the `401` itself** — a
+SPA calling the API with `fetch`/XHR, the Zowe CLI, `curl` scripts. The API
+routes of mvsMF (`/zosmf/*`) are the case this exists for.
+
+The reason is the browser. A `WWW-Authenticate: Basic` header makes it pop its
+own native credential dialog, and the Basic credentials it caches afterwards
+**outlive the token session** — every later request carries them, so logging out
+of the application no longer ends anything. A bare `401` leaves the client's own
+"session expired" handling in charge.
+
+Two things `AUTH=TOKEN` deliberately does *not* do:
+
+- It does not change which credentials are accepted. `curl -u user:pass` against
+  a `TOKEN` route authenticates exactly as it would against a `BASIC` one. The
+  route simply never advertises that it would accept them.
+- It does not consult the request. An operator declared this route
+  machine-facing, so the bare `401` is unconditional. (`BASIC` and the inherited
+  default still apply the older heuristic of suppressing the challenge for
+  clients sending `X-CSRF-ZOSMF-HEADER`, which guesses the same thing from the
+  request instead of from the configuration.)
+
+Keep `AUTH=BASIC` for routes a human may navigate to in a browser and where the
+native dialog is the wanted behaviour — a small admin area with no login page of
+its own. Keep `AUTH=FORM` for interactive pages.
 
 `/login`, `/logout` and the login-page assets (`/login.*`, `/favicon.*`) are
 always reachable so an `AUTH=FORM` challenge can render.

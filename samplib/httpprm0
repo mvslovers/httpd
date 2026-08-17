@@ -26,8 +26,23 @@
 # LOGIN=NONE
 #
 # Per-route auth policy -- trailing options on MOD= and LOC= override LOGIN:
-#   AUTH=NONE|FORM|BASIC   NONE=public, FORM=login form, BASIC=401 challenge
+#   AUTH=NONE|FORM|BASIC|TOKEN   RES=class:resource
 #   RES=class:resource     optional RACF/RAKF resource check (READ)
+#
+# AUTH= does NOT select which credentials are accepted -- every route accepts
+# all of them (Sec-Token/LtpaToken2 cookie, Bearer, Basic), because they are
+# resolved before the route is even matched.  AUTH= selects WHETHER the route
+# needs a login and HOW an unauthenticated request is challenged:
+#   NONE    public, never challenged
+#   FORM    the interactive HTML login form
+#   BASIC   401 + WWW-Authenticate, so a browser pops its native dialog
+#   TOKEN   a bare 401, never a challenge -- for APIs (see below)
+#
+# Use TOKEN wherever the client is a program that handles the 401 itself: a
+# SPA using fetch/XHR, Zowe, curl scripts.  A WWW-Authenticate would make the
+# browser pop its credential dialog, and the Basic credentials it then caches
+# outlive the token session and defeat logout.  TOKEN still authenticates
+# `curl -u user:pass` normally; it only stops advertising that it would.
 # A route without AUTH= inherits the LOGIN default.  /login, /logout and the
 # login-page assets stay reachable so an AUTH=FORM challenge can render.
 #
@@ -62,7 +77,7 @@
 MOD=MVSMF /zosmf/info                    AUTH=NONE
 MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
 MOD=MVSMF /zosmf/*
-# MOD=MVSMF /zosmf/*  AUTH=BASIC RES=FACILITY:MVSMF.ACCESS  (protected API)
+# MOD=MVSMF /zosmf/*  AUTH=TOKEN RES=FACILITY:MVSMF.ACCESS  (protected API)
 # MOD=HTTPDSRV /.dsrv  AUTH=FORM                             (browser login)
 # MOD=HTTPDM /.dm
 # MOD=HTTPDMTT /.dmtt
