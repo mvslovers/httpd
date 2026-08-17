@@ -3,7 +3,8 @@
 #undef array_count
 
 CRED *
-cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
+cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
+           unsigned maxage_secs)
 {
 	CRED	***array= cred_array();
 	CREDKEY	*key	= credkey();
@@ -63,7 +64,34 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password)
 	
 	/* do we already have a CRED for this CREDTOK? */
 	cred = cred_find_by_token(&tok);
-	if (cred) goto cleanup;
+	if (cred) {
+		/* A cached hit answers without touching RACF, so the ACEE stays the
+		   snapshot taken at the original login.  Past the hard max-age (#118)
+		   that is exactly what must not happen: drop the credential and fall
+		   through to racf_login(), which is where a REVOKE, a changed password
+		   or an altered group membership finally takes effect.
+
+		   Every entry point that authenticates arrives here -- the Basic source
+		   in httppc.c and the form POST in httpcred.c -- so the limit lives at
+		   this one chokepoint rather than at each caller.
+
+		   Freeing on the request path is the reaper's known borrow window (the
+		   M2 note in docs/refactoring-backlog.md: testlock catches a concurrent
+		   free, not a borrow), guarded by the same invariant -- SESSION_MAXAGE
+		   >> the longest request, which HTTPD032E warns about at startup.
+		   Merely rejecting it is not an option here: cred_login() would keep
+		   returning the same entry, and the client would loop between login and
+		   rejection until the next sweep.  credtok_logout_arr() re-locks the
+		   array, which is the same nesting cred_find_by_token() above already
+		   relies on. */
+		if (credexp((long) difftime64(time64(NULL), cred->created), maxage_secs)) {
+			credtok_logout_arr(array, &tok);
+			cred = NULL;
+		}
+		else {
+			goto cleanup;
+		}
+	}
 
 	/* attempt to login via racf interface.  On failure RAKF already writes its
 	   own RAKF0004 audit message, so we do NOT log here -- an httpd message

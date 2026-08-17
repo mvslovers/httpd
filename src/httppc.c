@@ -239,18 +239,28 @@ quit:
 }
 
 /*
-** cred_overage() - has this credential passed the configured hard max-age
-** (#118)?  The age is measured from cred->created, which -- unlike cred->last
-** -- is never refreshed, so activity cannot extend a session past the limit.
-** 0 disables the check; credexp() already treats a 0 limit as "never".
+** maxage_secs() - the configured hard credential max-age in seconds, 0 when
+** it is switched off (#118).  Parmlib carries it in minutes.
+*/
+static unsigned
+maxage_secs(HTTPD *httpd)
+{
+	return httpd ? (unsigned) httpd->cfg_session_maxage * 60 : 0;
+}
+
+/*
+** cred_overage() - has this credential passed that limit?  The age is measured
+** from cred->created, which -- unlike cred->last -- is never refreshed, so
+** activity cannot extend a session past the maximum.  credexp() treats a 0
+** limit as "never", which is what switches the check off.
 */
 static int
 cred_overage(HTTPD *httpd, CRED *cred)
 {
-	if (!httpd || !cred || !httpd->cfg_session_maxage) return 0;
+	if (!cred) return 0;
 
 	return credexp((long) difftime64(time64(NULL), cred->created),
-	               (unsigned) httpd->cfg_session_maxage * 60);
+	               maxage_secs(httpd));
 }
 
 /*
@@ -349,32 +359,15 @@ resolve_credential(HTTPC *httpc)
 			colon = strchr(creds, ':');
 			if (colon) {
 				*colon = 0;
-				httpc->cred = cred_login(httpc->addr,
-				                         (UCHAR *)creds, (UCHAR *)(colon + 1));
 
 				/* A Basic client carries its password on every request, so the
 				   max-age cannot log it out -- what the limit buys here is
-				   REVALIDATION.  cred_login() looks up before it authenticates,
-				   so a cached CRED is returned without touching RACF; once it
-				   is over-age, drop it and log in again, which re-checks the
-				   password and builds a fresh ACEE.  That bounds how long a
-				   REVOKEd userid, a changed password or stale group
-				   memberships keep working (#118).
-
-				   Unlike the token path this one must really free the CRED --
-				   cred_login() would otherwise keep returning the same over-age
-				   entry, and simply rejecting it would 401 the client until the
-				   next sweep.  That is the reaper's borrow window on the
-				   request path (M2 note, docs/refactoring-backlog.md), guarded
-				   by the same invariant: SESSION_MAXAGE >> the longest request,
-				   which HTTPD032E warns about at startup. */
-				if (httpc->cred && cred_overage(httpc->httpd, httpc->cred)) {
-					CREDTOK tok = httpc->cred->token;
-
-					credtok_logout_arr(httpc->httpd->credarr, &tok);
-					httpc->cred = cred_login(httpc->addr,
-					                         (UCHAR *)creds, (UCHAR *)(colon + 1));
-				}
+				   REVALIDATION, and cred_login() applies it: past the limit it
+				   drops the cached credential and checks the password against
+				   RACF again (#118). */
+				httpc->cred = cred_login(httpc->addr,
+				                         (UCHAR *)creds, (UCHAR *)(colon + 1),
+				                         maxage_secs(httpc->httpd));
 			}
 			memset(creds, 0, sizeof(creds));   /* scrub the password */
 		}

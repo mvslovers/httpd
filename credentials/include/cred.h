@@ -139,9 +139,17 @@ extern CRED *cred_find_by_acee(ACEE *acee)													asm("CREDFBAC");
  * note: caller must be APF authorized otherwise S047 abend.
  * returns NULL on error, check console for errors.
  * cred was added to WSA cred array if not NULL.
+ *
+ * This is the one find-then-authenticate chokepoint: a cached CRED is returned
+ * without touching RACF, which is what keeps re-auth cheap.  maxage_secs (#118)
+ * bounds that -- a cached credential older than the limit is discarded and the
+ * password is checked against RACF again.  0 disables the limit.  Every caller
+ * of this function must pass it, or its flow silently keeps the unbounded
+ * behaviour (that is how the form-login path was missed once already).
  */
 extern CRED *
-cred_login(unsigned addr, unsigned char *userid, unsigned char *password)					asm("CREDLIN");
+cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
+           unsigned maxage_secs)															asm("CREDLIN");
 
 /* overflow cap on the credential array (login flood protection, M2) */
 #define CRED_MAX 256

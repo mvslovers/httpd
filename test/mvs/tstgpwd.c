@@ -153,7 +153,7 @@ int main(void)
 
     /* pass a lower-case password: cred_login() upper-cases it before both
        racf_login() and encryption, so http_get_password() must return "SYS1". */
-    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1");
+    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1", 0);
     CHECK(cred != NULL, "cred_login #1 (fresh) succeeds");
     if (cred) {
         httpc->cred = cred;
@@ -162,7 +162,7 @@ int main(void)
         CHECK(ret != NULL && strcmp((char *)buf, "SYS1") == 0,
               "http_get_password == SYS1 (RACF-folded upper case, fresh read)");
 
-        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1");
+        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1", 0);
         CHECK(cred2 == cred, "cred_login #2 returns the SAME cached CRED");
         if (cred2) {
             httpc->cred = cred2;
