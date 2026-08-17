@@ -560,6 +560,7 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             if (http_cmp(v, "NONE") == 0)       pol->auth = HTTP_AUTH_NONE;
             else if (http_cmp(v, "FORM") == 0)  pol->auth = HTTP_AUTH_FORM;
             else if (http_cmp(v, "BASIC") == 0) pol->auth = HTTP_AUTH_BASIC;
+            else if (http_cmp(v, "TOKEN") == 0) pol->auth = HTTP_AUTH_TOKEN;
             else
                 wtof(MSG_ROUTE_BAD_AUTH, v);
         }

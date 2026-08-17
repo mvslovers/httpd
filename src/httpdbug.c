@@ -70,6 +70,7 @@ auth_text(UCHAR auth)
 	case HTTP_AUTH_NONE:	return "NONE";
 	case HTTP_AUTH_FORM:	return "FORM";
 	case HTTP_AUTH_BASIC:	return "BASIC";
+	case HTTP_AUTH_TOKEN:	return "TOKEN";
 	default:				return "?";
 	}
 }

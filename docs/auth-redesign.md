@@ -245,7 +245,7 @@ the token-model note in §4.
    authenticate (→401) then, if `RES=` is set, `racf_auth` (→403) — applied
    *before* serving a file or dispatching a CGI, so static/SPA routes get
    RACF/RAKF protection too. Decouple the challenge (form vs 401) from the core.
-   *(`AUTH=` is `NONE`/`FORM`/`BASIC`; a route without `AUTH=` inherits the
+   *(`AUTH=` is `NONE`/`FORM`/`BASIC`, plus `TOKEN` since #121; a route without `AUTH=` inherits the
    global `LOGIN` default.)*
 4. ✅ **(done — #99)** **HTTPX auth export** (`get_userid`/`get_acee`/
    `get_token`/`logout`/`check_auth`).
@@ -270,9 +270,14 @@ the token-model note in §4.
 ## 4. Open decisions
 - **~~Token transport~~ decided (#97):** both — the `LtpaToken2` cookie is the
   z/OSMF contract, `Authorization: Bearer` an optional convenience.
-- **Challenge heuristic** when auth is missing: the `X-CSRF-ZOSMF-HEADER`
-  suppression shipped with #120; the clean, server-declared per-route API
-  marker is **#121**.
+- **~~Challenge heuristic~~ decided — #121:** `AUTH=TOKEN` is the
+  server-declared API marker. A route carrying it answers a bare `401`
+  unconditionally, without consulting the request. #120's `X-CSRF-ZOSMF-HEADER`
+  suppression stays as the heuristic for `BASIC`/inherited routes. The `AUTH=`
+  keyword never selected a credential *source* — the resolver runs before the
+  route is matched, so every route accepts every source — which is why the fix
+  is a fourth challenge mode and not the `AUTH=BASIC,TOKEN` source list that
+  #98 documented but never built.
 - **~~Token model~~ decided (2026-08-17):** go **random**. The deterministic
   `SHA-256(addr,user,pass)` is an *offline verification oracle* — the input is
   low-entropy (`addr` known, userid guessable, password upper-case-folded by

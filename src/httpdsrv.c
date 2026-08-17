@@ -1659,6 +1659,7 @@ auth_mode_text(UCHAR auth)
     case HTTP_AUTH_NONE:    return "NONE (public, never challenged)";
     case HTTP_AUTH_FORM:    return "FORM (HTML login form)";
     case HTTP_AUTH_BASIC:   return "BASIC (401 WWW-Authenticate)";
+    case HTTP_AUTH_TOKEN:   return "TOKEN (bare 401, API route)";
     default:                return "(unknown)";
     }
 }

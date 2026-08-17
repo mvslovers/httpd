@@ -361,4 +361,9 @@ JES2 cross-check any more — use mvsMF's jobs API.
 so `auth` (`+14`) is named and spelled out — that is the field the request is
 gated on, not `login` (`+09`), which is the legacy byte and is labelled as such.
 `AUTH=DEFAULT` means the route carried no `AUTH=` keyword and falls back to the
-global `LOGIN` policy, which is not the same as "no authentication".
+global `LOGIN` policy, which is not the same as "no authentication". And
+`AUTH=` never selected a credential *source* — the resolver runs before the
+route is matched, so every route accepts every source. It selects whether a
+login is needed and how a missing one is challenged: `NONE`, `FORM`, `BASIC`,
+and since #121 `TOKEN` (a bare 401, never a challenge, for API routes whose
+clients handle the 401 themselves).
