@@ -239,14 +239,50 @@ quit:
 }
 
 /*
+** maxage_secs() - the configured hard credential max-age in seconds, 0 when
+** it is switched off (#118).  Parmlib carries it in minutes.
+*/
+static unsigned
+maxage_secs(HTTPD *httpd)
+{
+	return httpd ? (unsigned) httpd->cfg_session_maxage * 60 : 0;
+}
+
+/*
+** cred_overage() - has this credential passed that limit?  The age is measured
+** from cred->created, which -- unlike cred->last -- is never refreshed, so
+** activity cannot extend a session past the maximum.  credexp() treats a 0
+** limit as "never", which is what switches the check off.
+*/
+static int
+cred_overage(HTTPD *httpd, CRED *cred)
+{
+	if (!cred) return 0;
+
+	return credexp((long) difftime64(time64(NULL), cred->created),
+	               maxage_secs(httpd));
+}
+
+/*
 ** token_to_cred() - decode a base64 session-token string into a CREDTOK and
 ** resolve the session (NULL on a miss).  Shared by the Sec-Token / LtpaToken2
 ** cookies and the Bearer header; cred_find_by_token() refreshes cred->last (M2).
+**
+** An over-age credential is rejected HERE and not only by the reaper: the sweep
+** runs every ~60 s (httpd.c), so a reaper-only max-age would keep answering
+** with an expired session for up to a minute.  Enforcement is immediate;
+** reclamation is left to the sweep on purpose.  Freeing it on this path would
+** open a borrow window the idle design does not have -- a second worker holding
+** the same CRED for an in-flight request would be left with freed storage (the
+** M2 note in docs/refactoring-backlog.md: testlock catches a concurrent free,
+** not a borrow).  Leaving it linked costs one dead CRED for up to a minute and
+** resolves nothing in the meantime, because every lookup re-checks the age.
 */
 static CRED *
-token_to_cred(const char *b64)
+token_to_cred(HTTPC *httpc, const char *b64)
 {
 	CREDTOK	tok;
+	CRED	*cred;
 	size_t	len;
 	char	*buf;
 
@@ -260,7 +296,10 @@ token_to_cred(const char *b64)
 	memcpy(&tok, buf, len);
 	free(buf);
 
-	return cred_find_by_token(&tok);
+	cred = cred_find_by_token(&tok);
+	if (cred && cred_overage(httpc->httpd, cred)) cred = NULL;
+
+	return cred;
 }
 
 /*
@@ -283,11 +322,11 @@ resolve_credential(HTTPC *httpc)
 	httpc->cred = NULL;
 
 	/* 1. Sec-Token cookie */
-	httpc->cred = token_to_cred(http_get_env(httpc, "HTTP_Cookie-Sec-Token"));
+	httpc->cred = token_to_cred(httpc, http_get_env(httpc, "HTTP_Cookie-Sec-Token"));
 	if (httpc->cred) return;
 
 	/* 2. LtpaToken2 cookie (our token under the z/OSMF cookie name) */
-	httpc->cred = token_to_cred(http_get_env(httpc, "HTTP_Cookie-LtpaToken2"));
+	httpc->cred = token_to_cred(httpc, http_get_env(httpc, "HTTP_Cookie-LtpaToken2"));
 	if (httpc->cred) return;
 
 	authhdr = http_get_env(httpc, "HTTP_Authorization");
@@ -295,7 +334,7 @@ resolve_credential(HTTPC *httpc)
 
 	/* 3. Authorization: Bearer <token> */
 	if (http_cmpn(authhdr, "Bearer ", 7) == 0) {
-		httpc->cred = token_to_cred(authhdr + 7);
+		httpc->cred = token_to_cred(httpc, authhdr + 7);
 		return;
 	}
 
@@ -320,8 +359,15 @@ resolve_credential(HTTPC *httpc)
 			colon = strchr(creds, ':');
 			if (colon) {
 				*colon = 0;
+
+				/* A Basic client carries its password on every request, so the
+				   max-age cannot log it out -- what the limit buys here is
+				   REVALIDATION, and cred_login() applies it: past the limit it
+				   drops the cached credential and checks the password against
+				   RACF again (#118). */
 				httpc->cred = cred_login(httpc->addr,
-				                         (UCHAR *)creds, (UCHAR *)(colon + 1));
+				                         (UCHAR *)creds, (UCHAR *)(colon + 1),
+				                         maxage_secs(httpc->httpd));
 			}
 			memset(creds, 0, sizeof(creds));   /* scrub the password */
 		}

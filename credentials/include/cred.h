@@ -61,10 +61,12 @@ struct cred {
 	ACEE			*acee;			/* 48 RACF ACEE					*/
 	unsigned short	len;			/* 4C length of CRED			*/
 	unsigned char	version;		/* 4E version number			*/
+#define CRED_VERSION	2			/* ... 2 added created (#118)	*/
 	unsigned char   flags;			/* 4F flags						*/
 #define CRED_FLAG_NO_DELETE 0x80	/* ,,, do not delete cred		*/
-#define CRED_FLAG_KEEP_ACEE	0x40	/* ... do not delete cred->acee	*/	
-};									/* 50 (80 bytes)				*/
+#define CRED_FLAG_KEEP_ACEE	0x40	/* ... do not delete cred->acee	*/
+	time64_t		created;		/* 50 creation time stamp (#118)*/
+};									/* 58 (88 bytes)				*/
 
 /* cred_init() - initialize CRED environment, generates BLOWFISH_KEY for credkey() */
 extern int 
@@ -137,19 +139,34 @@ extern CRED *cred_find_by_acee(ACEE *acee)													asm("CREDFBAC");
  * note: caller must be APF authorized otherwise S047 abend.
  * returns NULL on error, check console for errors.
  * cred was added to WSA cred array if not NULL.
+ *
+ * This is the one find-then-authenticate chokepoint: a cached CRED is returned
+ * without touching RACF, which is what keeps re-auth cheap.  maxage_secs (#118)
+ * bounds that -- a cached credential older than the limit is discarded and the
+ * password is checked against RACF again.  0 disables the limit.  Every caller
+ * of this function must pass it, or its flow silently keeps the unbounded
+ * behaviour (that is how the form-login path was missed once already).
  */
 extern CRED *
-cred_login(unsigned addr, unsigned char *userid, unsigned char *password)					asm("CREDLIN");
+cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
+           unsigned maxage_secs)															asm("CREDLIN");
 
 /* overflow cap on the credential array (login flood protection, M2) */
 #define CRED_MAX 256
 
-/* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs.
- * ttl_secs == 0 disables reaping. Returns the number reaped. */
-extern unsigned cred_reap(unsigned ttl_secs)												asm("CREDREAP");
+/* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs, or
+ * older than maxage_secs counted from cred->created regardless of activity
+ * (#118).  Either limit may be 0 to disable it; both 0 disables reaping
+ * entirely.  Returns the number reaped. */
+extern unsigned cred_reap(unsigned ttl_secs, unsigned maxage_secs)							asm("CREDREAP");
 
 /* credexp() - pure expiry decision: has a credential idle for elapsed_secs
- * exceeded ttl_secs? (ttl 0 -> never; negative elapsed -> not yet; '>' bound) */
+ * exceeded ttl_secs? (ttl 0 -> never; negative elapsed -> not yet; '>' bound)
+ *
+ * The same decision serves the hard max-age (#118) unchanged -- pass the age
+ * since cred->created instead of the idle time, and the max-age instead of the
+ * TTL.  The two differ in which clock they measure, not in the arithmetic, so
+ * this stays one function rather than a copy that can drift. */
 extern int credexp(long elapsed_secs, unsigned ttl_secs)									asm("CREDEXP");
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */

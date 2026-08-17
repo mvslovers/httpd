@@ -146,7 +146,9 @@ struct httpd {
     void        *unused_88;         /* 88 (was: cgilua_path)        */
     void        *unused_8C;         /* 8C (was: cgilua_cpath)       */
     UFS			*ufs;				/* 90 Unix "like" File System   */
-    void        *unused_94;         /* 94 (was: HTTPT *httpt)       */
+    USHRT       cfg_session_maxage; /* 94 credential hard max-age   */
+                                    /* ... (min), 0=off (#118)      */
+    UCHAR       unused_96[2];       /* 96 (was: HTTPT *httpt)       */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */
     void        **cgictx;           /* 9C array of CGI context ptrs */
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */

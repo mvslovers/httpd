@@ -328,6 +328,9 @@
 /** HTTPD134I DISPLAY CONFIG, codepage in effect */
 #define MSG_D_CFG_CODEPAGE	"HTTPD134I CODEPAGE %s"
 
+/** HTTPD135I DISPLAY CONFIG, credential hard max-age; 0 disables it (#118) */
+#define MSG_D_CFG_MAXAGE	"HTTPD135I SESSION_MAXAGE %d MIN%s"
+
 /** HTTPD140I DISPLAY VERSION */
 #define MSG_D_VERSION		"HTTPD140I HTTPD %s (%s)"
 
@@ -405,6 +408,9 @@
 
 /** HTTPD026E the reaper would free a credential an in-flight request still holds */
 #define MSG_CFG_SESSION_UNSAFE	"HTTPD026E SESSION_TIMEOUT (%d MIN) <= CLIENT_TIMEOUT (%d SEC), RAISE IT"
+
+/** HTTPD032E same hazard as HTTPD026E, reached through the hard max-age (#118) */
+#define MSG_CFG_MAXAGE_UNSAFE	"HTTPD032E SESSION_MAXAGE (%d MIN) <= CLIENT_TIMEOUT (%d SEC), RAISE IT"
 
 /** HTTPD028E the listener socket could not be created at all */
 #define MSG_CFG_SOCKET		"HTTPD028E SOCKET() FAILED, RC=%d ERRNO=%d"

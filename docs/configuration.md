@@ -20,6 +20,7 @@ F HTTPD,D CONFIG
 HTTPD128I PORT 8080  MINTASK 3  MAXTASK 9
 HTTPD129I CLIENT_TIMEOUT 10  KEEPALIVE 5/100
 HTTPD130I SESSION_TIMEOUT 60 MIN
+HTTPD135I SESSION_MAXAGE 480 MIN
 HTTPD131I DOCROOT /wwwroot
 HTTPD134I CODEPAGE CP037
 HTTPD132I SMF TYPE 128 LEVEL ALL
@@ -84,6 +85,42 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 
 `LOGIN` remains the global default. Individual routes can override it and add a
 resource check with the per-route `AUTH=` / `RES=` options (see below).
+
+### Session lifetime (`SESSION_TIMEOUT`, `SESSION_MAXAGE`)
+
+A successful login caches the credential and its RACF ACEE, so later requests
+resolve without another RACF call. Two independent limits end that cached
+session; both are in **minutes**, and `0` disables the limit.
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `SESSION_TIMEOUT` | 30 | **Idle** timeout. Refreshed on every request, so an actively used session never expires by this limit alone. |
+| `SESSION_MAXAGE` | 480 | **Hard** maximum age, counted from login and never refreshed. Ends a session regardless of activity. |
+
+`SESSION_MAXAGE` exists because the idle timeout alone never expires an active
+session: the cached credential — and the ACEE snapshot taken at login — would
+otherwise stay valid indefinitely, so a userid `REVOKE`d after login, a changed
+password, or altered group memberships would keep working for as long as the
+client kept sending requests. The max-age bounds that lag.
+
+What reaching the limit *does* depends on how the client authenticates:
+
+- A client presenting a **token** (`Sec-Token` / `LtpaToken2` cookie, or
+  `Authorization: Bearer`) is logged out — the token stops resolving and the
+  next request gets a `401`.
+- A client sending **`Authorization: Basic`** carries its password on every
+  request, so it cannot be logged out. For it the max-age is a *revalidation*
+  interval: the cached credential is dropped and the password is checked
+  against RACF again.
+
+Both limits are enforced when a request looks a credential up, not only by the
+background sweep, so an expired session is rejected immediately rather than up
+to a minute later.
+
+> **Raise both well above the longest request.** The sweep frees credentials, so
+> a limit shorter than a request's own runtime could free one still in use.
+> The server writes `HTTPD026E` / `HTTPD032E` at startup when either is at or
+> below `CLIENT_TIMEOUT`.
 
 ### The server's own identity (`STCUSER=`, `STCGROUP=`)
 
@@ -384,6 +421,8 @@ KEEPALIVE_TIMEOUT=5
 KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
 LOGIN=RACF
+SESSION_TIMEOUT=30
+SESSION_MAXAGE=480
 MOD=MVSMF /zosmf/*
 SMF=AUTH TYPE=243
 ```

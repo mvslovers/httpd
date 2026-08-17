@@ -592,10 +592,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_94</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_94), httpd->unused_94);
+        "<td>httpd->cfg_session_maxage</td>"
+        "<td>Credential Hard Max-Age (minutes, 0=off)</td>"
+        "<td>%d</td></tr>\n",
+        O(cfg_session_maxage), httpd->cfg_session_maxage);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"

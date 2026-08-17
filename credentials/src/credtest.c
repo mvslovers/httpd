@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	
 	inet_aton("192.168.1.123", (in_addr_t*)&addr);
 
-	cred = cred_login(addr, "HERC01", "CUL8TR");
+	cred = cred_login(addr, "HERC01", "CUL8TR", 0);   /* 0 = no max-age */
 	if (cred) {
 		wtodumpf(cred, sizeof(CRED), "%s: CRED created", __func__);
 	}

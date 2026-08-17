@@ -91,7 +91,7 @@ int main(void)
         return mbt_test_summary("TSTGUID");
     }
 
-    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1");
+    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1", 0);
     CHECK(cred != NULL, "cred_login #1 (fresh) succeeds");
     if (cred) {
         httpc->cred = cred;
@@ -100,7 +100,7 @@ int main(void)
         CHECK(ret != NULL && strcmp((char *)buf, "IBMUSER") == 0,
               "http_get_userid == IBMUSER (cred_login fresh read)");
 
-        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1");
+        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1", 0);
         CHECK(cred2 != NULL, "cred_login #2 (cache hit) succeeds");
         CHECK(cred2 == cred, "cache hit returns the SAME cached CRED object");
         if (cred2) {
