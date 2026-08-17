@@ -1,6 +1,10 @@
 # HTTPD / mvsMF Authentication — Analysis & Redesign
 
-**Status:** design / planning (2026-07-04). Not yet implemented.
+**Status:** implemented (httpd 4.0.0 + mvsMF, marked 2026-08-17) — kept as the
+design record; the remaining §4 decisions are tracked as tickets (see §4).
+Identity at *authorization* time (ASXBSENV, resting identity, explicit
+authorization) was out of scope here and is covered by the successor document
+`identity-redesign.md`.
 **Scope:** the auth story across **httpd** (core + `credentials/`) and **mvsMF**
 (the z/OSMF-clone CGI + its `static/` SPA). Goal: **one credential model,
 several credential sources, per-route policy** — and retire mvsMF's parallel
@@ -247,13 +251,13 @@ the token-model note in §4.
    `get_token`/`logout`/`check_auth`).
 
 ### 3.2 mvsMF
-5. Implement `POST`/`DELETE /zosmf/services/authenticate` (mvslovers/mvsmf#162):
+5. ✅ **(done — mvslovers/mvsmf#162, PR #168)** Implement `POST`/`DELETE /zosmf/services/authenticate`:
    the login handler reads the httpd-resolved token via `http_get_token` and
    returns it as `LtpaToken2`; the logout handler calls `http_logout`. **Delete
    `authmw.c`**; read userid/ACEE via the export (`http_check_auth` for
    fine-grained routes). Configure `MOD MVSMF /zosmf/* AUTH=BASIC,TOKEN`.
 
-### 3.3 SPA (`static/`)
+### 3.3 SPA (`static/`) — ✅ done (mvslovers/mvsmf#161, PR #169)
 6. Login: `POST` creds **once** to the authenticate endpoint → store the
    **token** (not the password); drop `Session.pass`.
 7. API layer: send the **token** (cookie or `Bearer`), not
@@ -264,17 +268,18 @@ the token-model note in §4.
 ---
 
 ## 4. Open decisions
-- **Token transport:** cookie (`Sec-Token` / z/OSMF `LtpaToken2`) vs
-  `Authorization: Bearer` vs both (CSRF vs cross-origin trade-offs; the SPA
-  already sends `X-CSRF-ZOSMF-HEADER`).
-- **Challenge heuristic** when auth is missing: `Authorization` header present →
-  401; else form (simplest) — vs `Accept`/path/per-route.
+- **~~Token transport~~ decided (#97):** both — the `LtpaToken2` cookie is the
+  z/OSMF contract, `Authorization: Bearer` an optional convenience.
+- **Challenge heuristic** when auth is missing: the `X-CSRF-ZOSMF-HEADER`
+  suppression shipped with #120; the clean, server-declared per-route API
+  marker is **#121**.
 - **Token model:** keep deterministic `SHA-256(addr,user,pass)` (cheap re-auth,
   IP-bound) or add a random session id / rotation / hard max-age (token
-  *expiry* independent of idle).
+  *expiry* independent of idle) — tracked as **#118**.
 - **Crypto:** Blowfish (64-bit) + weak salt (`cred_init` uses the HTTPD struct /
-  object code) — revisit for a unified model.
-- **Realm** source (fixed vs Parmlib).
+  object code) — revisit for a unified model, together with #118's rotation
+  outcome.
+- **Realm** source (fixed vs Parmlib) — unticketed, low.
 - **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**
   `CREDTOK` (Zowe/SPA replay it as-is). We do **not** emulate real WebSphere
   LTPA; if a structured/validated token is ever needed, go straight to **JWT**.
