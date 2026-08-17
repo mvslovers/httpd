@@ -303,12 +303,16 @@ the token-model note in §4.
   secret key is what makes the random token unguessable inside an observable
   login window. (The object-code salt in `credinit.c` is the `salt == NULL`
   branch and only ever runs in the tests.)
-- **Realm** source (fixed vs Parmlib) — tracked as **#191**. `HTTP_AUTH_REALM`
-  is the constant `"MVS"` in `httppc.c`; it is the protection space a browser
-  caches Basic credentials under and the text it shows the user, so it should
-  identify the system (`__smfid()`, already read for the `Node:` header) with a
-  Parmlib override. Sequenced after #121, which removes the challenge — and
-  with it the realm — from API routes altogether.
+- **~~Realm~~ source decided — #191:** the realm is no longer the constant
+  `"MVS"`. It is the system's SMF ID (`httprlm()`, `src/httprlm.c`), the same
+  identity `httpresp()` already publishes in the `Node:` header, with `"MVS"`
+  kept only as the fallback for a system that supplies none. That matters
+  because the realm is both the text a browser shows the user and — together
+  with the origin — the key it caches Basic credentials under, so a constant
+  made every httpd on the network one shared protection space. A configurable
+  name (and whether the login form should carry it) is **#193**; after #121 the
+  realm is emitted only on `AUTH=BASIC` and inherited routes, since `AUTH=TOKEN`
+  sends no challenge at all.
 - **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**
   `CREDTOK` (Zowe/SPA replay it as-is). We do **not** emulate real WebSphere
   LTPA; if a structured/validated token is ever needed, go straight to **JWT**.

@@ -167,6 +167,14 @@ sources = ["test/tstracf.c", "src/httpracf.c"]
 name = "TSTSTAT"
 sources = ["test/tststat.c", "src/httpstat.c"]
 
+# httprlm() Basic realm from the SMF ID (issue #191).  __smfid() hands over a
+# 4-byte, blank-padded, unterminated field, and an empty realm would collapse
+# every protection space on the origin (RFC 7617 makes it required) -- so the
+# degenerate inputs are what this pins.  Free of httpd.h -> DUAL (host + MVS).
+[[test]]
+name = "TSTREALM"
+sources = ["test/tstrealm.c", "src/httprlm.c"]
+
 # credid_enc()/credid_dec() round-trip + flag survival across a repeat read of a
 # stored CRED (issue #109: http_get_userid() garbage on a cache-hit read).
 # blowfish_encrypt/decrypt are crent370 (MVS) -> MVS-only test (test-mvs); the
