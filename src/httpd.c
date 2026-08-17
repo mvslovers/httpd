@@ -298,8 +298,48 @@ initialize(int argc, char **argv)
     httpd->cgictx = (void **) calloc(1, (size_t)i);
 
 quit:
-	/* initialize our credential key */
-	rc = cred_init(httpd, sizeof(HTTPD));
+	/* Initialize our credential key.
+
+	   The salt used to be the HTTPD block on its own.  That is not a secret:
+	   of its 320 bytes roughly half are literal text (eye catcher, docroot,
+	   codepage), the rest is Parmlib configuration plus counters that are all
+	   zero at this point, and the only varying part is a handful of GETMAIN
+	   addresses.  MVS 3.8j has no address space layout randomisation, so for
+	   the same load module, region size and Parmlib those addresses reproduce
+	   and the key came out identical on every start -- derivable by anyone
+	   holding the load module and the Parmlib (#188).
+
+	   Mixing STCK and this address space's own control block addresses through
+	   SHA-256 makes the key differ per start.  That matters twice: the CREDID
+	   passwords encrypted with it stop being decryptable from a dump by someone
+	   who can rebuild the server, and the key becomes usable as the secret that
+	   makes credtok_rand()'s output unpredictable.
+
+	   Note this invalidates any credential built by a previous instance: the
+	   encrypted CREDID is the lookup key in cred_find_by_id() and it is
+	   ciphertext.  Harmless, because the store dies with the address space --
+	   but it would matter if credentials were ever persisted. */
+	{
+		SHA256_CTX          ctx;
+		unsigned char       salt[32];
+		unsigned long long  tod;
+		unsigned            *tcb  = (unsigned *)psa[0x21C/4];  /* PSATOLD */
+		void                *self = httpd;
+
+		__asm__("STCK\t0(%0)" : : "r" (&tod));
+
+		sha256_init(&ctx);
+		sha256_update(&ctx, (unsigned char *)&tod,  sizeof(tod));
+		sha256_update(&ctx, (unsigned char *)httpd, sizeof(HTTPD));
+		sha256_update(&ctx, (unsigned char *)&self, sizeof(self));
+		sha256_update(&ctx, (unsigned char *)&ascb, sizeof(ascb));
+		sha256_update(&ctx, (unsigned char *)&tcb,  sizeof(tcb));
+		sha256_final(&ctx, salt);
+
+		rc = cred_init(salt, sizeof(salt));
+
+		memset(salt, 0, sizeof(salt));
+	}
 	if (rc) {
 		wtof(MSG_CREDKEY_FAILED, rc);
 	}
