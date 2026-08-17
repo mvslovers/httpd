@@ -273,12 +273,26 @@ the token-model note in §4.
 - **Challenge heuristic** when auth is missing: the `X-CSRF-ZOSMF-HEADER`
   suppression shipped with #120; the clean, server-declared per-route API
   marker is **#121**.
-- **Token model:** keep deterministic `SHA-256(addr,user,pass)` (cheap re-auth,
-  IP-bound) or add a random session id / rotation / hard max-age (token
-  *expiry* independent of idle) — tracked as **#118**.
+- **~~Token model~~ decided (2026-08-17):** go **random**. The deterministic
+  `SHA-256(addr,user,pass)` is an *offline verification oracle* — the input is
+  low-entropy (`addr` known, userid guessable, password upper-case-folded by
+  `cred_login()`), so a leaked `LtpaToken2` lets an attacker hash candidates
+  until one matches. Cheap re-auth and the IP binding survive the change: the
+  Basic path looks up by `cred_find_by_id()` (already present, `credfbid.c`) and
+  `addr` is part of the CREDID. `http_get_password()`/#111 is untouched — the
+  password lives in `cred->id`, not in the token. Implementation: **#188**;
+  a hard max-age (`SESSION_MAXAGE`, on top of the sliding idle) stays on
+  **#118**, which also records why `SESSION_TIMEOUT` remains 30 min.
+  **Asymmetry to keep in mind:** real logout and a real max-age bind
+  *token-presenting* clients only. A Basic client carries the password on every
+  request and simply re-establishes a session, so for it the max-age is a
+  *revalidation interval* that bounds RACF revocation lag (a `REVOKE`d userid, a
+  changed password and a stale ACEE snapshot otherwise survive indefinitely).
 - **Crypto:** Blowfish (64-bit) + weak salt (`cred_init` uses the HTTPD struct /
-  object code) — revisit for a unified model, together with #118's rotation
-  outcome.
+  object code). This is no longer a stand-alone "revisit" item: #188 mixes the
+  secret `credkey` into the random token, and that key is what defeats guessing
+  inside an observable login window — so the salt is now a **dependency of the
+  token design**.
 - **Realm** source (fixed vs Parmlib) — unticketed, low.
 - **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**
   `CREDTOK` (Zowe/SPA replay it as-is). We do **not** emulate real WebSphere

@@ -291,10 +291,20 @@ the parse buffer, so the original NULL-deref was not reachable.
 - **No `HttpOnly`/`Secure`/`SameSite`** on the `Sec-Token` cookie.
 - ~~**No session timeout / token expiry**~~ **✔ delivered by `M2`** (PR #95):
   idle CRED+ACEE reaper with a Parmlib `SESSION_TIMEOUT`. Token *expiry* (a hard
-  max-age independent of activity) is still open if wanted.
+  max-age independent of activity) was **decided 2026-08-17** and is tracked as
+  **#118** (`SESSION_MAXAGE`, checked in the lookup path as well as the reaper —
+  the sweep only runs every ~60 s).
+- **Deterministic `CREDTOK`** = `SHA-256(addr,user,pass)` — an *offline
+  verification oracle* over a low-entropy input, so a leaked `LtpaToken2` lets an
+  attacker hash password candidates until one matches. **Decided 2026-08-17:**
+  replace it with a random session token — **#188**. See `docs/auth-redesign.md`
+  §4 *Token model*.
 - **No login rate-limiting** — brute force possible.
 - **Blowfish** (64-bit block) for in-memory CREDID — adequate for transient
-  storage, dated as a standard.
+  storage, dated as a standard. Its **weak salt** (`cred_init` seeds from the
+  HTTPD struct / object code) stopped being cosmetic with #188: the secret
+  `credkey` is what makes the random token unguessable inside an observable login
+  window, so the salt is now a dependency of the token design.
 - **Binary authorization only** (login-or-not). For per-endpoint/RACF-resource
   authorization, see *Architecture* (HTTPX auth helper).
 - **`DOCROOT` unset ⇒ no docroot confinement** (`httpopen.c:48-54`). With no
@@ -360,6 +370,10 @@ RACF ACEE per login was removed only by explicit `/logout` or shutdown.
 > **Resolved — this is the session timeout.**
 > - **Refresh:** `cred_find_by_token()` (the only per-request lookup — verified;
 >   `by_id`/`by_acee` unused) stamps `cred->last = time64(NULL)` on every hit.
+>   **#188 invalidates the parenthesis:** the random session token moves the
+>   Basic source's per-request lookup to `cred_find_by_id()`, which does *not*
+>   stamp — it must gain the same refresh, or an actively used Basic session is
+>   reaped `SESSION_TIMEOUT` after its creation.
 > - **Reaper:** `cred_reap(ttl_secs)` (`credreap.c`) walks the WSA array under
 >   `LOCK_EXC`, `array_del`s entries idle > TTL (skipping any `testlock` shows
 >   in-use), and `cred_free`s them (RACF logout) **after releasing** the array
