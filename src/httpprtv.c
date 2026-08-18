@@ -10,10 +10,9 @@ extern int usleep(unsigned usec);
 /* A zero-progress send (0 from http_send(), socket send buffer full)
 ** is retried after a pause instead of busy-spinning the worker at
 ** 100% CPU (issue #199); after SEND_STALL_MAX consecutive
-** zero-progress calls (10 seconds) the client is treated as gone.
+** zero-progress calls the client is treated as gone.  The policy
+** itself lives in httpd.h -- httpsend.c applies the same budget.
 */
-#define SEND_STALL_MAX      100
-#define SEND_STALL_PAUSE    100000  /* microseconds */
 
 /* Send the whole buffer, tolerating short writes.  Once the client
 ** is marked done no further progress can come at all - fail

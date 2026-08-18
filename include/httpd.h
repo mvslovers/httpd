@@ -186,6 +186,13 @@ enum cstate {
     CSTATE_CLOSE                    /* release client               */
 };
 
+/* no-progress send policy (issues #199, #201): a send reporting zero
+   progress means the client's receive window is closed, not that the
+   socket is dead -- pause and retry instead of busy-spinning a worker
+   at 100% CPU, and give up once the budget below is exhausted */
+#define SEND_STALL_MAX      100     /* consecutive no-progress sends*/
+#define SEND_STALL_PAUSE    100000  /* microseconds between retries */
+
 enum rdw {
     RDW_NONE=0,                     /* no RDW (default)             */
     RDW_B2,                         /* Big Endian 2 byte            */
