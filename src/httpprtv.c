@@ -51,6 +51,15 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
     int     len;
     UCHAR   buf[5120];
 
+    /* A client at or past CSTATE_DONE is finished: either the response
+       is complete, or a failed send marked it dead (#199).  Late output
+       would corrupt a kept-alive stream in the first case and is doomed
+       in the second -- refuse it before paying for vsnprintf/etoa/send,
+       because the display modules emit hundreds of calls per request
+       without checking any of them (#203). */
+    if (httpc->state >= CSTATE_DONE)
+        return -1;
+
     len = vsnprintf(buf, sizeof(buf), fmt, args);
     if (len >= (int)sizeof(buf))
         len = sizeof(buf) - 1;
