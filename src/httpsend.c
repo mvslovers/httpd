@@ -25,12 +25,14 @@ send_raw(HTTPC *httpc, const UCHAR *buf, int len)
             /* allow for EWOULDBLOCK */
             if (errno == EWOULDBLOCK) break;
 
-            /* an error occured */
-            if (httpc->state < CSTATE_DONE) {
+            /* an error occured - the socket is dead.  Report failure,
+               never pos: a 0 return means "no progress, retry later"
+               to callers, and a dead socket must never look retryable
+               or http_printv() spins on it forever (issue #199).  0
+               stays reserved for EWOULDBLOCK. */
+            if (httpc->state < CSTATE_DONE)
                 httpc->state = CSTATE_DONE;
-                return -1;
-            }
-            break;
+            return -1;
         }
     }
 
