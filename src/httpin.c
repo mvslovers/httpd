@@ -5,6 +5,51 @@
 #define HTTP_PRIVATE
 #include "httpd.h"
 
+/* RFC 7231 5.1.1: a client that sends "Expect: 100-continue" holds its
+** request body back until the server says it will read one.  Nothing here
+** answered that expectation, so such a client waited out its own timeout
+** while the body reader -- the CGI's, or the POST reader in httppars() --
+** called recv() on a socket that was empty *because* the client was waiting.
+** Every accepted socket is non-blocking (FIONBIO in httpd.c), so that recv()
+** returned EWOULDBLOCK at once and the request failed in under a tenth of a
+** second, with no byte of the body ever sent (mvsmf#247).
+**
+** Answered here, at the end of header parsing, because this is the one point
+** that precedes every body read in the server: httppars() consumes a POST
+** body under 4000 bytes itself, and a CGI reads a PUT body straight off the
+** socket.  A single call before both cannot be forgotten by a route type
+** added later.  It does mean the expectation is answered before the auth
+** gate runs, so a client whose request is about to be refused still uploads
+** its body -- exactly what it does today, having waited for its timeout
+** first, so nothing gets worse.
+**
+** Sent as ONE http_printf().  httpresp() would be wrong twice over: it looks
+** the phrase up in httpstat(), which carries none for 100 and would put
+** "500 Internal Server Error" on the wire; and it sets httpc->resp, which is
+** what httpprtv() tests when it decides whether a bare "\r\n" ends the final
+** response's headers.  Emitting the interim response as a single 25-byte
+** write touches neither.
+*/
+static void
+expect_continue(HTTPC *httpc)
+{
+    UCHAR *p;
+
+    /* HTTP/1.0 has no Expect (RFC 7231 5.1.1) -- ignore it there */
+    p = http_get_env(httpc, "REQUEST_VERSION");
+    if (!p || http_cmp(p, "HTTP/1.1") != 0) return;
+
+    /* the only expectation defined; anything else is not ours to satisfy */
+    p = http_get_env(httpc, "HTTP_EXPECT");
+    if (!p || http_cmp(p, "100-continue") != 0) return;
+
+    /* no body announced -> nothing is being held back */
+    if (!http_get_env(httpc, "HTTP_CONTENT-LENGTH") &&
+        !http_get_env(httpc, "HTTP_TRANSFER-ENCODING")) return;
+
+    http_printf(httpc, "HTTP/1.1 100 Continue\r\n\r\n");
+}
+
 int http_in(HTTPC *httpc)
 {
     int         rc      = 0;
@@ -167,6 +212,9 @@ int http_in(HTTPC *httpc)
         if (httpc->request_count >= httpc->httpd->cfg_keepalive_max)
             httpc->keepalive = 0;
     }
+
+    /* release a client that is waiting for permission to send its body */
+    expect_continue(httpc);
 
     /* next step will parse and do any additional processing */
     rc = 0;
