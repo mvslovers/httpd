@@ -75,6 +75,14 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
             /* no progress: EWOULDBLOCK, the only case send_raw()
                still reports as 0 */
             if (httpc->state >= CSTATE_DONE) return -1;
+            /* a stopping server must not sit out the stall budget:
+               shutdown waits for the workers, so every worker wait
+               has to honor quiesce (#122, #205) */
+            if (httpc->httpd->flag
+                & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
+                httpc->state = CSTATE_DONE;
+                return -1;
+            }
             if (++stall > SEND_STALL_MAX) {
                 httpc->state = CSTATE_DONE;
                 return -1;
