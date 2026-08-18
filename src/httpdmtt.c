@@ -84,7 +84,9 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
         
         if (!mt) continue;
         
-        http_printf(httpc, "%s\n", mt->mtentdat);
+        /* one call per trace entry; stop walking the table once the
+           client is gone (#203) -- quit still frees the CMTT copy */
+        if (http_printf(httpc, "%s\n", mt->mtentdat) < 0) goto quit;
     }
 
     if (!data) {

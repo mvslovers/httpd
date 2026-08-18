@@ -204,13 +204,16 @@ try_memory(HTTPD *httpd, HTTPC *httpc, OPTIONS *options)
             area, options->size, options->len);
     }
 
-    http_printf(httpc, "+00000 ");
+    /* every emitter in this loop runs per byte of the dump; once one
+       fails the client is gone, so stop at the line boundary instead
+       of grinding through the rest of the buffer (#203) */
+    if (http_printf(httpc, "+00000 ") < 0) goto quit;
     pos = 7;
     for(j=i=0; size > 0; i++) {
         if ( i==chunk ) {
-            http_printf(httpc, ":%s:\n", eChar);
+            if (http_printf(httpc, ":%s:\n", eChar) < 0) goto quit;
             j += i;
-            http_printf(httpc, "+%05X ", j);
+            if (http_printf(httpc, "+%05X ", j) < 0) goto quit;
             ie = i = 0;
             pos = 7;
         }
