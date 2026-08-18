@@ -268,6 +268,14 @@ console command, for instance).
 This is not hypothetical — a poll loop that ignored the flag is what produced
 the `SA03` shutdown crash in issue #122.
 
+The same rule applies inside the server: the send-stall retry in `httpprtv.c` /
+`httpsend.c` checks both flags before each pause (issue #205), which is what
+lets `P HTTPD` complete in ~3 s even while workers are parked on clients that
+have stopped reading. Note that a stalled client is also the trigger for a
+Hercules platform bug that can kill the whole emulator — see
+[hercules-x75-send-stall-repro.md](hercules-x75-send-stall-repro.md) before
+running that kind of load test.
+
 ### Building a Server Module
 
 Create a `project.toml` with dependencies on `crent370` and `httpd`:
