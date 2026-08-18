@@ -3,11 +3,52 @@
 */
 #include "httpd.h"
 
+/* libc370 ships usleep() (src/clib/usleep.c) but its headers carry
+   no prototype for it */
+extern int usleep(unsigned usec);
+
+/* A zero-progress send (0 from http_send(), socket send buffer full)
+** is retried after a pause instead of busy-spinning the worker at
+** 100% CPU (issue #199); after SEND_STALL_MAX consecutive
+** zero-progress calls (10 seconds) the client is treated as gone.
+*/
+#define SEND_STALL_MAX      100
+#define SEND_STALL_PAUSE    100000  /* microseconds */
+
+/* Send the whole buffer, tolerating short writes.  Once the client
+** is marked done no further progress can come at all - fail
+** immediately instead of pausing.
+*/
+static int
+send_all(HTTPC *httpc, const UCHAR *buf, int len)
+{
+    int rc;
+    int pos;
+    int stall = 0;
+
+    for (pos = 0; pos < len; pos += rc) {
+        rc = http_send(httpc, &buf[pos], len - pos);
+        if (rc < 0) return -1;
+        if (rc == 0) {
+            if (httpc->state >= CSTATE_DONE) return -1;
+            if (++stall > SEND_STALL_MAX) {
+                httpc->state = CSTATE_DONE;
+                return -1;
+            }
+            usleep(SEND_STALL_PAUSE);
+        }
+        else {
+            stall = 0;
+        }
+    }
+
+    return 0;
+}
+
 extern int
 httpprtv(HTTPC *httpc, const char *fmt, va_list args)
 {
     int     rc      = 0;
-    int     pos;
     int     len;
     UCHAR   buf[5120];
 
@@ -45,16 +86,12 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
                     UCHAR te[] = "Transfer-Encoding: chunked\r\n";
                     int te_len = sizeof(te) - 1;
                     http_etoa(te, te_len);
-                    for (pos = 0; pos < te_len; pos += rc) {
-                        rc = http_send(httpc, &te[pos], te_len - pos);
-                        if (rc < 0) goto quit;
-                    }
+                    rc = send_all(httpc, te, te_len);
+                    if (rc < 0) goto quit;
                     /* send the blank line (header terminator) */
                     http_etoa(buf, len);
-                    for (pos = 0; pos < len; pos += rc) {
-                        rc = http_send(httpc, &buf[pos], len - pos);
-                        if (rc < 0) goto quit;
-                    }
+                    rc = send_all(httpc, buf, len);
+                    if (rc < 0) goto quit;
                     /* enable chunk framing for subsequent body data */
                     httpc->chunked = 1;
                     rc = 0;
@@ -65,11 +102,7 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
 
         /* normal path: convert EBCDIC → ASCII and send */
         http_etoa(buf, len);
-        for(pos=0; pos < len; pos+=rc) {
-            rc = http_send(httpc, &buf[pos], len-pos);
-            if (rc<0) goto quit;
-        }
-        rc = 0;
+        rc = send_all(httpc, buf, len);
     }
 
 quit:
