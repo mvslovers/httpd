@@ -64,7 +64,13 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
 
     for (pos = 0; pos < len; pos += rc) {
         rc = send_raw(httpc, &buf[pos], len - pos);
-        if (rc < 0) return -1;      /* send_raw() set CSTATE_DONE */
+        if (rc < 0) {
+            /* set here rather than relying on the caller: the
+               MSG_SEND_UNDERFLOW guard also returns negative, and the
+               invariant below must hold for every path */
+            if (httpc->state < CSTATE_DONE) httpc->state = CSTATE_DONE;
+            return -1;
+        }
         if (rc == 0) {
             /* no progress: EWOULDBLOCK, the only case send_raw()
                still reports as 0 */
