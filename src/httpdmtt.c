@@ -3,6 +3,11 @@
 #include "httpdmsg.h"
 #include "clibmtt.h"
 
+/* C stack for this load module; the @@crt0 default demands 256 KB of
+** contiguous subpool 0 per request.  Must live in the module's own TU,
+** not cgistart.c, which downstream CGI modules autocall too (#196). */
+unsigned __stklen = 64*1024;
+
 #define httpx   (httpd->httpx)
 
 static int display_mtt(HTTPD *httpd, HTTPC *httpc, int data);
