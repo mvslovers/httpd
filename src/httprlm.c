@@ -8,8 +8,8 @@
 ** browser caches Basic credentials under, so a common realm invites it to reuse
 ** them across servers.
 **
-** The SMF ID is the identity httpd already publishes: httpresp() puts it in the
-** Node: response header.  Using it needs no configuration at all.
+** The SMF ID is the name the system already carries for itself, and using it
+** needs no configuration at all.
 **
 ** Kept free of project headers so the trimming and the fallback are host
 ** testable (test/tstrealm.c).
