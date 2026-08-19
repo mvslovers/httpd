@@ -51,8 +51,16 @@ httpresp(HTTPC *httpc, int resp)
         rc = http_printf(httpc, "Server: %s\r\n", p );
         if (rc) goto quit;
     }
+
+    /* Static product banner (#212).  Lives here, not in a CGI: a header only
+    ** half the site sends is worse than none. */
+    rc = http_printf(httpc, "X-Powered-By: MVSLOVERS\r\n");
+    if (rc) goto quit;
+
     /* No address-space identity here: Jobname/Jobid/Node headers named the
-    ** STC to unauthenticated callers and nothing consumed them (#209). */
+    ** STC to unauthenticated callers and nothing consumed them (#209).  A
+    ** static banner like X-Powered-By is a different thing from live system
+    ** state. */
 
     if (httpc->keepalive) {
         rc = http_printf(httpc, "Connection: keep-alive\r\n");
