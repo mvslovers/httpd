@@ -103,6 +103,11 @@ okay:
     rc = http_printf(httpc, "Content-Type: %s\r\n", mime->type);
     if (rc) goto die;
 
+    /* the mvsMF Desktop runs from this DOCROOT; keep the browser from
+    ** second-guessing the declared type (#209) */
+    rc = http_printf(httpc, "X-Content-Type-Options: nosniff\r\n");
+    if (rc) goto die;
+
     /* Content-Length for static UFS files, chunked for SSI */
     if (!httpc->ssi && httpc->ufp) {
         UFS *ufs = http_get_ufs(httpc);

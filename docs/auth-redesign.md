@@ -304,9 +304,10 @@ the token-model note in §4.
   login window. (The object-code salt in `credinit.c` is the `salt == NULL`
   branch and only ever runs in the tests.)
 - **~~Realm~~ source decided — #191:** the realm is no longer the constant
-  `"MVS"`. It is the system's SMF ID (`httprlm()`, `src/httprlm.c`), the same
-  identity `httpresp()` already publishes in the `Node:` header, with `"MVS"`
-  kept only as the fallback for a system that supplies none. That matters
+  `"MVS"`. It is the system's SMF ID (`httprlm()`, `src/httprlm.c`), with
+  `"MVS"` kept only as the fallback for a system that supplies none (the
+  `Node:` response header that used to publish the same identity on every
+  response was removed by #209). That matters
   because the realm is both the text a browser shows the user and — together
   with the origin — the key it caches Basic credentials under, so a constant
   made every httpd on the network one shared protection space. A configurable

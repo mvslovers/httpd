@@ -4,16 +4,10 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
-#include "clibsmf.h"
-#include "clibtiot.h"
-#include "clibssib.h"
 
 extern int
 httpresp(HTTPC *httpc, int resp)
 {
-	UCHAR		*smfid  = (UCHAR*)__smfid();	/* 4 character SMF ID */
-	UCHAR		*jobid  = (UCHAR*)__jobid();	/* 8 character JOB ID */
-	UCHAR		*jobname = (UCHAR*)__jobname(); /* 8 character JOB NAME */
     int     	rc  = 0;
     UCHAR   	*p;
     const char	*status;
@@ -57,18 +51,8 @@ httpresp(HTTPC *httpc, int resp)
         rc = http_printf(httpc, "Server: %s\r\n", p );
         if (rc) goto quit;
     }
-	if (jobname) {
-		rc = http_printf(httpc, "Jobname: %-8.8s\r\n", jobname);
-		if (rc) goto quit;
-	}
-	if (jobid) {
-		rc = http_printf(httpc, "Jobid: %-8.8s\r\n", jobid);
-		if (rc) goto quit;
-	}
-	if (smfid) {
-		rc = http_printf(httpc, "Node: %-4.4s\r\n", smfid);
-		if (rc) goto quit;
-	}
+    /* No address-space identity here: Jobname/Jobid/Node headers named the
+    ** STC to unauthenticated callers and nothing consumed them (#209). */
 
     if (httpc->keepalive) {
         rc = http_printf(httpc, "Connection: keep-alive\r\n");
