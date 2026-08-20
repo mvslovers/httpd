@@ -1,7 +1,8 @@
 /* TSTREALM.C
-** Tests for httprlm() -- the Basic-auth realm built from the SMF ID (#191).
+** Tests for httprlm() -- the Basic-auth realm built from the SMF ID (#191) --
+** and for httprlm_ok(), the gate on the Parmlib's REALM override (#193).
 **
-** httprlm() is free of project headers, so this is a DUAL test: it runs
+** Both are free of project headers, so this is a DUAL test: it runs
 ** natively via `make test-host` and on MVS via `make test-mvs`.
 **
 ** The cases that matter are the degenerate ones.  __smfid() hands over a fixed
@@ -64,6 +65,39 @@ int main(void)
         guard[1] = 'Y';
         httprlm("MVSC", guard, 0);
         CHECK(guard[0] == 'X', "outlen 0 writes nothing");
+    }
+
+    /* httprlm_ok() -- the gate on the REALM keyword (#193).  The value lands
+       inside the quoted-string of the WWW-Authenticate challenge and in the
+       login form's HTML, so what would break either framing is refused. */
+    CHECK(httprlm_ok("MVSC"), "an SMF-ID-like name is accepted");
+    CHECK(httprlm_ok("MVS Development System"),
+          "a multi-word name with blanks is accepted");
+    CHECK(httprlm_ok("M"), "a single character is accepted");
+
+    CHECK(!httprlm_ok(NULL), "NULL is refused");
+    CHECK(!httprlm_ok(""), "empty is refused (realm is required, RFC 7617)");
+
+    CHECK(!httprlm_ok("a\"b"), "double quote refused (quoted-string framing)");
+    CHECK(!httprlm_ok("a\\b"), "backslash refused (quoted-string escaping)");
+    CHECK(!httprlm_ok("a<b"), "'<' refused (login form HTML)");
+    CHECK(!httprlm_ok("a>b"), "'>' refused (login form HTML)");
+    CHECK(!httprlm_ok("a&b"), "'&' refused (login form HTML)");
+    CHECK(!httprlm_ok("a\rb"), "CR refused (header injection)");
+    CHECK(!httprlm_ok("a\nb"), "LF refused (header injection)");
+    CHECK(!httprlm_ok("a\tb"), "control character refused");
+
+    /* the length limit, exactly at the boundary */
+    {
+        char long_name[HTTP_REALM_CFG_MAX + 2];
+
+        memset(long_name, 'A', sizeof(long_name));
+        long_name[HTTP_REALM_CFG_MAX] = '\0';
+        CHECK(httprlm_ok(long_name), "HTTP_REALM_CFG_MAX characters accepted");
+
+        long_name[HTTP_REALM_CFG_MAX] = 'A';
+        long_name[HTTP_REALM_CFG_MAX + 1] = '\0';
+        CHECK(!httprlm_ok(long_name), "one character over the limit refused");
     }
 
     return mbt_test_summary("TSTREALM");

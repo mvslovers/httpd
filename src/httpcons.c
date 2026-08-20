@@ -272,6 +272,7 @@ d_config(char *buf)
         httpd->docroot[0] ? httpd->docroot : "(NONE)");
     wtof(MSG_D_CFG_CODEPAGE,
         httpd->codepage[0] ? httpd->codepage : "CP037");
+    wtof(MSG_D_CFG_REALM, httpd->cfg_realm);
     wtof(MSG_D_CFG_SMF, (int)httpd->smf_type, levels[httpd->smf_level]);
     wtof(MSG_D_CFG_SOURCE, parmlib_name(name, sizeof(name)));
 

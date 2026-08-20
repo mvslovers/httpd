@@ -261,13 +261,13 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>%d</td></tr>\n", 
         O(listen), httpd->listen);
 
-    /* stats file handle removed in 4.0.0 — SMF recording */
+    /* stats file handle removed in 4.0.0; slot reused by #193 */
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_1c</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_1c), httpd->unused_1c);
+        "<td>httpd->cfg_realm</td>"
+        "<td>Basic realm / server name</td>"
+        "<td>%s</td></tr>\n",
+        O(cfg_realm), httpd->cfg_realm ? httpd->cfg_realm : "(NULL)");
 
     if (httpd->dbg) {
         http_printf(httpc,

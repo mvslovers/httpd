@@ -331,6 +331,10 @@
 /** HTTPD135I DISPLAY CONFIG, credential hard max-age; 0 disables it (#118) */
 #define MSG_D_CFG_MAXAGE	"HTTPD135I SESSION_MAXAGE %d MIN%s"
 
+/** HTTPD136I DISPLAY CONFIG, Basic realm / server name (#193): the REALM
+ *  keyword's value, or the system's SMF ID when the Parmlib names none */
+#define MSG_D_CFG_REALM		"HTTPD136I REALM %s"
+
 /** HTTPD140I DISPLAY VERSION */
 #define MSG_D_VERSION		"HTTPD140I HTTPD %s (%s)"
 
@@ -492,6 +496,9 @@
 
 /** HTTPD423W the location table is full or the prefix is a duplicate */
 #define MSG_LOC_NOT_REG		"HTTPD423W UNABLE TO REGISTER LOCATION %s"
+
+/** HTTPD424W REALM refused by httprlm_ok() (#193); the SMF ID default stays */
+#define MSG_CFG_BAD_REALM	"HTTPD424W INVALID REALM VALUE: %.40s"
 
 /*
  * HTTPD43x -- SMF.  Split off HTTPD415W, which "LOC= requires a path"

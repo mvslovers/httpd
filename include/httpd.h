@@ -79,7 +79,8 @@ struct httpd {
     unsigned    addr;               /* 10 our listener IP address   */
     int         port;               /* 14 our listener port         */
     int         listen;             /* 18 our listener socket       */
-    void        *unused_1c;         /* 1C (was: FILE *stats)        */
+    const char  *cfg_realm;         /* 1C realm/server name (#193)  */
+                                    /* ... always set after config  */
 
     FILE        *dbg;               /* 20 debug/trace output        */
     int         tzoffset;           /* 24 time zone offset in secs  */

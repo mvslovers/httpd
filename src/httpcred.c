@@ -1,6 +1,7 @@
 /* HTTPCRED.C - process login request */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "httprlm.h"    /* HTTP_REALM_CFG_MAX (#193) */
 
 #define httpx   (httpd->httpx)
 
@@ -277,6 +278,7 @@ process_get(HTTPD *httpd, HTTPC *httpc)
 	CREDID  id;
 	char	*buf;
 	size_t	len;
+	char	title[HTTP_REALM_CFG_MAX + 32];
 #if 0	
 	wtof("httpcred.c:process_get() path=%s", path ? path : "(null)");
 #endif	
@@ -345,7 +347,14 @@ process_get(HTTPD *httpd, HTTPC *httpc)
 	}
 
 send_login:
-	rc = print_login(httpd, httpc, "Login Required");
+	/* The form names the system like the Basic challenge does (#193): the
+	   browser's credential dialog shows the realm, and a form that said
+	   nothing gave the same server two identities depending on which
+	   challenge the client got.  cfg_realm is settled in http_config()
+	   before the listener starts, so it is never NULL here. */
+	snprintf(title, sizeof(title), "Login Required &mdash; %s",
+	         httpd->cfg_realm);
+	rc = print_login(httpd, httpc, title);
 
 quit:    
     return rc;
