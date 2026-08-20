@@ -6,7 +6,7 @@
 ** All accessors are NULL-credential safe (an unauthenticated request has
 ** httpc->cred == NULL).  Exported through the HTTPX vector (append-only):
 **   http_get_userid  http_get_acee  http_get_token  http_check_auth
-**   http_logout  http_get_password
+**   http_logout  http_get_password  http_realm
 **
 ** Each function carries a >8-char C name, so it needs an explicit &FUNC CSECT
 ** name (matching its asm() alias) and an #undef to shed the httpx macro layer
@@ -243,4 +243,26 @@ http_get_password(HTTPC *httpc, UCHAR *out, unsigned outlen)
     memset(plain, 0, sizeof(plain));   /* scrub the local plaintext copy */
 
     return out;
+}
+
+/* http_realm() - the settled Basic realm / server name: the Parmlib's REALM
+** value, or the SMF ID when none is configured (#191, #193).  Never NULL or
+** empty after http_config(), so a caller needs no fallback.
+**
+** Exported for modules that send their OWN WWW-Authenticate challenge (mvsMF
+** does -- its 401s never pass through auth_required_response()).  A browser
+** caches Basic credentials under (origin, realm), and server and module answer
+** on the same origin: a module deriving its own realm splits that origin into
+** two protection spaces the moment REALM is configured (mvsmf#330).  This
+** accessor is the one source both challenges draw from.
+**
+** The string lives in httpd's static storage (httpprm.c) for the life of the
+** address space, so returning the pointer into another GRT is safe. */
+__asm__("\n&FUNC SETC 'HTTPGRLM'");
+#undef http_realm
+const char *
+http_realm(HTTPD *httpd)
+{
+    if (!httpd) return NULL;
+    return httpd->cfg_realm;
 }
