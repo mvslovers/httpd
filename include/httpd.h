@@ -79,7 +79,8 @@ struct httpd {
     unsigned    addr;               /* 10 our listener IP address   */
     int         port;               /* 14 our listener port         */
     int         listen;             /* 18 our listener socket       */
-    void        *unused_1c;         /* 1C (was: FILE *stats)        */
+    const char  *cfg_realm;         /* 1C realm/server name (#193)  */
+                                    /* ... always set after config  */
 
     FILE        *dbg;               /* 20 debug/trace output        */
     int         tzoffset;           /* 24 time zone offset in secs  */
@@ -552,6 +553,8 @@ struct httpx {
                                     /* 138 end client session       */
     UCHAR *     (*http_get_password)(HTTPC *, UCHAR *out, unsigned outlen);
                                     /* 13C client password into buf */
+    const char *(*http_realm)(HTTPD *);
+                                    /* 140 settled Basic realm (#193) */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -633,6 +636,7 @@ extern int http_check_auth(HTTPC *, const char *classname,
                            const char *resource, int attr)                asm("HTTPCKAU");
 extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");
 extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("HTTPGPWD");
+extern const char *http_realm(HTTPD *)                                     asm("HTTPGRLM");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
@@ -882,6 +886,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_get_password(httpc,out,outlen) \
     ((httpx->http_get_password)((httpc),(out),(outlen)))
+
+#define http_realm(httpd) \
+    ((httpx->http_realm)((httpd)))
 
 #endif  /* ifndef HTTPX_H */
 

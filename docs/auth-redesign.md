@@ -310,8 +310,10 @@ the token-model note in §4.
   response was removed by #209). That matters
   because the realm is both the text a browser shows the user and — together
   with the origin — the key it caches Basic credentials under, so a constant
-  made every httpd on the network one shared protection space. A configurable
-  name (and whether the login form should carry it) is **#193**; after #121 the
+  made every httpd on the network one shared protection space. **#193 settled
+  the two remaining pieces:** the Parmlib's `REALM` keyword overrides the SMF
+  ID default, and the login form carries the same name — one identity whichever
+  challenge the client gets. After #121 the
   realm is emitted only on `AUTH=BASIC` and inherited routes, since `AUTH=TOKEN`
   sends no challenge at all.
 - **~~LTPA fidelity~~ decided (2026-07-04):** `LtpaToken2` carries our **opaque**

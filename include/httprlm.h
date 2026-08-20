@@ -16,6 +16,11 @@
 /* Longest realm this produces: 4 SMF characters or the fallback, + NUL. */
 #define HTTP_REALM_MAX 8
 
+/* Longest realm the REALM keyword may configure (#193), excluding the NUL.
+** Bounds the static buffer the settled realm lives in (httpprm.c) and the
+** stack buffer the login form's title is composed in (httpcred.c). */
+#define HTTP_REALM_CFG_MAX 64
+
 /* httprlm() - copy the realm into out and return out.
 **
 ** smfid points at the 4-character, blank-padded, NOT NUL-terminated SMF ID as
@@ -30,5 +35,21 @@
 ** rather than overflowing.
 */
 char *httprlm(const char *smfid, char *out, unsigned outlen);
+
+/* httprlm_ok() - true if s is acceptable as a configured realm (#193).
+**
+** The value lands in two framings the parser cannot see from here: inside the
+** quoted-string of `WWW-Authenticate: Basic realm="..."`, and in the login
+** form's HTML.  Rather than escaping per consumer, the characters that would
+** break either framing are refused outright -- none of them belongs in a
+** human-readable system name:
+**
+**   - empty or NULL: realm is a required parameter (RFC 7617)
+**   - longer than HTTP_REALM_CFG_MAX
+**   - control characters (anything below ' ', so also CR/LF)
+**   - '"' and '\' (quoted-string framing and escaping)
+**   - '<', '>' and '&' (HTML)
+*/
+int httprlm_ok(const char *s);
 
 #endif /* HTTPRLM_H */

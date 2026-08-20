@@ -9,6 +9,7 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"       /* operator message catalog                    */
+#include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
 #include "httpxlat.h"
 #include "clibdsab.h"       /* get_dsab()  -- DD -> DSAB                    */
 #include "ieftiot.h"        /* TIOTDD      -- DSAB -> TIOT entry            */
@@ -75,6 +76,12 @@ fallback:
     return buf;
 }
 
+/* The settled Basic realm / server name (#193).  The HTTPD block carries only
+** the cfg_realm pointer; the value lives here for the life of the address
+** space -- the REALM keyword's value, or the httprlm() result when the
+** Parmlib names none.  Static, so no allocation can fail on this path. */
+static char cfg_realm_buf[HTTP_REALM_CFG_MAX + 1];
+
 /* Forward declarations */
 static void set_defaults(HTTPD *httpd);
 static void parse_line(HTTPD *httpd, char *line);
@@ -123,6 +130,15 @@ http_config(HTTPD *httpd, const char *member)
             parse_line(httpd, line);
         }
         fclose(fp);
+    }
+
+    /* The Basic realm / server name: the REALM keyword's value, or the
+       system's SMF ID when the Parmlib names none (#193, #191).  Settled once
+       here, so every consumer -- the WWW-Authenticate challenge, the login
+       form, D CONFIG -- reports the same name, and none needs a fallback. */
+    if (!httpd->cfg_realm) {
+        httpd->cfg_realm = httprlm((const char *)__smfid(),
+                                   cfg_realm_buf, sizeof(cfg_realm_buf));
     }
 
     /* A route that asked for an auth policy but did not get one is fail-open
@@ -220,6 +236,7 @@ set_defaults(HTTPD *httpd)
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
     httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
+    httpd->cfg_realm             = NULL;    /* settled after the parse (#193) */
 
     /* Hard max-age (#118): an actively used session outlives the idle TTL
        forever, so without this a credential cached at login stays valid --
@@ -364,6 +381,20 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
     }
     else if (strcmp(key, "LOGIN") == 0) {
         parse_login(httpd, value);
+    }
+    else if (strcmp(key, "REALM") == 0) {
+        /* Basic realm / server name (#193), defaulting to the SMF ID (#191).
+           The value lands inside the quoted-string of the WWW-Authenticate
+           challenge and in the login form's HTML, so httprlm_ok() refuses
+           the characters that would break either framing (see httprlm.h)
+           rather than escaping them per consumer. */
+        if (httprlm_ok(value)) {
+            strcpy(cfg_realm_buf, value);   /* httprlm_ok() bounds the length */
+            httpd->cfg_realm = cfg_realm_buf;
+        }
+        else {
+            wtof(MSG_CFG_BAD_REALM, value);
+        }
     }
     else if (strcmp(key, "TZOFFSET") == 0) {
         /* Retired (issue #145).  It is accepted and ignored rather than

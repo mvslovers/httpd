@@ -4,8 +4,6 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 
-#include "httprlm.h"   /* realm from the SMF ID (#191) */
-
 static int  needs_login(HTTPC *httpc, HTTPCGI *cgi);
 static void resolve_credential(HTTPC *httpc);
 static void auth_gate(HTTPC *httpc, HTTPCGI *route);
@@ -498,14 +496,14 @@ auth_required_response(HTTPC *httpc, UCHAR mode)
 
 	http_resp(httpc, 401);
 	if (challenge) {
-		char realm[HTTP_REALM_MAX];
-
-		/* The realm names the system, not the product (#191).  It is what the
+		/* The realm names the system, not the product: the SMF ID by default
+		   (#191), or the Parmlib's REALM value (#193) -- settled once in
+		   http_config(), so it is always non-NULL here.  It is what the
 		   browser shows the user, and together with the origin it is the key it
 		   caches the credentials under -- so a constant would make every httpd
 		   on the network one shared protection space. */
 		http_printf(httpc, "WWW-Authenticate: Basic realm=\"%s\"\r\n",
-		            httprlm((const char *)__smfid(), realm, sizeof(realm)));
+		            httpc->httpd->cfg_realm);
 	}
 	http_printf(httpc, "Cache-Control: no-store\r\n");
 	http_printf(httpc, "Content-Type: text/plain\r\n");

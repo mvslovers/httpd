@@ -11,8 +11,11 @@
 ** The SMF ID is the name the system already carries for itself, and using it
 ** needs no configuration at all.
 **
-** Kept free of project headers so the trimming and the fallback are host
-** testable (test/tstrealm.c).
+** httprlm_ok() gates the Parmlib's REALM override of that default (#193) --
+** see httprlm.h for what it refuses and why.
+**
+** Kept free of project headers so the trimming, the fallback and the gate are
+** host testable (test/tstrealm.c).
 */
 #include "httprlm.h"
 
@@ -45,4 +48,21 @@ httprlm(const char *smfid, char *out, unsigned outlen)
     out[n] = '\0';
 
     return out;
+}
+
+int
+httprlm_ok(const char *s)
+{
+    unsigned n;
+
+    if (!s || !s[0]) return 0;      /* realm is required (RFC 7617) */
+
+    for (n = 0; s[n]; n++) {
+        if (n >= HTTP_REALM_CFG_MAX) return 0;
+        if ((unsigned char)s[n] < ' ') return 0;    /* controls, incl CR/LF */
+        if (s[n] == '"' || s[n] == '\\') return 0;  /* quoted-string framing */
+        if (s[n] == '<' || s[n] == '>' || s[n] == '&') return 0;    /* HTML */
+    }
+
+    return 1;
 }

@@ -23,6 +23,7 @@ HTTPD130I SESSION_TIMEOUT 60 MIN
 HTTPD135I SESSION_MAXAGE 480 MIN
 HTTPD131I DOCROOT /wwwroot
 HTTPD134I CODEPAGE CP037
+HTTPD136I REALM MVSC
 HTTPD132I SMF TYPE 128 LEVEL ALL
 HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
 ```
@@ -85,6 +86,25 @@ When `LOGIN=RACF`, unauthenticated requests to protected resources receive a red
 
 `LOGIN` remains the global default. Individual routes can override it and add a
 resource check with the per-route `AUTH=` / `RES=` options (see below).
+
+### Server name (`REALM`)
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `REALM` | the system's SMF ID | Human-readable server name, up to 64 characters. Sent as the realm of the `WWW-Authenticate: Basic` challenge and shown on the login form. |
+
+The default names the system unambiguously (`MVSC` on the reference system) but
+says nothing to a user; `REALM=MVS Development System` would. The value may not
+contain `"`, `\`, `<`, `>`, `&` or control characters — it lands inside the
+quoted-string of the Basic challenge and in the login form's HTML, and the
+server refuses what would break either framing rather than escaping it
+(`HTTPD424W`; the default stays).
+
+The realm is more than a label: together with the origin it is the key a
+browser caches Basic credentials under. There is deliberately no per-route
+`REALM=` — distinct realms would give the browser distinct credential caches
+per route, which is easy to add later and hard to withdraw once someone relies
+on it.
 
 ### Session lifetime (`SESSION_TIMEOUT`, `SESSION_MAXAGE`)
 
@@ -452,6 +472,7 @@ KEEPALIVE_TIMEOUT=5
 KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
 LOGIN=RACF
+REALM=MVS Development System
 SESSION_TIMEOUT=30
 SESSION_MAXAGE=480
 MOD=MVSMF /zosmf/*

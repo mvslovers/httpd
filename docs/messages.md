@@ -141,7 +141,7 @@ Everything in this range is written because an operator asked for it, so the
 | `HTTPD121I`, `HTTPD122I` | `D LOGIN` | Logged-in users and their ACEE addresses. |
 | `HTTPD123I`, `HTTPD124I` | `D STATS` | SMF level and the request/error/byte/active counters. |
 | `HTTPD125I`, `HTTPD126I`, `HTTPD126E`, `HTTPD127W` | `S STATS` | Counter reset, level change, and the two operand errors. |
-| `HTTPD128I`–`HTTPD135I` | `D CONFIG` | Port, task limits, timeouts, session lifetime (idle and max-age), document root, codepage, SMF, and which Parmlib member was read. |
+| `HTTPD128I`–`HTTPD136I` | `D CONFIG` | Port, task limits, timeouts, session lifetime (idle and max-age), document root, codepage, realm/server name, SMF, and which Parmlib member was read. |
 | `HTTPD140I` | `D VERSION` | Version and build commit. |
 | `HTTPD142I`, `HTTPD143I` | `D TIME` | GMT and local time with the offset in minutes. |
 | `HTTPD144E`–`HTTPD148I` | `D MEMORY` | Address out of range, end of dump, ESTAE failure, an abend while reading, and the usage line. Reading storage is done under recovery, so a bad address is caught rather than fatal. |
@@ -192,6 +192,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD421W` | `MOD= REQUIRES A PROGRAM NAME` | The line is skipped. |
 | `HTTPD422W` | `x IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON` | `RECLAIM=` no longer does anything (#175). |
 | `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | Table full or duplicate prefix. That prefix will not be served. |
+| `HTTPD424W` | `INVALID REALM VALUE: v` | The `REALM` value is empty, longer than 64 characters, or contains `"`, `\`, `<`, `>`, `&` or a control character — it lands inside the quoted-string of the Basic challenge and in the login form's HTML, so those are refused. The SMF ID default stays. |
 | `HTTPD430I` | `SMF TYPE n LEVEL l` | Reported by `D CONFIG`, not at start. |
 | `HTTPD430W` | `SMF TYPE n CONFIGURED BUT SMF INACTIVE` | Written at start: records are being produced for a writer that is not there. Either start SMF or set `SMF NONE`. |
 | `HTTPD431W` | `INVALID SMF LEVEL "l"` | Not `NONE`/`ERROR`/`AUTH`/`ALL`. |

@@ -312,6 +312,10 @@ struct httpx {
                                     /* 138 end client session           */
     UCHAR *     (*http_get_password)(HTTPC *, UCHAR *out, unsigned outlen);
                                     /* 13C client password into buf     */
+    const char *(*http_realm)(HTTPD *);
+                                    /* 140 settled Basic realm: REALM   */
+                                    /* keyword or the SMF ID, never     */
+                                    /* NULL (httpd#191, #193)           */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -629,5 +633,8 @@ struct httpx {
 
 #define http_get_password(httpc,out,outlen) \
     ((httpx->http_get_password)((httpc),(out),(outlen)))
+
+#define http_realm(httpd) \
+    ((httpx->http_realm)((httpd)))
 
 #endif /* HTTPCGI_H */
