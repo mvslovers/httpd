@@ -86,7 +86,7 @@ httppcgi(HTTPC *httpc, HTTPCGI *cgi)
         ** here means the module never ran (#131). */
         switch (rc) {
         case HTTP_LINK_ENOLOAD:
-            reason = "could not be loaded (not found in STEPLIB?)";
+            reason = "could not be loaded";
             break;
         case HTTP_LINK_ENOPGM:
             reason = "was dispatched without a program name";

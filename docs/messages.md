@@ -211,7 +211,7 @@ surrounding log and what the client was doing.
 | `HTTPD905E` | `ENVIRONMENT VARIABLE v TOO LARGE CLIENT(c)` | The value exceeds what an `HTTPV` holds. |
 | `HTTPD906W` | `STORAGE RECLAIM FOR pgm FAILED, RC=n` | A CGI's subpool survived it. Storage leaks until restart. |
 | `HTTPD907W` | `STALE BUSY ENTRY FOR CLIENT(c) … -- CLEARED` | A busy-list entry outlived its request; cleared and processing resumed. |
-| `HTTPD908E` | `EXTERNAL PROGRAM pgm reason` | The CGI could not be linked — usually not in the STEPLIB, or not APF authorized. |
+| `HTTPD908E` | `EXTERNAL PROGRAM pgm reason` | The CGI could not be linked — `reason` says why. An abend after loading is reported with its code; a load failure carries none — the console log has the cause (e.g. `IEA703I` for a storage failure). |
 | `HTTPD909E` | `UNSUPPORTED HTTP STATUS n REQUESTED, SENT 500` | A handler asked for a status code this build has no reason phrase for. See `httpstat.c`. |
 | `HTTPD910E` | `ABEND Sxxx DETECTED` / `ABEND Unnnn DETECTED` | The main task's recovery caught an abend. |
 | `HTTPD911E` | `func LOCK FAILURE` | A lock could not be taken. |
