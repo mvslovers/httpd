@@ -1,6 +1,11 @@
 # HTTPD / mvsMF / ftpd Identity — Analysis & Redesign
 
-**Status:** design / planning (2026-08-17). Phase 1 in progress.
+**Status:** design / planning (2026-08-17); Phase 1 status refreshed 2026-08-20.
+Phase 1 is **2 of 4 done** — mvslovers/mvsmf#228 and #229 both landed
+2026-08-19. Still open: httpd#137, ftpd#97 / ufsd#65, and the **restjobs
+policy**, which §3.1 item 2 asked for, #229 did not cover, and which has no
+ticket. Phase 2 is not actionable: MVS-sysgen/RAKF#5, #6 and #8 are all open
+and uncommented.
 **Scope:** the *identity* story across **httpd**, **mvsMF**, **ftpd** (and, for
 the resting identity, **ufsd**): which ACEE an authorization decision runs
 under, what identity the address space rests on, and what changes without RAKF
@@ -139,21 +144,34 @@ rather than removing the switch.
 
 ### 3.1 Phase 1 — no RAKF changes
 
-1. **mvsMF: explicit authorization** (mvslovers/mvsmf#228) — the keystone.
-   `http_check_auth()` before each dataset operation (work list in the ticket).
-   Yields 403 with a z/OSMF-shaped body instead of S913 → 500, stops the
-   routine abends, and thereby cuts the §1.5 chain at link 1. Release gate for
-   mvsMF 1.0.0. Includes correcting the stale self-gating rationale comment in
-   `mvsmf.c`.
-2. **mvsMF: enumeration policy** (mvslovers/mvsmf#229) — the listing path opens
-   nothing, so nothing checks it; decide (gate per entry, gate the level, or
-   deliberately open) and keep refusals indistinguishable from "does not
-   exist". Decide the **restjobs** policy the same way (the mvsMF mirror of
-   ftpd#90 — spool access has no platform authorization model).
-3. **httpd: `RES=` startup warning** (httpd#137) — a route naming an undefined
-   resource currently fails open silently; probe at parse time and warn.
-4. **ftpd/ufsd resting identity** — ftpd#97 (replace the hardcoded
-   `FTPD`/`USER` with PARM keywords), ufsd#65 (adopt the startup logon).
+1. ✅ **(done — mvslovers/mvsmf#228, PR #316)** **mvsMF: explicit
+   authorization** — the keystone. `http_check_auth()` before each dataset
+   operation, through a `require_access()` wrapper at ten call sites in
+   `dsapi.c`. Member operations authorize on the **library** (RACF has no
+   member granularity), a rename checks both names, and every check runs ahead
+   of the first catalog or VTOC access, so a refusal cannot be told from "does
+   not exist". A denial answers the reference's `500` / category 4 body instead
+   of S913 → the generic abend one, which cuts the §1.5 chain at link 1.
+   **Left open:** `datasetCreateHandler` (POST) uses SVC 99, not an OPEN, so it
+   fell outside the site list — the only data set-mutating operation still
+   without an explicit check.
+2. ✅ **(decided — mvslovers/mvsmf#229)** **mvsMF: enumeration policy** — the
+   listing stays open, deliberately. Measured against the reference: real
+   z/OSMF lists a data set with full attributes to a userid that provably
+   cannot open it, so gating per entry would make mvsMF stricter than the thing
+   it clones and put a RACHECK per entry on the request path. Recorded as a
+   decision in mvsMF's `CLAUDE.md`; the constraint stands if it is revisited —
+   a refusal must not be distinguishable from "does not exist".
+   ⬜ **The restjobs half is undecided and untracked** (the mvsMF mirror of
+   ftpd#90 — spool access has no platform authorization model). `jobsapi.c`
+   carries no authorization check at all.
+3. ⬜ **httpd: `RES=` startup warning** (httpd#137) — a route naming an
+   undefined resource currently fails open silently; probe at parse time and
+   warn. Two halves, and only one needs a decision: whether fail-open stays is
+   a policy call, the startup warning is implementable either way.
+4. ⬜ **ftpd/ufsd resting identity** — ftpd#97 (replace the hardcoded
+   `FTPD`/`USER` with PARM keywords), ufsd#65 (adopt the startup logon). Both
+   still open; httpd has had its startup logon since #177.
 5. **Keep mvsMF's ambient switch.** It is the second net (§2); removing it in
    phase 1 would maximize the window with neither net.
 
