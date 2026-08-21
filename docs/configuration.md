@@ -234,9 +234,23 @@ serves a file or dispatches a CGI:
 
 > **A `RES=` resource with no profile defined permits the access.** That is
 > standard SAF behaviour — an undefined resource is "not protected", not
-> "denied" — so a typo in the class or resource name silently disables stage 2
-> for that route rather than locking it. `DEBUG 1` traces every such check, so
-> verify a new `RES=` route against the debug log before relying on it.
+> "denied" — so a typo in the class or resource name disables stage 2 for that
+> route rather than locking it.
+>
+> It does not disable it *quietly*, though. The server probes every `RES=`
+> resource once at start and writes `HTTPD425W` naming the route and the
+> resource it found no profile for, so the misconfiguration is visible in the
+> job log while it can still be fixed. `DEBUG 1` traces the same condition per
+> request. `AUTH=NONE` routes are not probed — `HTTPD414W` already reports
+> those.
+>
+> The probe asks only whether a profile *exists*, which is why it can run under
+> the server's own identity instead of a client's: an uncovered resource
+> answers "not protected" whoever asks, and the identity decides only between
+> "permitted" and "refused", both of which mean a profile is there. Only "not
+> protected" produces the message, so the check cannot warn falsely — on a
+> system with no security product every resource reports as permitted and it
+> simply stays silent.
 
 **A route that carries an auth policy is registered or the server does not
 start.** Dropping it is not a safe fallback: the route does not disappear, its

@@ -11,6 +11,7 @@
 
 #include "httpd.h"
 #include "httpdmsg.h"               /* operator message catalog         */
+#include "httpracf.h"               /* HTTP_RACF_NOTPROT (res_probe)    */
 #include "clibgrt.h"
 #include "clibsock.h"
 #include "clibver.h"                /* libc370_version()                */
@@ -146,6 +147,63 @@ stc_identity_restore(HTTPD *httpd)
 	httpd->stc_prev_acee = NULL;
 }
 
+/* res_probe() - say once, at start, that a RES= route names a resource no
+** profile covers.
+**
+** Stage 2 of auth_gate() permits every request to such a route: SAF answers
+** rc 4 ("resource not protected"), httpracf() counts that as allowed, and
+** #136 settled deliberately on keeping it that way.  But rc 4 is also exactly
+** what a typo in the class or in the resource name looks like, and the one
+** keyword whose whole job is authorization should not fail quietly in the
+** permissive direction (#137).  The decision itself is unchanged here -- this
+** only makes the misconfiguration visible while it can still be fixed.
+**
+** DEBUG 1 already traces the same condition (httpxauth.c), but per request and
+** only for someone who knew to look.  This line is unconditional and lands in
+** the job log and the Master Trace Table.
+**
+** The probe runs under the server's own resting identity -- HTTPD/USER after
+** stc_identity(), since acee == NULL takes RACHECK's ASXBSENV fallback -- and
+** not under a client's.  That is enough because it asks only whether a profile
+** EXISTS: measured against RAKF, an uncovered resource answers 4 whoever asks,
+** and the identity moves the answer only between 0 and 8, both of which mean a
+** profile is there.  That is a RAKF property and not a SAF one: under RACF
+** with PROTECTALL the same resource answers 8 for an ordinary user and 0 for a
+** SPECIAL one (see the RACHECK return codes in libc370 racauth.c), and MVS
+** 3.8j with no security product at all answers 0.  Only rc 4 warns, so on
+** either of those this stays silent rather than warning falsely.
+**
+** AUTH=NONE routes are skipped: auth_gate() never reaches stage 2 for them and
+** HTTPD414W has already said the RES= is ignored.  parse_kv_tail() leaves
+** resclass set on such a route rather than clearing it, so this test is live
+** code, not a defensive one.
+**
+** Cost is one RACHECK per RES= route, once -- and it audits nothing, now that
+** libc370#63 has racf_auth() setting LOG=NONE instead of DSTYPE=V.
+*/
+static void
+res_probe(HTTPD *httpd)
+{
+	unsigned	count;
+	unsigned	n;
+
+	if (!httpd->httpcgi) return;
+
+	count = array_count(&httpd->httpcgi);
+	for (n = 0; n < count; n++) {
+		HTTPCGI *cgi = httpd->httpcgi[n];
+
+		if (!cgi || !cgi->resclass || !cgi->resname) continue;
+		if (cgi->auth == HTTP_AUTH_NONE) continue;
+
+		if (racf_auth(NULL, cgi->resclass, cgi->resname, cgi->resattr)
+		    == HTTP_RACF_NOTPROT) {
+			wtof(MSG_RES_NO_PROFILE,
+			     cgi->resclass, cgi->resname, cgi->path);
+		}
+	}
+}
+
 static void
 initialize(int argc, char **argv)
 {
@@ -253,6 +311,12 @@ initialize(int argc, char **argv)
 	if (httpd->smf_level > SMF_LEVEL_NONE && !smf_active()) {
 		wtof(MSG_SMF_INACTIVE, (int)httpd->smf_type);
 	}
+
+	/* Same shape, same reason: a RES= route whose resource has no profile is
+	** configured for an authorization that cannot happen.  The routes exist
+	** only once http_config() has parsed them, and there is no way to reload
+	** the Parmlib, so this is the one point that needs it (#137). */
+	res_probe(httpd);
 
     /* create socket thread */
     httpd->socket_thread = cthread_create_ex(socket_thread,

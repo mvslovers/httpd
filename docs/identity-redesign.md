@@ -165,10 +165,18 @@ rather than removing the switch.
    ⬜ **The restjobs half is undecided and untracked** (the mvsMF mirror of
    ftpd#90 — spool access has no platform authorization model). `jobsapi.c`
    carries no authorization check at all.
-3. ⬜ **httpd: `RES=` startup warning** (httpd#137) — a route naming an
-   undefined resource currently fails open silently; probe at parse time and
-   warn. Two halves, and only one needs a decision: whether fail-open stays is
-   a policy call, the startup warning is implementable either way.
+3. ✅ **httpd: `RES=` startup warning** (httpd#137) — both halves settled.
+   **Fail-open stays**: making `RES=` deny on an undefined profile is precisely
+   the outage #136 removed (`RES=FACILITY:MVSMF.ACCESS` on a system without
+   that profile would 403 every `/zosmf/*` request), and a Parmlib knob for it
+   is opt-in to the same outage with nobody asking for it. What changes is that
+   it no longer fails open *quietly*: `res_probe()` RACHECKs every `RES=`
+   resource once after the Parmlib is parsed and writes `HTTPD425W` for each
+   one no profile covers. It probes for *existence*, which is why the server's
+   own identity suffices — an uncovered resource answers 4 whoever asks, and
+   identity only moves the answer between 0 and 8, both meaning a profile is
+   there. Should a hardened system ever want fail-closed, it is one line in
+   `auth_gate()` and this warning becomes the error.
 4. ⬜ **ftpd/ufsd resting identity** — ftpd#97 (replace the hardcoded
    `FTPD`/`USER` with PARM keywords), ufsd#65 (adopt the startup logon). Both
    still open; httpd has had its startup logon since #177.
