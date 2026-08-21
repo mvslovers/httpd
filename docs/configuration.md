@@ -78,14 +78,49 @@ All static content (HTML, CSS, JS, images) is served from this directory. Server
 
 ## Security
 
-| Keyword | Default | Description |
-|---------|---------|-------------|
-| `LOGIN` | NONE | Authentication mode. `NONE` = no authentication required. `RACF` = cookie-based RACF authentication with the built-in login page. |
+**Authentication is declared per route and nowhere else.** Each `MOD=` / `LOC=`
+line carries its own `AUTH=` mode and optional `RES=` resource check (see
+*Per-route auth policy* below). There is no server-wide authentication keyword:
+a route is gated because it says so, and a request that matches no route at all
+is public.
 
-When `LOGIN=RACF`, unauthenticated requests to protected resources receive a redirect to the login page. After successful RACF authentication, a `Sec-Token` cookie is issued. Sessions are bound to the client's IP address.
+A path that must not be public therefore needs a route, even when no CGI serves
+it — that is what `LOC=` is for:
 
-`LOGIN` remains the global default. Individual routes can override it and add a
-resource check with the per-route `AUTH=` / `RES=` options (see below).
+```
+LOC=/admin/*  AUTH=BASIC RES=FACILITY:HTTPD.ADMIN
+LOC=/*        AUTH=FORM
+```
+
+Successful authentication issues a `Sec-Token` cookie; sessions are bound to the
+client's IP address.
+
+### `LOGIN` is retired
+
+The `LOGIN` keyword set a global bitmask (`ALL`, `CGI`, `GET`, `HEAD`, `POST`,
+`NONE`) that routes without their own `AUTH=` inherited. It is gone: two
+overlapping policies is exactly the divergence the per-route redesign removed,
+and the bitmask gated by HTTP method while `AUTH=` gates by route, so the two
+never lined up.
+
+A member that still carries it is handled by what the operand said, because the
+two cases fail in opposite directions:
+
+| Line | Result |
+|------|--------|
+| `LOGIN=NONE`, or `LOGIN` with no operand | `HTTPD048W`, ignored — `NONE` was the default, so nothing changes |
+| `LOGIN=ALL` / `CGI` / `GET` / `HEAD` / `POST`, or an unrecognized operand | `HTTPD048E` + `HTTPD420E`, **the server does not start** |
+
+The second case is fatal on purpose. Those values *required* a login for
+requests that no longer name one themselves, so ignoring the line would
+silently publish every route in the member without an `AUTH=` of its own. The
+conversion cannot be done for you — `LOGIN=GET` says nothing about which routes
+it meant — so the server stops and asks for it. Add `AUTH=` to each route that
+needs one, then delete the `LOGIN` line.
+
+The `SET LOGIN` console command is gone with it. `DISPLAY LOGIN` remains and
+still lists the logged-in users; what a given route requires is shown by
+`/.dsrv?target=MOD`.
 
 ### Server name (`REALM`)
 
@@ -254,8 +289,8 @@ serves a file or dispatches a CGI:
 
 **A route that carries an auth policy is registered or the server does not
 start.** Dropping it is not a safe fallback: the route does not disappear, its
-requests are served under the global `LOGIN` default instead — and for a `LOC=`
-prefix under `LOGIN NONE` that hands out the whole subtree it was protecting. So
+requests are served with nothing gating them instead — and for a `LOC=` prefix
+that hands out the whole subtree it was protecting. So
 whenever such a route cannot be built, the server issues `HTTPD418E`/`HTTPD419E`
 naming it, then `HTTPD420E`, and terminates before the listener is bound. Three
 things reach that path:
@@ -282,7 +317,7 @@ than what it asked for.
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `AUTH=` | `NONE` \| `FORM` \| `BASIC` \| `TOKEN` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. `TOKEN` = a bare `401`, never a challenge. **Omitted** = inherit the global `LOGIN` default (backward compatible). |
+| `AUTH=` | `NONE` \| `FORM` \| `BASIC` \| `TOKEN` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. `TOKEN` = a bare `401`, never a challenge. **Omitted** = `NONE`, i.e. public — unless the line also carries `RES=`, which needs an identity and so implies `BASIC`. |
 | `RES=` | `class:resource` | Optional RACF/RAKF resource for stage 2, e.g. `RES=FACILITY:MVSMF.ACCESS`. Checked for `READ`. A resource always requires an identity, so it implies authentication even without `AUTH=`. |
 
 **`AUTH=` does not select the credential source.** The resolver runs before the
@@ -485,7 +520,6 @@ MAXTASK=9
 KEEPALIVE_TIMEOUT=5
 KEEPALIVE_MAX=100
 CLIENT_TIMEOUT=10
-LOGIN=RACF
 REALM=MVS Development System
 SESSION_TIMEOUT=30
 SESSION_MAXAGE=480

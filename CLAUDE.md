@@ -209,7 +209,6 @@ DOCROOT           /www
 CLIENT_TIMEOUT    10
 KEEPALIVE_TIMEOUT 5
 KEEPALIVE_MAX     100
-LOGIN             NONE
 DEBUG             0
 CGI    MVSMF      /zosmf/*
 CGI    HTTPDSRV   /.dsrv
@@ -372,9 +371,12 @@ JES2 cross-check any more — use mvsMF's jobs API.
 
 **Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPCGI`,
 so `auth` (`+14`) is named and spelled out — that is the field the request is
-gated on, not `login` (`+09`), which is the legacy byte and is labelled as such.
-`AUTH=DEFAULT` means the route carried no `AUTH=` keyword and falls back to the
-global `LOGIN` policy, which is not the same as "no authentication". And
+gated on, and since #105 the only one: the global `LOGIN` bitmask is retired,
+`+09` is a reserved byte, and there is no `AUTH=DEFAULT` any more. A route
+showing `AUTH=NONE` is public, whether the line said `AUTH=NONE` or said
+nothing. The one line that reads as public but is not is `RES=` without
+`AUTH=`: the parser resolves that to `BASIC` before the route is built, so what
+`?target=MOD` shows is still what gates the request. And
 `AUTH=` never selected a credential *source* — the resolver runs before the
 route is matched, so every route accepts every source. It selects whether a
 login is needed and how a missing one is challenged: `NONE`, `FORM`, `BASIC`,

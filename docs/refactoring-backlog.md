@@ -103,7 +103,7 @@ transient error, PR #85).
 `CBUFSIZE-1` (~3999) — so a path of ~301–3980 chars ending in `/` passes 414,
 survives parsing, and reaches this `memcpy`. The preceding `http_open` clamps
 into its own `buf[256]`, fails, and falls through here with the full-length
-path. **Unauthenticated** in the default config (`LOGIN NONE`).
+path. **Unauthenticated** in the default config (no route gates the docroot).
 **Fix:** reject over-long paths (or clamp) before the copy, e.g.
 `if (len + sizeof("default.html") > sizeof(buf)) { http_resp_not_found(...); ... }`;
 build the candidate into the size-checked buffer. Do **not** just enlarge `buf` —

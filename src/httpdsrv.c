@@ -317,35 +317,18 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     if (httpd->flag & HTTPD_FLAG_SHUTDOWN)  http_printf(httpc, " SHUTDOWN");
     http_printf(httpc, "</td></tr>\n");
 
-    http_printf(httpc, 
+    /* +2D held the global LOGIN bitmask until #105.  Shown as the reserved
+       byte it now is rather than dropped: this table is a map of the block,
+       and a reader comparing it against a dump wants the gap accounted for.
+       What gates a request is the route -- ?target=MOD. */
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->login</td>"
-        "<td>Login Requirements</td>"
-        "<td>%02X",
-        O(login), httpd->login);
-    if (httpd->login == HTTPD_LOGIN_ALL) {
-        http_printf(httpc, " ALL");
-    }
-    else if (httpd->login == 0) {
-        http_printf(httpc, " NONE");
-    }
-    else {
-        if (httpd->login & HTTPD_LOGIN_CGI) {
-            http_printf(httpc, " CGI");
-        }
-        if (httpd->login & HTTPD_LOGIN_GET) {
-            http_printf(httpc, " GET");
-        }
-        if (httpd->login & HTTPD_LOGIN_HEAD) {
-            http_printf(httpc, " HEAD");
-        }
-        if (httpd->login & HTTPD_LOGIN_POST) {
-            http_printf(httpc, " POST");
-        }
-    }
-    http_printf(httpc, "</td></tr>\n");
+        "<td>httpd->unused_2d</td>"
+        "<td>Reserved (was: global LOGIN policy, retired)</td>"
+        "<td>%02X</td></tr>\n",
+        O(unused_2d), httpd->unused_2d);
 
-    http_printf(httpc, 
+    http_printf(httpc,
         "<tr><td>+%04X</td>"
         "<td>httpd->client</td>"
         "<td>Client Options</td>"
@@ -1662,15 +1645,14 @@ quit:
 	return 0;
 }
 
-/* auth_mode_text() - decode HTTPCGI.auth (HTTP_AUTH_*).  DEFAULT is the value
-** a route carries when it had no AUTH= keyword, so it is not "no auth" -- the
-** request still runs through the legacy global LOGIN policy. */
+/* auth_mode_text() - decode HTTPCGI.auth (HTTP_AUTH_*).  Since #105 these four
+** are the whole set: there is no "unset" value that inherits a policy from
+** somewhere else, so what this cell says is what gates the route. */
 static const char *
 auth_mode_text(UCHAR auth)
 {
     switch (auth) {
-    case HTTP_AUTH_DEFAULT: return "DEFAULT (inherits the global LOGIN policy)";
-    case HTTP_AUTH_NONE:    return "NONE (public, never challenged)";
+    case HTTP_AUTH_NONE:    return "NONE (public -- AUTH=NONE or no AUTH=)";
     case HTTP_AUTH_FORM:    return "FORM (HTML login form)";
     case HTTP_AUTH_BASIC:   return "BASIC (401 WWW-Authenticate)";
     case HTTP_AUTH_TOKEN:   return "TOKEN (bare 401, API route)";
@@ -1724,10 +1706,10 @@ display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n)
         O(wild), route->wild);
 
     http_printf(httpc, "<tr><td>+%04X</td>"
-        "<td>route->login</td>"
-        "<td>Login Required (legacy -- route->auth decides)</td>"
+        "<td>route->unused_09</td>"
+        "<td>Reserved (was: login required, retired)</td>"
         "<td>%u</td></tr>\n",
-        O(login), route->login);
+        O(unused_09), route->unused_09);
 
     http_printf(httpc, "<tr><td>+%04X</td>"
         "<td>route->len</td>"

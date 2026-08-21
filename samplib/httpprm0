@@ -22,10 +22,14 @@
 # KEEPALIVE_MAX=100
 #
 # --- Security ---
-# LOGIN is the GLOBAL default for routes that set no explicit AUTH= (below).
-# LOGIN=NONE
+# Authentication is per route, and only per route.  The LOGIN keyword that
+# used to set a global default is retired: a member that still carries
+# LOGIN=NONE gets a warning, and one that carries any other LOGIN value is a
+# configuration error the server refuses to start on -- because ignoring it
+# would publish every route that names no AUTH= of its own.  Convert those
+# routes to AUTH= instead.
 #
-# Per-route auth policy -- trailing options on MOD= and LOC= override LOGIN:
+# Per-route auth policy -- trailing options on MOD= and LOC=:
 #   AUTH=NONE|FORM|BASIC|TOKEN   RES=class:resource
 #   RES=class:resource     optional RACF/RAKF resource check (READ)
 #
@@ -43,8 +47,11 @@
 # browser pop its credential dialog, and the Basic credentials it then caches
 # outlive the token session and defeat logout.  TOKEN still authenticates
 # `curl -u user:pass` normally; it only stops advertising that it would.
-# A route without AUTH= inherits the LOGIN default.  /login, /logout and the
-# login-page assets stay reachable so an AUTH=FORM challenge can render.
+# A route without AUTH= is PUBLIC, and so is a path no MOD=/LOC= line claims.
+# The one exception is RES= without AUTH=: a resource check needs an identity
+# to check against, so such a route authenticates and challenges with BASIC.
+# /login, /logout and the login-page assets stay reachable in every mode so an
+# AUTH=FORM challenge can render.
 #
 # --- Storage lifetime for modules (no configuration) ---
 # Every MOD= module runs with its heap in a request subpool: when the module

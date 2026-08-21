@@ -59,14 +59,11 @@ static char *help_text[] = {
 	NULL
 };
 
-/* auth_text() / attr_text() - short forms of the per-route auth policy.  The
-** long explanation of Auth=DEFAULT is printed once in the header rather than
-** on every line: this is a one-line-per-route trace, not a field table. */
+/* auth_text() / attr_text() - short forms of the per-route auth policy. */
 static const char *
 auth_text(UCHAR auth)
 {
 	switch (auth) {
-	case HTTP_AUTH_DEFAULT:	return "DEFAULT";
 	case HTTP_AUTH_NONE:	return "NONE";
 	case HTTP_AUTH_FORM:	return "FORM";
 	case HTTP_AUTH_BASIC:	return "BASIC";
@@ -95,8 +92,8 @@ dump_route(HTTPD *httpd, HTTPC *httpc)
     unsigned    n;
 
 	http_printf(httpc, "\nRoute Table\n");
-	http_printf(httpc, "   (Auth=DEFAULT means the route carried no AUTH= keyword"
-		" and inherits the global LOGIN policy)\n");
+	http_printf(httpc, "   (Auth=NONE is public -- either AUTH=NONE or no"
+		" AUTH= keyword at all, which since #105 mean the same thing)\n");
 
     count = array_count(&httpd->httpcgi);
     for (n=0; n < count; n++) {
@@ -121,9 +118,7 @@ dump_route(HTTPD *httpd, HTTPC *httpc)
 				attr_text(p->resattr));
 		}
 
-		/* login is the legacy byte, kept visible but named as such -- the
-		   request is gated on Auth above, not on this */
-		http_printf(httpc, " login=%u(legacy)\n", p->login);
+		http_printf(httpc, "\n");
     }
 
     return 0;
