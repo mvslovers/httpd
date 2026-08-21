@@ -703,8 +703,10 @@ cleanly (needs mbt ≥ `d57d447`). **Where a fix extracts a pure helper, keep th
 helper free of `httpd.h`** (only `<stddef.h>` + char literals): the test then
 runs **DUAL** (host *and* MVS), so the logic is actually *executed* on the host
 — real signal, not just a cc370 compile. Assertions on decoded/translated bytes
-must use the `asc2ebc`/`ebc2asc` tables (or char literals), never bare hex —
-EBCDIC.
+must use the active codepage tables — `http_codepage()->atoe` / `->etoa`, the
+same call the code under test uses — or char literals, never bare hex: EBCDIC.
+(The `asc2ebc`/`ebc2asc` globals this used to name are gone; they were module
+storage and unwritable on an APF/LNKLST fetch, issue #197.)
 
 **Done**
 - `TSTDECO` — `http_decode()`/`httpdeco()` percent/plus decoder, incl. the **S5**

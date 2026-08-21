@@ -28,14 +28,32 @@ extern HTTPCP http_legacy;        /* HTTPD 3.3.x hybrid (compat only) */
 /* Functions                                                          */
 /* ------------------------------------------------------------------ */
 
+struct httpd;                     /* the server control block         */
+
 /**
  * Select the server-default codepage.
- * Called once at startup from httpconf.c.
+ * Called once at startup from http_config().
  *
+ * The selected pair is recorded in the HTTPD control block, NOT in a module
+ * static: fetched from an APF-authorized or LNKLST library the load module
+ * lands in key-0 storage and a key-8 store into it abends S0C4 (issue #197).
+ *
+ * @param httpd     server control block to record the selection in
  * @param codepage  "CP037", "IBM1047", or "LEGACY" (case insensitive)
  * @return 0 on success, -1 on unknown codepage (falls back to CP037)
  */
-int http_xlate_init(const char *codepage);
+int http_xlate_init(struct httpd *httpd, const char *codepage);
+
+/**
+ * The codepage pair in effect.
+ *
+ * Resolves the HTTPD control block through the runtime anchors, so a CGI
+ * module's autocalled copy reports the server's codepage rather than its own
+ * uninitialised default.  Never returns NULL: without a server context (a unit
+ * test, a module run by itself) it answers CP037, which is also the built-in
+ * default.
+ */
+const HTTPCP *http_codepage(void) asm("HTTPCPGE");
 
 /**
  * Translate a buffer in-place using an explicit table.

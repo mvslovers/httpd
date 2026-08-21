@@ -99,6 +99,12 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
                 UCHAR *ver = http_get_env(httpc, "REQUEST_VERSION");
                 if (ver && http_cmp(ver, "HTTP/1.1") == 0) {
                     /* inject Transfer-Encoding header before blank line */
+                    /* An ARRAY, deliberately -- `UCHAR *te = "..."` would
+                    ** make http_etoa() translate the string literal in place,
+                    ** i.e. store into module storage.  That is unwritable when
+                    ** the module is fetched from an APF-authorized or LNKLST
+                    ** library (#197), and it would corrupt the literal for
+                    ** every later request besides. */
                     UCHAR te[] = "Transfer-Encoding: chunked\r\n";
                     int te_len = sizeof(te) - 1;
                     http_etoa(te, te_len);

@@ -13,6 +13,7 @@
 #define HTTP_PRIVATE
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "clibgrt.h"                /* __grtget() for http_codepage()   */
 
 /* ------------------------------------------------------------------ */
 /* Codepage pair struct                                                */
@@ -363,61 +364,86 @@ HTTPCP http_cp1047 = { ibm1047_atoe,  ibm1047_etoa  };
 HTTPCP http_legacy = { legacy_atoe,   legacy_etoa   };
 
 /* ------------------------------------------------------------------ */
-/* Server-default table pointers                                      */
+/* The codepage in effect                                             */
 /*                                                                    */
-/* These are the "active" tables. http_etoa() and http_atoe() use     */
-/* these. Set once at startup by http_xlate_init().                    */
+/* Kept in the HTTPD control block, not in a module static.  Fetched  */
+/* from an APF-authorized or LNKLST library the load module lands in  */
+/* key-0 storage, and a key-8 store into it abends S0C4 -- which is   */
+/* exactly what the old default_atoe/default_etoa/asc2ebc/ebc2asc     */
+/* assignments did (issue #197).  The tables themselves are only ever */
+/* READ, so they stay where they are.                                 */
 /*                                                                    */
-/* The legacy global symbols "ebc2asc" and "asc2ebc" (used by old     */
-/* code throughout httpd) also point here for backward compatibility.  */
+/* The block is resolved through the runtime anchors rather than      */
+/* passed in, because http_etoa()/http_atoe() sit in the HTTPX vector  */
+/* at 0x74/0x78 and their signatures are frozen.  Side effect worth   */
+/* having: a CGI module's autocalled copy used to read its OWN        */
+/* uninitialised default_etoa and was therefore always CP037 whatever */
+/* the Parmlib said; going through the block gives it the server's.   */
 /* ------------------------------------------------------------------ */
 
-static const unsigned char *default_atoe = cp037_atoe;
-static const unsigned char *default_etoa = cp037_etoa;
+/* Quiet counterpart of cgihttpd(): the same CRT-then-GRT lookup, but a
+** missing server context is a normal answer here (a unit test, a module run
+** by itself), not something to WTO a traceback about. */
+static HTTPD *
+xlate_httpd(void)
+{
+    CLIBCRT *crt = __crtget();
+    CLIBGRT *grt;
 
-/* backward-compatible global pointers (referenced by old httpd code) */
-unsigned char *asc2ebc = (unsigned char *)cp037_atoe;
-unsigned char *ebc2asc = (unsigned char *)cp037_etoa;
+    if (crt && crt->crtapp1 && strcmp(crt->crtapp1, HTTPD_EYE) == 0) {
+        return crt->crtapp1;
+    }
+
+    grt = __grtget();
+    if (grt && grt->grtapp1 && strcmp(grt->grtapp1, HTTPD_EYE) == 0) {
+        return grt->grtapp1;
+    }
+
+    return NULL;
+}
+
+__asm__("\n&FUNC    SETC 'http_codepage'");
+const HTTPCP *
+http_codepage(void)
+{
+    HTTPD *httpd = xlate_httpd();
+
+    if (httpd && httpd->xlate) return httpd->xlate;
+
+    return &http_cp037;         /* no server context -> the default */
+}
 
 /* ------------------------------------------------------------------ */
 /* http_xlate_init() — select server-default codepage                 */
 /*                                                                    */
-/* Called once during startup (from httpconf.c).                       */
+/* Called once during startup (from http_config()).                    */
 /* codepage: "CP037" | "IBM1047" | "LEGACY" (case insensitive)        */
 /* Returns: 0 on success, -1 on unknown codepage                      */
 /* ------------------------------------------------------------------ */
 
 int
-http_xlate_init(const char *codepage)
+http_xlate_init(struct httpd *httpd, const char *codepage)
 {
-    const unsigned char *atoe;
-    const unsigned char *etoa;
+    const HTTPCP *cp;
+
+    if (!httpd) return -1;
 
     if (!codepage || http_cmp(codepage, "CP037") == 0) {
-        atoe = cp037_atoe;
-        etoa = cp037_etoa;
+        cp = &http_cp037;
     }
     else if (http_cmp(codepage, "IBM1047") == 0) {
-        atoe = ibm1047_atoe;
-        etoa = ibm1047_etoa;
+        cp = &http_cp1047;
     }
     else if (http_cmp(codepage, "LEGACY") == 0) {
-        atoe = legacy_atoe;
-        etoa = legacy_etoa;
+        cp = &http_legacy;
     }
     else {
         wtof(MSG_CODEPAGE_UNKNOWN, codepage);
-        atoe = cp037_atoe;
-        etoa = cp037_etoa;
+        httpd->xlate = &http_cp037;
         return -1;
     }
 
-    default_atoe = atoe;
-    default_etoa = etoa;
-
-    /* update legacy global pointers */
-    asc2ebc = (unsigned char *)atoe;
-    ebc2asc = (unsigned char *)etoa;
+    httpd->xlate = cp;
 
     return 0;
 }
@@ -440,7 +466,7 @@ http_xlate(unsigned char *buf, int len, const unsigned char *tbl)
     if (!len) len = strlen((char *)buf);
     if (len <= 0) return buf;
 
-    if (!tbl) tbl = default_etoa;
+    if (!tbl) tbl = http_codepage()->etoa;
 
     for (i = 0; i < len; i++) {
         buf[i] = tbl[buf[i]];
@@ -459,7 +485,7 @@ http_xlate(unsigned char *buf, int len, const unsigned char *tbl)
 unsigned char *
 httpetoa(unsigned char *buf, int len)
 {
-    return http_xlate(buf, len, default_etoa);
+    return http_xlate(buf, len, http_codepage()->etoa);
 }
 
 /* ------------------------------------------------------------------ */
@@ -471,5 +497,5 @@ httpetoa(unsigned char *buf, int len)
 unsigned char *
 httpatoe(unsigned char *buf, int len)
 {
-    return http_xlate(buf, len, default_atoe);
+    return http_xlate(buf, len, http_codepage()->atoe);
 }

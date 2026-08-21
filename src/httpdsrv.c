@@ -562,10 +562,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_80</td>"
-        "<td>(reserved)</td>"
+        "<td>httpd->xlate</td>"
+        "<td>Codepage Pair in Effect (#197)</td>"
         "<td>%p</td></tr>\n",
-        O(unused_80), httpd->unused_80);
+        O(xlate), httpd->xlate);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -576,10 +576,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_88</td>"
-        "<td>(reserved)</td>"
+        "<td>httpd->stc_prev_acee</td>"
+        "<td>STC ACEE Restored at Shutdown (#197)</td>"
         "<td>%p</td></tr>\n",
-        O(unused_88), httpd->unused_88);
+        O(stc_prev_acee), httpd->stc_prev_acee);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -693,6 +693,15 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
         "<td>Credential Array Handle</td>"
         "<td>%p</td></tr>\n",
         O(credarr), httpd->credarr);
+
+    /* The realm VALUE, not the cfg_realm pointer reported further up -- the
+    ** two are the same string, and this is the storage it lives in (#197). */
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->cfg_realm_val</td>"
+        "<td>Basic Realm / Server Name Value</td>"
+        "<td>\"%s\"</td></tr>\n",
+        O(cfg_realm_val), httpd->cfg_realm_val);
 
     http_printf(httpc, "</table>\n");
     send_last(httpd, httpc);

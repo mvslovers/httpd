@@ -76,11 +76,13 @@ fallback:
     return buf;
 }
 
-/* The settled Basic realm / server name (#193).  The HTTPD block carries only
-** the cfg_realm pointer; the value lives here for the life of the address
-** space -- the REALM keyword's value, or the httprlm() result when the
-** Parmlib names none.  Static, so no allocation can fail on this path. */
-static char cfg_realm_buf[HTTP_REALM_CFG_MAX + 1];
+/* The settled Basic realm / server name (#193) lives in the HTTPD block, as
+** httpd->cfg_realm_val, with cfg_realm pointing at it -- the REALM keyword's
+** value, or the httprlm() result when the Parmlib names none.  It used to be
+** a file-scope buffer here, which is module storage: fetched from an
+** APF-authorized or LNKLST library the module lands in key-0 storage and the
+** key-8 store abends S0C4 (#197).  Still inline rather than malloc'd, so no
+** allocation can fail on this path. */
 
 /* Forward declarations */
 static void set_defaults(HTTPD *httpd);
@@ -138,7 +140,8 @@ http_config(HTTPD *httpd, const char *member)
        form, D CONFIG -- reports the same name, and none needs a fallback. */
     if (!httpd->cfg_realm) {
         httpd->cfg_realm = httprlm((const char *)__smfid(),
-                                   cfg_realm_buf, sizeof(cfg_realm_buf));
+                                   httpd->cfg_realm_val,
+                                   sizeof(httpd->cfg_realm_val));
     }
 
     /* A route that asked for an auth policy but did not get one is fail-open
@@ -153,7 +156,7 @@ http_config(HTTPD *httpd, const char *member)
     }
 
     /* initialize codepage translation tables */
-    http_xlate_init(httpd->codepage[0] ? httpd->codepage : NULL);
+    http_xlate_init(httpd, httpd->codepage[0] ? httpd->codepage : NULL);
 
     /* initialize UFS if enabled */
     if (httpd->ufs_enabled) {
@@ -229,9 +232,10 @@ set_defaults(HTTPD *httpd)
     httpd->bind_tries       = 10;
     httpd->bind_sleep       = 10;
     httpd->listen_queue     = 5;
-    httpd->unused_80        = NULL;
     strcpy(httpd->docroot, "/www");
     httpd->codepage[0]      = '\0';
+    httpd->xlate            = &http_cp037;  /* until CODEPAGE is parsed */
+    httpd->cfg_realm_val[0] = '\0';
     httpd->dbg_enabled      = 0;
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
@@ -389,8 +393,9 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
            the characters that would break either framing (see httprlm.h)
            rather than escaping them per consumer. */
         if (httprlm_ok(value)) {
-            strcpy(cfg_realm_buf, value);   /* httprlm_ok() bounds the length */
-            httpd->cfg_realm = cfg_realm_buf;
+            /* httprlm_ok() bounds the length to HTTP_REALM_CFG_MAX */
+            strcpy(httpd->cfg_realm_val, value);
+            httpd->cfg_realm = httpd->cfg_realm_val;
         }
         else {
             wtof(MSG_CFG_BAD_REALM, value);

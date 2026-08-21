@@ -50,11 +50,18 @@ close_stale_port(int port)
 #endif
 
 /* The security environment the STC started under -- the STC/STCGROUP account
-** RAKF hands out.  Retained by stc_identity() rather than released, so that
-** shutdown can put it back before it gives APF authorization up.  NULL until
-** the switch succeeds, which is what makes the restore a no-op on every path
-** that never got that far. */
-static ACEE *stc_prev_acee = NULL;
+** RAKF hands out -- is retained by stc_identity() rather than released, so
+** that shutdown can put it back before it gives APF authorization up.  It
+** lives in the HTTPD control block as httpd->stc_prev_acee: NULL until the
+** switch succeeds, which is what makes the restore a no-op on every path that
+** never got that far.
+**
+** It was a file-scope static here until #197.  That is module storage, and a
+** module fetched from an APF-authorized or LNKLST library lands in key-0
+** storage, so the key-8 store in stc_identity_restore() -- the one outside the
+** __super() window -- abended S0C4 on every P HTTPD.  main() memsets the block
+** before any path can reach the restore, so the NULL it relies on is
+** established exactly as reliably as the static's initializer was. */
 
 /* Replace the default STC security environment with a dedicated, low
 ** privilege identity.  Called once, from initialize(), before anything opens
@@ -64,7 +71,7 @@ static ACEE *stc_prev_acee = NULL;
 ** resting identity for the life of the server, and RTM releases it with the
 ** address space. */
 static void
-stc_identity(const char *user, const char *group)
+stc_identity(HTTPD *httpd, const char *user, const char *group)
 {
 	unsigned char	savekey;
 	ACEE			*old_acee;
@@ -100,7 +107,7 @@ stc_identity(const char *user, const char *group)
 	new_acee = racf_login(user, NULL, group, &racf_rc);
 	if (new_acee) {
 		racf_set_acee(new_acee);
-		stc_prev_acee = old_acee;       /* for stc_identity_restore() */
+		httpd->stc_prev_acee = old_acee;    /* for stc_identity_restore() */
 		wtof(MSG_STCID_SET, user, group);
 	}
 	else {
@@ -125,14 +132,18 @@ stc_identity(const char *user, const char *group)
 ** is right precisely because the field cannot be trusted to still hold ours.
 **
 ** racf_set_acee() does its own supervisor/key switching, so no __super() here.
-** It does need APF, which is why this runs BEFORE the release, not after. */
+** It does need APF, which is why this runs BEFORE the release, not after.
+**
+** The saved ACEE lives in the HTTPD control block rather than in a module
+** static (#197): main()'s HTTPD is automatic storage and therefore key 8, so
+** the clearing store below is legal whatever key the module itself is in. */
 static void
-stc_identity_restore(void)
+stc_identity_restore(HTTPD *httpd)
 {
-	if (!stc_prev_acee) return;
+	if (!httpd->stc_prev_acee) return;
 
-	racf_set_acee(stc_prev_acee);
-	stc_prev_acee = NULL;
+	racf_set_acee(httpd->stc_prev_acee);
+	httpd->stc_prev_acee = NULL;
 }
 
 static void
@@ -196,10 +207,12 @@ initialize(int argc, char **argv)
 	** the policy open, and refusing turns a profile typo into an outage, while
 	** continuing only leaves the identity where it already was.  Both paths say
 	** so loudly -- what must not happen is a silent fallback. */
-	stc_identity(stcuser, stcgroup);
+	stc_identity(httpd, stcuser, stcgroup);
 
-    /* initialize our server data area */
-    memset(httpd, 0, sizeof(HTTPD));
+    /* The block itself was zeroed by main() before any of this ran -- it has
+       to be, because stc_identity() above already stores into it and because
+       the early-failure paths in main() reach stc_identity_restore() without
+       ever calling us (#197). */
     strcpy(httpd->eye, HTTPD_EYE);
     httpd->flag |= HTTPD_FLAG_INIT;
     sprintf(httpd->rname, "HTTPD.%04X", asid);
@@ -301,7 +314,7 @@ quit:
 	/* Initialize our credential key.
 
 	   The salt used to be the HTTPD block on its own.  That is not a secret:
-	   of its 320 bytes roughly half are literal text (eye catcher, docroot,
+	   of its 392 bytes roughly half are literal text (eye catcher, docroot,
 	   codepage), the rest is Parmlib configuration plus counters that are all
 	   zero at this point, and the only varying part is a handful of GETMAIN
 	   addresses.  MVS 3.8j has no address space layout randomisation, so for
@@ -1081,6 +1094,15 @@ main(int argc, char **argv)
     grt->grtapp1    = &server;
     httpd           = grt->grtapp1;
 
+    /* Zero the block HERE, not in initialize().  `server` is automatic storage
+       and starts as whatever was on the stack, and two things read it before
+       initialize() runs or without initialize() running at all: stc_identity()
+       stores the retained ACEE into it, and the early `goto quit` paths below
+       reach stc_identity_restore(), which tests that same field.  With the
+       memset still down in initialize() those paths would act on garbage
+       (#197). */
+    memset(httpd, 0, sizeof(HTTPD));
+
     if (crt->crtopts & CRTOPTS_AUTH) {
         /* this task was previously authorized */
         rc = auth_setup(argv[0]);
@@ -1220,7 +1242,7 @@ quit:
     /* Back to the account that took the authorization out, before giving it
        back -- see stc_identity_restore().  A no-op if the switch never ran, so
        the early-failure paths that reach this label are unaffected. */
-    stc_identity_restore();
+    stc_identity_restore(httpd);
 
     if (crt) {
         if (crt->crtauth & CRTAUTH_STEPLIB) {

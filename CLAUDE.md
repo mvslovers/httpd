@@ -136,7 +136,7 @@ httpd.c (main / initialize)
 
 ### Data Structures
 
-**HTTPD (320 bytes, 0x140):** Server-wide singleton. Listener socket, worker pool manager, route table, config values, UFS handle, docroot, codepage, keep-alive settings, credential key/array, stats counters. Slots freed by the 4.0.0 removals are kept as `unused_nn` placeholders so no offset moves.
+**HTTPD (392 bytes, 0x188):** Server-wide singleton. Listener socket, worker pool manager, route table, config values, UFS handle, docroot, codepage, keep-alive settings, credential key/array, stats counters. Slots freed by the 4.0.0 removals are kept as `unused_nn` placeholders so no offset moves — reuse one rather than appending when a new field fits. It also holds the state that must not live in module storage (issue #197): the codepage pair in effect (`xlate`, 0x80), the STC ACEE restored at shutdown (`stc_prev_acee`, 0x88), and the settled Basic realm (`cfg_realm_val`, 0x140). The block is a `main()` local, so it is key-8 automatic storage whatever key the load module is in.
 
 **HTTPC (4,096 bytes):** Per-client session. Allocated on accept(), freed on close. Fixed layout with 4,008-byte inline buffer (CBUFSIZE). Contains state machine position, socket, environment variables, file handles, credential.
 
@@ -292,6 +292,19 @@ The mvsMF CGI module has its own additional ESTAE layer in `router.c` (via `try(
 
 ### Off-Limits
 
+- **Mutable module storage** — no writable file-scope data, no function-local
+  `static` that is ever stored into, and never translate or otherwise write a
+  string literal in place. Fetched from an APF-authorized or LNKLST library the
+  load module lands in key-0 storage while the code runs problem state key 8,
+  so the first such store is an S0C4 (issue #197). It is the **library the
+  module is fetched from** that decides this, not `AC(1)` and not the RENT
+  attribute — measured, see libc370's `doc/consumer-notes.md`. A `__super()`
+  window is not a way out: a module can be key-0 without holding the
+  authorization to switch keys. Put the state in the HTTPD control block (a
+  `main()` local, hence key 8), on the heap, or in `__wsaget()`. Read-only
+  statics are fine — the tables in `httpxlat.c` stay where they are.
+  Watch `UCHAR *x = "..."` versus `UCHAR x[] = "..."`: only the second is a
+  stack copy, and `http_etoa()` on the first writes the literal.
 - **HTTPX vector offsets** — never change existing entries, only append
 - **HTTPC size** — must remain exactly 4,096 bytes
 - **http_getc / http_gets** — single-byte recv is intentional (TCP/IP bug workaround)
@@ -328,7 +341,7 @@ each one is shown as hex plus a named field table:
 
 | target | block | needs `&m=` |
 |--------|-------|-------------|
-| `HTTPD` | the server singleton (320 bytes, `0x140`) | no |
+| `HTTPD` | the server singleton (392 bytes, `0x188`) | no |
 | `MGR` | `CTHDMGR`, the worker pool manager | no |
 | `FS` | `UFSSYS` handle (8 bytes with the libufs stub) | no |
 | `MOD` | the route array — every `MOD=` / `LOC=` entry | **yes** |
