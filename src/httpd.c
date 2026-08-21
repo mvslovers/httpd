@@ -1086,6 +1086,7 @@ main(int argc, char **argv)
     CIB         *cib;
     int         i;
     int         rc;
+    int         apf_at_entry;   /* authorized before auth_setup()? (#197) */
     unsigned    count;
     unsigned    *ecblist[10];
     HTTPD       server;
@@ -1103,7 +1104,17 @@ main(int argc, char **argv)
        (#197). */
     memset(httpd, 0, sizeof(HTTPD));
 
-    if (crt->crtopts & CRTOPTS_AUTH) {
+    /* Which route authorizes the STC decides whether its own module storage is
+    ** writable, and that is not something the log said until #197 sent someone
+    ** looking for it.  crtopts is the JSCB AUTH bit the CRT prologue copied at
+    ** entry, so it answers exactly the right question -- was the job step
+    ** authorized when program fetch ran?  Reusing the value the branch below
+    ** tests, rather than a second __isauth(), is what keeps the reported route
+    ** and the taken route from ever disagreeing.  UFSD007I / FTPD008I are the
+    ** same line in the other two servers. */
+    apf_at_entry = (crt->crtopts & CRTOPTS_AUTH) ? 1 : 0;
+
+    if (apf_at_entry) {
         /* this task was previously authorized */
         rc = auth_setup(argv[0]);
     }
@@ -1143,6 +1154,17 @@ main(int argc, char **argv)
 #if MBT_COMMIT_DIRTY
         wtof(MSG_BUILD_DIRTY);
 #endif
+        /* The key is inferred from the route, not measured: an authorized job
+        ** step has its module fetched key 0, an unauthorized one key 8, and
+        ** SVC 244 arrives too late to change either.  It belongs next to the
+        ** version banner because it is the other half of "which HTTPD is this"
+        ** -- the same load module behaves differently depending on how it got
+        ** authorized, and #197 was hard to place precisely because nothing
+        ** said which route this STC had taken. */
+        if (apf_at_entry)
+            wtof(MSG_APF_BY_LIB);
+        else
+            wtof(MSG_APF_BY_SVC);
     }
 
     if (rc) goto quit;

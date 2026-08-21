@@ -89,6 +89,16 @@
  *  a W on a healthy configuration only teaches operators to ignore Ws. */
 #define MSG_READY_NODOC		"HTTPD001I HTTPD %s READY - NO DOCUMENT ROOT"
 
+/** HTTPD002I the STC was already authorized at entry -- the job step was
+ *  authorized when program fetch ran, so MVS took the job pack area in
+ *  subpool 252 key 0 and the module's own storage is read-only to it.
+ *  The key is INFERRED from the route, not measured (issue #197). */
+#define MSG_APF_BY_LIB		"HTTPD002I AUTHORIZED BY LIBRARY (MODULE KEY 0)"
+
+/** HTTPD002I the STC authorized itself via SVC 244, which happens after
+ *  program fetch and so cannot relabel storage: the module stays key 8. */
+#define MSG_APF_BY_SVC		"HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)"
+
 /** HTTPD003W RACINIT needs key 0 and the STC could not get there */
 #define MSG_STCID_NOKEY		"HTTPD003W RACINIT SKIPPED, CANNOT ENTER SUPERVISOR STATE"
 

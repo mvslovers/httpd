@@ -56,6 +56,7 @@ that does is either a warning below or a misconfiguration.
 ```
 HTTPD000I HTTPD 4.0.0-DEV (A69A370) STARTING
 HTTPD005I LIBC370 1.0.2 (58767B3)
+HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/*
@@ -88,6 +89,8 @@ when it fails, and `HTTPD012E` covers that.
 | `HTTPD000I` | `HTTPD vers (commit) STARTING` | First line of every start. `commit` is the short git hash the module was built from. If it does not match what you deployed, the STC is running an older load module. |
 | `HTTPD001I` | `HTTPD vers READY - SERVING path` | The listener is up and requests are being accepted. |
 | `HTTPD001I` | `HTTPD vers READY - NO DOCUMENT ROOT` | As above, but no `DOCROOT` is configured. CGI routes work; static files 404. Informational, not a warning — a CGI-only server is an ordinary deployment. |
+| `HTTPD002I` | `AUTHORIZED BY LIBRARY (MODULE KEY 0)` | The job step was **already authorized when program fetch ran** — every dataset in the STEPLIB concatenation carries an APF entry and the module is linked `AC(1)`. MVS then takes the job pack area in subpool 252, key 0, so HTTPD's own module storage is read-only to it. The key is inferred from the route, not measured. `UFSD007I` / `FTPD008I` are the same line in the other two servers. |
+| `HTTPD002I` | `AUTHORIZED BY SVC (MODULE KEY 8)` | The STC authorized itself with SVC 244 after program fetch, which cannot relabel storage already allocated, so the module stays key 8. This is the normal route on a stock TK4-/TK5. Note one non-APF dataset anywhere in the STEPLIB concatenation is enough to put you here even when `HTTPD.LINKLIB` itself is APF-authorized. |
 | `HTTPD003W` | `RACINIT SKIPPED, CANNOT ENTER SUPERVISOR STATE` | The identity switch needs key 0 and could not get it — the STC is not APF authorized (see `HTTPD012E`). It keeps the inherited `STC/STCGROUP` identity. |
 | `HTTPD004I` | `STC IDENTITY SET TO user/group VIA RACINIT` | The server dropped the default `STC/STCGROUP` identity, which holds ALTER on every data set (issue #177). |
 | `HTTPD004W` | `RACINIT ENVIR=CREATE FAILED FOR user/group RC=n` | The userid is not defined to RAKF, or the group is wrong. The server **continues** on the inherited identity — define the userid, or start with `S HTTPD,STCUSER=x,STCGRP=y`. |
