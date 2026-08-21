@@ -50,11 +50,18 @@ close_stale_port(int port)
 #endif
 
 /* The security environment the STC started under -- the STC/STCGROUP account
-** RAKF hands out.  Retained by stc_identity() rather than released, so that
-** shutdown can put it back before it gives APF authorization up.  NULL until
-** the switch succeeds, which is what makes the restore a no-op on every path
-** that never got that far. */
-static ACEE *stc_prev_acee = NULL;
+** RAKF hands out -- is retained by stc_identity() rather than released, so
+** that shutdown can put it back before it gives APF authorization up.  It
+** lives in the HTTPD control block as httpd->stc_prev_acee: NULL until the
+** switch succeeds, which is what makes the restore a no-op on every path that
+** never got that far.
+**
+** It was a file-scope static here until #197.  That is module storage, and a
+** module fetched from an APF-authorized or LNKLST library lands in key-0
+** storage, so the key-8 store in stc_identity_restore() -- the one outside the
+** __super() window -- abended S0C4 on every P HTTPD.  main() memsets the block
+** before any path can reach the restore, so the NULL it relies on is
+** established exactly as reliably as the static's initializer was. */
 
 /* Replace the default STC security environment with a dedicated, low
 ** privilege identity.  Called once, from initialize(), before anything opens
@@ -64,7 +71,7 @@ static ACEE *stc_prev_acee = NULL;
 ** resting identity for the life of the server, and RTM releases it with the
 ** address space. */
 static void
-stc_identity(const char *user, const char *group)
+stc_identity(HTTPD *httpd, const char *user, const char *group)
 {
 	unsigned char	savekey;
 	ACEE			*old_acee;
@@ -100,7 +107,7 @@ stc_identity(const char *user, const char *group)
 	new_acee = racf_login(user, NULL, group, &racf_rc);
 	if (new_acee) {
 		racf_set_acee(new_acee);
-		stc_prev_acee = old_acee;       /* for stc_identity_restore() */
+		httpd->stc_prev_acee = old_acee;    /* for stc_identity_restore() */
 		wtof(MSG_STCID_SET, user, group);
 	}
 	else {
@@ -125,14 +132,18 @@ stc_identity(const char *user, const char *group)
 ** is right precisely because the field cannot be trusted to still hold ours.
 **
 ** racf_set_acee() does its own supervisor/key switching, so no __super() here.
-** It does need APF, which is why this runs BEFORE the release, not after. */
+** It does need APF, which is why this runs BEFORE the release, not after.
+**
+** The saved ACEE lives in the HTTPD control block rather than in a module
+** static (#197): main()'s HTTPD is automatic storage and therefore key 8, so
+** the clearing store below is legal whatever key the module itself is in. */
 static void
-stc_identity_restore(void)
+stc_identity_restore(HTTPD *httpd)
 {
-	if (!stc_prev_acee) return;
+	if (!httpd->stc_prev_acee) return;
 
-	racf_set_acee(stc_prev_acee);
-	stc_prev_acee = NULL;
+	racf_set_acee(httpd->stc_prev_acee);
+	httpd->stc_prev_acee = NULL;
 }
 
 static void
@@ -196,10 +207,12 @@ initialize(int argc, char **argv)
 	** the policy open, and refusing turns a profile typo into an outage, while
 	** continuing only leaves the identity where it already was.  Both paths say
 	** so loudly -- what must not happen is a silent fallback. */
-	stc_identity(stcuser, stcgroup);
+	stc_identity(httpd, stcuser, stcgroup);
 
-    /* initialize our server data area */
-    memset(httpd, 0, sizeof(HTTPD));
+    /* The block itself was zeroed by main() before any of this ran -- it has
+       to be, because stc_identity() above already stores into it and because
+       the early-failure paths in main() reach stc_identity_restore() without
+       ever calling us (#197). */
     strcpy(httpd->eye, HTTPD_EYE);
     httpd->flag |= HTTPD_FLAG_INIT;
     sprintf(httpd->rname, "HTTPD.%04X", asid);
@@ -301,7 +314,7 @@ quit:
 	/* Initialize our credential key.
 
 	   The salt used to be the HTTPD block on its own.  That is not a secret:
-	   of its 320 bytes roughly half are literal text (eye catcher, docroot,
+	   of its 392 bytes roughly half are literal text (eye catcher, docroot,
 	   codepage), the rest is Parmlib configuration plus counters that are all
 	   zero at this point, and the only varying part is a handful of GETMAIN
 	   addresses.  MVS 3.8j has no address space layout randomisation, so for
@@ -1073,6 +1086,7 @@ main(int argc, char **argv)
     CIB         *cib;
     int         i;
     int         rc;
+    int         apf_at_entry;   /* authorized before auth_setup()? (#197) */
     unsigned    count;
     unsigned    *ecblist[10];
     HTTPD       server;
@@ -1081,6 +1095,40 @@ main(int argc, char **argv)
     grt->grtapp1    = &server;
     httpd           = grt->grtapp1;
 
+    /* Zero the block HERE, not in initialize().  `server` is automatic storage
+       and starts as whatever was on the stack, and two things read it before
+       initialize() runs or without initialize() running at all: stc_identity()
+       stores the retained ACEE into it, and the early `goto quit` paths below
+       reach stc_identity_restore(), which tests that same field.  With the
+       memset still down in initialize() those paths would act on garbage
+       (#197). */
+    memset(httpd, 0, sizeof(HTTPD));
+
+    /* Which route authorizes the STC decides whether its own module storage is
+    ** writable, and the log did not say until #197 sent someone looking.
+    **
+    ** MEASURE it with TESTAUTH -- do not infer it from crtopts below.
+    ** `crtopts` is declared in libc370's clibcrt.h and read in @@apfset.c, but
+    ** NOTHING IN LIBC370 EVER ASSIGNS IT: the CRT is zeroed, so CRTOPTS_AUTH
+    ** is permanently clear.  A message built on it reports "BY SVC" on a
+    ** module that was demonstrably fetched key 0, which is exactly what the
+    ** first HTTPD002I said on mvsdev.  __isauth() is one TESTAUTH, no
+    ** supervisor state, and it is what UFSD007I / FTPD008I already use.
+    **
+    ** It has to run BEFORE the setup below: after __autask() every task is
+    ** authorized and the distinction is gone. */
+    apf_at_entry = __isauth();
+
+    /* Deliberately still on crtopts, dead field and all.  Because it is
+    ** permanently clear this always takes unauth_setup(), the path that calls
+    ** __autask() AND identify_cthread() -- and CTHREAD must be IDENTIFYed or
+    ** `ATTACH EP=CTHREAD` (libc370 @@ctcrtx.c) finds nothing, since CTHREAD is
+    ** an ENTRY inside this load module and not a library member.  auth_setup()
+    ** is an empty stub, so "correcting" this test to __isauth() would, on a
+    ** system that authorizes by library, skip the IDENTIFY and leave the
+    ** server unable to create a single thread.  The dead field is what has
+    ** been protecting httpd, ufsd and ftpd all along; see libc370#122 before
+    ** touching either half. */
     if (crt->crtopts & CRTOPTS_AUTH) {
         /* this task was previously authorized */
         rc = auth_setup(argv[0]);
@@ -1121,6 +1169,24 @@ main(int argc, char **argv)
 #if MBT_COMMIT_DIRTY
         wtof(MSG_BUILD_DIRTY);
 #endif
+        /* The key is inferred from the route, not measured: an authorized job
+        ** step has its module fetched key 0, an unauthorized one key 8, and
+        ** SVC 244 arrives too late to change either.  It belongs next to the
+        ** version banner because it is the other half of "which HTTPD is this"
+        ** -- the same load module behaves differently depending on how it got
+        ** authorized, and #197 was hard to place precisely because nothing
+        ** said which route this STC had taken.
+        **
+        ** Silent when the setup FAILED: HTTPD012E has already said so, and
+        ** naming a route there would claim an authorization the task does not
+        ** hold.  FTPD008I suppresses it the same way; UFSD007I does not need
+        ** to, because ufsd gives up before its banner. */
+        if (!rc) {
+            if (apf_at_entry)
+                wtof(MSG_APF_BY_LIB);
+            else
+                wtof(MSG_APF_BY_SVC);
+        }
     }
 
     if (rc) goto quit;
@@ -1220,7 +1286,7 @@ quit:
     /* Back to the account that took the authorization out, before giving it
        back -- see stc_identity_restore().  A no-op if the switch never ran, so
        the early-failure paths that reach this label are unaffected. */
-    stc_identity_restore();
+    stc_identity_restore(httpd);
 
     if (crt) {
         if (crt->crtauth & CRTAUTH_STEPLIB) {

@@ -19,6 +19,10 @@ dump(FILE *fp, const char *pName, const void *pvArea, int iSize, int iChunk)
     char    sHex[80];
     char    eChar[80];
     char    aChar[80];
+    /* Hoisted out of the byte loop below.  It used to be the asc2ebc global,
+    ** which was module storage and therefore unwritable on an APF/LNKLST
+    ** fetch (#197). */
+    const UCHAR *atoe = http_codepage()->atoe;
 
     fprintf(fp, "%*.*sDump of %08X \"%s\" (%d bytes)\n",
         indent, indent, "",
@@ -37,7 +41,7 @@ dump(FILE *fp, const char *pName, const void *pvArea, int iSize, int iChunk)
         if ((i & 3) == 3) iHex += sprintf(&sHex[iHex]," ");
 
         e = *pArea;
-        a = asc2ebc[e];
+        a = atoe[e];
 
         ie += sprintf(&eChar[ie],"%c", isgraph(e)?e:e==' '?e:'.');
         ia += sprintf(&aChar[ia],"%c", isgraph(a)?a:a==' '?a:'.');

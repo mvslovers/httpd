@@ -9,6 +9,10 @@ httpdeco(UCHAR *str)
     UCHAR   *result = str;
     UCHAR   *out    = str;
     UCHAR   temp[4];
+    /* Hoisted out of the loop: the table is selected once per call, not once
+    ** per escape.  It used to be the asc2ebc global, which was module storage
+    ** and therefore unwritable on an APF/LNKLST fetch (#197). */
+    const UCHAR *atoe = http_codepage()->atoe;
 
     while(*str) {
         switch (*str) {
@@ -21,7 +25,7 @@ httpdeco(UCHAR *str)
                 temp[0] = str[1];
                 temp[1] = str[2];
                 temp[2] = 0;
-                out[0] = asc2ebc[strtoul(temp, NULL, 16)];
+                out[0] = atoe[strtoul(temp, NULL, 16)];
                 str += 2;
             }
             else {

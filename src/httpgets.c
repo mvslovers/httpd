@@ -11,6 +11,10 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
     time64_t    timeout;
     unsigned    seconds;
     unsigned    ecb;
+    /* Hoisted out of the read loop below: one table lookup per line, not one
+    ** per character.  It used to be the asc2ebc global, which was module
+    ** storage and therefore unwritable on an APF/LNKLST fetch (#197). */
+    const UCHAR *atoe = http_codepage()->atoe;
 
     if (httpc->request_count > 0 && httpd->cfg_keepalive_timeout) {
         seconds = httpd->cfg_keepalive_timeout;
@@ -88,7 +92,7 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
         }
 
         /* translate ASCII to EBCDIC and save character */
-        buf[i++] = (UCHAR)asc2ebc[c];
+        buf[i++] = (UCHAR)atoe[c];
     }
     
 quit:

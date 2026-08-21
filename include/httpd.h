@@ -47,6 +47,7 @@
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 #include "httpbody.h"               /* request body classification  */
 #include "httpstat.h"               /* status code -> status line   */
+#include "httprlm.h"                /* HTTP_REALM_CFG_MAX (#193)    */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
 
@@ -67,8 +68,11 @@ typedef enum   rdw      RDW;        /* RDW option                   */
 ** across 21 files.  Keeping them cost 257 -Wall warnings -- every translation
 ** unit including this header -- for two remaining call sites. */
 
-extern UCHAR *ebc2asc;
-extern UCHAR *asc2ebc;
+/* The ebc2asc / asc2ebc globals are gone (issue #197).  They were module
+** storage that http_xlate_init() stored into, which abends S0C4 when the load
+** module is fetched from an APF-authorized or LNKLST library.  Ask for the
+** table instead:  const UCHAR *atoe = http_codepage()->atoe;  hoisted out of
+** the loop that indexes it. */
 
 struct httpd {
     char        eye[8];             /* 00 eye catcher               */
@@ -142,9 +146,12 @@ struct httpd {
     unsigned	total_errors;		/* 74 total error responses		*/
     unsigned	total_bytes_sent;	/* 78 total bytes sent			*/
     unsigned	active_connections;	/* 7C active client connections	*/
-    void        *unused_80;         /* 80 (was: st_dataset)         */
+    const HTTPCP *xlate;            /* 80 codepage pair in effect   */
+                                    /* ... (was: st_dataset) (#197) */
     void        *unused_84;         /* 84 (was: cgilua_dataset)     */
-    void        *unused_88;         /* 88 (was: cgilua_path)        */
+    ACEE        *stc_prev_acee;     /* 88 STC ACEE to put back at   */
+                                    /* ... shutdown, NULL until the */
+                                    /* ... switch took (#197)       */
     void        *unused_8C;         /* 8C (was: cgilua_cpath)       */
     UFS			*ufs;				/* 90 Unix "like" File System   */
     USHRT       cfg_session_maxage; /* 94 credential hard max-age   */
@@ -163,7 +170,14 @@ struct httpd {
     USHRT       cfg_session_timeout; /* 136 credential idle TTL (min), 0=off */
     CREDKEY     *credkey;           /* 138 blowfish key ptr (issue #111) */
     CRED        ***credarr;         /* 13C credential array ptr (issue #113) */
-};                                  /* 140                          */
+    /* The settled Basic realm / server name (#193).  cfg_realm above points
+    ** here once http_config() has settled it.  In the control block rather
+    ** than in a file-scope buffer because the module's own storage is key 0
+    ** when it is fetched from an APF-authorized or LNKLST library, and a
+    ** key-8 store into it abends S0C4 (#197).  Inline rather than malloc'd so
+    ** no allocation can fail on this path. */
+    char        cfg_realm_val[HTTP_REALM_CFG_MAX + 1];  /* 140          */
+};                                  /* 181, padded to 188 (392)     */
 
 /* HTTP variables */
 struct httpv {
