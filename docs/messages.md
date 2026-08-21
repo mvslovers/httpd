@@ -175,7 +175,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD030E` | `BIND() FAILED FOR HTTP PORT, RC=n ERRNO=e` | The port is taken. Retried per `BIND_TRIES`, then fatal. |
 | `HTTPD030I` | `EADDRINUSE, WAITING FOR TCPIP TO RELEASE HTTP PORT p` | A retry is in progress. Normal after an abrupt restart. |
 | `HTTPD031E` | `LISTEN() FAILED, RC=n ERRNO=e` | Bound but will not accept; the server does not start. |
-| `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The route table is full or the pattern is a duplicate. **That path will not be served.** |
+| `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The region ran out of storage while the Parmlib was being read. Nothing else reaches this message: there is no route-table limit, and a duplicate pattern is never detected (it registers as a second route and is simply unreachable, first match winning). **The path is not dark** — it is still served, statically from the document root under the global `LOGIN` default, just without the CGI. Standing alone the message also tells you the route carried no binding auth policy; one that did would bring `HTTPD419E`/`HTTPD420E` and the server would not start. |
 | `HTTPD036I` | `MODULE m REGISTERED FOR path` | One active CGI route. One line per route at start. |
 | `HTTPD048I` | `LOGIN NOT REQUIRED FOR ANY REQUEST` / `LOGIN REQUIRED FOR (…) REQUEST` | The global `LOGIN` policy. Note this is the *fallback* — a route's own `AUTH=` wins. |
 | `HTTPD048W` | `MISSING LOGIN (…) VALUE` / `INVALID LOGIN VALUE: v` | Parmlib operand errors. |
@@ -194,7 +194,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD420E` | `ROUTE AUTHORIZATION POLICY INCOMPLETE -- HTTPD WILL NOT START` | Follows `HTTPD418E`/`HTTPD419E`. The port is never bound. |
 | `HTTPD421W` | `MOD= REQUIRES A PROGRAM NAME` | The line is skipped. |
 | `HTTPD422W` | `x IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON` | `RECLAIM=` no longer does anything (#175). |
-| `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | Table full or duplicate prefix. That prefix will not be served. |
+| `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | As `HTTPD035W`, for a `LOC=` prefix: out of storage, with no table limit and no duplicate check behind it. The prefix keeps being served from the document root, but under the global `LOGIN` default instead of the policy the line gave it. |
 | `HTTPD424W` | `INVALID REALM VALUE: v` | The `REALM` value is empty, longer than 64 characters, or contains `"`, `\`, `<`, `>`, `&` or a control character — it lands inside the quoted-string of the Basic challenge and in the login form's HTML, so those are refused. The SMF ID default stays. |
 | `HTTPD425W` | `NO PROFILE FOR c:r -- path NOT GATED` | Written at start, once per `RES=` route whose resource no profile covers. The route still serves — SAF calls an unprotected resource *allowed*, not denied — so its authorization stage does nothing and only `AUTH=` is left standing. Define the profile, or correct the class or resource name; if the route was meant to be gated by authentication alone, drop the `RES=`. `AUTH=NONE` routes are not probed — `HTTPD414W` already reports those. |
 | `HTTPD430I` | `SMF TYPE n LEVEL l` | Reported by `D CONFIG`, not at start. |

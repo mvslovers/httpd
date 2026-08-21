@@ -441,7 +441,12 @@
 /** HTTPD031E the socket was bound but will not accept */
 #define MSG_CFG_LISTEN		"HTTPD031E LISTEN() FAILED, RC=%d ERRNO=%d"
 
-/** HTTPD035W the route table is full or the pattern is a duplicate */
+/** HTTPD035W the region ran out of storage while the Parmlib was being read.
+ *  Nothing else reaches this: there is no route-table limit (array_add() grows)
+ *  and duplicate patterns are never detected.  The path is NOT dark -- it is
+ *  served statically under the global LOGIN default, without the CGI.  Alone it
+ *  also says the route bound no auth policy; one that did brings HTTPD419E and
+ *  HTTPD420E and the server does not start (#220). */
 #define MSG_MOD_NOT_REG		"HTTPD035W UNABLE TO REGISTER MODULE %s FOR %s"
 
 /** HTTPD036I a CGI route is active */
@@ -504,7 +509,10 @@
 /** HTTPD422W RECLAIM= is retired (#175); %s is the keyword as written */
 #define MSG_ROUTE_RETIRED	"HTTPD422W %s IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON"
 
-/** HTTPD423W the location table is full or the prefix is a duplicate */
+/** HTTPD423W as HTTPD035W, for a LOC= prefix: out of storage, with no table
+ *  limit and no duplicate check behind it.  The prefix keeps being served from
+ *  the document root, under the global LOGIN default instead of its own
+ *  policy (#220). */
 #define MSG_LOC_NOT_REG		"HTTPD423W UNABLE TO REGISTER LOCATION %s"
 
 /** HTTPD424W REALM refused by httprlm_ok() (#193); the SMF ID default stays */
