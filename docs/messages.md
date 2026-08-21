@@ -196,6 +196,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD422W` | `x IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON` | `RECLAIM=` no longer does anything (#175). |
 | `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | Table full or duplicate prefix. That prefix will not be served. |
 | `HTTPD424W` | `INVALID REALM VALUE: v` | The `REALM` value is empty, longer than 64 characters, or contains `"`, `\`, `<`, `>`, `&` or a control character — it lands inside the quoted-string of the Basic challenge and in the login form's HTML, so those are refused. The SMF ID default stays. |
+| `HTTPD425W` | `NO PROFILE FOR c:r -- path NOT GATED` | Written at start, once per `RES=` route whose resource no profile covers. The route still serves — SAF calls an unprotected resource *allowed*, not denied — so its authorization stage does nothing and only `AUTH=` is left standing. Define the profile, or correct the class or resource name; if the route was meant to be gated by authentication alone, drop the `RES=`. `AUTH=NONE` routes are not probed — `HTTPD414W` already reports those. |
 | `HTTPD430I` | `SMF TYPE n LEVEL l` | Reported by `D CONFIG`, not at start. |
 | `HTTPD430W` | `SMF TYPE n CONFIGURED BUT SMF INACTIVE` | Written at start: records are being produced for a writer that is not there. Either start SMF or set `SMF NONE`. |
 | `HTTPD431W` | `INVALID SMF LEVEL "l"` | Not `NONE`/`ERROR`/`AUTH`/`ALL`. |

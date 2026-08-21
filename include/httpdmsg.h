@@ -510,6 +510,12 @@
 /** HTTPD424W REALM refused by httprlm_ok() (#193); the SMF ID default stays */
 #define MSG_CFG_BAD_REALM	"HTTPD424W INVALID REALM VALUE: %.40s"
 
+/** HTTPD425W a RES= route names a resource no profile covers (#137).  The
+ *  route still serves -- SAF calls an unprotected resource allowed -- so the
+ *  authorization stage does nothing and only the AUTH= stage is left.  Args:
+ *  class, resource, route path. */
+#define MSG_RES_NO_PROFILE	"HTTPD425W NO PROFILE FOR %.8s:%.32s -- %.24s NOT GATED"
+
 /*
  * HTTPD43x -- SMF.  Split off HTTPD415W, which "LOC= requires a path"
  * also used, and off HTTPD028W, which carried both SMF operand errors.
