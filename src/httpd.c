@@ -1105,16 +1105,31 @@ main(int argc, char **argv)
     memset(httpd, 0, sizeof(HTTPD));
 
     /* Which route authorizes the STC decides whether its own module storage is
-    ** writable, and that is not something the log said until #197 sent someone
-    ** looking for it.  crtopts is the JSCB AUTH bit the CRT prologue copied at
-    ** entry, so it answers exactly the right question -- was the job step
-    ** authorized when program fetch ran?  Reusing the value the branch below
-    ** tests, rather than a second __isauth(), is what keeps the reported route
-    ** and the taken route from ever disagreeing.  UFSD007I / FTPD008I are the
-    ** same line in the other two servers. */
-    apf_at_entry = (crt->crtopts & CRTOPTS_AUTH) ? 1 : 0;
+    ** writable, and the log did not say until #197 sent someone looking.
+    **
+    ** MEASURE it with TESTAUTH -- do not infer it from crtopts below.
+    ** `crtopts` is declared in libc370's clibcrt.h and read in @@apfset.c, but
+    ** NOTHING IN LIBC370 EVER ASSIGNS IT: the CRT is zeroed, so CRTOPTS_AUTH
+    ** is permanently clear.  A message built on it reports "BY SVC" on a
+    ** module that was demonstrably fetched key 0, which is exactly what the
+    ** first HTTPD002I said on mvsdev.  __isauth() is one TESTAUTH, no
+    ** supervisor state, and it is what UFSD007I / FTPD008I already use.
+    **
+    ** It has to run BEFORE the setup below: after __autask() every task is
+    ** authorized and the distinction is gone. */
+    apf_at_entry = __isauth();
 
-    if (apf_at_entry) {
+    /* Deliberately still on crtopts, dead field and all.  Because it is
+    ** permanently clear this always takes unauth_setup(), the path that calls
+    ** __autask() AND identify_cthread() -- and CTHREAD must be IDENTIFYed or
+    ** `ATTACH EP=CTHREAD` (libc370 @@ctcrtx.c) finds nothing, since CTHREAD is
+    ** an ENTRY inside this load module and not a library member.  auth_setup()
+    ** is an empty stub, so "correcting" this test to __isauth() would, on a
+    ** system that authorizes by library, skip the IDENTIFY and leave the
+    ** server unable to create a single thread.  The dead field is what has
+    ** been protecting httpd, ufsd and ftpd all along; see libc370#122 before
+    ** touching either half. */
+    if (crt->crtopts & CRTOPTS_AUTH) {
         /* this task was previously authorized */
         rc = auth_setup(argv[0]);
     }
@@ -1160,11 +1175,18 @@ main(int argc, char **argv)
         ** version banner because it is the other half of "which HTTPD is this"
         ** -- the same load module behaves differently depending on how it got
         ** authorized, and #197 was hard to place precisely because nothing
-        ** said which route this STC had taken. */
-        if (apf_at_entry)
-            wtof(MSG_APF_BY_LIB);
-        else
-            wtof(MSG_APF_BY_SVC);
+        ** said which route this STC had taken.
+        **
+        ** Silent when the setup FAILED: HTTPD012E has already said so, and
+        ** naming a route there would claim an authorization the task does not
+        ** hold.  FTPD008I suppresses it the same way; UFSD007I does not need
+        ** to, because ufsd gives up before its banner. */
+        if (!rc) {
+            if (apf_at_entry)
+                wtof(MSG_APF_BY_LIB);
+            else
+                wtof(MSG_APF_BY_SVC);
+        }
     }
 
     if (rc) goto quit;
