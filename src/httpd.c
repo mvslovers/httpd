@@ -167,7 +167,18 @@ stc_identity_restore(HTTPD *httpd)
 ** not under a client's.  That is enough because it asks only whether a profile
 ** EXISTS: measured against RAKF, an uncovered resource answers 4 whoever asks,
 ** and the identity moves the answer only between 0 and 8, both of which mean a
-** profile is there.  That is a RAKF property and not a SAF one: under RACF
+** profile is there.
+**
+** All three arms were measured in one start on mvsdev, with the server running
+** as HTTPD/USER: FACILITY:HTTPD.NOSUCH (no profile at all) warned, while
+** FACILITY:LIBC370.TSTRACMX.ALLOW (group USER holds READ, so rc 0) and
+** FACILITY:LIBC370.TSTRACMX.DENY (defined, nobody permitted, so rc 8) both
+** stayed silent.  The second of those is the one worth keeping: it is what
+** shows a REFUSAL is not mistaken for a missing profile, which is the whole
+** claim this function rests on.  Both profiles exist on that system as RACHECK
+** fixtures for libc370's tstracmx, listed in SYS1.SECURE.CNTL(PROFILES).
+**
+** That is a RAKF property and not a SAF one: under RACF
 ** with PROTECTALL the same resource answers 8 for an ordinary user and 0 for a
 ** SPECIAL one (see the RACHECK return codes in libc370 racauth.c), and MVS
 ** 3.8j with no security product at all answers 0.  Only rc 4 warns, so on

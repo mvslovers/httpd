@@ -175,8 +175,11 @@ rather than removing the switch.
    one no profile covers. It probes for *existence*, which is why the server's
    own identity suffices — an uncovered resource answers 4 whoever asks, and
    identity only moves the answer between 0 and 8, both meaning a profile is
-   there. Should a hardened system ever want fail-closed, it is one line in
-   `auth_gate()` and this warning becomes the error.
+   there. **Measured on mvsdev**, all three arms in one start as `HTTPD/USER`:
+   an undefined resource warned, while one permitting READ (rc 0) and one
+   refusing it (rc 8) both stayed silent — so a refusal is not mistaken for a
+   missing profile. Should a hardened system ever want fail-closed, it is one
+   line in `auth_gate()` and this warning becomes the error.
 4. ⬜ **ftpd/ufsd resting identity** — ftpd#97 (replace the hardcoded
    `FTPD`/`USER` with PARM keywords), ufsd#65 (adopt the startup logon). Both
    still open; httpd has had its startup logon since #177.
