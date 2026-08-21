@@ -295,18 +295,15 @@ d_login_cred(CRED *cred)
 static int
 d_login(char *buf)
 {
-    CLIBGRT     *grt    = __grtget();
-    HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
     CRED 		***array= cred_array();
     CRED		*cred;
     unsigned	count, n;
 
-	/* No global policy line any more (#105): who is logged in is a fact about
-	   the credential array, and what a request needs is a fact about its
-	   route -- D CONFIG and /.dsrv?target=MOD report that one. */
-	lock(httpd, LOCK_SHR);
-
+	/* The httpd lock this used to take was for the global policy line (#105);
+	   nothing here reads httpd any more.  Who is logged in is a fact about the
+	   credential array, which has its own lock, and what a request needs is a
+	   fact about its route -- /.dsrv?target=MOD reports that one. */
 	lock(array, LOCK_SHR);
 
 	count = array_count(array);
@@ -322,7 +319,6 @@ d_login(char *buf)
 	}
 	
 	unlock(array, LOCK_SHR);
-	unlock(httpd, LOCK_SHR);
     return rc;
 }
 
