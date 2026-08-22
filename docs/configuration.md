@@ -108,7 +108,7 @@ two cases fail in opposite directions:
 
 | Line | Result |
 |------|--------|
-| `LOGIN=NONE`, or `LOGIN` with no operand | `HTTPD048W`, ignored — `NONE` was the default, so nothing changes |
+| `LOGIN=NONE`, or `LOGIN=` with an empty value | `HTTPD048W`, ignored — `NONE` was the default, so nothing changes |
 | `LOGIN=ALL` / `CGI` / `GET` / `HEAD` / `POST`, or an unrecognized operand | `HTTPD048E` + `HTTPD420E`, **the server does not start** |
 
 The second case is fatal on purpose. Those values *required* a login for

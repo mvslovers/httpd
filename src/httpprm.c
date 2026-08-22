@@ -933,8 +933,10 @@ report_login_retired(HTTPD *httpd, const char *value)
     char *tok;
     int   required = 0;
 
-    /* A bare LOGIN keyword arrives as an empty value, which parse_login() used
-       to read as "no bits set" -- same as NONE, so warn and stop. */
+    /* LOGIN= with nothing after the '=' arrives as an empty value, which
+       parse_login() read as "no bits set" -- same as NONE, so warn and stop.
+       (A bare LOGIN with no '=' at all never gets here: parse_line() rejects
+       a line without a separator as malformed.) */
     if (!value || !*value) {
         wtof(MSG_LOGIN_RETIRED);
         return;
