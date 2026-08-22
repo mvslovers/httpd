@@ -175,11 +175,10 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD030E` | `BIND() FAILED FOR HTTP PORT, RC=n ERRNO=e` | The port is taken. Retried per `BIND_TRIES`, then fatal. |
 | `HTTPD030I` | `EADDRINUSE, WAITING FOR TCPIP TO RELEASE HTTP PORT p` | A retry is in progress. Normal after an abrupt restart. |
 | `HTTPD031E` | `LISTEN() FAILED, RC=n ERRNO=e` | Bound but will not accept; the server does not start. |
-| `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The region ran out of storage while the Parmlib was being read. Nothing else reaches this message: there is no route-table limit, and a duplicate pattern is never detected (it registers as a second route and is simply unreachable, first match winning). **The path is not dark** — it is still served, statically from the document root under the global `LOGIN` default, just without the CGI. Standing alone the message also tells you the route carried no binding auth policy; one that did would bring `HTTPD419E`/`HTTPD420E` and the server would not start. |
+| `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The region ran out of storage while the Parmlib was being read. Nothing else reaches this message: there is no route-table limit, and a duplicate pattern is never detected (it registers as a second route and is simply unreachable, first match winning). **The path is not dark** — it is still served, statically from the document root and ungated, just without the CGI. Standing alone the message also tells you the route carried no binding auth policy; one that did would bring `HTTPD419E`/`HTTPD420E` and the server would not start. |
 | `HTTPD036I` | `MODULE m REGISTERED FOR path` | One active CGI route. One line per route at start. |
-| `HTTPD048I` | `LOGIN NOT REQUIRED FOR ANY REQUEST` / `LOGIN REQUIRED FOR (…) REQUEST` | The global `LOGIN` policy. Note this is the *fallback* — a route's own `AUTH=` wins. |
-| `HTTPD048W` | `MISSING LOGIN (…) VALUE` / `INVALID LOGIN VALUE: v` | Parmlib operand errors. |
-| `HTTPD048E` | `INVALID SET LOGIN VALUE "v"` | The same from `S LOGIN` on the console. |
+| `HTTPD048W` | `LOGIN IS RETIRED -- USE AUTH= ON EACH MOD=/LOC= ROUTE` | The member carries `LOGIN=NONE`, or `LOGIN=` with an empty value. `NONE` was the default, so nothing changes; delete the line. |
+| `HTTPD048E` | `LOGIN v IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC` | **Fatal**, followed by `HTTPD420E`. The operand *required* a login, so ignoring it would publish every route in the member without its own `AUTH=`. Convert those routes to `AUTH=`, then delete the line. See [configuration.md](configuration.md). |
 | `HTTPD400E` | `ERRORS OCCURRED PROCESSING THE CONFIGURATION` | Summary; the specific failure is on the line before. The server does not start. |
 | `HTTPD410W` | `CGI= IS DEPRECATED, USE MOD= INSTEAD` | The 3.3.x spelling. Still honoured. |
 | `HTTPD411W` | `IGNORING UNKNOWN AUTH MODE 'm'` | Not one of `NONE`/`BASIC`/`FORM`/`DEFAULT`. The route falls back to the global policy — check this is what you want. |
@@ -190,11 +189,11 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD416I` | `STATS: n REQUESTS, n ERRORS, n BYTES` | Written once at shutdown. |
 | `HTTPD417I` | `LOCATION path REGISTERED` | A program-less static prefix is active. |
 | `HTTPD418E` | `NO STORAGE FOR RES=c:r` | **Fatal.** The route asked for a resource check and did not get one. |
-| `HTTPD419E` | `X=path COULD NOT BE REGISTERED -- ITS AUTH POLICY IS LOST` | **Fatal.** The route is absent, so its requests fall back to the global policy — for a protected subtree under `LOGIN NONE` that would serve it to anyone. |
+| `HTTPD419E` | `X=path COULD NOT BE REGISTERED -- ITS AUTH POLICY IS LOST` | **Fatal.** The route is absent, so nothing gates its requests at all — for a protected subtree that would serve it to anyone. |
 | `HTTPD420E` | `ROUTE AUTHORIZATION POLICY INCOMPLETE -- HTTPD WILL NOT START` | Follows `HTTPD418E`/`HTTPD419E`. The port is never bound. |
 | `HTTPD421W` | `MOD= REQUIRES A PROGRAM NAME` | The line is skipped. |
 | `HTTPD422W` | `x IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON` | `RECLAIM=` no longer does anything (#175). |
-| `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | As `HTTPD035W`, for a `LOC=` prefix: out of storage, with no table limit and no duplicate check behind it. The prefix keeps being served from the document root, but under the global `LOGIN` default instead of the policy the line gave it. |
+| `HTTPD423W` | `UNABLE TO REGISTER LOCATION path` | As `HTTPD035W`, for a `LOC=` prefix: out of storage, with no table limit and no duplicate check behind it. The prefix keeps being served from the document root, but ungated instead of under the policy the line gave it. |
 | `HTTPD424W` | `INVALID REALM VALUE: v` | The `REALM` value is empty, longer than 64 characters, or contains `"`, `\`, `<`, `>`, `&` or a control character — it lands inside the quoted-string of the Basic challenge and in the login form's HTML, so those are refused. The SMF ID default stays. |
 | `HTTPD425W` | `NO PROFILE FOR c:r -- path NOT GATED` | Written at start, once per `RES=` route whose resource no profile covers. The route still serves — SAF calls an unprotected resource *allowed*, not denied — so its authorization stage does nothing and only `AUTH=` is left standing. Define the profile, or correct the class or resource name; if the route was meant to be gated by authentication alone, drop the `RES=`. `AUTH=NONE` routes are not probed — `HTTPD414W` already reports those. |
 | `HTTPD430I` | `SMF TYPE n LEVEL l` | Reported by `D CONFIG`, not at start. |

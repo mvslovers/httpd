@@ -148,7 +148,9 @@ struct httpcgi {
     UCHAR       eye[8];             /* 00 Eye catcher                   */
 #define HTTPCGI_EYE  "HTTPCGI"      /* ...                              */
     UCHAR       wild;               /* 08 '*' or '?' in path name       */
-    UCHAR       login;              /* 09 login required                */
+    UCHAR       unused_09;          /* 09 (was: login required -- the
+                                       global LOGIN bitmask it belonged
+                                       to was retired in #105)          */
     USHRT       len;                /* 0A Path length                   */
     char        *path;              /* 0C Path name to match            */
     char        *pgm;               /* 10 external program name         */

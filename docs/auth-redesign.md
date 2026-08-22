@@ -118,7 +118,9 @@ Bearer <token>`**, each → `httpc->cred`.
 ### 2.2 Per-route auth **policy** — a 2-stage gate in the pipeline
 
 Each **route** (a path prefix) declares its own policy; the global `LOGIN` stays
-as the default. Two kinds of route carry the *same* policy:
+as the default. *(Superseded by #105: the global `LOGIN` bitmask is retired and
+a route without `AUTH=` is public. See [configuration.md](configuration.md).)*
+Two kinds of route carry the *same* policy:
 
 - **`MOD=`** — a route **with a program** (CGI), as today.
 - **`LOC=`** — a route **without a program**: a path prefix served statically
@@ -245,8 +247,9 @@ the token-model note in §4.
    authenticate (→401) then, if `RES=` is set, `racf_auth` (→403) — applied
    *before* serving a file or dispatching a CGI, so static/SPA routes get
    RACF/RAKF protection too. Decouple the challenge (form vs 401) from the core.
-   *(`AUTH=` is `NONE`/`FORM`/`BASIC`, plus `TOKEN` since #121; a route without `AUTH=` inherits the
-   global `LOGIN` default.)*
+   *(`AUTH=` is `NONE`/`FORM`/`BASIC`, plus `TOKEN` since #121. A route without
+   `AUTH=` inherited the global `LOGIN` default until #105 retired it; such a
+   route is now public, unless it carries `RES=`, which implies `BASIC`.)*
 4. ✅ **(done — #99)** **HTTPX auth export** (`get_userid`/`get_acee`/
    `get_token`/`logout`/`check_auth`).
 

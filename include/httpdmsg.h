@@ -452,20 +452,16 @@
 /** HTTPD036I a CGI route is active */
 #define MSG_MOD_REGISTERED	"HTTPD036I MODULE %s REGISTERED FOR %s"
 
-/** HTTPD048I no route requires authentication */
-#define MSG_LOGIN_NONE		"HTTPD048I LOGIN NOT REQUIRED FOR ANY REQUEST"
+/** HTTPD048W LOGIN NONE, or LOGIN with no operand.  The keyword is retired
+ *  (#105), but NONE was its default, so the member behaves as it always did
+ *  and the line is only noise. */
+#define MSG_LOGIN_RETIRED	"HTTPD048W LOGIN IS RETIRED -- USE AUTH= ON EACH MOD=/LOC= ROUTE"
 
-/** HTTPD048I which methods the global LOGIN policy gates */
-#define MSG_LOGIN_POLICY	"HTTPD048I LOGIN REQUIRED FOR (%s) REQUEST"
-
-/** HTTPD048W LOGIN with no operand */
-#define MSG_LOGIN_MISSING	"HTTPD048W MISSING LOGIN (ALL,CGI,HEAD,GET,POST,NONE) VALUE"
-
-/** HTTPD048W a LOGIN operand that is not one of the known keywords */
-#define MSG_LOGIN_INVALID	"HTTPD048W INVALID LOGIN VALUE: %s"
-
-/** HTTPD048E as above, from SET LOGIN on the console */
-#define MSG_S_LOGIN_INVALID	"HTTPD048E INVALID SET LOGIN VALUE \"%s\""
+/** HTTPD048E LOGIN with an operand that used to REQUIRE authentication, so
+ *  ignoring it would publish every route that carries no AUTH= of its own.
+ *  Fatal for the same reason HTTPD419E is: a policy silently weakened is worse
+ *  than a server that will not start.  %s is the operand as written. */
+#define MSG_LOGIN_RETIRED_E	"HTTPD048E LOGIN %s IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC"
 
 /** HTTPD400E the configuration had errors the server will not start on */
 #define MSG_CFG_ERRORS		"HTTPD400E ERRORS OCCURRED PROCESSING THE CONFIGURATION"

@@ -4,7 +4,6 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 
-static int  needs_login(HTTPC *httpc, HTTPCGI *cgi);
 static void resolve_credential(HTTPC *httpc);
 static void auth_gate(HTTPC *httpc, HTTPCGI *route);
 static int  auth_required_response(HTTPC *httpc, UCHAR mode);
@@ -159,79 +158,6 @@ quit:
     http_exit("http_process_client()\n");
 #endif
     return rc;
-}
-
-static int
-needs_login(HTTPC *httpc, HTTPCGI *cgi)
-{
-	int		needlogin 	= 0;
-	HTTPD	*httpd 		= httpc->httpd;
-	CRED	*cred 		= httpc->cred;
-	UCHAR	*path;
-
-    if (cgi) {
-		if (httpd->login & HTTPD_LOGIN_CGI) {
-			/* check for login required */
-			if (cgi->login) {
-				if (!cred) {
-					/* no credential */
-					needlogin++;
-				}
-				else if (cred->id.addr != httpc->addr) {
-					/* credential is for a different client IP address */
-					needlogin++;
-				}
-			}
-		}
-    }
-
-	/* if we're already logged in then we're done */
-	if (cred && cred->id.addr == httpc->addr) goto quit;
-
-	path = http_get_env(httpc, "REQUEST_PATH");
-
-	switch(httpc->state) {
-        case CSTATE_GET:
-            /* process GET request          */
-            if (http_cmp(path, "/login")==0 || http_cmp(path, "/logout")==0) {
-				/* These resources never need a login */
-				break;
-			}
-
-            if (__patmat(path, "/login.*") || __patmat(path, "/favicon.*")) {
-				/* These resources never need a login */
-				break;
-			}
-			
-			if (!cred && httpd->login & HTTPD_LOGIN_GET) {
-				needlogin++;
-			}
-			break;
-
-        case CSTATE_HEAD:
-            /* process HEAD request         */
-			if (!cred && httpd->login & HTTPD_LOGIN_HEAD) {
-				needlogin++;
-			}
-			break;
-
-        case CSTATE_PUT:
-            /* process PUT request          */
-			if (!cred && httpd->login & HTTPD_LOGIN_POST) {
-				needlogin++;
-			}
-			break;
-
-        case CSTATE_POST:
-            /* process POST request         */
-			if (!cred && httpd->login & HTTPD_LOGIN_POST) {
-				needlogin++;
-			}
-			break;
-    }
-
-quit:
-	return needlogin;
 }
 
 /*
@@ -392,31 +318,32 @@ is_asset_exempt(const char *path)
 **   Stage 2 (authorize): if the route sets RES=class:resource, RACHECK it under
 **     the client's ACEE (http_check_auth) -> 403 on deny.
 ** On 401/403 the response is emitted and httpc->state is set to CSTATE_DONE;
-** the caller detects that and stops.  route == NULL (a plain static path)
-** falls back to the legacy global LOGIN default.
+** the caller detects that and stops.
+**
+** route == NULL is a path no MOD=/LOC= line claimed, and it is public: since
+** #105 a request is gated because a route says so and for no other reason.
+** There is no global policy left to fall back to, and nothing to fall back
+** FROM either -- an unmatched path never carried a policy to lose.  Serving a
+** docroot that should not be public is a LOC= line with a wildcard path and an
+** AUTH= mode, which is a route and therefore visible in /.dsrv, unlike the
+** LOGIN bitmask it replaces.
 */
 static void
 auth_gate(HTTPC *httpc, HTTPCGI *route)
 {
-	UCHAR	mode   = route ? route->auth : HTTP_AUTH_DEFAULT;
+	UCHAR	mode   = route ? route->auth : HTTP_AUTH_NONE;
 	int		authed = (httpc->cred && httpc->cred->id.addr == httpc->addr);
 	int		need_authn;
 
-	/* Stage 1: does this route require authentication? */
-	if (mode == HTTP_AUTH_NONE) {
-		need_authn = 0;
-	}
-	else if (mode == HTTP_AUTH_FORM || mode == HTTP_AUTH_BASIC ||
-	         mode == HTTP_AUTH_TOKEN) {
-		need_authn = 1;
-	}
-	else {
-		/* HTTP_AUTH_DEFAULT: inherit the legacy global LOGIN policy.  A LOC=
-		   route (program-less) is treated like a plain static path (NULL). */
-		need_authn = needs_login(httpc, (route && route->pgm) ? route : NULL);
-	}
+	/* Stage 1: does this route require authentication?  Four concrete modes,
+	   no "unset" -- httpprm resolves a line that named no AUTH= before the
+	   policy ever reaches the route (see ROUTE_POLICY.has_auth). */
+	need_authn = (mode != HTTP_AUTH_NONE);
 
-	/* a RACF resource gate (RES=) always needs an identity to check against */
+	/* a RACF resource gate (RES=) always needs an identity to check against.
+	   Redundant for a route the Parmlib built -- parse_kv_tail() already gave
+	   a RES=-without-AUTH= route a challenge mode -- but kept because a route
+	   can also be registered through the httpx vector, where nothing does. */
 	if (route && route->resclass && mode != HTTP_AUTH_NONE) {
 		need_authn = 1;
 	}
@@ -450,8 +377,6 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 **   BASIC   -> 401 + WWW-Authenticate: Basic (suppressed for XHR clients that
 **              send the z/OSMF CSRF marker -- see the emit below)
 **   FORM    -> the interactive HTML login form
-**   DEFAULT -> legacy heuristic: a client that sent an Authorization header is
-**              a REST/Basic client (401); a browser gets the form.
 ** Always ends with httpc->state == CSTATE_DONE so the pipeline stops.
 **
 ** None of this decides which credentials are ACCEPTED -- resolve_credential()
@@ -462,30 +387,21 @@ auth_gate(HTTPC *httpc, HTTPCGI *route)
 static int
 auth_required_response(HTTPC *httpc, UCHAR mode)
 {
-	int	use_basic;
 	int	challenge;
 
+	/* FORM is the only mode that answers with a page instead of a 401.  BASIC
+	   and TOKEN are the only others that can arrive -- NONE never sets
+	   need_authn, and since #105 there is no unset mode to guess for. */
 	if (mode == HTTP_AUTH_FORM) {
 		return httpcred(httpc);              /* renders the form, sets DONE */
-	}
-	else if (mode == HTTP_AUTH_BASIC || mode == HTTP_AUTH_TOKEN) {
-		use_basic = 1;
-	}
-	else {
-		/* DEFAULT: REST client (sent Authorization) -> 401, else the form */
-		use_basic = (http_get_env(httpc, "HTTP_Authorization") != NULL);
-	}
-
-	if (!use_basic) {
-		return httpcred(httpc);              /* interactive client -> form */
 	}
 
 	/* Whether to advertise a challenge at all.
 	   TOKEN is the server-declared API marker (#121): never challenge, and do
 	   NOT consult the request -- an operator marked this route as machine-facing
 	   and that must not depend on what a client happens to send.
-	   For BASIC and DEFAULT the older heuristic from #120 still applies: omit
-	   the challenge for XHR clients identifying via the z/OSMF CSRF marker.  A
+	   For BASIC the older heuristic from #120 still applies: omit the
+	   challenge for XHR clients identifying via the z/OSMF CSRF marker.  A
 	   WWW-Authenticate makes the browser pop its native credential dialog, and
 	   the Basic credentials it then caches outlive the token session, defeating
 	   token logout (#119).  Genuine Basic clients (curl -u, Zowe) send

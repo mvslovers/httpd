@@ -19,7 +19,6 @@ static int d_stats(char *buf);
 static int set(char *buf);
 static int s_maxtask(char *buf);
 static int s_mintask(char *buf);
-static int s_login(char *buf);
 static int s_stats(char *in);
 
 /* http_console() */
@@ -84,8 +83,6 @@ static char *usage[] = {
     "DISPLAY Version (D V)",
     "    DISPLAYS THE SERVER VERSION AND BUILD",
     " ",
-    "SET Login [ALL,CGI,GET,HEAD,POST,NONE] (S L ...)",
-    "    SETS THE LOGIN OPTION",
     "SET MAxtask n (S MA n)",
     "    SETS THE WORKER MAXIMUM THREAD COUNT",
     "SET MIntask n (S MI n)",
@@ -160,11 +157,6 @@ set(char *buf)
         goto quit;
     }
     
-    if (http_cmpn(token, "LOGIN", len)==0) {
-		rc = s_login(rest);
-		goto quit;
-	}
-
     if (http_cmpn(token, "STATS", len)==0) {
 		rc = s_stats(rest);
 		goto quit;
@@ -303,16 +295,15 @@ d_login_cred(CRED *cred)
 static int
 d_login(char *buf)
 {
-    CLIBGRT     *grt    = __grtget();
-    HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
     CRED 		***array= cred_array();
     CRED		*cred;
     unsigned	count, n;
 
-	lock(httpd, LOCK_SHR);
-	rc = httpd048(httpd);
-
+	/* The httpd lock this used to take was for the global policy line (#105);
+	   nothing here reads httpd any more.  Who is logged in is a fact about the
+	   credential array, which has its own lock, and what a request needs is a
+	   fact about its route -- /.dsrv?target=MOD reports that one. */
 	lock(array, LOCK_SHR);
 
 	count = array_count(array);
@@ -328,7 +319,6 @@ d_login(char *buf)
 	}
 	
 	unlock(array, LOCK_SHR);
-	unlock(httpd, LOCK_SHR);
     return rc;
 }
 
@@ -769,73 +759,6 @@ s_mintask(char *buf)
     }
 
     unlock(httpd,1);
-    return rc;
-}
-
-static int
-s_login(char *in)
-{
-    CLIBGRT     *grt    = __grtget();
-    HTTPD       *httpd  = grt->grtapp1;
-    int         rc      = 0;
-    char 		*p		= NULL;
-	char		*next 	= NULL;
-
-    /* obtain a shared lock on httpd */
-    lock(httpd,LOCK_SHR);
-
-	if (!in) {
-		wtof(MSG_LOGIN_MISSING);
-		goto quit;
-	}
-
-	p = strtok(in, " (,");
-	next = strtok(NULL, "");
-#if 0
-	wtof("%s: p=\"%s\", next=\"%s\"", __func__, p, next ? next : "(null)");
-#endif
-    for(; p ; p = strtok(next," ,)"), next = strtok(NULL, "")) {
-#if 0
-		wtof("%s: LOGIN: p=\"%s\", next=\"%s\"", __func__, p, next ? next : "(null)");
-#endif
-		if (http_cmp(p, "ALL")==0) {
-			httpd->login |= HTTPD_LOGIN_ALL;
-			continue;
-		}
-		if (http_cmp(p, "CGI")==0) {
-			httpd->login |= HTTPD_LOGIN_CGI;
-			continue;
-		}
-		if (http_cmp(p, "GET")==0) {
-			httpd->login |= HTTPD_LOGIN_GET;
-			continue;
-		}
-		if (http_cmp(p, "HEAD")==0) {
-			httpd->login |= HTTPD_LOGIN_HEAD;
-			continue;
-		}
-		if (http_cmp(p, "POST")==0) {
-			httpd->login |= HTTPD_LOGIN_POST;
-			continue;
-		}
-		if (http_cmp(p, "NONE")==0) {
-			httpd->login &= 0xFF - HTTPD_LOGIN_ALL;
-			continue;
-		}
-		/* not one of our LOGIN= values */
-		wtof(MSG_S_LOGIN_INVALID, p);
-        break;
-	}
-
-#if 0
-	wtof("%s: httpd->login 0x%02X", __func__, httpd->login);
-	wtof("%s: NONE test 0x%02X", __func__, httpd->login & HTTPD_LOGIN_ALL);
-#endif
-
-	rc = httpd048(httpd);
-
-quit:
-    unlock(httpd,LOCK_SHR);
     return rc;
 }
 

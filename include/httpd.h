@@ -103,12 +103,10 @@ struct httpd {
 #define HTTPD_FLAG_QUIESCE  0x40    /* ... don't accept new request */
 #define HTTPD_FLAG_SHUTDOWN 0x80    /* ... shutdown now             */
 
-	volatile UCHAR login;			/* 2D login options		        */
-#define HTTPD_LOGIN_ALL  	0xF0    /* ... login required for ALL   */
-#define HTTPD_LOGIN_CGI		0x80	/* ... login required for CGI	*/
-#define HTTPD_LOGIN_GET		0x40	/* ... login required for GET   */
-#define HTTPD_LOGIN_HEAD	0x20	/* ... login required for HEAD  */
-#define HTTPD_LOGIN_POST    0x10	/* ... login required for POST  */
+	UCHAR		unused_2d;			/* 2D (was: the global LOGIN
+									   bitmask, retired in #105 --
+									   AUTH= per route is the only
+									   authentication policy now) */
 
 	volatile UCHAR client;			/* 2E client options			*/
 #define HTTPD_CLIENT_INMSG	0x80	/* ... client timeout messagep 	*/
@@ -271,7 +269,11 @@ struct httpcgi {
     UCHAR       eye[8];             /* 00 Eye catcher for dumps     */
 #define HTTPCGI_EYE  "HTTPCGI"      /* ...                          */
     UCHAR       wild;               /* 08 '*' or '?' in path name   */
-	UCHAR		login;				/* 09 login required (legacy)	*/
+	UCHAR		unused_09;			/* 09 (was: login required --
+									   retired with the global LOGIN
+									   bitmask in #105; auth at +14
+									   is the policy.  The slot stays
+									   so auth does not move.)		*/
     USHRT       len;                /* 0A Path length               */
     char  		*path;              /* 0C Path name to match        */
     char  		*pgm;               /* 10 program (NULL = LOC route) */
@@ -286,14 +288,20 @@ struct httpcgi {
     char        *resname;           /* 1C RACF resource name        */
 };									/* 20 (32 bytes)				*/
 
-/* HTTPCGI.auth -- per-route authentication mode.  DEFAULT (0) means the route
-   carried no AUTH= keyword and inherits the legacy global LOGIN policy, so
-   existing Parmlib members and calloc'd routes keep their old behavior. */
-#define HTTP_AUTH_DEFAULT 0         /* no AUTH= -> inherit global LOGIN     */
-#define HTTP_AUTH_NONE    1         /* AUTH=NONE  -> public, no challenge   */
-#define HTTP_AUTH_FORM    2         /* AUTH=FORM  -> HTML login form        */
-#define HTTP_AUTH_BASIC   3         /* AUTH=BASIC -> 401 WWW-Authenticate   */
-#define HTTP_AUTH_TOKEN   4         /* AUTH=TOKEN -> bare 401, no challenge */
+/* HTTPCGI.auth -- per-route authentication mode, and since #105 the ONLY
+   authentication policy: the global LOGIN bitmask that a route without AUTH=
+   used to inherit is gone, and with it HTTP_AUTH_DEFAULT.
+
+   NONE is deliberately 0, so the three ways a route can come into being all
+   mean the same thing.  A Parmlib line without AUTH=, a calloc()'d route in
+   httpacgi(), and a route registered by a module through the httpx vector
+   (which has no auth argument at all) are then identically public.  A route
+   is protected because it says so, never because the server was configured
+   that way somewhere else -- that indirection is what #105 removed. */
+#define HTTP_AUTH_NONE    0         /* no AUTH= / AUTH=NONE -> public       */
+#define HTTP_AUTH_FORM    1         /* AUTH=FORM  -> HTML login form        */
+#define HTTP_AUTH_BASIC   2         /* AUTH=BASIC -> 401 WWW-Authenticate   */
+#define HTTP_AUTH_TOKEN   3         /* AUTH=TOKEN -> bare 401, no challenge */
 
 /* AUTH= selects TWO things, and neither of them is the credential source:
    whether the route needs authentication at all, and how an unauthenticated
@@ -653,7 +661,6 @@ extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("
 extern const char *http_realm(HTTPD *)                                     asm("HTTPGRLM");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
-extern int httpd048(HTTPD *httpd)										asm("HTTPD048");
 extern int http_debug(HTTPC *httpc, const char *options)				asm("HTTPDBUG");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
 extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");

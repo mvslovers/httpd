@@ -2,6 +2,13 @@
    note: pgm and path much be literal string constants that do not change.
    A NULL pgm registers a program-less (LOC=) route: a static path prefix
    that carries auth policy but falls through to httpget instead of a CGI.
+
+   The login argument is ignored (#105).  It fed the global LOGIN bitmask,
+   which is retired -- AUTH= per route is the only authentication policy now.
+   The parameter stays because this function sits in the httpx vector at 0x104
+   and CGI modules are compiled against that signature; the route it builds is
+   HTTP_AUTH_NONE (calloc) whatever is passed, so a module registering a route
+   gets a public one and nothing pretends otherwise.
 */
 #include "httpd.h"
 
@@ -28,7 +35,7 @@ HTTPCGI *httpacgi(HTTPD *httpd, const char *pgm, const char *path, int login)
     strcpy(cgi->eye, HTTPCGI_EYE);
     if (strchr(path,'*')) cgi->wild++;
     if (strchr(path,'?')) cgi->wild++;
-    cgi->login = (login ? 1 : 0);
+    (void)login;                            /* retired -- see above */
     cgi->len  = strlen(path);
     cgi->path = strdup(path);
     cgi->pgm  = pgm ? strdup(pgm) : NULL;   /* NULL pgm == LOC route */

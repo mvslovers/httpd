@@ -90,7 +90,7 @@ static void parse_line(HTTPD *httpd, char *line);
 static void parse_keyvalue(HTTPD *httpd, const char *key, const char *value);
 static void parse_mod(HTTPD *httpd, const char *value);
 static void parse_loc(HTTPD *httpd, const char *value);
-static void parse_login(HTTPD *httpd, const char *value);
+static void report_login_retired(HTTPD *httpd, const char *value);
 static void report_tzoffset_retired(HTTPD *httpd);
 static int  do_bind(HTTPD *httpd);
 static void close_stale_port(int port);
@@ -145,11 +145,12 @@ http_config(HTTPD *httpd, const char *member)
     }
 
     /* A route that asked for an auth policy but did not get one is fail-open
-       authorization: the route is simply absent, so its requests fall back to
-       the global LOGIN default -- for a LOC= prefix under LOGIN NONE that
-       serves the whole protected subtree to anyone.  Refuse to start rather
-       than run a server whose gates are not the ones the Parmlib configured.
-       Checked before do_bind() so the port is never opened. */
+       authorization: the route is simply absent, so nothing gates its requests
+       at all -- for a LOC= prefix that serves the whole protected subtree to
+       anyone.  Refuse to start rather than run a server whose gates are not
+       the ones the Parmlib configured.  Checked before do_bind() so the port
+       is never opened.  A retired LOGIN= that used to require a login reaches
+       this the same way (see report_login_retired()). */
     if (httpd->flag & HTTPD_FLAG_CFGERR) {
         wtof(MSG_ROUTE_POLICY_BAD);
         return 8;
@@ -225,7 +226,6 @@ set_defaults(HTTPD *httpd)
     httpd->smf_level        = SMF_LEVEL_NONE;
     httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
-    httpd->login            = 0;            /* NONE */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
                             | HTTPD_CLIENT_STATS;
     httpd->ufs_enabled      = 1;
@@ -384,7 +384,7 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         httpd->cfg_session_maxage = (USHRT)i;
     }
     else if (strcmp(key, "LOGIN") == 0) {
-        parse_login(httpd, value);
+        report_login_retired(httpd, value);
     }
     else if (strcmp(key, "REALM") == 0) {
         /* Basic realm / server name (#193), defaulting to the SMF ID (#191).
@@ -528,27 +528,41 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
 ** Per-route auth policy, shared by MOD= (CGI) and LOC= (static prefix).
 ** ================================================================= */
 typedef struct {
-    UCHAR   auth;               /* HTTP_AUTH_* (DEFAULT until AUTH= seen)   */
+    UCHAR   auth;               /* HTTP_AUTH_* (NONE until AUTH= seen)      */
+    UCHAR   has_auth;           /* an AUTH= keyword was read (see below)    */
     UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
     UCHAR   failed;             /* policy could not be built (no storage)   */
     char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
     char   *resname;            /* strdup'd RACF resource name              */
 } ROUTE_POLICY;
 
-/* policy_binds() - true if this route asked for a gate the fallback cannot
-** supply.  A route that is not registered does not disappear: the request falls
-** back to the global LOGIN policy, and for a LOC= prefix that is exactly the
-** weaker policy the RES= was meant to replace (LOGIN NONE serves the whole
-** subtree unauthenticated).  So a *binding* policy that cannot be built is a
+/* has_auth exists because "the line said AUTH=NONE" and "the line said nothing"
+** are the same HTTP_AUTH_NONE once the policy reaches the route, and RES= has
+** to tell them apart: a resource always requires an identity to check against,
+** so RES= without AUTH= implies authentication (documented since #98), while
+** AUTH=NONE with RES= is the contradiction that NONE wins.  The distinction is
+** resolved here in the parser and never reaches the route -- auth_gate() sees
+** four concrete modes and no "unset" state.  That was HTTP_AUTH_DEFAULT's job,
+** and it is the whole reason the runtime no longer needs it (#105). */
+
+/* policy_binds() - true if this route asked for a gate that is lost with it.
+** A route that is not registered does not make its path disappear: the path
+** keeps being served, now with nothing gating it at all -- for a LOC= prefix
+** that is the whole subtree the RES= was meant to protect, handed out
+** unauthenticated.  So a *binding* policy that cannot be built is a
 ** configuration error, not a warning -- see the HTTPD_FLAG_CFGERR check in
-** http_config().  AUTH=NONE is the one policy the fallback can only tighten,
-** so a lost AUTH=NONE route is not fail-open and stays a warning. */
+** http_config().
+**
+** AUTH=NONE is the one policy losing the route cannot weaken (an unregistered
+** path is public, which is what NONE asked for), so a lost AUTH=NONE route
+** stays a warning.  Since #105 a route with no AUTH= at all carries NONE too,
+** and for exactly the same reason it is equally harmless to lose. */
 static int
 policy_binds(const ROUTE_POLICY *pol)
 {
     return pol->failed
         || pol->resclass != NULL
-        || (pol->auth != HTTP_AUTH_DEFAULT && pol->auth != HTTP_AUTH_NONE);
+        || pol->auth != HTTP_AUTH_NONE;
 }
 
 /* tokenize() - split s in place into whitespace-delimited tokens.  Returns the
@@ -597,8 +611,11 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             else if (http_cmp(v, "FORM") == 0)  pol->auth = HTTP_AUTH_FORM;
             else if (http_cmp(v, "BASIC") == 0) pol->auth = HTTP_AUTH_BASIC;
             else if (http_cmp(v, "TOKEN") == 0) pol->auth = HTTP_AUTH_TOKEN;
-            else
+            else {
                 wtof(MSG_ROUTE_BAD_AUTH, v);
+                continue;                       /* not a policy the line set */
+            }
+            pol->has_auth = 1;
         }
         else if (http_cmpn(t, "RES=", 4) == 0) {
             char *v     = t + 4;                /* class:resource */
@@ -643,10 +660,25 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
         }
     }
 
-    /* AUTH=NONE with a resource is contradictory: a public route has no ACEE
-       to check against.  Warn and let NONE win -- the gate skips authz. */
-    if (pol->auth == HTTP_AUTH_NONE && pol->resclass) {
+    /* An explicit AUTH=NONE with a resource is contradictory: a public route
+       has no ACEE to check against.  Warn and let NONE win -- the gate skips
+       authz.  Tested on has_auth, not on the mode: since #105 a line that
+       named no AUTH= at all also carries NONE, and that is the case just
+       below, not this one. */
+    if (pol->has_auth && pol->auth == HTTP_AUTH_NONE && pol->resclass) {
         wtof(MSG_ROUTE_NONE_RES, pol->resclass, pol->resname);
+    }
+
+    /* RES= without AUTH=: the resource check needs an identity, so the route
+       authenticates.  BASIC is the challenge -- it is the one mode that serves
+       both audiences a resource-gated route has (a browser pops its native
+       dialog, curl/Zowe read the 401 they already expect), and unlike FORM it
+       never answers an API client with an HTML page.  Naming AUTH= explicitly
+       is still the better member; this only keeps a RES=-only line from being
+       silently public, which is what it would otherwise become now that there
+       is no global LOGIN left for it to inherit. */
+    if (!pol->has_auth && pol->resclass) {
+        pol->auth = HTTP_AUTH_BASIC;
     }
 }
 
@@ -672,9 +704,9 @@ apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
 
 /* route_policy_lost() - a route that carried (or may have carried) a binding
 ** auth policy could not be registered.  Never continue: without the route the
-** request is served under the global LOGIN default, which is the weaker policy
-** the Parmlib asked to replace.  Flag the configuration so http_config()
-** refuses to start the server. */
+** path is served with nothing gating it at all, which is weaker than anything
+** the Parmlib asked for.  Flag the configuration so http_config() refuses to
+** start the server. */
 static void
 route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
 {
@@ -687,9 +719,9 @@ route_policy_lost(HTTPD *httpd, const char *kind, const char *path)
 /* route_malformed() - a MOD=/LOC= line was rejected before a route could be
 ** built, because the positional token it needs (program name / path) is missing
 ** and an AUTH=/RES= option stands in its place.  A dropped line is not
-** harmless: the prefix it was meant to gate is then served under the global
-** LOGIN default, so `LOC=AUTH=BASIC RES=FACILITY:HTTPD.ADMIN` -- the path
-** forgotten -- publishes exactly the subtree it named (issue #164).  Unlike the
+** harmless: the prefix it was meant to gate is then served ungated, so
+** `LOC=AUTH=BASIC RES=FACILITY:HTTPD.ADMIN` -- the path forgotten --
+** publishes exactly the subtree it named (issue #164).  Unlike the
 ** allocation failures this shares its reporting with, a typo reaches it.
 **
 ** The remaining tokens are parsed only to classify the line: a binding policy
@@ -703,7 +735,7 @@ route_malformed(HTTPD *httpd, const char *kind, char **tok, int ntok,
     ROUTE_POLICY pol;
     int          binds;
 
-    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_NONE    */
     parse_kv_tail(httpd, tok, 0, ntok, &pol);   /* every token is an option */
     binds = policy_binds(&pol);
     apply_policy(NULL, &pol);                   /* release RES= strings */
@@ -728,7 +760,6 @@ parse_mod(HTTPD *httpd, const char *value)
     int   ti;
     int   j;
     int   binds;
-    int   login = httpd->login & HTTPD_LOGIN_CGI;
     ROUTE_POLICY pol;
     HTTPCGI *cgi;
 
@@ -741,7 +772,7 @@ parse_mod(HTTPD *httpd, const char *value)
         return;
     }
 
-    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_NONE    */
 
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1) {                             /* no program name */
@@ -792,7 +823,10 @@ parse_mod(HTTPD *httpd, const char *value)
         apply_policy(NULL, &pol);
     }
     else if (program[0]) {
-        cgi = http_add_cgi(httpd, program, path, login);
+        /* the 4th argument is the retired login flag (#105).  It stays in the
+           signature because http_add_cgi sits in the httpx vector at 0x104
+           and modules are compiled against it; httpacgi() ignores it. */
+        cgi = http_add_cgi(httpd, program, path, 0);
         apply_policy(cgi, &pol);
         if (cgi)
             wtof(MSG_MOD_REGISTERED, program, path);
@@ -835,7 +869,7 @@ parse_loc(HTTPD *httpd, const char *value)
         return;
     }
 
-    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_DEFAULT */
+    memset(&pol, 0, sizeof(pol));               /* auth = HTTP_AUTH_NONE    */
 
     ntok = tokenize(tmp, tok, 8);
     if (ntok < 1 || is_route_kv(tok[0])) {      /* first token must be a path */
@@ -874,38 +908,67 @@ parse_loc(HTTPD *httpd, const char *value)
 }
 
 /* ====================================================================
-** Parse LOGIN value: NONE, ALL, CGI, GET, HEAD, POST (comma-separated)
+** LOGIN is retired (#105) -- AUTH= on each MOD=/LOC= route is the only
+** authentication policy now.
+**
+** How loudly depends on what the operand said, because the two cases fail in
+** opposite directions.  LOGIN NONE (and a bare LOGIN, which parsed to the same
+** thing) required no login of anything: dropping it changes nothing, so the
+** line is noise and a warning is enough.  Any other operand -- ALL, CGI, GET,
+** HEAD, POST -- REQUIRED a login for requests that no longer name one
+** themselves, and every route in the member that carries no AUTH= of its own
+** would silently become public.  That is the same fail-open shape HTTPD419E
+** refuses to start on, so it is refused here too, and for the same reason:
+** the operator must convert the routes, not discover the hole in a log.
+**
+** Deliberately NOT a partial translation into per-route AUTH= modes.  LOGIN
+** gated by HTTP method, AUTH= gates by route, and the two do not map: LOGIN
+** GET says nothing about which routes it meant.  A guess here would produce a
+** configuration the Parmlib never asked for.
 ** ================================================================= */
 static void
-parse_login(HTTPD *httpd, const char *value)
+report_login_retired(HTTPD *httpd, const char *value)
 {
     char *tmp;
     char *tok;
+    int   required = 0;
 
-    tmp = strdup(value);
-    if (!tmp) return;
-
-    httpd->login = 0;
-
-    for (tok = strtok(tmp, ","); tok; tok = strtok(NULL, ",")) {
-        while (*tok == ' ') tok++;
-        if (http_cmp(tok, "ALL") == 0)
-            httpd->login |= HTTPD_LOGIN_ALL;
-        else if (http_cmp(tok, "CGI") == 0)
-            httpd->login |= HTTPD_LOGIN_CGI;
-        else if (http_cmp(tok, "GET") == 0)
-            httpd->login |= HTTPD_LOGIN_GET;
-        else if (http_cmp(tok, "HEAD") == 0)
-            httpd->login |= HTTPD_LOGIN_HEAD;
-        else if (http_cmp(tok, "POST") == 0)
-            httpd->login |= HTTPD_LOGIN_POST;
-        else if (http_cmp(tok, "NONE") == 0)
-            httpd->login = 0;
-        else
-            wtof(MSG_LOGIN_INVALID, tok);
+    /* LOGIN= with nothing after the '=' arrives as an empty value, which
+       parse_login() read as "no bits set" -- same as NONE, so warn and stop.
+       (A bare LOGIN with no '=' at all never gets here: parse_line() rejects
+       a line without a separator as malformed.) */
+    if (!value || !*value) {
+        wtof(MSG_LOGIN_RETIRED);
+        return;
     }
 
-    httpd048(httpd);
+    tmp = strdup(value);
+    if (!tmp) {
+        /* Out of storage before the operand could be classified.  Assume it
+           required a login: refusing to start on a LOGIN NONE is an operator
+           annoyance, starting anyway on a LOGIN ALL is a published server. */
+        wtof(MSG_LOGIN_RETIRED_E, value);
+        httpd->flag |= HTTPD_FLAG_CFGERR;
+        return;
+    }
+
+    /* Any token other than NONE gated something.  An unknown token counts as
+       gating too -- parse_login() rejected it with a warning and carried on,
+       but here it is the difference between a warning and a refusal, and the
+       operator's intent behind a misspelled operand is not ours to guess. */
+    for (tok = strtok(tmp, ","); tok; tok = strtok(NULL, ",")) {
+        while (*tok == ' ') tok++;
+        if (*tok && http_cmp(tok, "NONE") != 0) required = 1;
+    }
+
+    if (required) {
+        wtof(MSG_LOGIN_RETIRED_E, value);
+        httpd->flag |= HTTPD_FLAG_CFGERR;
+    }
+    else {
+        wtof(MSG_LOGIN_RETIRED);
+    }
+
     free(tmp);
 }
 
