@@ -198,23 +198,32 @@ When `httpc->chunked == 1`, every `http_send()` call is automatically wrapped in
 
 ### Parmlib Configuration
 
-Read from `DD:HTTPPRM` (FB-80 dataset). Lines starting with `#` or `*` are comments. Format: `KEYWORD VALUE [VALUE...]`.
+Read from `DD:HTTPPRM` (FB-80 dataset). Lines starting with `#` or `*` are
+comments. The format is **`KEYWORD=VALUE`** — `parse_line()` (httpprm.c) looks
+for an `=` and rejects any line without one as `HTTPD026W UNRECOGNIZED
+CONFIGURATION LINE`. Keywords are folded to upper case; values are not.
 
 ```
 # HTTPD 4.0.0 Configuration
-PORT              8080
-MINTASK           3
-MAXTASK           9
-DOCROOT           /www
-CLIENT_TIMEOUT    10
-KEEPALIVE_TIMEOUT 5
-KEEPALIVE_MAX     100
-DEBUG             0
-CGI    MVSMF      /zosmf/*
-CGI    HTTPDSRV   /.dsrv
+PORT=8080
+MINTASK=3
+MAXTASK=9
+DOCROOT=/www
+CLIENT_TIMEOUT=10
+KEEPALIVE_TIMEOUT=5
+KEEPALIVE_MAX=100
+REALM=MVSDEV
+MOD=MVSMF /zosmf/*                       AUTH=TOKEN
+MOD=HTTPDSRV /.dsrv                      AUTH=FORM
+MOD=HTTPDM /.dm                          AUTH=BASIC
+LOC=/pub/*                               AUTH=NONE
 ```
 
-Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no CGIs).
+A route is `MOD=` (a program) or `LOC=` (a program-less static prefix), each
+with its own `AUTH=`; there is no `CGI` keyword. **Write the `AUTH=`** — since
+#105 a route without one is public, with no global policy to fall back on.
+
+Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no routes).
 
 ### Key Source Files
 

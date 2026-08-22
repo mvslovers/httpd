@@ -11,6 +11,7 @@
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
 #include "httpxlat.h"
+#include "clibenq.h"        /* ENQ()       -- port single-instance (#223)   */
 #include "clibdsab.h"       /* get_dsab()  -- DD -> DSAB                    */
 #include "ieftiot.h"        /* TIOTDD      -- DSAB -> TIOT entry            */
 #include "osjfcb.h"         /* JFCB        -- TIOT entry -> dsname(member)  */
@@ -1020,8 +1021,43 @@ do_bind(HTTPD *httpd)
     int                 rc;
     int                 i;
     struct sockaddr_in  serv_addr;
+    char                enq_rname[24];
 
-    /* close sockets that are using this port */
+    /* Refuse a second instance on the same port (#223).
+    **
+    ** This has to come first, before close_stale_port() below, because that
+    ** sweep is indiscriminate: the socket table lives in Hercules and is
+    ** global to the emulator, not per address space, so on an already running
+    ** server it finds the LIVE listener, closes it as "stale" and lets this
+    ** bind succeed.  /S HTTPD on a running server therefore did not merely
+    ** start a second one -- it took the first one's listener away.
+    **
+    ** The resource is keyed by port, so a deliberate second server on another
+    ** port (S HTTPD,M=HTTPPRM1) still starts.  RET=USE takes the resource when
+    ** it is free and returns rc=4 instead of waiting when another address
+    ** space holds it.  do_bind() is reached from http_config() <- initialize()
+    ** <- main(), so the ENQ belongs to main's TCB and MVS releases it at task
+    ** end -- including after an ABEND.  There is no DEQ to forget, no stale
+    ** lock to clean up, and a restart after a crash is not blocked by it.
+    **
+    ** FTPD solves this the same way (ftpd.c, FTPD.PORT.nnnnn).
+    */
+    snprintf(enq_rname, sizeof(enq_rname), "HTTPD.PORT.%05d", httpd->port);
+
+    rc = ENQ(HTTPD_ENQ_QNAME, enq_rname, ENQ_SYSTEM | ENQ_EXC | ENQ_USE);
+    if (rc != 0) {
+        /* rc=4 is the expected "another address space holds it".  rc=8 --
+        ** "this task already owns it" -- cannot arise: do_bind() has exactly
+        ** one caller (http_config(), itself called once by initialize()), so
+        ** the ENQ is issued once per address space.  Anything else means the
+        ** ENQ itself failed, and treating that as "port free" would restore
+        ** exactly the damage above.  Refuse either way. */
+        wtof(MSG_PORT_IN_USE, httpd->port);
+        return 8;
+    }
+
+    /* close sockets that are using this port.  Safe only because the ENQ
+       above ruled out a live instance on it -- see #224 for the rest. */
     close_stale_port(httpd->port);
 
     /* create listener socket */
