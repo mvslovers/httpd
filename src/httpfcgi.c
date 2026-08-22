@@ -18,7 +18,6 @@ HTTPROUTE *httpfcgi(HTTPD *httpd, const char *path)
     for (n=0; n < count; n++) {
         HTTPROUTE *p = httpd->route[n];
 
-        if (!p) continue;
         if (p->wild) {
             /* use pattern matching */
             if (__patmat(path, p->path)) {

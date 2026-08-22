@@ -93,6 +93,69 @@ Each HTTP request flows through these states:
 
 **HTTPV** — Environment variable. Header followed by `name\0value\0` storage. Allocated per variable, freed on request reset.
 
+### Dynamic arrays: no holes below the count
+
+Most of the server's collections are libc370 dynamic arrays — a `void **` with
+an `ARRAY` header (count, size, eyecatcher) immediately in front of it, reached
+through `array_add()` / `array_del()` / `array_count()` / `array_get()`.
+
+**None of those operations can leave an empty slot below the count.** Measured
+in libc370's sources, not assumed:
+
+| source | behaviour |
+|--------|-----------|
+| `@@aradd.c:65` | `(*carray)[array->count++] = vitem;` — appends at the end, growing by `ARRAY_DEFAULT` when full |
+| `@@ardel.c:22-26` | shifts every later element left, decrements `count`, and NULLs only the slot *past* the new count |
+| `@@arcou.c:18` | `array_count()` returns `array->count` |
+
+So for `n < array_count(&a)`, `a[n]` is non-NULL — **provided** nothing puts a
+NULL there in the first place. There are exactly two ways that could happen,
+and both are the caller's doing, not the array's:
+
+1. **A producer adds NULL.** `array_add()` stores whatever it is handed; it
+   does not reject a NULL item. The server's own producers all check first —
+   `httpacgi.c` (`httpd->route`), `httpsenv.c` (`httpc->env`), `httpsbz.c`
+   (`httpd->busy`) and the accept path in `httpd.c` (`httpd->httpc`) each add
+   an item they have just verified is non-NULL.
+2. **Code stores NULL through the raw pointer.** There is no `array_set()`, but
+   the backing store is a plain `void **` and nothing stops an assignment.
+   As of #229 no server code does this.
+
+**Do not add a NULL check when indexing `a[n]` below `array_count()`.** It
+cannot fire, and a check that cannot fire teaches the next reader a contract
+that does not exist. `httpfenv()` — the hottest lookup in the server —
+dereferences `httpc->env[n]` directly, and that is the house style.
+
+That rule is about direct indexing only. **`array_get()` callers still check**:
+it returns NULL for an index outside `1..count`, so the NULL means "bad index",
+not "hole" — which is why `d_login()` in `httpcons.c` tests its result.
+
+Three situations genuinely do need a check on a direct index, and all three are
+visible at the call site:
+
+- **Arrays the server does not produce.** `grt->grtsock` and `grt->grtenv`
+  belong to libc370, `mgr->worker` and the task array to CTHDMGR, and the
+  `MTENTRY` array in `httpdmtt.c` is built by the Master Trace Table reader.
+  Their producers have not been audited here, so their guards stay.
+- **An array pointer that came from outside.** `display_route()` in
+  `httpdsrv.c` walks whatever address the request passed in `?m=`. The
+  `ARRAY` eyecatcher check inside `array_count()` makes a wrong address return
+  0 rather than a wild count, but nothing proves the array it did find is the
+  route table, so that walk keeps its NULL check.
+- **`httpd->httpc`, walked without the lock.** `build_fd_set()` and
+  `process_clients()` in `httpd.c` and `httppcs.c` keep their NULL checks
+  deliberately. Its producer does check, so by the rule above the checks are
+  dead — but two of those walks race an `array_del()` on a worker, and #229
+  deliberately left that concurrency question open rather than settle it by
+  deleting a guard. They are a retained hedge, not an oversight; remove them
+  only together with a decision about the locking.
+
+Concurrency is a separate question and a NULL check answers none of it. A
+concurrent `array_del()` *shifts*, so an unsynchronised walker can see an entry
+move past an index it has already passed — it skips an element, it never finds
+a hole. `build_fd_set()` in `httpd.c` reads `httpd->httpc[]` without the lock
+and carries a note about exactly this.
+
 ### Response Pipeline
 
 ```

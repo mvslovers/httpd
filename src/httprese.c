@@ -16,11 +16,12 @@ httprese(HTTPC *httpc)
     if (httpc->env) {
         /* free variables */
         count = array_count(&httpc->env);
+        /* no NULL slot below count (docs/development.md, "Dynamic arrays"),
+           and no need to blank a slot the array_free() below releases -- that
+           store was the one place in the server that put a NULL inside a live
+           array, which is where the belief in holes came from (#229). */
         for(n=0;n<count;n++) {
-            if (httpc->env[n]) {
-                free(httpc->env[n]);
-                httpc->env[n] = NULL;
-            }
+            free(httpc->env[n]);
         }
         array_free(&httpc->env);
     }

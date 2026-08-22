@@ -1,5 +1,11 @@
 /* HTTPFENV.C
 ** Find environment variable
+**
+** v is dereferenced without a NULL check on purpose: httpc->env has no empty
+** slot below array_count() -- http_set_env() is its only producer and adds a
+** checked non-NULL HTTPV.  See docs/development.md, "Dynamic arrays: no holes
+** below the count" (#229).  This is the hottest lookup in the server; do not
+** add a check that can never fire.
 */
 #include "httpd.h"
 
