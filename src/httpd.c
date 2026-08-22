@@ -638,28 +638,46 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
         memset(excp, 0, sizeof(fd_set));
     }
 
-    /* NOTE: httpd->httpc[] is read here without lock.  build_fd_set() runs in
-     * the same socket_thread as the array_add(), but the array_del() in
-     * httpclos() runs on a worker.
+    /* httpd->httpc[] is read here without the lock.  That is safe because the
+     * array has exactly one writer, and it is this thread -- not because of
+     * any NULL in it (#235).
      *
-     * This used to claim array_del() "sets entries to NULL before removal, and
-     * we check for NULL below".  It does not: arraydel() shifts every later
+     * Entries reach it only through the accept path below, in the branch taken
+     * when httpd->mgr is NULL -- and that is the no-worker fallback alone, not
+     * a startup window.  http_config() is already listening well before this
+     * thread exists, but initialize() holds lock(httpd,0) from before
+     * cthread_create_ex() until after cthread_manager_init(), and every pass
+     * of this loop starts in process_clients() -> http_process_clients(),
+     * which ENQs that same resource.  lock() is ENQ RET=HAVE (libc370
+     * @@enqdeq.c), so another TCB's holder makes it wait, not fail: this
+     * thread cannot reach accept() until mgr is set or has failed.  A
+     * connection sitting in the backlog at STC start therefore does not slip
+     * into this array, and with a worker pool the array stays empty for the
+     * life of the server.
+     *
+     * Which leaves the fallback -- and no manager means no worker threads at
+     * all.  The accept below, both walks over the array, and the array_del()
+     * in httpclos() then run on this one thread; nothing else exists to race
+     * it.  (Workers, when they exist, take their clients from
+     * cthread_queue_add() alone and never see this array.  httpd->busy does
+     * hold client pointers a worker touches, but nothing walks it to close or
+     * free a client -- it is add / delete-this-one / compare-only.)
+     *
+     * One exception, worth knowing before trusting this: if the socket thread
+     * does not post its termination ECB within 10s, terminate() says
+     * HTTPD041I, detaches it anyway, and then walks and frees this array from
+     * the main thread.  A socket thread still running past that point is a
+     * second writer -- and a far wider problem than this array.
+     *
+     * What stood here claimed array_del() "sets entries to NULL before removal,
+     * and we check for NULL below".  It does not: arraydel() shifts every later
      * element left and NULLs only the slot past the new count (libc370
-     * @@ardel.c), so the NULL check below can never fire and is not what makes
-     * the read safe.  What a concurrent delete can do is shift an entry past
-     * the index this loop already passed -- skipping a client for one select()
-     * pass.  Benign here (the next pass picks it up), but it is a shift, not a
-     * hole; do not reason about this array as if it had holes.  See
-     * docs/development.md, "Dynamic arrays: no holes below the count".
-     *
-     * The NULL check below therefore stays as a deliberate hedge on an
-     * unsynchronised read, not because a hole can occur.  #229 removed the
-     * equivalent dead checks on httpd->route and httpc->env, which nothing
-     * races, and left this one pending a decision about the locking here.
+     * @@ardel.c).  The check that argument justified is gone with the
+     * single-writer finding; see docs/development.md, "Dynamic arrays: no holes
+     * below the count".
      */
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];
-        if (!httpc) continue;           /* no client handle? */
 
         if (httpc->socket < 0) continue;   /* no socket? */
 
@@ -698,13 +716,10 @@ process_clients(fd_set *read, fd_set *write, fd_set *excp)
     goto quit;
 
 httpd_locked:
-    /* look for any clients that need to be closed.  The NULL check below
-       cannot fire -- see the note in build_fd_set() and docs/development.md,
-       "Dynamic arrays" -- and is kept as a hedge, not against a hole (#229). */
+    /* look for any clients that need to be closed */
     count = array_count(&httpd->httpc);
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];
-        if (!httpc) continue;           /* no client handle? */
 
         if (httpc->state==CSTATE_CLOSE) {
             /* we close a single client at a time,
