@@ -376,6 +376,33 @@ That reaches **every** task — the server, its worker threads and every module 
 because both the server's and the modules' startup code call `tzset()` after
 loading the environment. It is the only supported way to override it.
 
+**Point that DD at a data set of its own, never at `SYS2.PARMLIB`.** The
+environment is not read once: `cgistart` runs `loadenv("dd:SYSENV")` on
+**every** CGI LINK, into the module's own (fresh, empty) GRT — modules and the
+server do not share an environment. So the DD has to stay allocated for the
+life of the started task, which makes whatever data set it names permanently
+allocated to this address space.
+
+That is not merely a per-request member read. Any exclusive dynamic allocation
+of the same data set from inside the address space then escalates the address
+space's shared SYSDSN ENQ to exclusive — and MVS ENQ has no way back down, so
+the escalation outlives the operation and blocks every other address space
+until the STC ends. Measured through mvsMF (mvslovers/mvsmf#342): a member
+delete left `SYS2.PARMLIB` unavailable system-wide until HTTPD was restarted,
+and the waiting jobs said nothing but `IEF861I`. The delete path is fixed
+(mvslovers/libc370#127), but the arming condition is the allocation, so the
+cheap and permanent protection is to name a data set nothing else contends
+for:
+
+```
+//SYSENV   DD  DSN=HTTPD.ENV,DISP=SHR
+```
+
+`FREE=CLOSE` is **not** a way around this — with it the DD is unallocated
+before the first request, and every CGI then starts with an empty environment.
+The shipped proc carries no `SYSENV` DD at all; add one only if you need `TZ`
+or another variable.
+
 Timestamps in API responses are unaffected either way: they are returned as
 ISO 8601 instants in UTC (`2026-08-07T17:25:18.000Z`), converted with `gmtime`,
 so the caller localizes them. The `Date:` response header is likewise always
