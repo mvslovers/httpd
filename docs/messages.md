@@ -179,7 +179,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD036I` | `MODULE m REGISTERED FOR path` | One active CGI route. One line per route at start. |
 | `HTTPD048W` | `LOGIN IS RETIRED -- USE AUTH= ON EACH MOD=/LOC= ROUTE` | The member carries `LOGIN=NONE`, or `LOGIN=` with an empty value. `NONE` was the default, so nothing changes; delete the line. |
 | `HTTPD048E` | `LOGIN v IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC` | **Fatal**, followed by `HTTPD420E`. The operand *required* a login, so ignoring it would publish every route in the member without its own `AUTH=`. Convert those routes to `AUTH=`, then delete the line. See [configuration.md](configuration.md). |
-| `HTTPD400E` | `ERRORS OCCURRED PROCESSING THE CONFIGURATION` | Summary; the specific failure is on the line before. The server does not start. |
+| `HTTPD400E` | `ERRORS OCCURRED PROCESSING THE CONFIGURATION` | Summary; the specific failure is on the line before. The server does not start, and **the step ends `CC 0008`** (#226) — so a refused configuration is distinguishable from a clean `P HTTPD` in `$DJ` and in a COND CODE check, not only in the log. |
 | `HTTPD410W` | `CGI= IS DEPRECATED, USE MOD= INSTEAD` | The 3.3.x spelling. Still honoured. |
 | `HTTPD411W` | `IGNORING UNKNOWN AUTH MODE 'm'` | Not one of `NONE`/`BASIC`/`FORM`/`DEFAULT`. The route falls back to the global policy — check this is what you want. |
 | `HTTPD412W` | `IGNORING MALFORMED RES= 'v' (NEED CLASS:RESOURCE)` | The route keeps its `AUTH=` but gains no resource check. |
