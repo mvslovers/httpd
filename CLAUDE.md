@@ -49,6 +49,12 @@ gh issue list --repo mvslovers/httpd
 plus the *Issues & Tasks* database in Notion. Do not restore a task list here —
 a copy of a tracker is wrong the first time someone closes something.
 
+`TODO.md` in the repo root is the one permitted companion, and it is not that
+copy: it holds the **ranking** of the open issues, the reasoning behind the
+order, and which ones wait on a decision rather than on code — none of which
+GitHub stores. It names issues but never owns their state. Reconcile it after
+every merge, and if it ever disagrees with `gh issue list`, the tracker wins.
+
 ## Dependencies (from project.toml)
 
 ```toml
