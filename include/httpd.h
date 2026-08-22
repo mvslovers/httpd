@@ -386,6 +386,11 @@ struct httproute {
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
 #define HTTPD_PARMLIB_DD "HTTPPRM"
 
+/* The ENQ major name that makes a port single-instance (issue #223).  The
+   minor name carries the port, so a deliberate second server on another port
+   still starts.  FTPD uses the same shape under FTPD.PORT.nnnnn. */
+#define HTTPD_ENQ_QNAME  "HTTPD"
+
 /* The identity the STC logs on to at startup, replacing the STC/STCGROUP one
    RAKF hands out -- which holds ALTER on every data set (issue #177).  These
    are defaults; S HTTPD,STCUSER=x,STCGROUP=y overrides them.  They come from

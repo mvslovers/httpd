@@ -441,6 +441,11 @@
 /** HTTPD031E the socket was bound but will not accept */
 #define MSG_CFG_LISTEN		"HTTPD031E LISTEN() FAILED, RC=%d ERRNO=%d"
 
+/** HTTPD037E another address space already serves this port (#223).  Not a
+    bind failure: the port ENQ is tested before do_bind() touches a socket, so
+    this instance ends without disturbing the running one. */
+#define MSG_PORT_IN_USE		"HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT %d, THIS INSTANCE ENDS"
+
 /** HTTPD035W the region ran out of storage while the Parmlib was being read.
  *  Nothing else reaches this: there is no route-table limit (array_add() grows)
  *  and duplicate patterns are never detected.  The path is NOT dark -- it is
