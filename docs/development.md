@@ -130,7 +130,7 @@ That rule is about direct indexing only. **`array_get()` callers still check**:
 it returns NULL for an index outside `1..count`, so the NULL means "bad index",
 not "hole" — which is why `d_login()` in `httpcons.c` tests its result.
 
-Three situations genuinely do need a check on a direct index, and all three are
+Two situations genuinely do need a check on a direct index, and both are
 visible at the call site:
 
 - **Arrays the server does not produce.** `grt->grtsock` and `grt->grtenv`
@@ -142,19 +142,32 @@ visible at the call site:
   `ARRAY` eyecatcher check inside `array_count()` makes a wrong address return
   0 rather than a wild count, but nothing proves the array it did find is the
   route table, so that walk keeps its NULL check.
-- **`httpd->httpc`, walked without the lock.** `build_fd_set()` and
-  `process_clients()` in `httpd.c` and `httppcs.c` keep their NULL checks
-  deliberately. Its producer does check, so by the rule above the checks are
-  dead — but two of those walks race an `array_del()` on a worker, and #229
-  deliberately left that concurrency question open rather than settle it by
-  deleting a guard. They are a retained hedge, not an oversight; remove them
-  only together with a decision about the locking.
 
 Concurrency is a separate question and a NULL check answers none of it. A
 concurrent `array_del()` *shifts*, so an unsynchronised walker can see an entry
 move past an index it has already passed — it skips an element, it never finds
-a hole. `build_fd_set()` in `httpd.c` reads `httpd->httpc[]` without the lock
-and carries a note about exactly this.
+a hole.
+
+**`httpd->httpc` is the array where that looked like it mattered**, and #235
+settled it: the array has exactly one writer, and it is the socket thread, so
+`build_fd_set()` may read it without the lock.
+
+Entries reach it only through the accept path's `httpd->mgr == NULL` branch,
+and that branch is the no-worker fallback alone — there is no startup window
+into it. `initialize()` holds `lock(httpd,0)` from before `cthread_create_ex()`
+until after `cthread_manager_init()` (`httpd.c:303`…`:473`), and every pass of
+the socket loop begins in `process_clients()` → `http_process_clients()`, which
+ENQs that same resource. `lock()` is ENQ `RET=HAVE` (libc370 `@@enqdeq.c`), so
+a holder on another TCB makes it **wait** rather than fail — the socket thread
+cannot reach `accept()` until `mgr` is set or has failed. With a worker pool the
+array stays empty for the life of the server; `?target=HTTPD` prints its count.
+
+In the fallback there are no worker threads at all, so the accept, both walks
+and the `array_del()` in `httpclos()` all run on the socket thread. The one
+exception is a shutdown that reports `HTTPD041I` and detaches an unresponsive
+socket thread: `terminate()` then walks and frees the array from the main thread
+while that thread may still be running. The three NULL checks those walks used
+to carry are gone with #235.
 
 ### Response Pipeline
 

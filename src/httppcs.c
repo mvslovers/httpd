@@ -22,14 +22,9 @@ httppcs(void)
     goto quit;
 
 locked:
-    /* the NULL check below cannot fire -- httpd->httpc has no hole below its
-       count (docs/development.md, "Dynamic arrays") -- and is kept only as a
-       hedge on this array's unsynchronised readers elsewhere (#229) */
     count = array_count(&httpd->httpc);
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];
-        if (!httpc) continue;           /* no client handle? */
-
         http_process_client(httpc);
     }
     if (lockrc==0) unlock(httpd,0);
