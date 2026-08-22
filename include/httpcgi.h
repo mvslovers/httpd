@@ -57,7 +57,7 @@ typedef struct cib      CIB;        /* Console info block   — opaque    */
 ** httpd needs the layout: the three vector entries below take and return the
 ** pointer and never look inside it, which is exactly the contract HTTPD and
 ** CRED already have here.  One definition, in httpd.h, cannot diverge. */
-typedef struct httpcgi  HTTPCGI;    /* Route                — opaque    */
+typedef struct httproute HTTPROUTE; /* Route                — opaque    */
 #include <socket.h>                 /* struct in_addr                   */
 
 /* ------------------------------------------------------------------ */
@@ -152,7 +152,7 @@ struct httpm {
     int         binary;             /* 08 Binary flag                   */
 };                                  /* 0C (12 bytes)                    */
 
-/* struct httpcgi is deliberately NOT defined here -- see the opaque typedef
+/* struct httproute is deliberately NOT defined here -- see the opaque typedef
 ** in the forward-declaration block above. */
 
 /* HTTP function execution vector */
@@ -283,12 +283,12 @@ struct httpx {
                                     /* F8 process a client              */
     int         (*http_link)(HTTPC *, const char *);
                                     /* FC link to external program      */
-    HTTPCGI *   (*http_find_cgi)(HTTPD *httpd, const char *path);
-                                    /* 100 find cgi for path name       */
-    HTTPCGI *   (*http_add_cgi)(HTTPD *httpd, const char *pgm,
+    HTTPROUTE *   (*http_find_route)(HTTPD *httpd, const char *path);
+                                    /* 100 find route for path name       */
+    HTTPROUTE *   (*http_add_route)(HTTPD *httpd, const char *pgm,
                                 const char *path, int login);
-                                    /* 104 add cgi for pgm and path     */
-    int         (*http_process_cgi)(HTTPC *httpc, HTTPCGI *cgi);
+                                    /* 104 add route for pgm and path     */
+    int         (*http_process_route)(HTTPC *httpc, HTTPROUTE *route);
                                     /* 108 process CGI request          */
     void        *unused_10C;        /* 10C (was: mqtc_pub)              */
     unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
@@ -558,8 +558,8 @@ struct httpx {
 #define HTTP_LINK_IS_PGMRC(v) ((v) <= HTTP_LINK_EPGMRC_BASE)
 #define HTTP_LINK_PGMRC(v)    ((v) - HTTP_LINK_EPGMRC_BASE)
 
-#define http_find_cgi(httpd,path) \
-    ((httpx->http_find_cgi)((httpd),(path)))
+#define http_find_route(httpd,path) \
+    ((httpx->http_find_route)((httpd),(path)))
 
 /* http_cgi_subpool() -- the heap subpool this CGI's storage belongs to, or 0.
 **
@@ -586,11 +586,19 @@ struct httpx {
 /* The request heap subpool.  Keep in sync with httpd.h. */
 #define HTTP_CGI_SUBPOOL  5
 
-#define http_add_cgi(httpd,pgm,path,login) \
-    ((httpx->http_add_cgi)((httpd),(pgm),(path),(login)))
+#define http_add_route(httpd,pgm,path,login) \
+    ((httpx->http_add_route)((httpd),(pgm),(path),(login)))
 
-#define http_process_cgi(httpc,cgi) \
-    ((httpx->http_process_cgi)((httpc),(cgi)))
+#define http_process_route(httpc,route) \
+    ((httpx->http_process_route)((httpc),(route)))
+
+/* The names these three had before #105, kept because this header ships in the
+** lib tarball and out-of-tree module source is not greppable.  The vector
+** entries themselves never moved -- 0x100/0x104/0x108 -- and neither did the
+** external symbols HTTPFCGI/HTTPACGI/HTTPPCGI, so this is spelling only. */
+#define http_find_cgi(httpd,path)           http_find_route((httpd),(path))
+#define http_add_cgi(httpd,pgm,path,login)  http_add_route((httpd),(pgm),(path),(login))
+#define http_process_cgi(httpc,route)       http_process_route((httpc),(route))
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))

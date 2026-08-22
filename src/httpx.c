@@ -25,6 +25,15 @@
 #ifndef __clang__
 extern char httpd_abi_offsets[(offsetof(struct httpd, httpx) == 0x08 &&
                                offsetof(struct httpd, flag)  == 0x2C) ? 1 : -1];
+
+/* Same trick, for the one buffer overrun a rename can cause by accident.
+** httpacgi() writes HTTPROUTE_EYE into eye[8] with strcpy(), so the literal
+** may be at most 7 characters -- an 8-character one puts its NUL into wild at
+** +08, clearing the wildcard flag on every route with no abend and no message.
+** #105 came within a build of exactly that: renaming HTTPCGI_EYE mechanically
+** produced "HTTPROUTE", which is 9.  sizeof of a string literal counts the
+** NUL, so <= 8 is the test. */
+extern char httproute_eye_fits[(sizeof(HTTPROUTE_EYE) <= 8) ? 1 : -1];
 #endif
 
 /* static execution vector */
@@ -92,9 +101,9 @@ static HTTPX vect = {
     http_console,               /* F4 http_console()                */
     http_process_client,        /* F8 http_process_client()         */
     http_link,                  /* FC http_link()                   */
-    http_find_cgi,              /* 100 http_find_cgi()              */
-    http_add_cgi,               /* 104 http_add_cgi()               */
-    http_process_cgi,           /* 108 http_process_cgi()           */
+    http_find_route,            /* 100 http_find_route()            */
+    http_add_route,             /* 104 http_add_route()             */
+    http_process_route,         /* 108 http_process_route()         */
     NULL,                       /* 10C (was: mqtc_pub)              */
     http_xlate,                 /* 110 http_xlate()                 */
     &http_cp037,                /* 114 CP037 codepage pair          */

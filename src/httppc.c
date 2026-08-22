@@ -5,7 +5,7 @@
 #include "httpdmsg.h"
 
 static void resolve_credential(HTTPC *httpc);
-static void auth_gate(HTTPC *httpc, HTTPCGI *route);
+static void auth_gate(HTTPC *httpc, HTTPROUTE *route);
 static int  auth_required_response(HTTPC *httpc, UCHAR mode);
 static int  forbidden_response(HTTPC *httpc);
 static int  is_asset_exempt(const char *path);
@@ -18,7 +18,7 @@ httppc(HTTPC *httpc)
     int     rc  		= 0;
     char    *path;
     char	*debug;
-    HTTPCGI	*route;
+    HTTPROUTE	*route;
 
 #if 0
     http_enter("http_process_client()\n");
@@ -60,7 +60,7 @@ httppc(HTTPC *httpc)
         resolve_credential(httpc);
 
         /* find the route (MOD= CGI or LOC= static prefix) owning this path */
-        route = path ? http_find_cgi(httpd, path) : NULL;
+        route = path ? http_find_route(httpd, path) : NULL;
 
         /* /login and /logout are the auth UI endpoints: always dispatch them,
            in every mode, so an AUTH=FORM challenge can never lock itself out */
@@ -104,7 +104,7 @@ httppc(HTTPC *httpc)
             }
 
             /* path needs to be processed by external program */
-            rc = http_process_cgi(httpc, route);
+            rc = http_process_route(httpc, route);
             goto check_done;
         }
 
@@ -329,7 +329,7 @@ is_asset_exempt(const char *path)
 ** LOGIN bitmask it replaces.
 */
 static void
-auth_gate(HTTPC *httpc, HTTPCGI *route)
+auth_gate(HTTPC *httpc, HTTPROUTE *route)
 {
 	UCHAR	mode   = route ? route->auth : HTTP_AUTH_NONE;
 	int		authed = (httpc->cred && httpc->cred->id.addr == httpc->addr);

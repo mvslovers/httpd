@@ -685,16 +685,16 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
 /* apply_policy() - move the parsed policy onto a freshly registered route
 ** (the strdup'd RES= storage becomes AS-lifetime, like path/pgm), or release
 ** it if the route could not be registered.  This is the only writer of
-** cgi->resclass/resname, so the both-or-neither invariant parse_kv_tail
+** route->resclass/resname, so the both-or-neither invariant parse_kv_tail
 ** establishes holds for every registered route. */
 static void
-apply_policy(HTTPCGI *cgi, ROUTE_POLICY *pol)
+apply_policy(HTTPROUTE *route, ROUTE_POLICY *pol)
 {
-    if (cgi) {
-        cgi->auth     = pol->auth;
-        cgi->resattr  = pol->resattr;
-        cgi->resclass = pol->resclass;
-        cgi->resname  = pol->resname;
+    if (route) {
+        route->auth     = pol->auth;
+        route->resattr  = pol->resattr;
+        route->resclass = pol->resclass;
+        route->resname  = pol->resname;
     }
     else {
         free(pol->resclass);
@@ -761,7 +761,7 @@ parse_mod(HTTPD *httpd, const char *value)
     int   j;
     int   binds;
     ROUTE_POLICY pol;
-    HTTPCGI *cgi;
+    HTTPROUTE *route;
 
     /* the line cannot even be tokenized, so whether it carried an AUTH=/RES=
        policy is unknowable -- assume it did rather than start a server with a
@@ -819,26 +819,26 @@ parse_mod(HTTPD *httpd, const char *value)
     binds = policy_binds(&pol);
 
     if (pol.failed) {
-        cgi = NULL;                             /* refuse the route outright */
+        route = NULL;                             /* refuse the route outright */
         apply_policy(NULL, &pol);
     }
     else if (program[0]) {
         /* the 4th argument is the retired login flag (#105).  It stays in the
-           signature because http_add_cgi sits in the httpx vector at 0x104
+           signature because http_add_route sits in the httpx vector at 0x104
            and modules are compiled against it; httpacgi() ignores it. */
-        cgi = http_add_cgi(httpd, program, path, 0);
-        apply_policy(cgi, &pol);
-        if (cgi)
+        route = http_add_route(httpd, program, path, 0);
+        apply_policy(route, &pol);
+        if (route)
             wtof(MSG_MOD_REGISTERED, program, path);
         else
             wtof(MSG_MOD_NOT_REG, program, path);
     }
     else {
-        cgi = NULL;
+        route = NULL;
         apply_policy(NULL, &pol);               /* release RES= strings */
     }
 
-    if (!cgi && binds)
+    if (!route && binds)
         route_policy_lost(httpd, "MOD", path);
 
     free(tmp);
@@ -860,7 +860,7 @@ parse_loc(HTTPD *httpd, const char *value)
     int   ntok;
     int   binds;
     ROUTE_POLICY pol;
-    HTTPCGI *cgi;
+    HTTPROUTE *route;
 
     /* see parse_mod(): an untokenizable line is treated as policy-bearing */
     tmp = strdup(value);
@@ -888,20 +888,20 @@ parse_loc(HTTPD *httpd, const char *value)
     binds = policy_binds(&pol);
 
     if (pol.failed) {
-        cgi = NULL;                             /* refuse the route outright */
+        route = NULL;                             /* refuse the route outright */
         apply_policy(NULL, &pol);
     }
     else {
         /* pgm == NULL registers a program-less (static) route */
-        cgi = http_add_cgi(httpd, NULL, path, 0);
-        apply_policy(cgi, &pol);
-        if (cgi)
+        route = http_add_route(httpd, NULL, path, 0);
+        apply_policy(route, &pol);
+        if (route)
             wtof(MSG_LOC_REGISTERED, path);
         else
             wtof(MSG_LOC_NOT_REG, path);
     }
 
-    if (!cgi && binds)
+    if (!route && binds)
         route_policy_lost(httpd, "LOC", path);
 
     free(tmp);

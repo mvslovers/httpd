@@ -25,7 +25,7 @@ static int display_workers(HTTPD *httpd, HTTPC *httpc);
 
 static int display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs);
 static int display_ufssys(HTTPD *httpd, HTTPC *httpc, UFSSYS *sys);
-static int display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n);
+static int display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPROUTE *route, unsigned n);
 static int display_worker_row(HTTPD *httpd, HTTPC *httpc, CTHDWORK *worker, unsigned n);
 static int display_queue_data(HTTPD *httpd, HTTPC *httpc, CTHDQUE *q);
 #if 0 /* ufs370 internal types -- not available with libufs stub */
@@ -385,10 +385,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, 
         "<tr><td>+%04X</td>"
-        "<td><a href=\"?target=MOD&m=%p\">httpd->httpcgi</a></td>"
+        "<td><a href=\"?target=MOD&m=%p\">httpd->route</a></td>"
         "<td>Route Array (MOD= programs, LOC= static prefixes)</td>"
         "<td>%p</td></tr>\n", 
-        O(httpcgi), httpd->httpcgi, httpd->httpcgi);
+        O(route), httpd->route, httpd->route);
 
     http_printf(httpc, 
         "<tr><td>+%04X</td>"
@@ -1603,8 +1603,8 @@ static int
 display_route(HTTPD *httpd, HTTPC *httpc)
 {
     int         rc      = 0;
-    HTTPCGI     *route  = NULL;
-    HTTPCGI     **array = NULL;
+    HTTPROUTE     *route  = NULL;
+    HTTPROUTE     **array = NULL;
     char        *memory = NULL;
     unsigned    n, count;
 
@@ -1619,16 +1619,16 @@ display_route(HTTPD *httpd, HTTPC *httpc)
         goto done;
     }
 
-    array = (HTTPCGI**) strtoul(memory, NULL, 16);
+    array = (HTTPROUTE**) strtoul(memory, NULL, 16);
     count = array_count(&array);
 
     http_printf(httpc, "<h2>Route Array %p</h2>", array);
 #if 0
     http_printf(httpc,
         "<embed type=\"text/html\" src=\"/.dm?t=%s&m=%p&l=%u\" width=\"800\" height=\"140\">\n",
-        "Route%20Array", array, count*sizeof(HTTPCGI*));
+        "Route%20Array", array, count*sizeof(HTTPROUTE*));
 #endif
-    display_memory(httpd, httpc, "Route Array", array, count*sizeof(HTTPCGI*), 16);
+    display_memory(httpd, httpc, "Route Array", array, count*sizeof(HTTPROUTE*), 16);
 
 
     for(n=0; n < count; n++) {
@@ -1645,7 +1645,7 @@ quit:
 	return 0;
 }
 
-/* auth_mode_text() - decode HTTPCGI.auth (HTTP_AUTH_*).  Since #105 these four
+/* auth_mode_text() - decode HTTPROUTE.auth (HTTP_AUTH_*).  Since #105 these four
 ** are the whole set: there is no "unset" value that inherits a policy from
 ** somewhere else, so what this cell says is what gates the route. */
 static const char *
@@ -1660,7 +1660,7 @@ auth_mode_text(UCHAR auth)
     }
 }
 
-/* racf_attr_text() - decode HTTPCGI.resattr.  0 is the common value: httpprm
+/* racf_attr_text() - decode HTTPROUTE.resattr.  0 is the common value: httpprm
 ** only sets resattr when RES= is present, and racf_auth() assumes READ for 0. */
 static const char *
 racf_attr_text(UCHAR attr)
@@ -1676,7 +1676,7 @@ racf_attr_text(UCHAR attr)
 }
 
 static int
-display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n)
+display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPROUTE *route, unsigned n)
 {
     char        title[40];
 
@@ -1684,7 +1684,7 @@ display_route_row(HTTPD *httpd, HTTPC *httpc, HTTPCGI *route, unsigned n)
 
     http_printf(httpc, "<h3>%s</h3>\n", title);
 
-    display_memory(httpd, httpc, title, route, sizeof(HTTPCGI), 16);
+    display_memory(httpd, httpc, title, route, sizeof(HTTPROUTE), 16);
 
     http_printf(httpc, "<table>\n");
 
