@@ -198,19 +198,19 @@ res_probe(HTTPD *httpd)
 	unsigned	count;
 	unsigned	n;
 
-	if (!httpd->httpcgi) return;
+	if (!httpd->route) return;
 
-	count = array_count(&httpd->httpcgi);
+	count = array_count(&httpd->route);
 	for (n = 0; n < count; n++) {
-		HTTPCGI *cgi = httpd->httpcgi[n];
+		HTTPROUTE *route = httpd->route[n];
 
-		if (!cgi || !cgi->resclass || !cgi->resname) continue;
-		if (cgi->auth == HTTP_AUTH_NONE) continue;
+		if (!route || !route->resclass || !route->resname) continue;
+		if (route->auth == HTTP_AUTH_NONE) continue;
 
-		if (racf_auth(NULL, cgi->resclass, cgi->resname, cgi->resattr)
+		if (racf_auth(NULL, route->resclass, route->resname, route->resattr)
 		    == HTTP_RACF_NOTPROT) {
 			wtof(MSG_RES_NO_PROFILE,
-			     cgi->resclass, cgi->resname, cgi->path);
+			     route->resclass, route->resname, route->path);
 		}
 	}
 }
@@ -553,18 +553,18 @@ terminate(void)
     }
 
     /* cleanup the CGI array */
-    if (httpd->httpcgi) {
-        count = array_count(&httpd->httpcgi);
+    if (httpd->route) {
+        count = array_count(&httpd->route);
 
         for(n=0; n < count; n++) {
-            HTTPCGI *cgi = httpd->httpcgi[n];
-			if (!cgi) continue;
-			if (cgi->pgm) 	free(cgi->pgm);
-			if (cgi->path) 	free(cgi->path); 
-            free(cgi);
+            HTTPROUTE *route = httpd->route[n];
+			if (!route) continue;
+			if (route->pgm) 	free(route->pgm);
+			if (route->path) 	free(route->path); 
+            free(route);
         }
 
-        array_free(&httpd->httpcgi);
+        array_free(&httpd->route);
     }
 
     /* free the per-CGI context pointer array (M11); the blocks it points to

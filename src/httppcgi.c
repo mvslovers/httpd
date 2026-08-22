@@ -37,19 +37,19 @@ reclaim(unsigned char sp)
 }
 
 extern int
-httppcgi(HTTPC *httpc, HTTPCGI *cgi)
+httppcgi(HTTPC *httpc, HTTPROUTE *route)
 {
     int         rc      = 0;
 
     http_enter("httppcgi()\n");
 
     /* link to external program */
-    rc = http_link(httpc, cgi->pgm);
+    rc = http_link(httpc, route->pgm);
     if (rc < 0) {
         /* The module did not run to completion.  Which of the possible
         ** reasons it was decides the wording only -- everything below the
         ** reason text is common to all of them (#131). */
-        const char  *pgm    = cgi->pgm ? cgi->pgm : "(none)";
+        const char  *pgm    = route->pgm ? route->pgm : "(none)";
         const char  *reason = NULL;
         char        detail[32];
 

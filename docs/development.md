@@ -89,7 +89,7 @@ Each HTTP request flows through these states:
 
 **HTTPX** — Function vector table (~270 bytes). Contains ~68 function pointers that server modules use to call server functions without linking directly to server code. server modules receive this via `httpd->httpx`.
 
-**HTTPCGI** — Module registration. Maps a URL pattern or file extension to a load module name. (Note: the struct is still named `HTTPCGI` internally — this will be renamed in a future release.)
+**HTTPROUTE** — One route. Maps a URL pattern or file extension to a load module name (`MOD=`), or carries no program at all (`LOC=`), and holds the route's auth policy. Renamed from `HTTPCGI` in #105.
 
 **HTTPV** — Environment variable. Header followed by `name\0value\0` storage. Allocated per variable, freed on request reset.
 
@@ -153,7 +153,7 @@ The difference matters: [Traditional CGI](https://publib.boulder.ibm.com/httpser
 
 This means you cannot write a standard CGI script (e.g. a REXX program that reads environment variables and writes to stdout) and expect it to work with HTTPD. Server modules must be compiled as MVS load modules and use the HTTPX API.
 
-> **Note on naming:** Some internal code still uses the legacy name "CGI" (e.g. `httpcgi.h`, `HTTPCGI` struct, `cgimain` entry point). This will be renamed in a future release. The Parmlib keyword has already been changed from `CGI=` to `MOD=`.
+> **Note on naming:** The route type was renamed `HTTPCGI` → `HTTPROUTE` in #105, and `http_find_cgi` / `http_add_cgi` / `http_process_cgi` became `http_find_route` / `http_add_route` / `http_process_route`. What did **not** change, and must not: the httpx vector offsets `0x100`/`0x104`/`0x108`, the external symbols `HTTPFCGI`/`HTTPACGI`/`HTTPPCGI`, and the field layout. `httpcgi.h` keeps the old macro spellings as aliases for out-of-tree modules. The header filename, the `cgimain` entry point and `http_cgi_subpool()` still say CGI — those really are about CGI programs. The Parmlib keyword changed from `CGI=` to `MOD=` earlier.
 
 Modules are registered via the Parmlib:
 

@@ -56,7 +56,7 @@ typedef struct httpc    HTTPC;      /* HTTP Client                  */
 typedef struct httpm    HTTPM;      /* HTTP Mime                    */
 typedef struct httpx    HTTPX;      /* HTTP function vector         */
 typedef struct httpv    HTTPV;      /* HTTP Variables               */
-typedef struct httpcgi  HTTPCGI;    /* HTTP CGI path and programs   */
+typedef struct httproute HTTPROUTE; /* One route (MOD= or LOC=)     */
 typedef struct smf_httpd_request SMF_HTTPD_REQ;     /* SMF request  */
 typedef struct smf_httpd_session SMF_HTTPD_SESS;    /* SMF session  */
 typedef enum   cstate   CSTATE;     /* HTTP Client state            */
@@ -118,7 +118,7 @@ struct httpd {
     CTHDTASK    *socket_thread;     /* 30 socket_thread subtask     */
     CTHDMGR     *mgr;               /* 34 worker_thread manager     */
     char        rname[12];          /* 38 resource name             */
-    HTTPCGI     **httpcgi;          /* 44 CGI path and programs     */
+    HTTPROUTE   **route;            /* 44 route table               */
 	time64_t 	uptime;				/* 48 Server startup time		*/
     void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
@@ -264,10 +264,16 @@ struct httpm {
    int          binary;             /* 08 Binary flag               */
 };                                  /* 0C (12 bytes)                */
 
-/* CGI callback struct */
-struct httpcgi {
+/* One route: a MOD= entry with a program, or a LOC= static prefix without one
+** (pgm == NULL).  Both carry the same auth policy, which is what stopped
+** "CGI" being an honest name for this (#105). */
+struct httproute {
     UCHAR       eye[8];             /* 00 Eye catcher for dumps     */
-#define HTTPCGI_EYE  "HTTPCGI"      /* ...                          */
+/* 7 characters, and it has to stay that way: httpacgi() sets this with
+** strcpy(), so the NUL is the 8th byte of eye[8].  A longer name would run
+** into wild at +08 and silently switch wildcard matching off.  Asserted at
+** compile time in httpx.c. */
+#define HTTPROUTE_EYE  "*ROUTE*"    /* ...                          */
     UCHAR       wild;               /* 08 '*' or '?' in path name   */
 	UCHAR		unused_09;			/* 09 (was: login required --
 									   retired with the global LOGIN
@@ -277,7 +283,7 @@ struct httpcgi {
     USHRT       len;                /* 0A Path length               */
     char  		*path;              /* 0C Path name to match        */
     char  		*pgm;               /* 10 program (NULL = LOC route) */
-    /* per-route auth policy -- append-only.  HTTPCGI is heap-allocated and
+    /* per-route auth policy -- append-only.  HTTPROUTE is heap-allocated and
        opaque to CGI modules (httpcgi.h), so appending fields is safe. */
     UCHAR       auth;               /* 14 AUTH mode (HTTP_AUTH_*)   */
     UCHAR       resattr;            /* 15 RACF attr (RACF_ATTR_*)   */
@@ -288,7 +294,7 @@ struct httpcgi {
     char        *resname;           /* 1C RACF resource name        */
 };									/* 20 (32 bytes)				*/
 
-/* HTTPCGI.auth -- per-route authentication mode, and since #105 the ONLY
+/* HTTPROUTE.auth -- per-route authentication mode, and since #105 the ONLY
    authentication policy: the global LOGIN bitmask that a route without AUTH=
    used to inherit is gone, and with it HTTP_AUTH_DEFAULT.
 
@@ -546,11 +552,11 @@ struct httpx {
                                     /* F8 process a client          */
     int         (*http_link)(HTTPC *, const char *);
                                     /* FC link to external program  */
-    HTTPCGI *   (*http_find_cgi)(HTTPD *httpd, const char *path);
-                                    /* 100 find cgi for path name   */
-    HTTPCGI *   (*http_add_cgi)(HTTPD *httpd, const char *pgm, const char *path, int login);
-                                    /* 104 add cgi for pgm and path */
-    int         (*http_process_cgi)(HTTPC *httpc, HTTPCGI *cgi);
+    HTTPROUTE *   (*http_find_route)(HTTPD *httpd, const char *path);
+                                    /* 100 find route for path name   */
+    HTTPROUTE *   (*http_add_route)(HTTPD *httpd, const char *pgm, const char *path, int login);
+                                    /* 104 add route for pgm and path */
+    int         (*http_process_route)(HTTPC *httpc, HTTPROUTE *route);
                                     /* 108 process CGI request      */
     void        *unused_10C;        /* 10C (was: mqtc_pub)          */
     unsigned char *(*http_xlate)(unsigned char *, int, const unsigned char *);
@@ -641,10 +647,10 @@ extern char *http_ntoa(struct in_addr in)                               asm("HTT
 extern int http_console(CIB *cib)                                       asm("HTTPCONS");
 extern int http_process_client(HTTPC *)                                 asm("HTTPPC");
 extern int http_link(HTTPC *, const char *)                             asm("HTTPLINK");
-extern HTTPCGI *http_find_cgi(HTTPD *httpd, const char *path)           asm("HTTPFCGI");
+extern HTTPROUTE *http_find_route(HTTPD *httpd, const char *path)       asm("HTTPFCGI");
 extern UCHAR http_cgi_subpool(HTTPC *)                                  asm("HTTPCGSP");
-extern HTTPCGI *http_add_cgi(HTTPD *httpd, const char *pgm, const char *path, int login) asm("HTTPACGI");
-extern int http_process_cgi(HTTPC *httpc, HTTPCGI *cgi)                 asm("HTTPPCGI");
+extern HTTPROUTE *http_add_route(HTTPD *httpd, const char *pgm, const char *path, int login) asm("HTTPACGI");
+extern int http_process_route(HTTPC *httpc, HTTPROUTE *route)           asm("HTTPPCGI");
 extern unsigned char *http_xlate(unsigned char *, int, const unsigned char *) asm("HTTPXLAT");
 extern UFS *http_get_ufs(HTTPC *)                                          asm("HTTPGUFS");
 extern void *http_cgictx_get(HTTPD *, const char *, unsigned)              asm("HTTPGCTX");
@@ -869,17 +875,17 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 #define http_link(httpc,pgm) \
     ((httpx->http_link)((httpc),(pgm)))
 
-#define http_find_cgi(httpd,path) \
-    ((httpx->http_find_cgi)((httpd),(path)))
+#define http_find_route(httpd,path) \
+    ((httpx->http_find_route)((httpd),(path)))
 
 #define http_cgi_subpool(httpc) \
     ((httpx->http_cgi_subpool)((httpc)))
 
-#define http_add_cgi(httpd,pgm,path,login) \
-    ((httpx->http_add_cgi)((httpd),(pgm),(path),(login)))
+#define http_add_route(httpd,pgm,path,login) \
+    ((httpx->http_add_route)((httpd),(pgm),(path),(login)))
 
-#define http_process_cgi(httpc,cgi) \
-    ((httpx->http_process_cgi)((httpc),(cgi)))
+#define http_process_route(httpc,route) \
+    ((httpx->http_process_route)((httpc),(route)))
 
 #define http_xlate(buf,len,tbl) \
     ((httpx->http_xlate)((buf),(len),(tbl)))

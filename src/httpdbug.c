@@ -95,9 +95,9 @@ dump_route(HTTPD *httpd, HTTPC *httpc)
 	http_printf(httpc, "   (Auth=NONE is public -- either AUTH=NONE or no"
 		" AUTH= keyword at all, which since #105 mean the same thing)\n");
 
-    count = array_count(&httpd->httpcgi);
+    count = array_count(&httpd->route);
     for (n=0; n < count; n++) {
-        HTTPCGI *p = httpd->httpcgi[n];
+        HTTPROUTE *p = httpd->route[n];
 
         if (!p) continue;
 

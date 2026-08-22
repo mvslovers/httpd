@@ -5,37 +5,37 @@
    httpcmp(), which had no prototype in scope. */
 #undef http_cmp
 
-HTTPCGI *httpfcgi(HTTPD *httpd, const char *path)
+HTTPROUTE *httpfcgi(HTTPD *httpd, const char *path)
 {
-    HTTPCGI     *cgi    = NULL;
+    HTTPROUTE     *route    = NULL;
     unsigned    count;
     unsigned    n;
 
     if (!httpd) goto quit;
     if (!path) goto quit;
 
-    count = array_count(&httpd->httpcgi);
+    count = array_count(&httpd->route);
     for (n=0; n < count; n++) {
-        HTTPCGI *p = httpd->httpcgi[n];
+        HTTPROUTE *p = httpd->route[n];
 
         if (!p) continue;
         if (p->wild) {
             /* use pattern matching */
             if (__patmat(path, p->path)) {
-                cgi = p;
+                route = p;
                 break;
             }
         }
         else {
             /* use caseless string compare */
             if (http_cmp(path, p->path)==0) {
-                cgi = p;
+                route = p;
                 break;
             }
         }
     }
 
 quit:
-    return cgi;
+    return route;
 }
 

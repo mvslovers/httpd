@@ -142,7 +142,7 @@ httpd.c (main / initialize)
 
 **HTTPX (~270 bytes):** Function vector table. CGI modules call all server functions through this vector — they never link directly to HTTPD code. **Never change existing offsets** — only append new function pointers at the end.
 
-**HTTPCGI (32 bytes):** One route. URL pattern → load module name (`MOD=`) or NULL for a program-less static prefix (`LOC=`), plus the per-route auth policy (`auth`, `resattr`, `resclass`, `resname`).
+**HTTPROUTE (32 bytes):** One route. URL pattern → load module name (`MOD=`) or NULL for a program-less static prefix (`LOC=`), plus the per-route auth policy (`auth`, `resattr`, `resclass`, `resname`). Called `HTTPCGI` until #105; a `LOC=` route has no program, so the old name described only half of what the struct models. Defined once, in `httpd.h` — `httpcgi.h` publishes it opaque.
 
 ### Request Processing Pipeline
 
@@ -369,7 +369,7 @@ Their sources sit in `tbd/`, outside the build; see `tbd/README.md`. So the
 three display modules above are the whole set now, and `/jes/status` is not a
 JES2 cross-check any more — use mvsMF's jobs API.
 
-**Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPCGI`,
+**Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPROUTE`,
 so `auth` (`+14`) is named and spelled out — that is the field the request is
 gated on, and since #105 the only one: the global `LOGIN` bitmask is retired,
 `+09` is a reserved byte, and there is no `AUTH=DEFAULT` any more. A route
