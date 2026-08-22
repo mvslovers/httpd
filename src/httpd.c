@@ -204,7 +204,7 @@ res_probe(HTTPD *httpd)
 	for (n = 0; n < count; n++) {
 		HTTPROUTE *route = httpd->route[n];
 
-		if (!route || !route->resclass || !route->resname) continue;
+		if (!route->resclass || !route->resname) continue;
 		if (route->auth == HTTP_AUTH_NONE) continue;
 
 		if (racf_auth(NULL, route->resclass, route->resname, route->resattr)
@@ -580,7 +580,6 @@ terminate(void)
 
         for(n=0; n < count; n++) {
             HTTPROUTE *route = httpd->route[n];
-			if (!route) continue;
 			if (route->pgm) 	free(route->pgm);
 			if (route->path) 	free(route->path); 
             free(route);
@@ -639,11 +638,24 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
         memset(excp, 0, sizeof(fd_set));
     }
 
-    /* NOTE: httpd->httpc[] is read here without lock.
-     * This is safe because build_fd_set() runs in the same
-     * socket_thread as array_add(). array_del() in httpclos
-     * runs in worker threads but sets entries to NULL before
-     * removal, and we check for NULL below.
+    /* NOTE: httpd->httpc[] is read here without lock.  build_fd_set() runs in
+     * the same socket_thread as the array_add(), but the array_del() in
+     * httpclos() runs on a worker.
+     *
+     * This used to claim array_del() "sets entries to NULL before removal, and
+     * we check for NULL below".  It does not: arraydel() shifts every later
+     * element left and NULLs only the slot past the new count (libc370
+     * @@ardel.c), so the NULL check below can never fire and is not what makes
+     * the read safe.  What a concurrent delete can do is shift an entry past
+     * the index this loop already passed -- skipping a client for one select()
+     * pass.  Benign here (the next pass picks it up), but it is a shift, not a
+     * hole; do not reason about this array as if it had holes.  See
+     * docs/development.md, "Dynamic arrays: no holes below the count".
+     *
+     * The NULL check below therefore stays as a deliberate hedge on an
+     * unsynchronised read, not because a hole can occur.  #229 removed the
+     * equivalent dead checks on httpd->route and httpc->env, which nothing
+     * races, and left this one pending a decision about the locking here.
      */
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];
@@ -686,7 +698,9 @@ process_clients(fd_set *read, fd_set *write, fd_set *excp)
     goto quit;
 
 httpd_locked:
-    /* look for any clients that need to be closed */
+    /* look for any clients that need to be closed.  The NULL check below
+       cannot fire -- see the note in build_fd_set() and docs/development.md,
+       "Dynamic arrays" -- and is kept as a hedge, not against a hole (#229). */
     count = array_count(&httpd->httpc);
     for(n=0; n < count; n++) {
         httpc = httpd->httpc[n];

@@ -421,8 +421,7 @@ ssi_printenv(HTTPC *httpc)
     ssi_printf(httpc, " <tr><th>Variable</th><th>Value</th></tr>\n");
     for(n=0; n<count; n++) {
         v = httpc->env[n];
-        if (!v) continue;
-        
+
         ssi_printf(httpc, " <tr><td>%s</td><td>%s</td></tr>\n", v->name, v->value);
     }
     ssi_printf(httpc, "</table>\n");
