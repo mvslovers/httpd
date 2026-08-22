@@ -17,7 +17,6 @@ httppc(HTTPC *httpc)
 	HTTPD 	*httpd 		= httpc->httpd;
     int     rc  		= 0;
     char    *path;
-    char	*debug;
     HTTPROUTE	*route;
 
 #if 0
@@ -135,10 +134,6 @@ httppc(HTTPC *httpc)
 
 check_done:
     if (httpc->state==CSTATE_DONE) {
-		debug = http_get_env(httpc, "QUERY_DEBUG");
-		if (debug) {
-			http_debug(httpc, debug);
-		}
         http_done(httpc);
     }
     if (httpc->state==CSTATE_REPORT) {
