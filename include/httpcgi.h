@@ -48,6 +48,16 @@ typedef struct ufs      UFS;        /* UFS filesystem       — opaque    */
 typedef struct ufsfile  UFSFILE;    /* UFS file handle      — opaque    */
 #endif
 typedef struct cib      CIB;        /* Console info block   — opaque    */
+/* A route (a MOD= program or a LOC= static prefix).  Opaque on purpose: this
+** header used to carry its own copy of the definition, and that copy went
+** stale -- it still described the 20-byte struct from before the per-route
+** auth policy (#98) appended auth/resattr/resclass/resname, while httpd.h had
+** 32.  The visible prefix matched, so nothing broke, but a module doing
+** sizeof() or allocating one would have been 12 bytes short.  Nothing outside
+** httpd needs the layout: the three vector entries below take and return the
+** pointer and never look inside it, which is exactly the contract HTTPD and
+** CRED already have here.  One definition, in httpd.h, cannot diverge. */
+typedef struct httpcgi  HTTPCGI;    /* Route                — opaque    */
 #include <socket.h>                 /* struct in_addr                   */
 
 /* ------------------------------------------------------------------ */
@@ -58,7 +68,6 @@ typedef struct httpc    HTTPC;      /* HTTP Client                      */
 typedef struct httpm    HTTPM;      /* HTTP Mime type                   */
 typedef struct httpx    HTTPX;      /* HTTP function vector             */
 typedef struct httpv    HTTPV;      /* HTTP variable                    */
-typedef struct httpcgi  HTTPCGI;    /* CGI path registration            */
 typedef enum   cstate   CSTATE;     /* HTTP Client state                */
 typedef enum   rdw      RDW;        /* RDW option                       */
 
@@ -143,18 +152,8 @@ struct httpm {
     int         binary;             /* 08 Binary flag                   */
 };                                  /* 0C (12 bytes)                    */
 
-/* CGI path registration */
-struct httpcgi {
-    UCHAR       eye[8];             /* 00 Eye catcher                   */
-#define HTTPCGI_EYE  "HTTPCGI"      /* ...                              */
-    UCHAR       wild;               /* 08 '*' or '?' in path name       */
-    UCHAR       unused_09;          /* 09 (was: login required -- the
-                                       global LOGIN bitmask it belonged
-                                       to was retired in #105)          */
-    USHRT       len;                /* 0A Path length                   */
-    char        *path;              /* 0C Path name to match            */
-    char        *pgm;               /* 10 external program name         */
-};                                  /* 14 (20 bytes)                    */
+/* struct httpcgi is deliberately NOT defined here -- see the opaque typedef
+** in the forward-declaration block above. */
 
 /* HTTP function execution vector */
 struct httpx {
