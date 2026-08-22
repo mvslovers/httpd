@@ -8,7 +8,8 @@ items are waiting on a decision rather than on code.
 Refresh it after every merge — an entry that outlives its issue is worse than no
 file, because it reads as current.
 
-*Last reconciled against the tracker: 2026-08-22, four issues open.*
+*Last reconciled against the tracker: 2026-08-22, four issues open (#235 closed
+by PR #236, #237 filed out of it).*
 
 ---
 
@@ -49,33 +50,7 @@ window between workers are untouched.
 
 ---
 
-## 2 · #235 — `build_fd_set()` reads `httpd->httpc[]` without the lock
-
-*type:bug · best value per unit of effort*
-
-Filed out of #229. The comment that justified the lock-free read claimed
-`array_del()` "sets entries to NULL before removal"; `@@ardel.c` shifts every
-later element left and NULLs only the slot past the new count. #229 corrected the
-comment and deliberately left the locking alone, so the read now stands without
-an argument.
-
-The hazard is not a NULL — the array has no holes below its count (see
-`docs/development.md`, "Dynamic arrays"). It is dereferencing an `HTTPC` that
-`httpclos()` is in the middle of `free()`ing.
-
-**Start with the cheap question, because it may dissolve the issue rather than
-fix it:** is `httpd->httpc` populated in any supported configuration?
-`array_add(&httpd->httpc, httpc)` at `httpd.c:889` runs only in the **no thread
-manager** fallback; with CTHDMGR the accepted client goes to
-`cthread_queue_add()` and never enters the array. If it is dead, the array, the
-three walks over it and this issue all go away together.
-
-Either outcome also resolves the three `if (!httpc) continue;` guards, which
-#229 left in place labelled as a deliberate hedge pending this decision.
-
----
-
-## 3 · #233 — `HTTPD400E` blames the configuration for failures that are not
+## 2 · #233 — `HTTPD400E` blames the configuration for failures that are not
 
 *priority:medium · type:cleanup · the fastest win*
 
@@ -89,6 +64,28 @@ On the fifth path it is redundant: `HTTPD420E` already ends with
 `HTTPD WILL NOT START`.
 
 One call site (`httpd.c:324`), tightly scoped.
+
+---
+
+## 3 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+
+*type:bug · latent, cheap*
+
+`httpclos()` brackets its walk with an unconditional `lock(httpd,0)` /
+`unlock(httpd,0)`. ENQ ownership is per TCB and not counted (libc370 `@@lk.c`),
+so when `process_clients()` calls `http_close()` while holding that lock, the
+inner `lock()` gets rc 8 and the inner DEQ releases the *outer* holder's ENQ.
+
+Nothing breaks today — only a `break` follows the `http_close()` — and it is the
+one place in the server that does not use the `if (lockrc==0) unlock(...)` form
+every other call site uses. Filed out of #235, which also bounds it: the walk
+only finds a client to close when the server came up without a worker pool, so
+the nesting is rare on top of being harmless. Fix it for the next reader, not
+for a live symptom.
+
+The issue carries a second, unconfirmed observation for the same change:
+`process_clients()` appears to call `http_process_clients()` twice per pass
+(`httpd.c:684` and `:691`).
 
 ---
 
@@ -110,12 +107,10 @@ Nothing is broken today; this is placement hygiene.
 ## Suggested sequencing
 
 Not the same as the ranking above, because #176's next step is a conversation
-and #235's is an hour of reading.
+rather than code.
 
-1. **#235, the clarification step only** — establish whether `httpd->httpc` is
-   reachable at all. Cheap, and it decides whether the rest is a lock fix or a
-   deletion.
-2. **#233** — small, self-contained, operator-facing.
+1. **#233** — small, self-contained, operator-facing.
+2. **#237** — smaller still, and the reading behind it is already done in #235.
 3. **#176** — needs a direction decided first (per-task ACEE vs. removing the
    switch). That is a decision, not code.
 4. **#198** — whenever the region map is being looked at anyway.
@@ -123,6 +118,23 @@ and #235's is an hour of reading.
 ---
 
 ## Recently landed
+
+- **#235** — *`build_fd_set()` reads `httpd->httpc[]` without the lock*
+  (PR #236). Settled by reading, not by locking: the array has exactly one
+  writer, the socket thread, so the lock-free read stands. The issue's
+  mitigating assumption holds, and for a firmer reason than it gave —
+  `initialize()` holds `lock(httpd,0)` across both the socket-thread create and
+  `cthread_manager_init()`, and the socket loop's first act ENQs that same
+  resource (`RET=HAVE`, so it waits), so the thread cannot accept before `mgr`
+  is decided. No startup window; the array is populated only when the manager
+  failed to initialize, and then no worker threads exist at all. The shutdown
+  force-detach path (`HTTPD041I`) is the one second-writer exception and is now
+  written down. The three `if (!httpc) continue;` guards are gone. Spawned #237.
+
+  **Left open deliberately:** the array now has exactly one producer, the
+  no-worker fallback. Whether that fallback should exist — whether a server with
+  no worker pool ought to start at all — is the question `httpd.c:379-385`
+  defers to #226, not something this PR settled.
 
 - **#229** — *Write down the array contract instead of hedging against it*
   (PR #234, merged 2026-08-22, `3820a3f`). Removed five dead NULL guards on
