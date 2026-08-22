@@ -24,6 +24,13 @@
 extern int sleep(unsigned seconds);
 extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff */
 
+/* Seconds to let the stack settle after close_stale_port() closed something,
+** before the immediate rebind (#224).  Deliberately NOT httpd->bind_sleep,
+** which defaults to 10: that is the fallback retry cadence, and paying it on
+** the recovery path would make every restart-after-a-crash ten times slower
+** than it needs to be.  2 is the value this sweep has always used. */
+#define STALE_PORT_SETTLE   2
+
 /* parmlib_name() - resolve what the HTTPPRM DD actually points at, e.g.
 ** "SYS2.PARMLIB(HTTPPRM0)".  The STC PROC makes the member a startup choice
 ** (S HTTPD,M=HTTPPRM1), so "which member is this server running?" is a real
@@ -94,7 +101,7 @@ static void parse_loc(HTTPD *httpd, const char *value);
 static void report_login_retired(HTTPD *httpd, const char *value);
 static void report_tzoffset_retired(HTTPD *httpd);
 static int  do_bind(HTTPD *httpd);
-static void close_stale_port(int port);
+static int  close_stale_port(int port, int skip);
 static char *trim(char *s);
 
 __asm__("\n&FUNC    SETC 'http_config'");
@@ -1019,6 +1026,7 @@ do_bind(HTTPD *httpd)
 {
     int                 sock;
     int                 rc;
+    int                 error;
     int                 i;
     struct sockaddr_in  serv_addr;
     char                enq_rname[24];
@@ -1056,10 +1064,6 @@ do_bind(HTTPD *httpd)
         return 8;
     }
 
-    /* close sockets that are using this port.  Safe only because the ENQ
-       above ruled out a live instance on it -- see #224 for the rest. */
-    close_stale_port(httpd->port);
-
     /* create listener socket */
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
@@ -1073,10 +1077,31 @@ do_bind(HTTPD *httpd)
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port        = htons(httpd->port);
 
-    rc = bind(sock, &serv_addr, sizeof(serv_addr));
+    /* Capture errno immediately: close_stale_port() below issues getsockname()
+       and closesocket(), either of which clobbers it before it is reported. */
+    rc    = bind(sock, &serv_addr, sizeof(serv_addr));
+    error = (rc < 0) ? errno : 0;
+
+    /* Only a bind that actually failed with EADDRINUSE justifies the sweep
+       (#224).  It used to run unconditionally, before the socket even existed,
+       which is how it came to close a LIVE listener; and it ran a second time
+       after the retries had failed, immediately before `return 8`, where it
+       could not help the start it was part of.  Here it is a recovery step for
+       a port that is demonstrably blocked, and the ENQ above has already ruled
+       out another HTTPD holding it. */
+    if (rc < 0 && error == EADDRINUSE) {
+        if (close_stale_port(httpd->port, sock) > 0) {
+            /* give the stack a moment to release what was just closed, then
+               retry at once -- the bind_tries loop below is the fallback, not
+               the first resort */
+            sleep(STALE_PORT_SETTLE);
+            rc    = bind(sock, &serv_addr, sizeof(serv_addr));
+            error = (rc < 0) ? errno : 0;
+        }
+    }
+
     if (rc < 0) {
-        int error = errno;
-        wtof(MSG_CFG_BIND, rc, errno);
+        wtof(MSG_CFG_BIND, rc, error);
         if (error == EADDRINUSE) {
             for (i = 0; i < httpd->bind_tries; i++) {
                 wtof(MSG_CFG_BIND_RETRY, httpd->port);
@@ -1088,7 +1113,6 @@ do_bind(HTTPD *httpd)
         if (rc < 0) {
             wtof(MSG_CFG_BIND, rc, errno);
             closesocket(sock);
-            close_stale_port(httpd->port);
             return 8;
         }
     }
@@ -1111,17 +1135,37 @@ do_bind(HTTPD *httpd)
 }
 
 /* ====================================================================
-** Close sockets bound to a given port (stale from previous instance)
+** Close sockets bound to a given port (stale from previous instance).
+** Returns the number closed.
+**
+** EVERY match is closed, not just the first (#224).  A server that ended
+** without closing its sockets leaves behind the listener AND every connection
+** it had accepted -- an accepted socket's local address is the listen port
+** too, so getsockname() matches it -- and each one keeps the port occupied.
+** Closing one was therefore almost never enough.
+**
+** `skip` is the caller's own descriptor.  It matters here in a way it did not
+** before: this used to run before socket() had been called at all, and now it
+** runs with a live socket the caller is about to bind.  A failed bind() may
+** still leave that descriptor in the table with a local port set, and closing
+** it would leave the caller binding a closed socket.
+**
+** The table this walks lives in Hercules and is global to the emulator, not
+** per address space.  That is why a dead STC's leftovers are visible here at
+** all -- and why the caller must have ruled out a live holder first.
 ** ================================================================= */
-static void
-close_stale_port(int port)
+static int
+close_stale_port(int port, int skip)
 {
     int                 rc;
     int                 i;
     int                 addrlen;
+    int                 closed = 0;
     struct sockaddr     addr;
 
     for (i = 1; i < FD_SETSIZE; i++) {
+        if (i == skip) continue;
+
         addrlen = sizeof(addr);
         rc = getsockname(i, &addr, &addrlen);
         if (rc == 0) {
@@ -1129,9 +1173,10 @@ close_stale_port(int port)
             if (in->sin_port == port) {
                 wtof(MSG_STALE_SOCKET, i, in->sin_port);
                 closesocket(i);
-                sleep(2);
-                break;
+                closed++;
             }
         }
     }
+
+    return closed;
 }
