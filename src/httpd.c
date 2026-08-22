@@ -215,9 +215,22 @@ res_probe(HTTPD *httpd)
 	}
 }
 
-static void
+/* initialize() - returns the step return code: 0 when the server came up, 8
+** when it refused to.  It used to be void, which is how a Parmlib error the
+** server explicitly refuses to start on still ended the step CC 0000 (#226):
+** http_config() returned 8, initialize() acted on it, and the value had
+** nowhere to go.  main() then inferred the failure from !httpd->listen, and an
+** inference carries no severity -- so in JES a refused configuration was
+** indistinguishable from a clean P HTTPD, for $DJ, for an automation rule
+** keyed on COND CODE, and for anything that restarts a failed STC.
+**
+** Kept in its own variable rather than reusing rc, which is written again
+** further down by cthread_post() and cred_init(); returning rc would report
+** whichever of those ran last. */
+static int
 initialize(int argc, char **argv)
 {
+    int                 initrc  = 0;    /* step return code -- see above */
     CLIBGRT             *grt        = __grtget();
     CLIBPPA             *ppa        = __ppaget();
     HTTPD               *httpd      = grt->grtapp1;
@@ -313,6 +326,7 @@ initialize(int argc, char **argv)
 			closesocket(httpd->listen);
 			httpd->listen = 0;
 		}
+		initrc = rc;                    /* 8 from http_config() (#226) */
 		goto quit;
 	}
 
@@ -336,6 +350,7 @@ initialize(int argc, char **argv)
         wtof(MSG_NO_SOCKET_THREAD);
         closesocket(httpd->listen);
         httpd->listen = 0;
+        initrc = 8;                     /* did not come up either (#226) */
         goto quit;
     }
 
@@ -362,7 +377,10 @@ initialize(int argc, char **argv)
     /* Note: the thread manager will only start 3 threads initially */
     httpd->mgr = cthread_manager_init(httpd->cfg_maxtask, worker_thread, httpd, 64*1024);
     if (!httpd->mgr) {
-        /* gripe and continue */
+        /* gripe and continue -- deliberately does NOT set initrc.  Whether a
+           server with no worker pool should start at all is a separate
+           question from what code it ends with, and this path has always
+           chosen to come up; #226 only made the refusals honest. */
         wtof(MSG_NO_WORKERS);
     }
 
@@ -428,6 +446,10 @@ quit:
 
 		memset(salt, 0, sizeof(salt));
 	}
+	/* Same classification as the worker pool above: HTTPD047E says logins are
+	   dead, but the server has always come up anyway, so this does not set
+	   initrc either.  Note rc is cred_init()'s from here on -- initrc is what
+	   this function returns. */
 	if (rc) {
 		wtof(MSG_CREDKEY_FAILED, rc);
 	}
@@ -454,7 +476,7 @@ quit:
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
 
     http_exit("initialize()\n");
-    return;
+    return initrc;
 }
 
 #if 0
@@ -1285,6 +1307,10 @@ main(int argc, char **argv)
     }
 
 #if 0
+    /* If this is ever re-enabled: try() returns the ABEND code, which is not
+       the same thing as initialize()'s return value (#226) -- one of them has
+       to go somewhere else, or a config refusal and an abend become one
+       number again. */
     rc = try(initialize,argc,argv);
     if (rc) {
         /* report abend and exit */
@@ -1292,12 +1318,15 @@ main(int argc, char **argv)
         goto cleanup;
     }
 #else
-    /* Note: All the heavy lifting occurs in the threads created by initialize() */
-    initialize(argc,argv);
+    /* Note: All the heavy lifting occurs in the threads created by initialize().
+       rc is the step return code from here on: 0 unless the server refused to
+       start, and nothing below writes it, so a normal P HTTPD still ends
+       CC 0000 (#226). */
+    rc = initialize(argc,argv);
 #endif
 
     if (!httpd->listen) {
-        /* no listener socket, exit */
+        /* no listener socket, exit -- rc says whether that was a refusal */
         goto cleanup;
     }
 
