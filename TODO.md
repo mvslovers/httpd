@@ -106,8 +106,10 @@ it is a two-project agreement on a TCB word, not a RAKF feature toggle.
   resting identity, which makes the startup logon load-bearing rather than
   defence-in-depth. httpd has had one since #177 and ftpd since before
   `mvslovers/ftpd#97` (hardcoded literals; that issue is now about configuring
-  them) — but `mvslovers/ufsd#65` has none at all, which is where the cost
-  actually lands. Both are unblocked.
+  them). ufsd has none and is staying that way: `mvslovers/ufsd#65` closed
+  *not planned* on 2026-08-23, because nothing untrusted can steer an OPEN in
+  that address space (`docs/identity-redesign.md` §3.2). The cost of the
+  fallback therefore lands on httpd and ftpd, not there. ftpd#97 is unblocked.
 - **The §1.5 verification** is unblocked but not free. Before booking a run:
   link 1 of the chain is a *denied* access abending, and `mvslovers/mvsmf#228`
   is exactly the change that stops data set denials from reaching the S913 — the
@@ -145,6 +147,10 @@ This file is httpd-only, and the identity work is not. `docs/identity-redesign.m
 owns that story across httpd, mvsMF, ftpd, ufsd and RAKF. Do not rank those here;
 update the status line there.
 
-Unblocked and outside this repo: `mvslovers/ftpd#97`, `mvslovers/ufsd#65` (the
-last Phase 1 item), `mvslovers/mvsmf#329`, `mvslovers/mvsmf#345`.
+Unblocked and outside this repo: `mvslovers/ftpd#97` (now the last Phase 1
+item), `mvslovers/mvsmf#329`, `mvslovers/mvsmf#345`.
 Also `blocked:rakf`: `mvslovers/ftpd#64`.
+
+Closed *not planned* on 2026-08-23: `mvslovers/ufsd#65` — reasoning in its
+closing comment and in `docs/identity-redesign.md` §3.2. The per-client
+permission question that replaces it is `mvslovers/ufsd#67`.
