@@ -21,7 +21,7 @@ PR #244, #242 by PR #246 and #243 by PR #247).*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #250 | `type:docs` + `type:research` | nothing; half of it is a text edit |
+| 1 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | — | #198 | hygiene, explicitly not a bug | **milestone 4.1.0** — see below |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
@@ -36,20 +36,27 @@ written down.
 
 ---
 
-### 1 · #250 — module dispatch is documented four ways, two of them wrong
+### 1 · #250 — does a LINKed module survive in the Job Pack Area?
 
-*the doc half needs no MVS time; the measurement half gates #198*
+*what is left of it needs a live server and nothing else*
 
-`docs/configuration.md` and `docs/development.md` describe the inbound path as a
-startup `__load()` and a direct HTTPX call at ~10µs. `httppcgi.c:47` calls
-`http_link()` on every dispatch and `httplink.c` is `__linkds()` — a LINK SVC,
-which `refactoring-backlog.md` P7 costs at ~50 ms. The two user-facing documents
-are the wrong pair, and they are the ones shipping with 4.0.0.
+~~**(a)** Five statements across `docs/configuration.md` and
+`docs/development.md` described module dispatch as a startup `__load()` and a
+direct HTTPX call at ~10µs, where `httppcgi.c:47` LINKs on every dispatch.~~
+Landed as PR #251 before 4.0.0 — they were the user-facing documents.
 
-Splits cleanly: **(a)** correcting the wording is a source read, no machine
-needed; **(b)** whether the LINKed copy survives in the JPA to the next request
-needs two `/.dm` calls against a live server, and its answer is what re-scopes
-#198's second step from placement hygiene to a per-request disk fetch.
+**(b) is the open half, and it is the one worth having.** Whether the copy LINK
+brings in stays in the JPA to the next request, or is fetched from the library
+again each time, is unsettled: the project's own sources said both, which is
+what made #250 worth filing. Two `/.dm` calls against a running server decide
+it — compare free storage between them.
+
+**(c)** re-scopes #198's second step on that answer: placement hygiene if the
+copy persists, a per-request disk fetch worth eliminating if it does not.
+
+The docs now record (b) as an open question and say not to write either answer
+down until it is measured. Honour that — a plausible guess written into
+`development.md` is exactly how the five wrong statements got there.
 
 ---
 
@@ -134,6 +141,12 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#250(a)** — module dispatch documented five ways, four of them wrong
+  (PR #251). Corrected before 4.0.0, because `configuration.md` and
+  `development.md` are what users read and they described an architecture the
+  server does not have — a startup `__load()` and a `~10µs` direct call, against
+  a LINK SVC on every dispatch that P7 costs at ~50 ms. The HTTPX half was right
+  and stayed. #250 remains open for the measurement.
 - **#237** — `httpclos()` DEQed the lock `process_clients()` was holding
   (PR #249). Capture the `lock()` rc, unlock only on 0 — the form the rest of
   the server already uses. What the audit added over the issue: the conditional
