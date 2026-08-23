@@ -9,10 +9,16 @@ httpclos(HTTPC *httpc)
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
+    int         lockrc;
     unsigned    n;
     unsigned    count;
 
-    lock(httpd,0);
+    /* ENQ ownership is per TCB and not counted, so rc 8 means the caller
+    ** already holds this resource -- process_clients() calls us that way.
+    ** DEQ only what we took ourselves; unlocking unconditionally would
+    ** release the caller's lock (#237).
+    */
+    lockrc = lock(httpd,0);
     count = array_count(&httpd->httpc);
     for(n=0; n < count; n++) {
         if (httpd->httpc[n]==httpc) {
@@ -20,7 +26,7 @@ httpclos(HTTPC *httpc)
             break;
         }
     }
-    unlock(httpd,0);
+    if (lockrc==0) unlock(httpd,0);
 
     if (httpc) {
         if (httpd->active_connections > 0)
