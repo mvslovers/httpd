@@ -318,10 +318,17 @@ initialize(int argc, char **argv)
 	/* Get configuration from member/dataset/NULL */
 	rc = http_config(httpd, config);
 	if (rc) {
-		/* The member is named by HTTPD022I above, and the specific failure by
-		   the message right before this one -- printing the CONFIG= parm here
-		   only ever produced "(null)", since it is not what gets read (#166). */
-		wtof(MSG_CFG_ERRORS);
+		/* No summary line here.  HTTPD400E ERRORS OCCURRED PROCESSING THE
+		   CONFIGURATION used to be written on every one of these, and four of
+		   the five paths that reach it are not configuration errors at all:
+		   the port is held by another address space (HTTPD037E), or socket(),
+		   bind() or listen() failed.  On those it did not merely repeat, it
+		   misattributed -- sending the operator into the Parmlib after a
+		   mistake that was not there, at exactly the moment that costs most.
+		   On the fifth, HTTPD420E already ends with HTTPD WILL NOT START.
+		   Every path names its own cause, HTTPD098I/HTTPD099I below mark the
+		   stop, and the CC 0008 that tells a refused start from a clean
+		   P HTTPD is initrc, never the WTO (#233, #226). */
 		if (httpd->listen) {
 			closesocket(httpd->listen);
 			httpd->listen = 0;

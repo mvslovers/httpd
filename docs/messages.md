@@ -77,6 +77,31 @@ HTTPD416I STATS: 3302 REQUESTS, 858 ERRORS, 31887467 BYTES
 HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
+## A refused start
+
+A start the server refuses looks like this — here `S HTTPD` on a port a running
+instance already serves (#223):
+
+```
+HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT 8090, THIS INSTANCE ENDS
+HTTPD098I HTTPD SHUTTING DOWN
+HTTPD416I STATS: 0 REQUESTS, 0 ERRORS, 0 BYTES
+HTTPD099I HTTPD SHUTDOWN COMPLETE
+```
+
+**The first line is the cause**, and it is the only one that varies:
+`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E` or `HTTPD420E`, each naming
+what actually failed. Everything below it is the ordinary stop sequence, byte
+for byte what a clean `P HTTPD` writes — so past that first line the log does
+not tell the two apart. There is no summary line: `HTTPD400E` used to follow
+every one of these and named the configuration on four of the five, sending the
+operator into the Parmlib after a mistake that was not there (#233).
+
+**The step return code tells them apart.** A refused start ends `CC 0008`
+(#226), a clean `P HTTPD` ends `CC 0000`. Automation that has to recognize a
+failed start — `$DJ`, a COND CODE check, an IEFACTRT exit, a rule that restarts
+a dead STC — keys on that, never on a console string.
+
 The configuration is **not** echoed at start — not the member, not the codepage,
 not the task limits. `F HTTPD,D CONFIG` reports all of it on demand, at any point
 in the server's life. Nor is APF status: that it was obtained is only interesting
@@ -175,12 +200,12 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD030E` | `BIND() FAILED FOR HTTP PORT, RC=n ERRNO=e` | The port is taken. Retried per `BIND_TRIES`, then fatal. |
 | `HTTPD030I` | `EADDRINUSE, WAITING FOR TCPIP TO RELEASE HTTP PORT p` | A retry is in progress. Normal after an abrupt restart. |
 | `HTTPD031E` | `LISTEN() FAILED, RC=n ERRNO=e` | Bound but will not accept; the server does not start. |
-| `HTTPD037E` | `HTTPD IS ALREADY ACTIVE ON PORT p, THIS INSTANCE ENDS` | `S HTTPD` while a server is already serving that port. This instance ends with CC 0008 and the running one is untouched — it is refused *before* the stale-port sweep, which would otherwise close the live listener. Not a bind failure — no `HTTPD030E` accompanies it, though `HTTPD400E` follows as the usual summary. To run a second server deliberately, give it another port (`S HTTPD,M=HTTPPRM1`). |
+| `HTTPD037E` | `HTTPD IS ALREADY ACTIVE ON PORT p, THIS INSTANCE ENDS` | `S HTTPD` while a server is already serving that port. This instance ends with CC 0008 and the running one is untouched — it is refused *before* the stale-port sweep, which would otherwise close the live listener. Not a bind failure — no `HTTPD030E` accompanies it, and no summary line follows it: this message *is* the report. To run a second server deliberately, give it another port (`S HTTPD,M=HTTPPRM1`). |
 | `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The region ran out of storage while the Parmlib was being read. Nothing else reaches this message: there is no route-table limit, and a duplicate pattern is never detected (it registers as a second route and is simply unreachable, first match winning). **The path is not dark** — it is still served, statically from the document root and ungated, just without the CGI. Standing alone the message also tells you the route carried no binding auth policy; one that did would bring `HTTPD419E`/`HTTPD420E` and the server would not start. |
 | `HTTPD036I` | `MODULE m REGISTERED FOR path` | One active CGI route. One line per route at start. |
 | `HTTPD048W` | `LOGIN IS RETIRED -- USE AUTH= ON EACH MOD=/LOC= ROUTE` | The member carries `LOGIN=NONE`, or `LOGIN=` with an empty value. `NONE` was the default, so nothing changes; delete the line. |
 | `HTTPD048E` | `LOGIN v IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC` | **Fatal**, followed by `HTTPD420E`. The operand *required* a login, so ignoring it would publish every route in the member without its own `AUTH=`. Convert those routes to `AUTH=`, then delete the line. See [configuration.md](configuration.md). |
-| `HTTPD400E` | `ERRORS OCCURRED PROCESSING THE CONFIGURATION` | Summary; the specific failure is on the line before. The server does not start, and **the step ends `CC 0008`** (#226) — so a refused configuration is distinguishable from a clean `P HTTPD` in `$DJ` and in a COND CODE check, not only in the log. |
+| `HTTPD400E` | *(retired)* | A summary that named the configuration on four of the five paths reaching it, where the real fault was the port, `socket()`, `bind()` or `listen()` — and on the fifth only repeated `HTTPD420E` (#233). Every refused start already names its own cause; see [A refused start](#a-refused-start) for the sequence and the `CC 0008` it ends with. |
 | `HTTPD410W` | `CGI= IS DEPRECATED, USE MOD= INSTEAD` | The 3.3.x spelling. Still honoured. |
 | `HTTPD411W` | `IGNORING UNKNOWN AUTH MODE 'm'` | Not one of `NONE`/`BASIC`/`FORM`/`DEFAULT`. The route falls back to the global policy — check this is what you want. |
 | `HTTPD412W` | `IGNORING MALFORMED RES= 'v' (NEED CLASS:RESOURCE)` | The route keeps its `AUTH=` but gains no resource check. |
