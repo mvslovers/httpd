@@ -11,8 +11,8 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, six issues open (#233 closed
-by PR #244; #242, #243 and #245 filed out of it).*
+*Last reconciled against the tracker: 2026-08-23, five issues open (#233 closed
+by PR #244 and #242 by PR #246; #243 and #245 filed out of #233).*
 
 ---
 
@@ -24,7 +24,6 @@ by PR #244; #242, #243 and #245 filed out of it).*
 | 2 | #245 | `type:bug` | nothing |
 | 3 | #237 | `type:bug` | nothing |
 | 4 | #198 | hygiene, explicitly not a bug | nothing |
-| 5 | #242 | `type:cleanup` | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 ---
@@ -100,21 +99,6 @@ Whenever the region map is being looked at anyway.
 
 ---
 
-### 5 · #242 — dead `if (httpd->listen)` guard on the config failure path
-
-*ranked last because nothing behind it can misbehave*
-
-`do_bind()` assigns `httpd->listen` as its last statement before `return 0`, so
-every non-zero return from `http_config()` leaves it zero and the guard in
-`httpd.c`'s failure branch is never taken. Same shape as the guards PR #236
-dropped once `httpd->httpc` had a single writer: one writer, one point, and a
-test written as though there might be more.
-
-Filed out of #233, which found it and left it out on purpose — folding it in
-would have made a message diff into a control-flow diff.
-
----
-
 ## Deferred — blocked on RAKF
 
 Maintainer decision, 2026-08-23: anything needing a change in `MVS-sysgen/RAKF`
@@ -167,11 +151,15 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#242** — the dead listener guard on that same path (PR #246). `do_bind()`
+  is the only writer that stores a socket in `httpd->listen`, and it does so as
+  its last act before `return 0`.
 - **#233** — `HTTPD400E` retired (PR #244). It named the configuration on four
   of the five paths that reached it, where the fault was the port or the stack.
   Nothing replaced it; the `CC 0008` fact it used to carry now sits in
   `docs/messages.md` under *A refused start*, next to the healthy start and stop.
-  Spawned #242 and #243.
+  Both refusal branches measured on mvsdev — `HTTPD037E` and `HTTPD420E`, each
+  ending `CC 0008` with no summary line. Spawned #242, #243 and #245.
 - **#235** — `build_fd_set()` reads `httpd->httpc[]` without the lock (PR #236).
   Settled by reading rather than locking; spawned #237. The open question it
   deliberately did not settle — whether a server with no worker pool should
