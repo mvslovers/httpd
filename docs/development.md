@@ -220,14 +220,33 @@ The difference matters: [Traditional CGI](https://publib.boulder.ibm.com/httpser
 
 | | Traditional CGI | HTTPD Server Modules |
 |---|----------------|---------------------|
-| Execution | Forked process per request | Loaded into server address space at startup |
+| Execution | Forked process per request | LINK SVC per request, inside the server address space |
 | Communication | stdin/stdout, env vars | HTTPX function vector (direct function calls) |
 | Request data | `$REQUEST_METHOD`, `$QUERY_STRING` env vars | `http_get_env(httpc, "REQUEST_METHOD")` via HTTPX |
 | Response | Write to stdout | `http_resp()`, `http_printf()` via HTTPX |
-| Performance | Process fork overhead per request | Direct function call (~10µs) |
+| Performance | Process fork overhead per request | No fork; one LINK SVC per dispatch |
 | Analogy | Perl/Python CGI scripts | Apache `mod_php`, `mod_rewrite` |
 
 This means you cannot write a standard CGI script (e.g. a REXX program that reads environment variables and writes to stdout) and expect it to work with HTTPD. Server modules must be compiled as MVS load modules and use the HTTPX API.
+
+**How a module is actually reached.** `httppcgi()` calls `http_link()` for every
+dispatch (`src/httppcgi.c`), and `http_link()` is the MVS LINK SVC — `__linkds()`
+in `src/httplink.c`, with a parameter list carrying the `HTTPD` and `HTTPC`
+pointers. So the `MOD=` name is resolved and the module entered *on each
+request*, on the worker thread's TCB. There is no startup load and no cached
+entry point, and the module does not stay resident by virtue of having run once.
+
+The direct calls are the other direction only: the module reaching back into the
+server through HTTPX, an indirect branch through a vector table. The LINK is the
+part with a cost worth talking about — `docs/refactoring-backlog.md` P7 puts it
+at ~50 ms per dispatch and proposes an in-process router for hot endpoints.
+Treat that figure as an estimate: it has not been measured, and no measured
+number for either side of this exists in the repo.
+
+> Whether the copy LINK brings in survives in the Job Pack Area to the next
+> request, or is fetched from the library again each time, is **not settled** —
+> see [#250](https://github.com/mvslovers/httpd/issues/250). Do not write either
+> answer down anywhere until it has been measured.
 
 > **Note on naming:** The route type was renamed `HTTPCGI` → `HTTPROUTE` in #105, and `http_find_cgi` / `http_add_cgi` / `http_process_cgi` became `http_find_route` / `http_add_route` / `http_process_route`. What did **not** change, and must not: the httpx vector offsets `0x100`/`0x104`/`0x108`, the external symbols `HTTPFCGI`/`HTTPACGI`/`HTTPPCGI`, and the field layout. `httpcgi.h` keeps the old macro spellings as aliases for out-of-tree modules. The header filename, the `cgimain` entry point and `http_cgi_subpool()` still say CGI — those really are about CGI programs. The Parmlib keyword changed from `CGI=` to `MOD=` earlier.
 
@@ -240,7 +259,7 @@ MOD=LUA                    Extension routing (derives *.lua from name)
 
 When no pattern is specified, HTTPD derives the file extension from the module name (lowercase). The module then handles all requests for files with that extension in the DOCROOT.
 
-HTTPD loads the module via `__load()` and calls its entry point for matching requests.
+For a matching request, HTTPD enters the module through the LINK SVC, as described under [Overview](#overview) — not through `__load()`, and not once at startup.
 
 ### Module Structure
 
