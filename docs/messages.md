@@ -77,6 +77,11 @@ HTTPD416I STATS: 3302 REQUESTS, 858 ERRORS, 31887467 BYTES
 HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
+The configuration is **not** echoed at start — not the member, not the codepage,
+not the task limits. `F HTTPD,D CONFIG` reports all of it on demand, at any point
+in the server's life. Nor is APF status: that it was obtained is only interesting
+when it fails, and `HTTPD012E` covers that.
+
 ## A refused start
 
 A start the server refuses looks like this — here `S HTTPD` on a port a running
@@ -90,22 +95,32 @@ HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
 **The first line is the cause**, and it is the only one that varies:
-`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E` or `HTTPD420E`, each naming
-what actually failed. Everything below it is the ordinary stop sequence, byte
-for byte what a clean `P HTTPD` writes — so past that first line the log does
-not tell the two apart. There is no summary line: `HTTPD400E` used to follow
-every one of these and named the configuration on four of the five, sending the
-operator into the Parmlib after a mistake that was not there (#233).
+`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E`, `HTTPD420E` or `HTTPD033E`,
+each naming what actually failed. There is no summary line under it: `HTTPD400E`
+used to follow every one of these and named the *configuration* on four of the
+five it could reach, sending the operator into the Parmlib after a mistake that
+was not there (#233).
 
-**The step return code tells them apart.** A refused start ends `CC 0008`
-(#226), a clean `P HTTPD` ends `CC 0000`. Automation that has to recognize a
-failed start — `$DJ`, a COND CODE check, an IEFACTRT exit, a rule that restarts
-a dead STC — keys on that, never on a console string.
+Below the first line is the ordinary stop sequence — the same shape as a clean
+`P HTTPD`, but not the same lines. **No `HTTPD060I` appears**, because no thread
+was ever started, and `HTTPD416I` reads `0 REQUESTS, 0 ERRORS, 0 BYTES` because
+nothing was served. Those absences are a hint, not a test: a server stopped
+right after a start it survived writes almost the same thing.
 
-The configuration is **not** echoed at start — not the member, not the codepage,
-not the task limits. `F HTTPD,D CONFIG` reports all of it on demand, at any point
-in the server's life. Nor is APF status: that it was obtained is only interesting
-when it fails, and `HTTPD012E` covers that.
+**The step return code is the test.** A start refused by `initialize()` — the
+six ids above — ends `CC 0008` (#226); a clean `P HTTPD` ends `CC 0000`.
+Automation that has to recognize a failed start — `$DJ`, a COND CODE check, an
+IEFACTRT exit, a rule that restarts a dead STC — keys on that, never on a
+console string.
+
+**Three kinds of failed start end otherwise**, because they happen before
+`initialize()` is reached:
+
+| Failure | Ends |
+|---|---|
+| `HTTPD014E`–`HTTPD019W` — a reserved DD present, or a required one missing | `EXIT_FAILURE` from `__start`, before `main()` runs |
+| `HTTPD012E` — APF authorization could not be obtained | the failing setup's return code |
+| `HTTPD090E` — the console interface could not be initialized | **`CC 0000`** — the gap #226 did not cover (#245) |
 
 ## HTTPD0xx — server lifecycle
 

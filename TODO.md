@@ -11,8 +11,8 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, five issues open (#233 closed
-by PR #244, #243 and #242 filed out of it).*
+*Last reconciled against the tracker: 2026-08-23, six issues open (#233 closed
+by PR #244; #242, #243 and #245 filed out of it).*
 
 ---
 
@@ -21,9 +21,10 @@ by PR #244, #243 and #242 filed out of it).*
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
 | 1 | #243 | `type:bug` `priority:medium` | **a decision** — see below |
-| 2 | #237 | `type:bug` | nothing |
-| 3 | #198 | hygiene, explicitly not a bug | nothing |
-| 4 | #242 | `type:cleanup` | nothing |
+| 2 | #245 | `type:bug` | nothing |
+| 3 | #237 | `type:bug` | nothing |
+| 4 | #198 | hygiene, explicitly not a bug | nothing |
+| 5 | #242 | `type:cleanup` | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 ---
@@ -48,7 +49,24 @@ retired by #105, still missing `TOKEN` from #121 — rides along with it.
 
 ---
 
-### 2 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+### 2 · #245 — `HTTPD090E` refuses the start and the step ends `CC 0000`
+
+*#226, finished*
+
+`main()` reaches the console check only when the APF setup returned zero, and
+nothing between the two writes `rc` — so `HTTPD090E UNABLE TO INITIALIZE
+CONSOLE INTERFACE`, which is fatal by design, returns 0. A restart rule keyed
+on COND CODE reads a clean stop and leaves the system without an HTTP server.
+
+#226 gave `initialize()` a return value and never reached `main()`'s own early
+exits. This is the last one that is silent: the DD checks in `httpstrt.c` end
+`EXIT_FAILURE`, `HTTPD012E` carries `__autask()`'s rc, and `HTTPD033E` sets
+`initrc = 8`. Ranked here because it is a two-line fix with an operational
+consequence, not because it is likely.
+
+---
+
+### 3 · #237 — `httpclos()` releases the lock `process_clients()` is holding
 
 *latent, cheap, and the reading behind it is already done in #235*
 
@@ -67,7 +85,7 @@ The issue carries a second, unconfirmed observation for the same change:
 
 ---
 
-### 3 · #198 — Pre-allocate lazy first-use storage at startup
+### 4 · #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
@@ -82,7 +100,7 @@ Whenever the region map is being looked at anyway.
 
 ---
 
-### 4 · #242 — dead `if (httpd->listen)` guard on the config failure path
+### 5 · #242 — dead `if (httpd->listen)` guard on the config failure path
 
 *ranked last because nothing behind it can misbehave*
 
