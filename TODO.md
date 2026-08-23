@@ -22,12 +22,17 @@ PR #244, #242 by PR #246 and #243 by PR #247).*
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
 | 1 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
-| — | #198 | hygiene, explicitly not a bug | **milestone 4.1.0** — see below |
+| — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **Nothing open waits on a decision any more,** and with #237 merged nothing
-open is a code bug either. Only #250 is ranked; the other two are parked, one
-on a release boundary and one on another organisation.
+open is a code bug either. Nothing open blocks 4.0.0: both #250 and #198 carry
+the 4.1.0 milestone, and #176 is parked on another organisation.
+
+#250 is still ranked first even though it is milestoned out, and the two are not
+in conflict. The milestone says it is not a 4.0.0 deliverable; the rank says it
+is the next thing to do, because it is read-only, costs minutes, and #198's
+second step cannot be estimated until it is answered.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
