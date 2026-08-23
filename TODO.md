@@ -11,9 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, two issues open (#237 closed
-by PR #249, and before it #245 by PR #248, #233 by PR #244, #242 by PR #246 and
-#243 by PR #247).*
+*Last reconciled against the tracker: 2026-08-23, three issues open (#250 filed
+that day; #237 closed by PR #249, and before it #245 by PR #248, #233 by
+PR #244, #242 by PR #246 and #243 by PR #247).*
 
 ---
 
@@ -21,12 +21,13 @@ by PR #249, and before it #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #198 | hygiene, explicitly not a bug | nothing |
+| 1 | #250 | `type:docs` + `type:research` | nothing; half of it is a text edit |
+| — | #198 | hygiene, explicitly not a bug | **milestone 4.1.0** — see below |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **Nothing open waits on a decision any more,** and with #237 merged nothing
-open is a bug either. #198 is the only schedulable item; #176 is parked on
-another organisation.
+open is a code bug either. Only #250 is ranked; the other two are parked, one
+on a release boundary and one on another organisation.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
@@ -35,18 +36,49 @@ written down.
 
 ---
 
-### 1 · #198 — Pre-allocate lazy first-use storage at startup
+### 1 · #250 — module dispatch is documented four ways, two of them wrong
+
+*the doc half needs no MVS time; the measurement half gates #198*
+
+`docs/configuration.md` and `docs/development.md` describe the inbound path as a
+startup `__load()` and a direct HTTPX call at ~10µs. `httppcgi.c:47` calls
+`http_link()` on every dispatch and `httplink.c` is `__linkds()` — a LINK SVC,
+which `refactoring-backlog.md` P7 costs at ~50 ms. The two user-facing documents
+are the wrong pair, and they are the ones shipping with 4.0.0.
+
+Splits cleanly: **(a)** correcting the wording is a source read, no machine
+needed; **(b)** whether the LINKed copy survives in the JPA to the next request
+needs two `/.dm` calls against a live server, and its answer is what re-scopes
+#198's second step from placement hygiene to a per-request disk fetch.
+
+---
+
+## Deferred — milestone 4.1.0
+
+### #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
 The recurring planter died with libc370#115/#119. What remains is that one-time
 lazy initialization lands mid-region during traffic: worker-pool growth (64 K
-stack per new worker) and each module's first LINK. Two concrete steps — start
-the pool at MAXTASK (or add a `PREALLOC` keyword), and touch every
-Parmlib-registered `MOD=` once during initialization, so both sit below the
-high-water mark before the first request.
+stack per new worker) and each module's first LINK.
 
-Whenever the region map is being looked at anyway.
+**Deferred to 4.1.0 on 2026-08-23** — not because it is risky. Step 1 behind a
+`PREALLOC` keyword defaulting off is a parser line and a `cthread_worker_add()`
+loop; the code would not even run in the shipping default. It is deferred
+because it fixes nothing anyone reports, and pre-release attention is the scarce
+resource. This file already said "whenever the region map is being looked at
+anyway", so the milestone only records what was already true.
+
+Two things the scoping turned up that the issue text does not have:
+
+- Step 1 wants `PREALLOC`, **not** a changed default. MAXTASK at startup is
+  576 K of worker stacks against 192 K — free for a server that sees
+  concurrency, since the pool never shrinks back, but 384 K permanently spent on
+  a server that never does.
+- Step 2 as written cannot use the existing path: `__linkds()` would *run* the
+  module with no request. `__load()` (libc370 `clibos.h:202`) is the primitive
+  that loads without executing. And it is gated on #250(b).
 
 ---
 
