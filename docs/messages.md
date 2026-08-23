@@ -222,7 +222,8 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD048E` | `LOGIN v IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC` | **Fatal**, followed by `HTTPD420E`. The operand *required* a login, so ignoring it would publish every route in the member without its own `AUTH=`. Convert those routes to `AUTH=`, then delete the line. See [configuration.md](configuration.md). |
 | `HTTPD400E` | *(retired)* | A summary that named the configuration on four of the five paths reaching it, where the real fault was the port, `socket()`, `bind()` or `listen()` — and on the fifth only repeated `HTTPD420E` (#233). Every refused start already names its own cause; see [A refused start](#a-refused-start) for the sequence and the `CC 0008` it ends with. |
 | `HTTPD410W` | `CGI= IS DEPRECATED, USE MOD= INSTEAD` | The 3.3.x spelling. Still honoured. |
-| `HTTPD411W` | `IGNORING UNKNOWN AUTH MODE 'm'` | Not one of `NONE`/`BASIC`/`FORM`/`DEFAULT`. The route falls back to the global policy — check this is what you want. |
+| `HTTPD411W` | *(retired)* | Said the value was ignored, and ignoring it meant registering the route as **public** — it named `DEFAULT`, retired with the global policy by #105, and never named `TOKEN` (#121). Replaced by `HTTPD411E` (#243). In a log from an older build it means the route on that line was served to anyone. |
+| `HTTPD411E` | `UNKNOWN AUTH MODE 'm' -- USE NONE, FORM, BASIC OR TOKEN` | **Fatal**, followed by `HTTPD419E` naming the route and `HTTPD420E`. Those four are the whole set; there is no unset mode behind them. The line asked for a gate and the value does not build one, so the route is refused rather than published — with or without a `RES=` on the same line. Correct the spelling; `AUTH=NONE` is how a route is made public deliberately. |
 | `HTTPD412W` | `IGNORING MALFORMED RES= 'v' (NEED CLASS:RESOURCE)` | The route keeps its `AUTH=` but gains no resource check. |
 | `HTTPD413W` | `IGNORING UNKNOWN ROUTE OPTION 'o'` | Unknown keyword on a `MOD=`/`LOC=` line. |
 | `HTTPD414W` | `AUTH=NONE IGNORES RES=c:r (PUBLIC ROUTE)` | A public route cannot also demand a profile. One of the two is wrong. |
@@ -230,7 +231,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD416I` | `STATS: n REQUESTS, n ERRORS, n BYTES` | Written once at shutdown. |
 | `HTTPD417I` | `LOCATION path REGISTERED` | A program-less static prefix is active. |
 | `HTTPD418E` | `NO STORAGE FOR RES=c:r` | **Fatal.** The route asked for a resource check and did not get one. |
-| `HTTPD419E` | `X=path COULD NOT BE REGISTERED -- ITS AUTH POLICY IS LOST` | **Fatal.** The route is absent, so nothing gates its requests at all — for a protected subtree that would serve it to anyone. |
+| `HTTPD419E` | `X=path COULD NOT BE REGISTERED -- ITS AUTH POLICY IS LOST` | **Fatal.** The route is absent, so nothing gates its requests at all — for a protected subtree that would serve it to anyone. Four things reach it: no storage for the `RES=` pair (`HTTPD418E`) or for the route itself, a line that could not be tokenized, a missing program name or path with an option standing in its place (`HTTPD421W`/`HTTPD415W`), and an `AUTH=` value the build does not know (`HTTPD411E`). Only the first is a storage problem — **read the line above this one** before hunting for one. |
 | `HTTPD420E` | `ROUTE AUTHORIZATION POLICY INCOMPLETE -- HTTPD WILL NOT START` | Follows `HTTPD418E`/`HTTPD419E`. The port is never bound. |
 | `HTTPD421W` | `MOD= REQUIRES A PROGRAM NAME` | The line is skipped. |
 | `HTTPD422W` | `x IS RETIRED -- CGI STORAGE RECLAIM IS ALWAYS ON` | `RECLAIM=` no longer does anything (#175). |
