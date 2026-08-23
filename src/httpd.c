@@ -328,11 +328,13 @@ initialize(int argc, char **argv)
 		   On the fifth, HTTPD420E already ends with HTTPD WILL NOT START.
 		   Every path names its own cause, HTTPD098I/HTTPD099I below mark the
 		   stop, and the CC 0008 that tells a refused start from a clean
-		   P HTTPD is initrc, never the WTO (#233, #226). */
-		if (httpd->listen) {
-			closesocket(httpd->listen);
-			httpd->listen = 0;
-		}
+		   P HTTPD is initrc, never the WTO (#233, #226).
+
+		   There is no listener to close on the way out, either.  do_bind()
+		   assigns httpd->listen as its last act before returning 0 -- it is
+		   the only place in the server that ever stores a socket there -- so
+		   a non-zero rc always leaves the field at the zero main() gave it.
+		   The guard that used to stand here could not fire (#242). */
 		initrc = rc;                    /* 8 from http_config() (#226) */
 		goto quit;
 	}
