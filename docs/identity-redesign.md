@@ -2,15 +2,17 @@
 
 **Status:** design / planning (2026-08-17); Phase 1 status refreshed 2026-08-23.
 Phase 1 is **3 of 4 done** — mvslovers/mvsmf#228 and #229 landed 2026-08-19,
-httpd#137 on 2026-08-21. Still open: the resting identity (ftpd#97, ufsd#65),
+httpd#137 on 2026-08-21. Still open: the resting identity (ftpd#97 alone since
+mvslovers/ufsd#65 was closed *not planned* on 2026-08-23 — see §3.2),
 and the **restjobs policy**, the half of §3.1 item 2 that #229 did not cover —
 now tracked as mvslovers/mvsmf#345. **Phase 2 is deferred by decision
 (2026-08-23), not merely stalled:** anything requiring a RAKF change is flagged
 `blocked:rakf` and ranked out until upstream moves. All three of
 MVS-sysgen/RAKF#5, #6 and #8 have been open and uncommented since 2026-08-06 /
 08-17, and RAKF is in another organisation. See §3.2.
-**Scope:** the *identity* story across **httpd**, **mvsMF**, **ftpd** (and, for
-the resting identity, **ufsd**): which ACEE an authorization decision runs
+**Scope:** the *identity* story across **httpd**, **mvsMF**, **ftpd** (and
+**ufsd**, whose resting identity §3.2 settles and whose per-client question
+outlives it): which ACEE an authorization decision runs
 under, what identity the address space rests on, and what changes without RAKF
 changes (phase 1) versus with them (phase 2).
 
@@ -48,7 +50,7 @@ under another name.
 | mvsMF | per-request `racf_set_acee()` switch + restore; dataset ops are plain `fopen()` | the ambient value *is* the authorization (mvslovers/mvsmf#228) |
 | ftpd | explicit `racf_auth()` pre-checks + an OPEN-path switch; stage-1 hardening in ftpd#78 | entitlement safe; transient window remains (ftpd#64) |
 | httprexx / httplua | never touch an ACEE | inherit whatever rests in ASXBSENV |
-| ufsd | no identity handling at all; per-client checks are a Phase-1 simplification | every container OPEN runs under the resting identity (ufsd#65) |
+| ufsd | no identity handling at all; per-client checks are a Phase-1 simplification | every container OPEN runs under the resting identity — but nothing untrusted can steer one (§3.2; ufsd#65 closed *not planned*) |
 
 **The resting identity is the exposure, not the leftovers.** RAKF has no
 started-procedures table: every STC gets the hardcoded `STC`/`STCGROUP` account
@@ -56,7 +58,8 @@ started-procedures table: every STC gets the hardcoded `STC`/`STCGROUP` account
 profile (`DATASET * STCGROUP ALTER`) that identity holds ALTER on every data
 set. Mitigations: httpd logs on to a dedicated low-privilege userid at startup
 (`stc_identity()`, `STCUSER=`/`STCGROUP=` JCL PARMs — httpd#177); ftpd does the
-equivalent with hardcoded literals (ftpd#97); ufsd not yet (ufsd#65).
+equivalent with hardcoded literals (ftpd#97); ufsd deliberately not — the
+switch would change nothing it can reach (ufsd#65, closed *not planned*; §3.2).
 
 ### 1.3 How enforcement actually works (measured)
 
@@ -187,9 +190,9 @@ rather than removing the switch.
    refusing it (rc 8) both stayed silent — so a refusal is not mistaken for a
    missing profile. Should a hardened system ever want fail-closed, it is one
    line in `auth_gate()` and this warning becomes the error.
-4. ⬜ **ftpd/ufsd resting identity** — ftpd#97 (replace the hardcoded
-   `FTPD`/`USER` with PARM keywords), ufsd#65 (adopt the startup logon). Both
-   still open; httpd has had its startup logon since #177.
+4. ⬜ **ftpd resting identity** — ftpd#97 (replace the hardcoded `FTPD`/`USER`
+   with PARM keywords). httpd has had its startup logon since #177; ufsd#65 was
+   closed *not planned* on 2026-08-23 (§3.2), so this item is ftpd's alone.
 5. **Keep mvsMF's ambient switch.** It is the second net (§2); removing it in
    phase 1 would maximize the window with neither net.
 
@@ -204,7 +207,7 @@ real and the resolution is simply not ours to time.
 (§3.2 item 1) parked, the local startup logon stops being defence-in-depth and
 becomes the only thing between an STC and the `STC`/`STCGROUP` identity that
 holds ALTER on every data set. §3.1 item 4 is therefore the priority of this
-document — but its two halves are **not** in the same state:
+document — and since 2026-08-23 it has one half left:
 
 - **ftpd already switches.** `racf_login("FTPD", NULL, "USER")` at
   `ftpd.c:317-345`, measured live: `FTPD004I STC IDENTITY SET TO FTPD/USER VIA
@@ -215,10 +218,33 @@ document — but its two halves are **not** in the same state:
   since #177), the entitlement set is not enumerated, and the failure policy is
   implicit — a failed RACINIT logs `FTPD004W` and continues on the inherited
   identity.
-- **ufsd does not switch at all.** `racf_login`/`racf_set_acee` appear nowhere
-  in its `src/`. Every container OPEN runs under whatever the address space
-  rests on. **ufsd#65 is the real gap of the two**, and the deferral is what
-  makes it urgent rather than tidy.
+- **ufsd does not switch at all, and does not need to.** `racf_login`/
+  `racf_set_acee` appear nowhere in its `src/`, and every container OPEN runs
+  under whatever the address space rests on. This document called that *"the
+  real gap of the two"* until 2026-08-23. The review that closed
+  `mvslovers/ufsd#65` (*not planned*) established three facts this section did
+  not have, and each of them says the resting identity is not reachable there:
+  **no foreign code in the address space** — ufsd loads exactly one module of
+  its own, and UFSDSSIR runs in the *client's* address space, so there is no
+  ufsd equivalent of a CGI inheriting ASXBSENV; **no client can name a data
+  set** — the request set is closed (`ufsd/include/ufsd.h:337-356`) and operates
+  only inside mounted containers, with mounting driven by Parmlib and console
+  only; and **every client is already APF-authorized** —
+  `ufsd/client/libufs.c:6`, with `iefssreq` issuing MODESET MODE=SUP
+  (`ufsd/src/ufsd#ssi.c:214-227`), so a caller that can reach UFSD at all can
+  bypass RACF regardless of what ufsd rests on. The §1.5 chain cannot form
+  there either: ufsd performs no logon and no logout, so nothing ever zeroes
+  ASXBSENV in its address space.
+
+  The cost side is unlike httpd's as well. httpd needed READ on a static
+  document root; ufsd would need UPDATE on containers an operator can extend at
+  runtime with `F UFSD,MOUNT`, and a wrong profile fails the root mount, which
+  ends the start (`ufsd/src/ufsd#ini.c:659-665`) — a theoretical exposure traded
+  for a real outage class. What the switch would have bought is one thing: a
+  wrong DSN in UFSDPRM or in that command currently opens any data set DISP=OLD
+  with ALTER behind it, and would be denied at OPEN instead. If it is ever
+  revisited, the condition recorded on the issue is that it must fail open —
+  retain the inherited ACEE and reinstall it if the root mount fails.
 
 **And it promotes httpd#176's fallback.** *Remove the ambient switch entirely* —
 modules never set an ACEE, opens run under the server identity — needs no RAKF
@@ -262,8 +288,10 @@ removed or kept as documented redundancy is the last §4 decision.
   FACILITY widening resource, or deliberately open on closed systems —
   document either way.
 - **ufsd per-client permissions:** the Phase-1 "no ACEE checks" simplification
-  is out of scope for the resting-identity work (ufsd#65) but is the next
-  identity question once phase 1 lands.
+  was out of scope for the resting-identity work and is now tracked as
+  mvslovers/ufsd#67. It is the identity question that does apply to ufsd — its
+  owner/group model is decorative rather than enforcing, and no resting-identity
+  change would have closed that.
 - **§1.5 verification:** run the `/.dm` recipe once against a live stand and
   record the result on httpd#176.
 
@@ -271,7 +299,7 @@ removed or kept as documented redundancy is the last §4 decision.
 
 - `auth-redesign.md` — the credential model this builds on (implemented, 4.0.0)
 - mvslovers/httpd#176, #177, #137 · mvslovers/mvsmf#228, #229, #329, #345 ·
-  mvslovers/ftpd#64, #78, #90, #97 · mvslovers/ufsd#65
+  mvslovers/ftpd#64, #78, #90, #97 · mvslovers/ufsd#65 (closed), #67
 - MVS-sysgen/RAKF#5, #6, #8
 - Key code: `libc370/src/racf/{racsacee,racauth,raclogin,raclgout}.c`,
   `httpd/src/{httpxauth,httpd}.c`, `httpd/credentials/src/credfree.c`,
