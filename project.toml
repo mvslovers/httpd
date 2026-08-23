@@ -13,7 +13,7 @@ type = "application"
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
-libc370 = "1.0.2"
+libc370 = "1.0.3"
 
 [build]
 # The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
@@ -49,7 +49,7 @@ cflags = [
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = ">=1.2.0"
+"mvslovers/ufsd" = ">=1.2.1"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
@@ -282,5 +282,91 @@ headers = [
 	"include/types.h",
 ]
 
+# -- Distribution (SMP4 install package) --------------------------
+# Turns `make package` into an installable product, the same two transports
+# ufsd and ftpd ship with:
+#
+#   load modules -> XMIT -> staging HTTPLOAD -> SMP ++MOD -> HTTPD.<vrm>.LINKLIB
+#   samplib/     -> XMIT -> TSO RECEIVE                   -> HTTPD.<vrm>.SAMPLIB
+#
+# SMP *copies* the host-bound modules rather than re-binding them (a COPY-style
+# ++JCLIN is what says so), which is what keeps HTTPD's ac = 1 and every custom
+# entry point exactly as ld370 set them.  The sample library stays outside SMP:
+# an MCS card ends at column 72 and HTTPPRM0 has comment lines reaching column
+# 80, so routing the configuration pattern through the SYSMOD would make it
+# answer to a delivery mechanism.  The datasets are versioned, so every release
+# brings a fresh SAMPLIB anyway -- there is no in-place update for SMP to
+# manage.
+#
+# samplib/httpd carries @LINKLIB@ in its STEPLIB, which mbtdist replaces with
+# the versioned target while staging -- the same placeholder ufsd's and ftpd's
+# procs use, and the reason the shipped proc points at the library SMP actually
+# installed into rather than at a name fixed when the file was written.  Do not
+# mention a placeholder in a nearby comment: the substitution runs over the
+# whole member, and a 21-character dataset name landing in a comment line is how
+# a proc that fit an FB-80 card stops fitting one.
+#
+# Every value is a dataset name; the ddname SMP addresses it by is always the
+# last qualifier, so LINKLIB, SAMPLIB, HTTPLOAD and AHTTPLOD fall out of the
+# names.  @VRM@ becomes V4R0M0 at package time (V4R0M0D while the version still
+# carries -dev).  ufsd/ftpd spell these <product>LOAD / A<product>LOD, which for
+# a five-letter product would be nine characters; HTTPLOAD/AHTTPLOD keeps the
+# suffix and drops the letter, rather than keeping HTTPD and truncating the
+# suffix (HTTPDLOD/AHTTPDLD).  Both names go into the FMID's JCLIN, so this is a
+# one-shot choice -- changing it later is a new functional level.
+#
+# All five [[module]] entries ship, ABEND0C1 included: mbtdist packages every
+# module and offers no exclude.  Deliberate rather than overlooked -- since
+# 4.0.0 a module is inert unless a Parmlib route names it, and the shipped
+# HTTPPRM0 leaves its /.abend line commented out.  It is the acceptance vehicle
+# for the storage reclaim (#154/#174), and a diagnostic that is present but
+# unreachable is worth more than one an operator would have to rebuild to use.
+[distribution]
+# Shipped into the archive as README.md, which is the name the generated install
+# job points at ("See the README for which member goes where").  Without it the
+# package tells the operator to read a file it does not contain.
+readme = "docs/installation.md"
+
+[distribution.smp]
+# One FMID per minor release, spent exactly once: it names a functional level,
+# and a changed one is a new level.  Patches on top of it ship as PTFs.  4.0.x
+# is THTP400; a later 4.1.0 becomes THTP410 and is installed as a clean cut
+# (RESTORE + REJECT the old, then receive the new).  The T stays clear of the
+# E??nnnn namespace MVS 3.8j's own function SYSMODs occupy (EBB1102 is 3.8j
+# itself, alongside EAS1102, EBT1102, EDE1102, ...).
+#
+# NOT yet verified the way TFTP100 and TUFS120 were, and the difference matters.
+# What is measured is the SMPPTS on mvsdev -- 1544 SYSMODs scanned, no THTP400
+# (smp-todo.md §2) -- and the PTS shows only what was *received*.  The CDS and
+# ACDS store hashed member names, so LIST CDS SYSMOD(THTP400) and LIST ACDS
+# SYSMOD(THTP400) are the only way to see what is actually applied or accepted.
+# Both stands (mvsdev, drnmig3a) still have to answer RC 04 with an empty list
+# before the 4.0.0 tag.  A test install must use a throwaway id -- a
+# half-applied FMID leaves this one occupied, and smp-todo.md reserves TTST400
+# for exactly that.
+fmid = "THTP400"
+system = "Z038"
+
+# Empty despite the [dependencies] entry on ufsd, which is a *build* time one:
+# libufs is linked statically, so nothing of ufsd has to be installed for the
+# load modules to run.  At run time it is soft even though 4.0.0 serves static
+# files from UFS and nowhere else: ufs_sys_init() failing is HTTPD044W and the
+# server keeps running, so every MOD= route -- mvsMF, the display modules --
+# works on a system with no UFSD at all.  REQ(TUFS120) would therefore refuse
+# the install wherever UFSD is absent, for a facility that already degrades on
+# its own.  The installation guide documents UFSD as an optional runtime
+# prerequisite instead, which is also how ufsd itself treats RAKF.
+prereq = []
+
+accept_fmid = true              # accept the FMID once so a PTF can be RESTOREd
+lklib = "HTTPD.@VRM@.HTTPLOAD"  # staging: what the load XMIT is received into
+target = "HTTPD.@VRM@.LINKLIB"  # where the load modules end up
+distlib = "HTTPD.@VRM@.AHTTPLOD"
+
+[[distribution.library]]
+dir = "samplib"
+target = "HTTPD.@VRM@.SAMPLIB"
+
+# -- Release ------------------------------------------------------
 [release]
 version_files = ["VERSION"]
