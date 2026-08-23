@@ -708,14 +708,13 @@ process_clients(fd_set *read, fd_set *write, fd_set *excp)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
-    int         rc      = http_process_clients();
     int         lockrc;
     unsigned    count;
     unsigned    n;
     HTTPC       *httpc;
 
     /* process all the http clients (does its own locking) */
-    rc = http_process_clients();
+    http_process_clients();
 
     /* get lock so we can cleanup any clients that are closing */
     lockrc = lock(httpd, 0);
