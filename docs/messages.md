@@ -113,14 +113,18 @@ Automation that has to recognize a failed start — `$DJ`, a COND CODE check, an
 IEFACTRT exit, a rule that restarts a dead STC — keys on that, never on a
 console string.
 
-**Three kinds of failed start end otherwise**, because they happen before
-`initialize()` is reached:
+`HTTPD090E` ends `CC 0008` as well (#245), but it is the one refusal with a
+different **shape**: the console interface is checked before `initialize()`
+runs, so there is nothing to quiesce and the `HTTPD098I` / `HTTPD416I` /
+`HTTPD099I` lines do not follow it. It stands alone. That is why the return
+code is the test and the sequence is not.
+
+**Two kinds of failed start end with something other than `CC 0008`**:
 
 | Failure | Ends |
 |---|---|
 | `HTTPD014E`–`HTTPD019W` — a reserved DD present, or a required one missing | `EXIT_FAILURE` from `__start`, before `main()` runs |
-| `HTTPD012E` — APF authorization could not be obtained | the failing setup's return code |
-| `HTTPD090E` — the console interface could not be initialized | **`CC 0000`** — the gap #226 did not cover (#245) |
+| `HTTPD012E` — APF authorization could not be obtained | the failing setup's return code, passed through unchanged |
 
 ## HTTPD0xx — server lifecycle
 
@@ -166,7 +170,7 @@ console string.
 | `HTTPD062E` | `ABEND xxxxxxxx IN WORKER(w) CLIENT(c) SOCKET(s)` | A worker's ESTAE caught an abend. Only that request dies; the worker is recycled and the server continues. Always worth a bug report — include the abend code and the request. |
 | `HTTPD070E` | `UNKNOWN CODEPAGE "name", USING CP037` | The `CODEPAGE` value is not one this build knows. Check the spelling. |
 | `HTTPD071I` | *(retired)* | The codepage in effect is a `D CONFIG` value (`HTTPD134I`), not a startup line. |
-| `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. |
+| `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. The step ends `CC 0008` (#245). This message is the whole report — it is written before anything was initialized, so no stop sequence follows it. |
 | `HTTPD098I` | `HTTPD SHUTTING DOWN` | `P HTTPD` was accepted and the quiesce has begun. |
 | `HTTPD099I` | `HTTPD SHUTDOWN COMPLETE` | Everything was released. If the address space ends without this line, shutdown did not finish cleanly. |
 

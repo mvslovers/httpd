@@ -1340,7 +1340,16 @@ main(int argc, char **argv)
 #endif
 
     if (!com) {
+        /* Fatal by design -- no COM is no MODIFY and no STOP.  rc is provably 0
+           here (everything between the APF check above and this test is #if 0),
+           so without this assignment the step ended CC 0000 and a refused start
+           was indistinguishable from a clean P HTTPD.  8 is initialize()'s
+           refusal code (#226); this is the last main() exit that was silent
+           (#245).  Note the jump is to quit:, not cleanup: -- nothing was
+           initialized, so this message stands alone with no stop sequence
+           under it. */
         wtof(MSG_CONSOLE_FAILED);
+        rc = 8;
         goto quit;
     }
 
