@@ -11,9 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, three issues open (#245
-closed by PR #248, and before it #233 by PR #244, #242 by PR #246 and #243 by
-PR #247).*
+*Last reconciled against the tracker: 2026-08-23, two issues open (#237 closed
+by PR #249, and before it #245 by PR #248, #233 by PR #244, #242 by PR #246 and
+#243 by PR #247).*
 
 ---
 
@@ -21,12 +21,11 @@ PR #247).*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #237 | `type:bug` | nothing |
-| 2 | #198 | hygiene, explicitly not a bug | nothing |
+| 1 | #198 | hygiene, explicitly not a bug | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**Nothing open waits on a decision any more.** #243 was the one that did, and
-it is settled — the two remaining items are code, and #176 is parked on
+**Nothing open waits on a decision any more,** and with #237 merged nothing
+open is a bug either. #198 is the only schedulable item; #176 is parked on
 another organisation.
 
 **The return-code work is finished.** #226 and #245 between them settled every
@@ -36,26 +35,7 @@ written down.
 
 ---
 
-### 1 · #237 — `httpclos()` releases the lock `process_clients()` is holding
-
-*latent, cheap, and the reading behind it is already done in #235*
-
-`httpclos()` brackets its walk with an unconditional `lock(httpd,0)` /
-`unlock(httpd,0)`. ENQ ownership is per TCB and not counted (libc370 `@@lk.c`),
-so when `process_clients()` calls `http_close()` while holding that lock, the
-inner `lock()` gets rc 8 and the inner DEQ releases the *outer* holder's ENQ.
-
-Nothing breaks today — only a `break` follows the `http_close()` — and it is the
-one place in the server that does not use the `if (lockrc==0) unlock(...)` form
-every other call site uses. Fix it for the next reader, not for a live symptom.
-
-The issue carries a second, unconfirmed observation for the same change:
-`process_clients()` appears to call `http_process_clients()` twice per pass
-(`httpd.c:684` and `:691`).
-
----
-
-### 2 · #198 — Pre-allocate lazy first-use storage at startup
+### 1 · #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
@@ -122,6 +102,17 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#237** — `httpclos()` DEQed the lock `process_clients()` was holding
+  (PR #249). Capture the `lock()` rc, unlock only on 0 — the form the rest of
+  the server already uses. What the audit added over the issue: the conditional
+  `unlock()` sits *before* the cleanup block, so in the rc-8 path that block now
+  runs under the caller's lock, and nothing reachable from it re-ENQs `httpd`
+  (the resource name comes from the address alone, libc370 `@@lk.c`).
+  `process_clients()` is the only rc-8 caller — `terminate()` and both
+  accept-path calls hold no lock. The duplicate `http_process_clients()` is
+  confirmed and gone; it was a second state-machine pump per pass in the
+  no-worker fallback, unobservable there because `mgr` NULL leaves `select()`
+  non-blocking and the loop spinning.
 - **#245** — `HTTPD090E` ended the step `CC 0000` (PR #248). The last `main()`
   exit #226 did not reach; `rc = 8` before the `goto quit`, `initialize()`'s
   refusal code rather than a second one. Not measured and not measurable — the
