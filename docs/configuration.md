@@ -448,7 +448,7 @@ MOD=PROGRAM                     Extension match (derives *.program from name)
 MOD=PROGRAM /url/pattern AUTH=BASIC RES=class:resource   with auth policy
 ```
 
-Server modules are load modules that HTTPD loads at startup via `__load()` and calls directly through the HTTPX function vector. They run inside the server's address space — unlike traditional CGI programs which fork a new process per request.
+Server modules are MVS load modules that run inside the server's address space, on the worker thread's own TCB — unlike traditional CGI programs, which fork a new process per request. HTTPD enters one through the MVS **LINK SVC on every dispatch** (`http_link()` → `__linkds()`); there is no load at startup and no cached entry point. What *is* a direct call is the other direction: the module reaching back into the server through the HTTPX function vector. See [Writing Server Modules](development.md#writing-server-modules) for the dispatch path in detail.
 
 Any `MOD=` route may add the per-route `AUTH=` / `RES=` options described under
 [Security](#security).
