@@ -50,6 +50,9 @@
 # A route without AUTH= is PUBLIC, and so is a path no MOD=/LOC= line claims.
 # The one exception is RES= without AUTH=: a resource check needs an identity
 # to check against, so such a route authenticates and challenges with BASIC.
+# A misspelled mode is NOT public: the line asked for a gate and the value does
+# not build one, so the route is refused (HTTPD411E) and the server does not
+# start.  AUTH=NONE is how a route is published on purpose.
 # /login, /logout and the login-page assets stay reachable in every mode so an
 # AUTH=FORM challenge can render.
 #
