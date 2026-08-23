@@ -11,8 +11,8 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, five issues open (#233 closed
-by PR #244 and #242 by PR #246; #243 and #245 filed out of #233).*
+*Last reconciled against the tracker: 2026-08-23, four issues open (#233 closed
+by PR #244, #242 by PR #246 and #243 by PR #247; #245 filed out of #233).*
 
 ---
 
@@ -20,35 +20,18 @@ by PR #244 and #242 by PR #246; #243 and #245 filed out of #233).*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #243 | `type:bug` `priority:medium` | **a decision** — see below |
-| 2 | #245 | `type:bug` | nothing |
-| 3 | #237 | `type:bug` | nothing |
-| 4 | #198 | hygiene, explicitly not a bug | nothing |
+| 1 | #245 | `type:bug` | nothing |
+| 2 | #237 | `type:bug` | nothing |
+| 3 | #198 | hygiene, explicitly not a bug | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
----
-
-### 1 · #243 — a misspelled `AUTH=` value publishes the route
-
-*the only open item with an exposure behind it*
-
-A route line that names `AUTH=` and gets the value wrong — `AUTH=BASCI` — warns
-`HTTPD411W` and registers **public**. The `continue` in `parse_kv_tail()` skips
-`has_auth = 1`, so the memset's `HTTP_AUTH_NONE` stands and `policy_binds()`
-sees nothing to lose. A `RES=` on the same line rescues it to `BASIC` by
-accident; authentication-only routes, which is most of them, are not rescued.
-
-**It waits on a decision, not on code.** Refusing the start (`HTTPD_FLAG_CFGERR`
-→ `HTTPD420E`, what #105's own reasoning argues for), resolving to `BASIC`, or
-documenting the exposure are three different servers. The issue lays out all
-three; the change itself is small whichever wins.
-
-The stale `HTTPD411W` text — still naming `DEFAULT` and a global policy both
-retired by #105, still missing `TOKEN` from #121 — rides along with it.
+**Nothing open waits on a decision any more.** #243 was the one that did, and
+it is settled — the three remaining items are code, and #176 is parked on
+another organisation.
 
 ---
 
-### 2 · #245 — `HTTPD090E` refuses the start and the step ends `CC 0000`
+### 1 · #245 — `HTTPD090E` refuses the start and the step ends `CC 0000`
 
 *#226, finished*
 
@@ -65,7 +48,7 @@ consequence, not because it is likely.
 
 ---
 
-### 3 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+### 2 · #237 — `httpclos()` releases the lock `process_clients()` is holding
 
 *latent, cheap, and the reading behind it is already done in #235*
 
@@ -84,7 +67,7 @@ The issue carries a second, unconfirmed observation for the same change:
 
 ---
 
-### 4 · #198 — Pre-allocate lazy first-use storage at startup
+### 3 · #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
@@ -151,6 +134,12 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#243** — a misspelled `AUTH=` value published the route (PR #247). Decided
+  as *refuse the start*, the option #105's own reasoning argues for: `pol->failed`
+  refuses the route before it is registered, and the `HTTPD419E`/`HTTPD420E`
+  chain that already existed ends the start — with a `RES=` on the line or
+  without, which was the asymmetry. Measured both ways on a spare port beside
+  the STC. `HTTPD411W` retired in favour of `HTTPD411E`; the id is not reused.
 - **#242** — the dead listener guard on that same path (PR #246). `do_bind()`
   is the only writer that stores a socket in `httpd->listen`, and it does so as
   its last act before `return 0`.
