@@ -115,9 +115,9 @@ console string.
 
 `HTTPD090E` ends `CC 0008` as well (#245), but it is the one refusal with a
 different **shape**: the console interface is checked before `initialize()`
-runs, so there is nothing to quiesce and none of the three lines above follow
-it. It stands alone. That is why the return code is the test and the sequence
-is not.
+runs, so there is nothing to quiesce and the `HTTPD098I` / `HTTPD416I` /
+`HTTPD099I` lines do not follow it. It stands alone. That is why the return
+code is the test and the sequence is not.
 
 **Two kinds of failed start end with something other than `CC 0008`**:
 
