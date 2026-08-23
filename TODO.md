@@ -11,7 +11,8 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, four issues open.*
+*Last reconciled against the tracker: 2026-08-23, six issues open (#233 closed
+by PR #244; #242, #243 and #245 filed out of it).*
 
 ---
 
@@ -19,31 +20,53 @@ is to hold nothing worth going stale.
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #233 | `priority:medium` `type:cleanup` | nothing |
-| 2 | #237 | `type:bug` | nothing |
-| 3 | #198 | hygiene, explicitly not a bug | nothing |
+| 1 | #243 | `type:bug` `priority:medium` | **a decision** — see below |
+| 2 | #245 | `type:bug` | nothing |
+| 3 | #237 | `type:bug` | nothing |
+| 4 | #198 | hygiene, explicitly not a bug | nothing |
+| 5 | #242 | `type:cleanup` | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 ---
 
-### 1 · #233 — `HTTPD400E` blames the configuration for failures that are not
+### 1 · #243 — a misspelled `AUTH=` value publishes the route
 
-*the fastest win*
+*the only open item with an exposure behind it*
 
-Four of the five paths reaching `HTTPD400E ERRORS OCCURRED PROCESSING THE
-CONFIGURATION` are not configuration errors at all — port already held
-(`HTTPD037E`), `socket()`, `bind()`, `listen()`. The Parmlib was fine, and the
-message sends the operator into `SYS2.PARMLIB(HTTPPRM0)` hunting a mistake that
-is not there — at exactly the moment it costs most, a failed start.
+A route line that names `AUTH=` and gets the value wrong — `AUTH=BASCI` — warns
+`HTTPD411W` and registers **public**. The `continue` in `parse_kv_tail()` skips
+`has_auth = 1`, so the memset's `HTTP_AUTH_NONE` stands and `policy_binds()`
+sees nothing to lose. A `RES=` on the same line rescues it to `BASIC` by
+accident; authentication-only routes, which is most of them, are not rescued.
 
-On the fifth path it is redundant: `HTTPD420E` already ends with
-`HTTPD WILL NOT START`.
+**It waits on a decision, not on code.** Refusing the start (`HTTPD_FLAG_CFGERR`
+→ `HTTPD420E`, what #105's own reasoning argues for), resolving to `BASIC`, or
+documenting the exposure are three different servers. The issue lays out all
+three; the change itself is small whichever wins.
 
-One call site (`httpd.c:324`), tightly scoped.
+The stale `HTTPD411W` text — still naming `DEFAULT` and a global policy both
+retired by #105, still missing `TOKEN` from #121 — rides along with it.
 
 ---
 
-### 2 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+### 2 · #245 — `HTTPD090E` refuses the start and the step ends `CC 0000`
+
+*#226, finished*
+
+`main()` reaches the console check only when the APF setup returned zero, and
+nothing between the two writes `rc` — so `HTTPD090E UNABLE TO INITIALIZE
+CONSOLE INTERFACE`, which is fatal by design, returns 0. A restart rule keyed
+on COND CODE reads a clean stop and leaves the system without an HTTP server.
+
+#226 gave `initialize()` a return value and never reached `main()`'s own early
+exits. This is the last one that is silent: the DD checks in `httpstrt.c` end
+`EXIT_FAILURE`, `HTTPD012E` carries `__autask()`'s rc, and `HTTPD033E` sets
+`initrc = 8`. Ranked here because it is a two-line fix with an operational
+consequence, not because it is likely.
+
+---
+
+### 3 · #237 — `httpclos()` releases the lock `process_clients()` is holding
 
 *latent, cheap, and the reading behind it is already done in #235*
 
@@ -62,7 +85,7 @@ The issue carries a second, unconfirmed observation for the same change:
 
 ---
 
-### 3 · #198 — Pre-allocate lazy first-use storage at startup
+### 4 · #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
@@ -74,6 +97,21 @@ Parmlib-registered `MOD=` once during initialization, so both sit below the
 high-water mark before the first request.
 
 Whenever the region map is being looked at anyway.
+
+---
+
+### 5 · #242 — dead `if (httpd->listen)` guard on the config failure path
+
+*ranked last because nothing behind it can misbehave*
+
+`do_bind()` assigns `httpd->listen` as its last statement before `return 0`, so
+every non-zero return from `http_config()` leaves it zero and the guard in
+`httpd.c`'s failure branch is never taken. Same shape as the guards PR #236
+dropped once `httpd->httpc` had a single writer: one writer, one point, and a
+test written as though there might be more.
+
+Filed out of #233, which found it and left it out on purpose — folding it in
+would have made a message diff into a control-flow diff.
 
 ---
 
@@ -129,6 +167,11 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#233** — `HTTPD400E` retired (PR #244). It named the configuration on four
+  of the five paths that reached it, where the fault was the port or the stack.
+  Nothing replaced it; the `CC 0008` fact it used to carry now sits in
+  `docs/messages.md` under *A refused start*, next to the healthy start and stop.
+  Spawned #242 and #243.
 - **#235** — `build_fd_set()` reads `httpd->httpc[]` without the lock (PR #236).
   Settled by reading rather than locking; spawned #237. The open question it
   deliberately did not settle — whether a server with no worker pool should

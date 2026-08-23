@@ -468,8 +468,19 @@
  *  than a server that will not start.  %s is the operand as written. */
 #define MSG_LOGIN_RETIRED_E	"HTTPD048E LOGIN %s IS RETIRED -- ROUTES WITHOUT AUTH= WOULD BECOME PUBLIC"
 
-/** HTTPD400E the configuration had errors the server will not start on */
-#define MSG_CFG_ERRORS		"HTTPD400E ERRORS OCCURRED PROCESSING THE CONFIGURATION"
+/*
+ * HTTPD400E is retired (#233).  "ERRORS OCCURRED PROCESSING THE CONFIGURATION"
+ * followed every failing return from http_config(), and four of the five paths
+ * that reach it are not configuration errors: the port held by another address
+ * space (HTTPD037E), socket() (HTTPD028E), bind() (HTTPD030E), listen()
+ * (HTTPD031E).  It named the wrong subsystem during a failed start.  On the
+ * fifth, HTTPD420E already ends with HTTPD WILL NOT START.
+ *
+ * Nothing took its place: every path writes its own cause, HTTPD098I/HTTPD099I
+ * mark the stop, and the CC 0008 (#226) lives in initialize()'s return value,
+ * not in a WTO.  The id stays reserved rather than reused -- a log from an
+ * older build still means what it meant.
+ */
 
 /** HTTPD410W CGI= was the 3.3.x spelling */
 #define MSG_ROUTE_CGI_DEPR	"HTTPD410W CGI= IS DEPRECATED, USE MOD= INSTEAD"
