@@ -1,11 +1,14 @@
 # HTTPD / mvsMF / ftpd Identity — Analysis & Redesign
 
-**Status:** design / planning (2026-08-17); Phase 1 status refreshed 2026-08-20.
-Phase 1 is **2 of 4 done** — mvslovers/mvsmf#228 and #229 both landed
-2026-08-19. Still open: httpd#137, ftpd#97 / ufsd#65, and the **restjobs
-policy**, which §3.1 item 2 asked for, #229 did not cover, and which has no
-ticket. Phase 2 is not actionable: MVS-sysgen/RAKF#5, #6 and #8 are all open
-and uncommented.
+**Status:** design / planning (2026-08-17); Phase 1 status refreshed 2026-08-23.
+Phase 1 is **3 of 4 done** — mvslovers/mvsmf#228 and #229 landed 2026-08-19,
+httpd#137 on 2026-08-21. Still open: the resting identity (ftpd#97, ufsd#65),
+and the **restjobs policy**, the half of §3.1 item 2 that #229 did not cover —
+now tracked as mvslovers/mvsmf#345. **Phase 2 is deferred by decision
+(2026-08-23), not merely stalled:** anything requiring a RAKF change is flagged
+`blocked:rakf` and ranked out until upstream moves. All three of
+MVS-sysgen/RAKF#5, #6 and #8 have been open and uncommented since 2026-08-06 /
+08-17, and RAKF is in another organisation. See §3.2.
 **Scope:** the *identity* story across **httpd**, **mvsMF**, **ftpd** (and, for
 the resting identity, **ufsd**): which ACEE an authorization decision runs
 under, what identity the address space rests on, and what changes without RAKF
@@ -162,9 +165,13 @@ rather than removing the switch.
    it clones and put a RACHECK per entry on the request path. Recorded as a
    decision in mvsMF's `CLAUDE.md`; the constraint stands if it is revisited —
    a refusal must not be distinguishable from "does not exist".
-   ⬜ **The restjobs half is undecided and untracked** (the mvsMF mirror of
-   ftpd#90 — spool access has no platform authorization model). `jobsapi.c`
-   carries no authorization check at all.
+   ⬜ **The restjobs half is still undecided** — now tracked as
+   mvslovers/mvsmf#345 (the mvsMF mirror of ftpd#90 — spool access has no
+   platform authorization model). `jobsapi.c` carries no authorization check at
+   all: `owner` defaults to the caller but the client can widen it with `*`, and
+   the by-jobid paths — including spool-content read and purge — never consult
+   an owner. #229 does not settle it by precedent: that decision was about
+   *enumeration*, and three of these four paths are not that.
 3. ✅ **httpd: `RES=` startup warning** (httpd#137) — both halves settled.
    **Fail-open stays**: making `RES=` deny on an undefined profile is precisely
    the outage #136 removed (`RES=FACILITY:MVSMF.ACCESS` on a system without
@@ -186,7 +193,39 @@ rather than removing the switch.
 5. **Keep mvsMF's ambient switch.** It is the second net (§2); removing it in
    phase 1 would maximize the window with neither net.
 
-### 3.2 Phase 2 — RAKF changes
+### 3.2 Phase 2 — RAKF changes (deferred, 2026-08-23)
+
+**Decision:** none of this is scheduled. `mvslovers/httpd#176` and
+`mvslovers/ftpd#64` carry the `blocked:rakf` label and are ranked out of their
+repos' active lists; they stay open rather than closed, because the exposure is
+real and the resolution is simply not ours to time.
+
+**What the deferral changes for Phase 1.** With the started-procedures table
+(§3.2 item 1) parked, the local startup logon stops being defence-in-depth and
+becomes the only thing between an STC and the `STC`/`STCGROUP` identity that
+holds ALTER on every data set. §3.1 item 4 is therefore the priority of this
+document — but its two halves are **not** in the same state:
+
+- **ftpd already switches.** `racf_login("FTPD", NULL, "USER")` at
+  `ftpd.c:317-345`, measured live: `FTPD004I STC IDENTITY SET TO FTPD/USER VIA
+  RACINIT`. Note that `RAKF0010I ... STARTED USING DEFAULT STC ACCOUNT` does not
+  contradict this — RAKF issues it when the task is *created*, before ftpd's own
+  code runs. What ftpd#97 still holds is the three "to settle" bullets: the
+  literals cannot be changed without a rebuild (httpd has `STCUSER=`/`STCGROUP=`
+  since #177), the entitlement set is not enumerated, and the failure policy is
+  implicit — a failed RACINIT logs `FTPD004W` and continues on the inherited
+  identity.
+- **ufsd does not switch at all.** `racf_login`/`racf_set_acee` appear nowhere
+  in its `src/`. Every container OPEN runs under whatever the address space
+  rests on. **ufsd#65 is the real gap of the two**, and the deferral is what
+  makes it urgent rather than tidy.
+
+**And it promotes httpd#176's fallback.** *Remove the ambient switch entirely* —
+modules never set an ACEE, opens run under the server identity — needs no RAKF
+change and becomes the only schedulable resolution. It deserves evaluating on
+its merits rather than being carried as a second choice; that evaluation is the
+live question on #176 and is not deferred. Its cost lands squarely on the
+resting identity, which is why it and §3.1 item 4 have to be weighed together.
 
 1. **Started-procedures table** (MVS-sysgen/RAKF#8) — proc name → userid/group,
    hardcoded account as fallback. Root fix for §1.2's resting identity; the
@@ -231,7 +270,7 @@ removed or kept as documented redundancy is the last §4 decision.
 ## 5. References
 
 - `auth-redesign.md` — the credential model this builds on (implemented, 4.0.0)
-- mvslovers/httpd#176, #177, #137 · mvslovers/mvsmf#228, #229 ·
+- mvslovers/httpd#176, #177, #137 · mvslovers/mvsmf#228, #229, #329, #345 ·
   mvslovers/ftpd#64, #78, #90, #97 · mvslovers/ufsd#65
 - MVS-sysgen/RAKF#5, #6, #8
 - Key code: `libc370/src/racf/{racsacee,racauth,raclogin,raclgout}.c`,

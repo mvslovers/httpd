@@ -3,56 +3,32 @@
 **State lives on GitHub, not here.** `gh issue list --repo mvslovers/httpd` is
 the source of truth for what is open, closed or newly filed. What this file adds
 is the part the tracker cannot hold: the **order**, the reason for it, and which
-items are waiting on a decision rather than on code.
+items wait on a decision rather than on code.
 
-Refresh it after every merge — an entry that outlives its issue is worse than no
-file, because it reads as current.
+**It carries nothing that is copied.** Where a chain of reasoning already has an
+owner — the issue thread, the PR, a design document — this file points at it and
+stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
+wrong the first time someone closes something, and the only defence that works
+is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-22, four issues open (#235 closed
-by PR #236, #237 filed out of it).*
-
----
-
-## 1 · #176 — Modules must stop switching ambient identity
-
-*no label · security · the heaviest by a wide margin*
-
-ASXBSENV is address-space-wide and 3.8j has no per-task ACEE. The issue thread
-carries a **fail-open chain measured against sources**:
-
-1. A denied access abends the CGI (S913). That is the *routine* outcome of a
-   denial, not an edge case — OPEN does not refuse politely.
-2. The requesting client's ACEE is left in ASXBSENV.
-3. The idle reaper frees that CRED and `racf_logout()` zeroes the field
-   (`libc370` `raclgout.c:68-74`) — necessary, or the system would rest on freed
-   storage.
-4. RAKF reads ASXBSENV == 0 as **permitted** (`ICHSFR00.hlasm:111-116`, comment
-   "WHO KNOWS").
-
-Independent of that chain: the resting identity is `STC`/`STCGROUP`, which holds
-ALTER on every data set. Any ACEE-unaware CGI inherits it — `httprexx` and
-`httplua` reference `racf_set_acee` nowhere, so both do.
-
-**Changed since the thread was written:** mvslovers/mvsmf#228 is **closed**. An
-explicit authorization check before the open answers 403 and never reaches the
-S913, which cuts the chain at link 1 and materially lowers live exposure. It
-does **not** resolve this issue: the resting identity and the interleaving
-window between workers are untouched.
-
-**Blocked on a decision, not on implementation.** Two candidate resolutions:
-
-- *Per-task ACEE* (preferred) — a convention between RAKF and libc370 on a TCB
-  word free on 3.8j, consulted ahead of ASXBSENV. Fixes the class rather than
-  routing around it. Not a RAKF feature toggle: the TCB layout is MVS's, so it
-  is a two-project agreement, and RAKF is not in this org.
-- *Remove the switch entirely* — modules never set an ACEE, opens run under the
-  server identity. Fallback if the first does not land.
+*Last reconciled against the tracker: 2026-08-23, four issues open.*
 
 ---
 
-## 2 · #233 — `HTTPD400E` blames the configuration for failures that are not
+## The order
 
-*priority:medium · type:cleanup · the fastest win*
+| | Issue | Kind | Waiting on |
+|---|---|---|---|
+| 1 | #233 | `priority:medium` `type:cleanup` | nothing |
+| 2 | #237 | `type:bug` | nothing |
+| 3 | #198 | hygiene, explicitly not a bug | nothing |
+| — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
+
+---
+
+### 1 · #233 — `HTTPD400E` blames the configuration for failures that are not
+
+*the fastest win*
 
 Four of the five paths reaching `HTTPD400E ERRORS OCCURRED PROCESSING THE
 CONFIGURATION` are not configuration errors at all — port already held
@@ -67,9 +43,9 @@ One call site (`httpd.c:324`), tightly scoped.
 
 ---
 
-## 3 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+### 2 · #237 — `httpclos()` releases the lock `process_clients()` is holding
 
-*type:bug · latent, cheap*
+*latent, cheap, and the reading behind it is already done in #235*
 
 `httpclos()` brackets its walk with an unconditional `lock(httpd,0)` /
 `unlock(httpd,0)`. ENQ ownership is per TCB and not counted (libc370 `@@lk.c`),
@@ -78,10 +54,7 @@ inner `lock()` gets rc 8 and the inner DEQ releases the *outer* holder's ENQ.
 
 Nothing breaks today — only a `break` follows the `http_close()` — and it is the
 one place in the server that does not use the `if (lockrc==0) unlock(...)` form
-every other call site uses. Filed out of #235, which also bounds it: the walk
-only finds a client to close when the server came up without a worker pool, so
-the nesting is rare on top of being harmless. Fix it for the next reader, not
-for a live symptom.
+every other call site uses. Fix it for the next reader, not for a live symptom.
 
 The issue carries a second, unconfirmed observation for the same change:
 `process_clients()` appears to call `http_process_clients()` twice per pass
@@ -89,57 +62,89 @@ The issue carries a second, unconfirmed observation for the same change:
 
 ---
 
-## 4 · #198 — Pre-allocate lazy first-use storage at startup
+### 3 · #198 — Pre-allocate lazy first-use storage at startup
 
-*no label · hygiene, explicitly not a bug*
+*hygiene, explicitly not a bug*
 
-The recurring planter died with libc370#115/#119. What remains is that
-one-time lazy initialization lands mid-region during traffic: worker-pool growth
-(64 K stack per new worker) and each module's first LINK. Two concrete steps —
-start the pool at MAXTASK (or add a `PREALLOC` keyword), and touch every
+The recurring planter died with libc370#115/#119. What remains is that one-time
+lazy initialization lands mid-region during traffic: worker-pool growth (64 K
+stack per new worker) and each module's first LINK. Two concrete steps — start
+the pool at MAXTASK (or add a `PREALLOC` keyword), and touch every
 Parmlib-registered `MOD=` once during initialization, so both sit below the
 high-water mark before the first request.
 
-Nothing is broken today; this is placement hygiene.
+Whenever the region map is being looked at anyway.
 
 ---
 
-## Suggested sequencing
+## Deferred — blocked on RAKF
 
-Not the same as the ranking above, because #176's next step is a conversation
-rather than code.
+Maintainer decision, 2026-08-23: anything needing a change in `MVS-sysgen/RAKF`
+is flagged `blocked:rakf` and deferred. RAKF is in another organisation, and #5,
+#6 and #8 have been open and uncommented since 2026-08-06 / 08-17. These items
+stay open and stay ranked out — not closed, not forgotten, and not waited on.
 
-1. **#233** — small, self-contained, operator-facing.
-2. **#237** — smaller still, and the reading behind it is already done in #235.
-3. **#176** — needs a direction decided first (per-task ACEE vs. removing the
-   switch). That is a decision, not code.
-4. **#198** — whenever the region map is being looked at anyway.
+### #176 — Modules must stop switching ambient identity
+
+*security · `blocked:rakf`*
+
+ASXBSENV is address-space-wide and 3.8j has no per-task ACEE. The measured
+fail-open chain is **not restated here** — `docs/identity-redesign.md` §1.5 owns
+it, with the source citations (`credfree.c:33`, `raclgout.c:68-74`,
+`ICHSFR00.hlasm:116`) and the cross-project picture this file cannot hold.
+
+The **per-task ACEE** (`MVS-sysgen/RAKF#5`) is the preferred resolution and is
+what the deferral parks: it fixes the class rather than routing around it, and
+it is a two-project agreement on a TCB word, not a RAKF feature toggle.
+
+**Two parts are ours and are not deferred with it:**
+
+- **The fallback needs no RAKF.** *Remove the switch entirely* — modules never
+  set an ACEE, opens run under the server identity — is all in our own code. The
+  deferral promotes it from second choice to the only schedulable resolution, so
+  it wants evaluating on its merits. Its cost: every open then runs under the
+  resting identity, which makes the startup logon load-bearing rather than
+  defence-in-depth. httpd has had one since #177 and ftpd since before
+  `mvslovers/ftpd#97` (hardcoded literals; that issue is now about configuring
+  them) — but `mvslovers/ufsd#65` has none at all, which is where the cost
+  actually lands. Both are unblocked.
+- **The §1.5 verification** is unblocked but not free. Before booking a run:
+  link 1 of the chain is a *denied* access abending, and `mvslovers/mvsmf#228`
+  is exactly the change that stops data set denials from reaching the S913 — the
+  obvious provocation path was removed by the fix that shrank the exposure.
+  Create (`mvslovers/mvsmf#329`) does not substitute: `__dsalcf()` returns an rc,
+  it does not abend. Another abending path has to stand in, or the run observes
+  nothing.
+
+Note that `mvslovers/mvsmf#345` is **not** evidence for this issue and is not
+blocked by it: JES spool has no RAKF gate on 3.8j at all, so no ACEE — ambient or
+explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape.
 
 ---
 
 ## Recently landed
 
-- **#235** — *`build_fd_set()` reads `httpd->httpc[]` without the lock*
-  (PR #236). Settled by reading, not by locking: the array has exactly one
-  writer, the socket thread, so the lock-free read stands. The issue's
-  mitigating assumption holds, and for a firmer reason than it gave —
-  `initialize()` holds `lock(httpd,0)` across both the socket-thread create and
-  `cthread_manager_init()`, and the socket loop's first act ENQs that same
-  resource (`RET=HAVE`, so it waits), so the thread cannot accept before `mgr`
-  is decided. No startup window; the array is populated only when the manager
-  failed to initialize, and then no worker threads exist at all. The shutdown
-  force-detach path (`HTTPD041I`) is the one second-writer exception and is now
-  written down. The three `if (!httpc) continue;` guards are gone. Spawned #237.
+Pointers only. The reasoning lives in the closing comments, which is where this
+project already writes it down properly.
 
-  **Left open deliberately:** the array now has exactly one producer, the
-  no-worker fallback. Whether that fallback should exist — whether a server with
-  no worker pool ought to start at all — is the question `httpd.c:379-385`
-  defers to #226, not something this PR settled.
+- **#235** — `build_fd_set()` reads `httpd->httpc[]` without the lock (PR #236).
+  Settled by reading rather than locking; spawned #237. The open question it
+  deliberately did not settle — whether a server with no worker pool should
+  start at all — is deferred to #226.
+- **#229** — the array contract, written down instead of hedged against
+  (PR #234). Note: bare `#229` means httpd's here; `mvslovers/mvsmf#229` is the
+  data set enumeration decision, and both get cited in the same conversations.
+- **#137** — `RES=` startup warning (PR #219). Fail-open stays, deliberately;
+  `res_probe()` writes `HTTPD425W` for a resource no profile covers.
+- **#105** — the auth model cleanup, as #222 (global `LOGIN` bitmask retired,
+  `AUTH=DEFAULT` gone) and #227 (`HTTPCGI` → `HTTPROUTE`).
 
-- **#229** — *Write down the array contract instead of hedging against it*
-  (PR #234, merged 2026-08-22, `3820a3f`). Removed five dead NULL guards on
-  `httpd->route` / `httpc->env`, corrected the false `array_del()` comment in
-  `build_fd_set()` that was the source of the belief in holes, and documented
-  the contract in `docs/development.md`. Verified with a live acceptance run on
-  mvsdev (throwaway instance on port 8229): the route array dumped 28 bytes —
-  7 × 4 — with all seven pointers non-zero. Spawned #235.
+## Cross-repo
+
+This file is httpd-only, and the identity work is not. `docs/identity-redesign.md`
+owns that story across httpd, mvsMF, ftpd, ufsd and RAKF. Do not rank those here;
+update the status line there.
+
+Unblocked and outside this repo: `mvslovers/ftpd#97`, `mvslovers/ufsd#65` (the
+last Phase 1 item), `mvslovers/mvsmf#329`, `mvslovers/mvsmf#345`.
+Also `blocked:rakf`: `mvslovers/ftpd#64`.
