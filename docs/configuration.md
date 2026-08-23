@@ -292,7 +292,7 @@ start.** Dropping it is not a safe fallback: the route does not disappear, its
 requests are served with nothing gating them instead — and for a `LOC=` prefix
 that hands out the whole subtree it was protecting. So
 whenever such a route cannot be built, the server issues `HTTPD418E`/`HTTPD419E`
-naming it, then `HTTPD420E`, and terminates before the listener is bound. Three
+naming it, then `HTTPD420E`, and terminates before the listener is bound. Four
 things reach that path:
 
 - the policy itself could not be built, or the route could not be added (both
@@ -311,13 +311,26 @@ things reach that path:
   option into an 8-character module name (`AUTH=BAS`) and registered a route
   that could never load.
 
+- **the `AUTH=` value is not one of the four modes** — the other typo case, and
+  the one that needs nothing else to go wrong:
+
+  ```
+  MOD=ADMIN /admin/*   AUTH=BASCI
+  ```
+
+  The route is refused with `HTTPD411E` and the server stops. It used to be
+  registered instead, under the same `NONE` a line with no `AUTH=` gets, so a
+  single transposed letter published the path (#243). A `RES=` on the same line
+  rescued it to `BASIC` by accident; routes gated by authentication alone were
+  not rescued, and both behave the same way now.
+
 A route that fails to register with no policy at all, or with `AUTH=NONE` only,
 stays a warning and the server continues — the fallback can only be stricter
 than what it asked for.
 
 | Option | Values | Description |
 |--------|--------|-------------|
-| `AUTH=` | `NONE` \| `FORM` \| `BASIC` \| `TOKEN` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. `TOKEN` = a bare `401`, never a challenge. **Omitted** = `NONE`, i.e. public — unless the line also carries `RES=`, which needs an identity and so implies `BASIC`. |
+| `AUTH=` | `NONE` \| `FORM` \| `BASIC` \| `TOKEN` | Challenge for stage 1. `NONE` = public (no authentication). `FORM` = the HTML login form. `BASIC` = `401 WWW-Authenticate: Basic`. `TOKEN` = a bare `401`, never a challenge. **Omitted** = `NONE`, i.e. public — unless the line also carries `RES=`, which needs an identity and so implies `BASIC`. **Anything else** is refused, not ignored: `HTTPD411E` and the server does not start. |
 | `RES=` | `class:resource` | Optional RACF/RAKF resource for stage 2, e.g. `RES=FACILITY:MVSMF.ACCESS`. Checked for `READ`. A resource always requires an identity, so it implies authentication even without `AUTH=`. |
 
 **`AUTH=` does not select the credential source.** The resolver runs before the

@@ -449,7 +449,8 @@
 /** HTTPD035W the region ran out of storage while the Parmlib was being read.
  *  Nothing else reaches this: there is no route-table limit (array_add() grows)
  *  and duplicate patterns are never detected.  The path is NOT dark -- it is
- *  served statically under the global LOGIN default, without the CGI.  Alone it
+ *  served statically from the document root and ungated, without the CGI (the
+ *  global LOGIN default this used to name went with #105).  Alone it
  *  also says the route bound no auth policy; one that did brings HTTPD419E and
  *  HTTPD420E and the server does not start (#220). */
 #define MSG_MOD_NOT_REG		"HTTPD035W UNABLE TO REGISTER MODULE %s FOR %s"
@@ -485,8 +486,24 @@
 /** HTTPD410W CGI= was the 3.3.x spelling */
 #define MSG_ROUTE_CGI_DEPR	"HTTPD410W CGI= IS DEPRECATED, USE MOD= INSTEAD"
 
-/** HTTPD411W AUTH= with a mode that is not NONE/BASIC/FORM/DEFAULT */
-#define MSG_ROUTE_BAD_AUTH	"HTTPD411W IGNORING UNKNOWN AUTH MODE '%s'"
+/*
+ * HTTPD411W is retired (#243).  "IGNORING UNKNOWN AUTH MODE" named a set that
+ * no longer exists (DEFAULT went with #105, TOKEN arrived with #121) and, worse,
+ * described what the server did: it ignored the value and registered the route
+ * under the parser's HTTP_AUTH_NONE, i.e. public.  A line that names AUTH= has
+ * the operator's intent to gate written on it, so dropping it is the fail-open
+ * shape HTTPD419E already refuses to start on.  The id stays reserved rather
+ * than reused -- in a log from an older build it still means what it meant,
+ * which is that the route named on that line was served to anyone.
+ */
+
+/** HTTPD411E AUTH= with a value that is not NONE/FORM/BASIC/TOKEN -- the four
+ *  parse_kv_tail() accepts, and there is no "unset" mode behind them (#105).
+ *  Fatal: the route is refused before registration, HTTPD419E names it and
+ *  HTTPD420E ends the start.  Same treatment a RES= that could not be built
+ *  gets, for the same reason -- a policy silently weakened is worse than a
+ *  server that will not start (#243). */
+#define MSG_ROUTE_BAD_AUTH	"HTTPD411E UNKNOWN AUTH MODE '%.24s' -- USE NONE, FORM, BASIC OR TOKEN"
 
 /** HTTPD412W RES= must be class:resource */
 #define MSG_ROUTE_BAD_RES	"HTTPD412W IGNORING MALFORMED RES= '%s' (NEED CLASS:RESOURCE)"
@@ -509,7 +526,13 @@
 /** HTTPD418E RES= parsed but its storage could not be obtained */
 #define MSG_ROUTE_NO_RES_MEM	"HTTPD418E NO STORAGE FOR RES=%.16s:%.40s"
 
-/** HTTPD419E the route is gone and its auth policy with it -- fatal */
+/** HTTPD419E the route is gone and its auth policy with it -- fatal.  Four
+ *  things reach it: no storage for the RES= pair (HTTPD418E) or for the route
+ *  itself, a line that could not be tokenized at all, a missing positional
+ *  token with an option standing in its place (#164), and an AUTH= value this
+ *  build does not know (HTTPD411E, #243).  Only the first needs a short region
+ *  -- the other three are typos, so do not read this message as a storage
+ *  report until the line above it says so. */
 #define MSG_ROUTE_LOST		"HTTPD419E %s=%.40s COULD NOT BE REGISTERED -- ITS AUTH POLICY IS LOST"
 
 /** HTTPD420E at least one route would have answered without its policy */
@@ -523,8 +546,8 @@
 
 /** HTTPD423W as HTTPD035W, for a LOC= prefix: out of storage, with no table
  *  limit and no duplicate check behind it.  The prefix keeps being served from
- *  the document root, under the global LOGIN default instead of its own
- *  policy (#220). */
+ *  the document root, ungated instead of under the policy the line gave it
+ *  (#220; there is no global LOGIN default left to fall back on since #105). */
 #define MSG_LOC_NOT_REG		"HTTPD423W UNABLE TO REGISTER LOCATION %s"
 
 /** HTTPD424W REALM refused by httprlm_ok() (#193); the SMF ID default stays */

@@ -539,7 +539,7 @@ typedef struct {
     UCHAR   auth;               /* HTTP_AUTH_* (NONE until AUTH= seen)      */
     UCHAR   has_auth;           /* an AUTH= keyword was read (see below)    */
     UCHAR   resattr;            /* RACF attr (RACF_ATTR_READ when RES= set) */
-    UCHAR   failed;             /* policy could not be built (no storage)   */
+    UCHAR   failed;             /* unbuildable -> the route is refused      */
     char   *resclass;           /* strdup'd RACF class (NULL = no authz)    */
     char   *resname;            /* strdup'd RACF resource name              */
 } ROUTE_POLICY;
@@ -560,6 +560,11 @@ typedef struct {
 ** unauthenticated.  So a *binding* policy that cannot be built is a
 ** configuration error, not a warning -- see the HTTPD_FLAG_CFGERR check in
 ** http_config().
+**
+** pol->failed is binding by definition: the line asked for a gate this build
+** could not construct -- RES= storage that was not obtained, or an AUTH= value
+** it does not know (#243).  Such a route is refused before registration, so
+** nothing but a refused start keeps its path from being served ungated.
 **
 ** AUTH=NONE is the one policy losing the route cannot weaken (an unregistered
 ** path is public, which is what NONE asked for), so a lost AUTH=NONE route
@@ -620,8 +625,19 @@ parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
             else if (http_cmp(v, "BASIC") == 0) pol->auth = HTTP_AUTH_BASIC;
             else if (http_cmp(v, "TOKEN") == 0) pol->auth = HTTP_AUTH_TOKEN;
             else {
+                /* The line named AUTH=, so the intent to gate is written on it
+                   -- and the value is not a mode this build can build.  Refuse
+                   the route.  It used to be ignored, which meant registering it
+                   under the memset's HTTP_AUTH_NONE: the continue skipped
+                   has_auth, policy_binds() saw nothing to lose, and AUTH=BASCI
+                   published exactly the path it was meant to protect (#243).
+                   A RES= on the same line rescued it to BASIC by accident; an
+                   authentication-only route, which is most of them, was not
+                   rescued.  failed carries both cases to HTTPD419E/HTTPD420E,
+                   the refusal a RES= that could not be built already gets. */
                 wtof(MSG_ROUTE_BAD_AUTH, v);
-                continue;                       /* not a policy the line set */
+                pol->failed = 1;
+                continue;               /* a later AUTH= must not clear it */
             }
             pol->has_auth = 1;
         }
