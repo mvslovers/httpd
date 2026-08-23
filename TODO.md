@@ -11,8 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, four issues open (#233 closed
-by PR #244, #242 by PR #246 and #243 by PR #247; #245 filed out of #233).*
+*Last reconciled against the tracker: 2026-08-23, three issues open (#245
+closed by PR #248, and before it #233 by PR #244, #242 by PR #246 and #243 by
+PR #247).*
 
 ---
 
@@ -20,35 +21,22 @@ by PR #244, #242 by PR #246 and #243 by PR #247; #245 filed out of #233).*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #245 | `type:bug` | nothing |
-| 2 | #237 | `type:bug` | nothing |
-| 3 | #198 | hygiene, explicitly not a bug | nothing |
+| 1 | #237 | `type:bug` | nothing |
+| 2 | #198 | hygiene, explicitly not a bug | nothing |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **Nothing open waits on a decision any more.** #243 was the one that did, and
-it is settled — the three remaining items are code, and #176 is parked on
+it is settled — the two remaining items are code, and #176 is parked on
 another organisation.
 
----
-
-### 1 · #245 — `HTTPD090E` refuses the start and the step ends `CC 0000`
-
-*#226, finished*
-
-`main()` reaches the console check only when the APF setup returned zero, and
-nothing between the two writes `rc` — so `HTTPD090E UNABLE TO INITIALIZE
-CONSOLE INTERFACE`, which is fatal by design, returns 0. A restart rule keyed
-on COND CODE reads a clean stop and leaves the system without an HTTP server.
-
-#226 gave `initialize()` a return value and never reached `main()`'s own early
-exits. This is the last one that is silent: the DD checks in `httpstrt.c` end
-`EXIT_FAILURE`, `HTTPD012E` carries `__autask()`'s rc, and `HTTPD033E` sets
-`initrc = 8`. Ranked here because it is a two-line fix with an operational
-consequence, not because it is likely.
+**The return-code work is finished.** #226 and #245 between them settled every
+exit that could end a refused start `CC 0000`; nothing in that thread is open,
+and `docs/messages.md` §*A refused start* is where the resulting contract is
+written down.
 
 ---
 
-### 2 · #237 — `httpclos()` releases the lock `process_clients()` is holding
+### 1 · #237 — `httpclos()` releases the lock `process_clients()` is holding
 
 *latent, cheap, and the reading behind it is already done in #235*
 
@@ -67,7 +55,7 @@ The issue carries a second, unconfirmed observation for the same change:
 
 ---
 
-### 3 · #198 — Pre-allocate lazy first-use storage at startup
+### 2 · #198 — Pre-allocate lazy first-use storage at startup
 
 *hygiene, explicitly not a bug*
 
@@ -134,6 +122,14 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#245** — `HTTPD090E` ended the step `CC 0000` (PR #248). The last `main()`
+  exit #226 did not reach; `rc = 8` before the `goto quit`, `initialize()`'s
+  refusal code rather than a second one. Not measured and not measurable — the
+  path needs `__gtcom()` to fail, which the spare-port method cannot provoke and
+  a host test cannot reach. In `docs/messages.md` it is deliberately *not* filed
+  under the refused-start sequence: it jumps to `quit:`, not `cleanup:`, so
+  `HTTPD098I`/`HTTPD416I`/`HTTPD099I` never follow it. Same `CC 0008`, different
+  shape.
 - **#243** — a misspelled `AUTH=` value published the route (PR #247). Decided
   as *refuse the start*, the option #105's own reasoning argues for: `pol->failed`
   refuses the route before it is registered, and the `HTTPD419E`/`HTTPD420E`
