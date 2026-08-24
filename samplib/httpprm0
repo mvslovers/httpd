@@ -84,13 +84,23 @@
 # match wins): the anonymous reachability probe (/zosmf/info) and the token
 # login/logout endpoint (/zosmf/services/authenticate) do their own auth, so
 # the gate must not challenge them.
+# TOKEN on the catch-all, not a blank: a route without AUTH= is PUBLIC, and
+# leaving the whole API ungated would hand every dataset and job endpoint to
+# anyone who can reach the port.  TOKEN answers a bare 401 without a
+# WWW-Authenticate, which is what an API client (Zowe, a SPA, curl scripts)
+# wants -- see the AUTH= notes above.
 MOD=MVSMF /zosmf/info                    AUTH=NONE
 MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
-MOD=MVSMF /zosmf/*
-# MOD=MVSMF /zosmf/*  AUTH=TOKEN RES=FACILITY:MVSMF.ACCESS  (protected API)
-# MOD=HTTPDSRV /.dsrv  AUTH=FORM                             (browser login)
-# MOD=HTTPDM /.dm
-# MOD=HTTPDMTT /.dmtt
+MOD=MVSMF /zosmf/*                       AUTH=TOKEN
+# Add a RACF/RAKF profile check on top of the login:
+# MOD=MVSMF /zosmf/*  AUTH=TOKEN RES=FACILITY:MVSMF.ACCESS
+#
+# The display modules read live storage and the console log, so none of them
+# may be uncommented without an AUTH= of its own.  They are development and
+# diagnostic tools, not production endpoints.
+# MOD=HTTPDSRV /.dsrv                    AUTH=FORM     (browser login)
+# MOD=HTTPDM /.dm                        AUTH=BASIC
+# MOD=HTTPDMTT /.dmtt                    AUTH=BASIC
 #
 # ABEND0C1 allocates (?kb=n, default 128) and then abends S0C1 without freeing
 # -- the acceptance probe for the storage reclaim.  Drive it a few hundred

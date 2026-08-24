@@ -11,9 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, three issues open (#250 filed
-that day; #237 closed by PR #249, and before it #245 by PR #248, #233 by
-PR #244, #242 by PR #246 and #243 by PR #247).*
+*Last reconciled against the tracker: 2026-08-24, three issues open (#252 filed
+and closed the same day by PR #253; before it #250, #237 by PR #249, #245 by
+PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247).*
 
 ---
 
@@ -38,6 +38,14 @@ second step cannot be estimated until it is answered.
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
 and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
+
+**Nothing MVS-side blocks the 4.0.0 tag any more.** The release work was never
+in the tracker — it is in [`smp-todo.md`](smp-todo.md) — and as of 2026-08-24 it
+is done: `THTP400` is free in the CDS *and* the ACDS on both stands (O1), the
+full install was rehearsed under the throwaway FMID `TTST400` and cleaned back
+off with UCLIN, every step CC 0000 (O2), and the document root ships as a UFS
+image (O3, #252). What is left there is a checksum for the release assets and
+O4, a convenience sample nobody is blocked on.
 
 ---
 
