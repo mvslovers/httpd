@@ -80,7 +80,7 @@ nicht aus Werkzeugmangel:
 
 Umgesetzt:
 
-- **`make webroot`** baut `dist/httpd-webroot.img` aus `static/` mit einem
+- **`make webroot`** baut `build/webroot/httpd-webroot.img` aus `static/` mit einem
   gepinnten `ufsd-utils` (1 MB = 256 Blöcke, `--owner`/`--group` gesetzt, damit
   im Artefakt keine Build-Maschinen-Userid steht). `package` und `dist` hängen
   davon ab, `[distribution] extra` legt es ins Archiv.

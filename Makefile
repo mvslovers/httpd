@@ -27,7 +27,14 @@ include $(MBT_ROOT)/mk/mbt.mk
 # Owner and group are metadata: UFSD enforces the MOUNT's OWNER(), not the
 # inode owner.  They are named anyway, so a release artifact does not carry
 # whatever userid happened to build it.
-WEBROOT_IMG   := $(DISTDIR)/httpd-webroot.img
+#
+# It is built under $(BUILDDIR) and NOT under $(DISTDIR), which is not a
+# detail: the release workflow publishes `dist/*` as GitHub Release assets, so
+# an image sitting there would appear beside the versioned artifacts under a
+# name carrying no version at all -- and as a second copy of what the archive
+# already holds.  The archive is where it belongs, next to the README and the
+# jobs an operator needs with it.
+WEBROOT_IMG   := $(BUILDDIR)/webroot/httpd-webroot.img
 WEBROOT_SRC   := static
 WEBROOT_SIZE  := 1M
 WEBROOT_OWNER := IBMUSER
@@ -65,7 +72,7 @@ webroot: $(WEBROOT_IMG)
 # A directory's mtime moves when an entry is added or removed, which covers it.
 $(WEBROOT_IMG): $(shell find $(WEBROOT_SRC) -type f -o -type d) $(WEBROOT_TOOL_DEP)
 	$(E) "[webroot] $(notdir $@) ($(WEBROOT_SIZE), from $(WEBROOT_SRC)/)"
-	@mkdir -p $(DISTDIR)
+	@mkdir -p $(dir $@)
 	@rm -f $@
 	$(Q)$(UFSD_UTILS) create $@ --size $(WEBROOT_SIZE) --blksize 4096 \
 	    --owner $(WEBROOT_OWNER) --group $(WEBROOT_GROUP) > /dev/null
