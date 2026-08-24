@@ -39,13 +39,13 @@ exit that could end a refused start `CC 0000`; nothing in that thread is open,
 and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
 
-**What is left before the 4.0.0 tag is not in the tracker at all** — it is the
-install package, and [`smp-todo.md`](smp-todo.md) holds it. One item now:
-**O2**, the dry run under the throwaway FMID `TTST400`. O1 closed on
-2026-08-24 — `THTP400` answered RC 04 with an empty list in the CDS *and* the
-ACDS on both stands — and O3 closed with #252, which put the document root in
-the archive as a UFS image; of it only a checksum for the release assets is
-left.
+**Nothing MVS-side blocks the 4.0.0 tag any more.** The release work was never
+in the tracker — it is in [`smp-todo.md`](smp-todo.md) — and as of 2026-08-24 it
+is done: `THTP400` is free in the CDS *and* the ACDS on both stands (O1), the
+full install was rehearsed under the throwaway FMID `TTST400` and cleaned back
+off with UCLIN, every step CC 0000 (O2), and the document root ships as a UFS
+image (O3, #252). What is left there is a checksum for the release assets and
+O4, a convenience sample nobody is blocked on.
 
 ---
 

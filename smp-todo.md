@@ -19,7 +19,14 @@ Dieses Dokument hält nur noch das, was **für httpd offen** ist.
 
 ---
 
-## 1. Offen
+## 1. Stand
+
+**Vor dem 4.0.0-Tag ist nichts mehr offen, was MVS braucht.** O1 (FMID frei) und
+O2 (Generalprobe) sind am 2026-08-24 gefahren, O3 (Webroot) ist mit Issue #252
+umgesetzt. Was bleibt, ist O4 — eine Bequemlichkeitsfrage, keine Blockade — und
+die Checksummen aus O3. Die erledigten Punkte bleiben mitsamt Belegen stehen:
+sie sind das Protokoll des Release-Laufs, und die nächste Minor-Version fährt
+dieselbe Strecke.
 
 ### ~~O1 — `THTP400` im CDS und ACDS prüfen~~ · **erledigt 2026-08-24**
 
@@ -56,25 +63,42 @@ MVS/CE 116 000 Zeilen aus.
   den Job-RC abfragt, kann eine leere von einer treffenden Liste nicht
   unterscheiden.
 
-### O2 — Testinstallation mit Wegwerf-FMID `TTST400`
+### ~~O2 — Testinstallation mit Wegwerf-FMID `TTST400`~~ · **erledigt 2026-08-24**
 
-Die Generalprobe aus einem `-dev`-Baum. Ein Testlauf unter `THTP400`, der
-abbricht oder halb angewendet wird, belegt genau die ID, die das getaggte 4.0.0
-braucht — und das CDS lässt sich hinterher nur mit `UCLIN` bereinigen
-(`docs/installation.md` §12).
+Auf `mvsdev` gefahren, aus dem entpackten Archiv (`httpd-4.0.0-dev-dist.zip`),
+also genau dem, was ein Betreiber bekommt. `fmid` stand dafür auf `TTST400` —
+die Änderung ist **nicht** committet, `project.toml` sagt wieder `THTP400`.
 
-Mit mbt ist das eine Zeile: `fmid` in `project.toml` auf `TTST400` setzen,
-`make package`, installieren — **und die Änderung nie committen**.
+| Schritt | Ergebnis |
+|---|---|
+| XMITs binär hochgeladen (`IBMUSER.HTTPD.LOAD.XMIT`, `…SAMP.XMIT`) | ok |
+| `httpd-4.0.0-dev-alloc.jcl` (`JOB01972`) | CC 0000, `LINKLIB` + `AHTTPLOD` angelegt |
+| `httpd-4.0.0-dev-inst.jcl` (`JOB01973`), nur die zwei `CHANGE.ME.*` ersetzt | **alle acht Schritte CC 0000**: DELOLD, RECV1, RECV2, RECV, APPLYCHK, APPLY, ACCEPT, CLEANUP |
+| `LIST CDS/ACDS SYSMOD(TTST400)` (`JOB01974`) | RC 00, `JCLIN=YES`, REC/APP/ACC gestempelt, `MOD = HTTPD HTTPDM HTTPDMTT HTTPDSRV ABEND0C1` in **beiden** Zonen |
+| `HTTPD.V4R0M0D.LINKLIB` / `.AHTTPLOD` | je fünf Module |
+| `HTTPD.V4R0M0D.SAMPLIB` | `HTTPD`, `HTTPPRM0`, `HTTPWEBR` |
+| `HTTPD.V4R0M0D.HTTPLOAD` | von CLEANUP verschrottet, wie vorgesehen |
+| UCLIN + IDCAMS-Scratch (`JOB01975`) | CC 0000 |
+| `LIST` danach (`JOB01976`, `JOB01977`) | `TTST400` in beiden Zonen weg, `THTP400` weiterhin frei |
 
-Die Datasetnamen kollidieren dabei nicht mit dem späteren Release, ohne dass
-man etwas dafür tun muss: `@VRM@` kommt aus der Projektversion, und
-`4.0.0-dev` ergibt `V4R0M0D`, das getaggte `4.0.0` dagegen `V4R0M0`. Der Test
-lebt also in `HTTPD.V4R0M0D.*`, das Release in `HTTPD.V4R0M0.*`.
+Nach dem Lauf stehen auf `mvsdev` wieder nur `HTTPD.LINKLIB` und
+`HTTPD.WWWROOT` — beides Site-Inhalt, unberührt.
 
-Aufräumen danach: UCLIN-Job aus `docs/installation.md` §12 mit `TTST400`, dann
-die Datasets löschen, dann denselben `LIST`-Job wie in O1 — diesmal auf
-`TTST400`, um zu sehen, dass die Wegwerf-ID wieder weg ist, und auf `THTP400`,
-um zu bestätigen, dass der Testlauf sie nicht angefasst hat.
+**Was der Lauf über das Paket beweist**, über die Returncodes hinaus:
+
+- Die `@VRM@`- und `@LINKLIB@`-Ersetzung kommt richtig auf dem Zielsystem an:
+  der installierte `HTTPWEBR` sagt `DSN=HTTPD.V4R0M0D.WEBROOT.UFS`, die Proc
+  `STEPLIB DD DSN=HTTPD.V4R0M0D.LINKLIB`.
+- SMP kopiert, statt neu zu binden — die fünf Module stehen nach APPLY im
+  Ziel und nach ACCEPT in der DLIB.
+- Der UCLIN-Weg aus `docs/installation.md` §12 funktioniert wie beschrieben;
+  er war bis dahin nur hergeleitet, nicht gefahren.
+- Die Versionierung trägt: `V4R0M0D` (dev) kollidiert nicht mit dem späteren
+  `V4R0M0`, und die Site-Platte `HTTPD.WWWROOT` liegt neben allem.
+
+**Eine Falle, die dabei sichtbar wurde:** Datasets im Aufräumjob per IDCAMS
+löschen, nicht über die REST-API — ein `DELETE /zosmf/restfiles/ds/…` lässt das
+ENQ stehen, und der nächste `DISP=SHR`-Job hängt.
 
 ### O3 — UFS-Webroot: entschieden und umgesetzt (Issue #252)
 
