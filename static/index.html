@@ -79,8 +79,24 @@
             font-size: 0.75rem;
         }
 
-        a {
+        .links {
+            margin-top: 60px;
+        }
+
+        .link {
             color: #8ab4ff;
+            text-decoration: none;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .optional {
+            margin-top: 8px;
+            color: #777;
+            font-family: monospace;
+            font-size: 0.8rem;
         }
 
         footer {
@@ -89,6 +105,15 @@
             color: #777;
             font-family: monospace;
             font-size: 0.8rem;
+        }
+
+        footer a {
+            color: #8ab4ff;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -130,12 +155,24 @@
 
     </section>
 
+    <section class="links">
+
+        <div>
+            <a class="link" href="/mvsmf/index.html">
+                Open mvsMF →
+            </a>
+
+            <div class="optional">
+                Available if mvsMF is installed.
+            </div>
+        </div>
+
+    </section>
+
 </main>
 
 <footer>
-    <a href="https://github.com/mvslovers/httpd">
-        github.com/mvslovers/httpd
-    </a>
+    <a href="https://github.com/mvslovers/httpd">HTTPD</a> for MVS
 </footer>
 
 </body>
