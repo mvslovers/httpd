@@ -6,7 +6,7 @@ Hercules build) from the release distribution archive.
 The installation is managed by **SMP Release 4** — the SMP that ships with
 MVS 3.8j, not SMP/E. That means the system keeps a record of what was
 installed, and there is a supported way back out (see
-[Removing HTTPD](#11-removing-httpd)).
+[Removing HTTPD](#12-removing-httpd)).
 
 ## Getting help
 
@@ -15,7 +15,7 @@ installed, and there is a supported way back out (see
 
 That is the only place bug reports are tracked. Please include the two build
 stamps HTTPD writes at startup (`HTTPD000I` and `HTTPD005I`, see
-[step 9](#9-start-and-verify)) — they identify the exact build — plus the
+[step 10](#10-start-and-verify)) — they identify the exact build — plus the
 console messages and, for an install problem, the job output.
 
 **Questions and general support** are on Discord:
@@ -44,6 +44,7 @@ recognise which file is which.
 | `httpd-<version>-samplib.xmit` | the sample library: STC procedure and configuration pattern |
 | `httpd-<version>-alloc.jcl` | allocates the datasets SMP installs into — **run once** |
 | `httpd-<version>-inst.jcl` | receives everything and installs it — repeatable |
+| `httpd-webroot.img` | the document root as a UFS370 disk image — outside SMP, see [step 9](#9-the-webroot-disk) |
 
 The load library holds five modules:
 
@@ -73,8 +74,9 @@ See [step 7](#7-install-the-procedure-and-the-configuration).
 > and removing the other four changes no behaviour of a server that never
 > routed to them.
 
-The sample library holds two members, `HTTPD` (the started task procedure) and
-`HTTPPRM0` (the configuration pattern).
+The sample library holds three members: `HTTPD` (the started task procedure),
+`HTTPPRM0` (the configuration pattern) and `HTTPWEBR` (a job that allocates the
+dataset the webroot image is uploaded to).
 
 Where everything ends up:
 
@@ -82,7 +84,11 @@ Where everything ends up:
 HTTPD.<vrm>.LINKLIB     the load modules -- point STEPLIB here
 HTTPD.<vrm>.SAMPLIB     the patterns you copy from in step 7
 HTTPD.<vrm>.AHTTPLOD    SMP's distribution library, the base a RESTORE returns to
+HTTPD.<vrm>.WEBROOT.UFS the document root, if you upload the shipped one (step 9)
 ```
+
+The last one is not SMP's: it is a filesystem image, and it holds site content
+that an `APPLY` must never touch. Step 9 is where it comes from.
 
 ---
 
@@ -94,7 +100,8 @@ HTTPD.<vrm>.AHTTPLOD    SMP's distribution library, the base a RESTORE returns t
 - **RAKF** — see [Authorisation](#authorisation) below. HTTPD does not start
   without either RAKF or an APF list entry, and no configuration option turns
   that off.
-- **UFSD**, only if you want to serve static files — see below.
+- **UFSD**, only if you want to serve static files — see below. The archive
+  ships a document root for it as a disk image (step 9).
 - **mvsMF**, only if you want the REST API the shipped configuration routes to
   — see below.
 - A userid authorised to submit jobs, to update a PROCLIB in the started-task
@@ -128,6 +135,10 @@ line that tells you the filesystem is not there, and it is written earlier in
 the start. On a deployment that will never have UFSD, `UFS=0` in the
 configuration member skips the initialisation altogether and the warning with
 it.
+
+With UFSD there, the archive has a document root ready for it —
+`httpd-webroot.img`, a formatted filesystem holding the welcome page, which
+[step 9](#9-the-webroot-disk) uploads and mounts.
 
 Install HTTPD now and add UFSD later if you want it:
 <https://github.com/mvslovers/ufsd/releases>, with its own guide at
@@ -246,6 +257,11 @@ primary for the load XMIT (roughly 650 KB), 5 for the sample library, secondary
 about 10% of each. Method b) below shows this with zowe; TSO or ISPF 3.2 does
 the same job.
 
+The third file that has to reach the host, `httpd-webroot.img`, is **not** one of
+these: it is a filesystem image with its own record format, it is not received
+by anything, and it is only needed once the server runs. It has its own step —
+[step 9](#9-the-webroot-disk) — and nothing here applies to it.
+
 Pick **one** method:
 
 ### a) FTP — mvslovers/ftpd (no pre-allocation)
@@ -303,6 +319,8 @@ them unnecessary.
 No pre-allocation needed. Use your emulator's file transfer in **binary** mode
 (no ASCII/CRLF translation) with `RECFM=FB LRECL=80 BLKSIZE=3120`. The exact
 option syntax is client-dependent — consult its file-transfer documentation.
+[Step 9](#9-the-webroot-disk) walks an IND$FILE upload through in full, for the
+webroot image; the same emulator handling applies here.
 
 ---
 
@@ -323,7 +341,7 @@ Expect `COND CODE 0000`.
 > install, `HTTPD.<vrm>.AHTTPLOD` holds SMP's accepted copy of the modules; a
 > re-run that scratched it would leave the SMP inventory reporting an install
 > that is no longer on the system, and nothing would say so. To start over,
-> reject the SYSMOD first — see [Removing HTTPD](#11-removing-httpd).
+> reject the SYSMOD first — see [Removing HTTPD](#12-removing-httpd).
 
 ---
 
@@ -332,7 +350,7 @@ Expect `COND CODE 0000`.
 Only relevant when you are upgrading. The APPLY writes into
 `HTTPD.<vrm>.LINKLIB`, and each release has its own — so a running *older* HTTPD
 does not block the install. It does, however, keep running the old modules until
-you restart it (step 9) against the procedure you copy in step 7.
+you restart it (step 10) against the procedure you copy in step 7.
 
 ```
 /P HTTPD
@@ -418,6 +436,9 @@ Copy from `HTTPD.<vrm>.SAMPLIB`:
 | `HTTPPRM0` | a PARMLIB | **yes — see below** |
 
 `SYS2.PROCLIB` is the usual home for the procedure.
+
+The third member, `HTTPWEBR`, is not copied anywhere: it is a job you submit
+straight from the sample library when you get to [step 9](#9-the-webroot-disk).
 
 ### Which PARMLIB
 
@@ -576,7 +597,170 @@ client can log in.
 
 ---
 
-## 9. Start and verify
+## 9. The webroot disk
+
+`DOCROOT` names a path in the UFSD filesystem, so the pages HTTPD serves live on
+a UFS disk and not in a library. The archive carries one ready to use:
+`httpd-webroot.img`, a 1 MB UFS370 filesystem holding the welcome page. Three
+steps put it on the system — allocate, upload, mount — and none of them belongs
+to SMP.
+
+**Why it travels on its own.** SMP has no element type for a `DSORG=PS`,
+`RECFM=U` image, and site content is precisely what an `APPLY` must never
+touch. TSO RECEIVE is no better: it allocates its own target and refuses to
+merge into an existing dataset, which makes it a first-install-only transport
+for something you will replace. So the disk ships as a plain file and goes up
+over **IND$FILE**, which needs nothing on the target beyond a 3270 session.
+
+This step needs **UFSD** (step 2). Without it there is nothing to mount and
+nothing static to serve; every `MOD=` route works regardless.
+
+**Already have a webroot?** Then read this for the mechanics and keep your own
+disk. Nothing here can overwrite it — the dataset is named for this release.
+
+### a) Allocate the dataset
+
+`HTTPD.<vrm>.SAMPLIB(HTTPWEBR)` does exactly this and nothing else:
+
+```jcl
+//ALLOC    EXEC PGM=IEFBR14
+//WEBROOT  DD  DSN=HTTPD.<vrm>.WEBROOT.UFS,DISP=(NEW,CATLG),
+//             UNIT=SYSDA,SPACE=(4096,256),
+//             DCB=(DSORG=PS,RECFM=U,BLKSIZE=4096)
+```
+
+**Run it before the upload, not after.** IND$FILE allocates an *existing*
+dataset `DISP=SHR` and takes the DCB from its label; only when the dataset is
+missing does it invent one of its own. Allocating it here is what pins
+`BLKSIZE=4096` — the block size the image was formatted with, and the one thing
+about the transfer that has to be right.
+
+`SPACE` is counted in blocks of 4096, so 256 blocks is the megabyte the image
+occupies. **Primary extent only**: the filesystem is addressed by block number
+within the primary extent, so anything in a secondary would never be reached.
+
+### b) Upload it with IND$FILE
+
+The image must arrive byte for byte: **binary**, no ASCII translation, no CRLF
+conversion. With the dataset allocated, the command carries no options at all —
+which also makes it independent of which IND$FILE build your system has:
+
+```
+IND$FILE PUT HTTPD.V4R0M0.WEBROOT.UFS
+```
+
+Binary is IND$FILE's default; `ASCII` and `CRLF` are what you would have to add
+to break it.
+
+Most emulators issue that command for you. x3270, c3270 and wc3270 take it as
+one action, and their file-transfer dialog asks for the same fields:
+
+```
+Transfer(Direction=send,
+         LocalFile=httpd-webroot.img,
+         HostFile=HTTPD.V4R0M0.WEBROOT.UFS,
+         Host=tso, Mode=binary, Exist=replace)
+```
+
+Leave `Recfm`, `Lrecl`, `Blksize` and the space fields **unset**: the dataset
+exists, so its label decides, and an emulator's allocation defaults are not
+worth auditing.
+
+Either way the session has to sit on an input field that can accept the command
+before the transfer starts — a cleared TSO **READY** screen, or ISPF option 6.
+The emulator types `IND$FILE` into whatever field the cursor is on; it does not
+find one for you.
+
+If you would rather let IND$FILE create the dataset, it needs to be told
+everything the allocation job otherwise says:
+
+```
+IND$FILE PUT HTTPD.V4R0M0.WEBROOT.UFS (RECFM(U) BLKSIZE(4096) TRACKS SPACE(70)
+```
+
+70 tracks holds a megabyte even on a 3350, where a 4096-byte block packs four to
+a track; a 3380 or 3390 needs half that. There is no secondary quantity on
+purpose (see above).
+
+A megabyte over a 3270 session takes minutes rather than seconds. That is the
+transfer, not a hang.
+
+### c) Mount it
+
+The mount belongs to **UFSD**, not to HTTPD. In its Parmlib member:
+
+```
+MOUNT    DSN(HTTPD.V4R0M0.WEBROOT.UFS)  PATH(/www)  MODE(RO)
+```
+
+or, without a restart — note that the operator command spells its operands with
+`=` and commas where the Parmlib statement uses parentheses:
+
+```
+/F UFSD,MOUNT DSN=HTTPD.V4R0M0.WEBROOT.UFS,PATH=/www,MODE=RO
+```
+
+`/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount it
+there instead. `MODE(RO)` is the default and the right setting here — the
+shipped disk is product content and nothing in the server writes to it.
+
+**UFSD first, then HTTPD.** The filesystem has to be up and mounted before the
+server that serves from it — a runtime dependency SMP cannot express, which is
+why the SYSMOD declares no prerequisite on UFSD at all.
+
+### d) Verify
+
+```
+/F UFSD,MOUNT LIST
+curl -v http://your-mvs-host:8080/
+```
+
+`/` serves `/www/index.html`: HTTPD appends `index.html` to a request for a
+directory.
+
+| What you see | What it means |
+|---|---|
+| `UFSD062E SUPERBLOCK VALIDATION FAILED FOR …` | the dataset's `BLKSIZE` is not the image's 4096 — or the transfer was not binary |
+| `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running (step 2) |
+| `404` on `/` | mounted somewhere other than `DOCROOT` |
+| a page of mojibake | the transfer translated the bytes; upload again in binary |
+
+### Replacing the content later
+
+**Unmount before you re-upload.** IND$FILE allocates `DISP=SHR`, so it will
+happily rewrite a dataset UFSD has open — under the server's own buffers:
+
+```
+/F UFSD,UNMOUNT PATH=/www
+    ... upload ...
+/F UFSD,MOUNT DSN=HTTPD.V4R0M0.WEBROOT.UFS,PATH=/www,MODE=RO
+```
+
+For pages of your own, build the image on your workstation with
+[ufsd-utils](https://github.com/mvslovers/ufsd-utils) and upload it the same way:
+
+```
+ufsd-utils create mysite.img --size 1M --blksize 4096 --owner IBMUSER
+ufsd-utils cp -r ./mysite/ mysite.img:/
+```
+
+Text files are stored in **IBM-1047**, which is what `ufsd-utils` writes by
+default and what HTTPD's static file path translates back with — a UFS file is
+converted with that table regardless of the `CODEPAGE=` setting, which governs
+MVS datasets and the server's own output. So there is nothing to configure here,
+and nothing to match up.
+
+With mvsMF installed there is a second route for single files —
+`PUT /zosmf/restfiles/fs/www/index.html` — but only into a filesystem mounted
+`MODE(RW)`, which the shipped disk is not.
+
+One thing the image is not: reproducible. It carries its own creation
+timestamp, so two builds of the same commit differ byte for byte. Compare it
+against the archive you downloaded, never against one you rebuilt.
+
+---
+
+## 10. Start and verify
 
 ```
 /S HTTPD                      default member (HTTPPRM0)
@@ -653,7 +837,7 @@ and `DISPLAY TIme` need one and two letters respectively.
 
 ---
 
-## 10. What HTTPD serves
+## 11. What HTTPD serves
 
 Two kinds of route, both declared in the configuration member, both carrying the
 same per-route auth policy:
@@ -679,7 +863,7 @@ writing your own module is
 
 ---
 
-## 11. Removing HTTPD
+## 12. Removing HTTPD
 
 Because the installation is SMP-managed, there is a defined way back — but it is
 **not** the `RESTORE` followed by `REJECT` that SMP documentation leads you to
@@ -779,8 +963,9 @@ Leave `HTTPD.<vrm>.SAMPLIB` alone if you like — the install job's `DELOLD` ste
 scratches it on its own.
 
 **5. What is not removed, because SMP never owned it:** the procedure and the
-configuration member you copied in step 7, and your RAKF definitions. Those are
-yours to delete.
+configuration member you copied in step 7, your RAKF definitions, and the
+webroot disk `HTTPD.<vrm>.WEBROOT.UFS` with the `MOUNT` statement that names it.
+Those are yours to delete — unmount the disk before you scratch it.
 
 > The `RESTORE`/`REJECT` behaviour above was measured on 2026-08-14 against an
 > accepted FMID from a package built by this same generator, on an MVS/CE system
@@ -813,6 +998,8 @@ yours to delete.
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
 | `401` on a route showing `AUTH=NONE` | Not HTTPD's gate. mvsMF runs its own auth track on `/zosmf/*` — establish which layer answered before debugging HTTPD's |
 | `S106` at start on a freshly installed library | The XMIT was uploaded in text mode. Re-upload in **binary** and re-run the install job |
+| `UFSD062E SUPERBLOCK VALIDATION FAILED` at `MOUNT` | The webroot dataset was not allocated `RECFM=U BLKSIZE=4096`, or the image was uploaded in text mode — step 9 |
+| `404` on `/` with UFSD running | The webroot is mounted somewhere other than `DOCROOT`, or nothing is mounted there at all — step 9 |
 | The step ends `CC 0000` but nothing was ever served | A clean `/P HTTPD` and a refused start are `CC 0000` and `CC 0008`. If it is 0000, the server ran — look for what stopped it |
 
 For the complete message reference, see

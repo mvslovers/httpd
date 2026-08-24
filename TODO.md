@@ -11,9 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-23, three issues open (#250 filed
-that day; #237 closed by PR #249, and before it #245 by PR #248, #233 by
-PR #244, #242 by PR #246 and #243 by PR #247).*
+*Last reconciled against the tracker: 2026-08-24, three issues open (#252 filed
+and closed the same day by PR #253; before it #250, #237 by PR #249, #245 by
+PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247).*
 
 ---
 
@@ -38,6 +38,12 @@ second step cannot be estimated until it is answered.
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
 and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
+
+**What is left before the 4.0.0 tag is not in the tracker at all** — it is the
+install package, and [`smp-todo.md`](smp-todo.md) holds it: the `THTP400` check
+against CDS and ACDS on both stands (O1), and the dry run under the throwaway
+FMID (O2). O3 closed with #252, which put the document root in the archive as a
+UFS image; what remains of it is a checksum for the release assets.
 
 ---
 
