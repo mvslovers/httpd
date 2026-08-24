@@ -61,6 +61,18 @@ above are inert on a fresh install. That is deliberate: `/.dm` and `/.dmtt` hand
 out arbitrary storage and the console log, and `ABEND0C1` abends on purpose.
 See [step 7](#7-install-the-procedure-and-the-configuration).
 
+> **The four are diagnostic, debugging and development tools, and they are on
+> their way out.** They ship in 4.0.x so that a problem on a live system can be
+> looked at without a private build — reading a control block beats guessing at
+> one, and `/.dmtt` is often the fastest way to the console log. They are not
+> production endpoints, and **the next release will not deliver them**: a server
+> whose job is hosting an API has no business shipping an arbitrary-storage
+> reader alongside it. Build them from source when you need them.
+>
+> Nothing depends on them. `HTTPD` is the only module the started task names,
+> and removing the other four changes no behaviour of a server that never
+> routed to them.
+
 The sample library holds two members, `HTTPD` (the started task procedure) and
 `HTTPPRM0` (the configuration pattern).
 
@@ -132,8 +144,13 @@ z/OSMF-compatible REST API, which is a separate product:
 ```
 MOD=MVSMF /zosmf/info                    AUTH=NONE
 MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
-MOD=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*                       AUTH=TOKEN
 ```
+
+The first two are public on purpose — the anonymous reachability probe and the
+token login endpoint do their own auth, so the gate must not challenge them.
+The catch-all behind them is where the datasets, jobs and files live, and it is
+gated. First match wins, so the order matters.
 
 If mvsMF is not installed, HTTPD starts and those routes register normally — the
 program is not looked for until a request first matches. The failure then shows
@@ -224,8 +241,10 @@ enter them once in step 6. This guide uses `IBMUSER.HTTPD.LOAD.XMIT` and
 Whether you have to allocate them first depends on the upload path: **FTPD**
 and **IND$FILE** create the dataset from the attributes you supply, mvsMF and
 most other FTP servers need it to exist. Where a method says *pre-allocate*,
-allocate both as `DSORG=PS, RECFM=FB, LRECL=80, BLKSIZE=3120`, primary ~50
-tracks, secondary 20 (TSO or ISPF 3.2).
+allocate both as `DSORG=PS, RECFM=FB, LRECL=80, BLKSIZE=3120` — 50 tracks
+primary for the load XMIT (roughly 650 KB), 5 for the sample library, secondary
+about 10% of each. Method b) below shows this with zowe; TSO or ISPF 3.2 does
+the same job.
 
 Pick **one** method:
 
@@ -248,7 +267,17 @@ uploading through the thing you are about to stop.
 ### b) mvsMF (z/OSMF-compatible REST API), via zowe
 
 Only when a *different* server is up, or you are not replacing this one. It
-requires the datasets to **exist first**, so *pre-allocate*, then:
+requires the datasets to **exist first**, so allocate them, here with zowe
+itself:
+
+```
+zowe files create ps "IBMUSER.HTTPD.LOAD.XMIT" \
+     --recfm FB --lrecl 80 --blksize 3120 --size 50TRK
+zowe files create ps "IBMUSER.HTTPD.SAMP.XMIT" \
+     --recfm FB --lrecl 80 --blksize 3120 --size 5TRK
+```
+
+then upload:
 
 ```
 zowe zos-files upload file-to-data-set httpd-<version>-load.xmit \
@@ -256,6 +285,11 @@ zowe zos-files upload file-to-data-set httpd-<version>-load.xmit \
 zowe zos-files upload file-to-data-set httpd-<version>-samplib.xmit \
      "IBMUSER.HTTPD.SAMP.XMIT" --binary
 ```
+
+`--size` sets the primary allocation and gives you a secondary of about 10% of
+it. The values above are for a 3390 and leave room to spare — the load XMIT is
+roughly 650 KB, the sample library well under 20 KB. On a smaller device, or if
+you hit an `SB37`, raise them.
 
 ### c) Another FTP server (pre-allocate)
 
@@ -494,7 +528,9 @@ LOC=/*                  AUTH=NONE     static prefix, public on purpose
 
 The display modules deserve their own warning. `MOD=HTTPDM /.dm` with no `AUTH=`
 hands anyone who can reach the port arbitrary storage reads, and `/.dmtt` hands
-them the console log. If you enable them, gate them:
+them the console log. They are debugging tools that will not be shipped after
+4.0.x (step 1) — enable them while you are diagnosing something, and gate them
+whenever you do:
 
 ```
 MOD=HTTPDSRV  /.dsrv    AUTH=FORM
