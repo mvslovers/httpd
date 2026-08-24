@@ -9,7 +9,7 @@ die Messungen vermerkt. Was ein Betreiber tun muss, steht in
 
 Dieses Dokument hält nur noch das, was **für httpd offen** ist.
 
-> *Stand: 2026-08-23, gegen `[distribution]` in `project.toml` abgeglichen.*
+> *Stand: 2026-08-24, gegen `[distribution]` in `project.toml` abgeglichen.*
 
 > **Die frühere Fassung verwies auf `../SMP-COOKBOOK.md` und
 > `../SMP-INSTALLATION.md`. Beide Dateien gibt es nicht mehr.** Der Spike liegt
@@ -50,7 +50,7 @@ haben diesen Job vor ihrem Tag gefahren, httpd noch nicht — der Kommentar in
 Die Generalprobe aus einem `-dev`-Baum. Ein Testlauf unter `THTP400`, der
 abbricht oder halb angewendet wird, belegt genau die ID, die das getaggte 4.0.0
 braucht — und das CDS lässt sich hinterher nur mit `UCLIN` bereinigen
-(`docs/installation.md` §11).
+(`docs/installation.md` §12).
 
 Mit mbt ist das eine Zeile: `fmid` in `project.toml` auf `TTST400` setzen,
 `make package`, installieren — **und die Änderung nie committen**.
@@ -60,40 +60,55 @@ man etwas dafür tun muss: `@VRM@` kommt aus der Projektversion, und
 `4.0.0-dev` ergibt `V4R0M0D`, das getaggte `4.0.0` dagegen `V4R0M0`. Der Test
 lebt also in `HTTPD.V4R0M0D.*`, das Release in `HTTPD.V4R0M0.*`.
 
-Aufräumen danach: UCLIN-Job aus `docs/installation.md` §11 mit `TTST400`, dann
+Aufräumen danach: UCLIN-Job aus `docs/installation.md` §12 mit `TTST400`, dann
 die Datasets löschen, dann `LIST CDS/ACDS SYSMOD(THTP400)` — das ist zugleich
 O1.
 
-### O3 — UFS-Webroot: SMP kann das nicht ausliefern
+### O3 — UFS-Webroot: entschieden und umgesetzt (Issue #252)
 
-Eine UFS-Disk ist ein `DSORG=PS`, `RECFM=U`, `BLKSIZE=4096`-Binärimage; SMP4
-kennt dafür keinen Elementtyp (es kennt nur
-`++MOD/MAC/SRC/MACUPD/SRCUPD/ZAP`). Sie ist außerdem **Site-Inhalt** — ein
-erneutes APPLY dürfte sie nie anfassen.
+Die Disk fährt **nicht** über SMP und **nicht** über XMIT, sondern als Datei im
+Archiv und per **IND$FILE** aufs Ziel. Beides aus einem strukturellen Grund,
+nicht aus Werkzeugmangel:
 
-Heute steht in `docs/installation.md`, dass ohne UFSD nur die `MOD=`-Routen
-laufen und `HTTPD044W` kommt. Das ist ehrlich, aber es ist keine Auslieferung.
-Offen:
+- SMP4 kennt für ein `DSORG=PS`/`RECFM=U`-Image keinen Elementtyp
+  (`++MOD/MAC/SRC/MACUPD/SRCUPD/ZAP` ist die ganze Liste), und es ist
+  **Site-Inhalt** — ein APPLY dürfte es nie anfassen.
+- TSO RECEIVE legt sein Ziel selbst an und weigert sich, in ein bestehendes
+  Dataset zu mischen: ein Transport nur für die Erstinstallation, für etwas, das
+  der Betreiber ersetzt. (`xmit370` könnte das Format ohnehin nicht — Verzeichnis
+  → PDS, `--recfm fb|f`, LRECL 80.)
 
-- [ ] **U1** Image bauen — `ufsd-utils create webroot.img --size 10M`,
-      `ufsd-utils cp -r static/ webroot.img:/`, danach `ufsd-utils ls -l`
-      gegenprüfen (Falle T3)
-- [ ] **U2** Hochladen: `ufsd-utils upload webroot.img --dsn HTTPD.WEBROOT`
-- [ ] **U3** Mount dokumentieren — `UFSDPRMx` gehört **ufsd**, nicht httpd:
-      `MOUNT DSN(HTTPD.WEBROOT) PATH(/www) MODE(RO)`, oder dynamisch
-      `/F UFSD,MOUNT DSN=HTTPD.WEBROOT,PATH=/www,MODE=RO`. Kein `++MACUPD` in
-      ufsds Parmlib
-- [ ] **U4** Reihenfolge: **ufsd zuerst**, Dateisystem gemountet, `/www`
-      existiert — *dann* httpd. Eine Laufzeitabhängigkeit, die SMP nicht
-      abbilden kann
-- [ ] **U5** `make webroot` + CI-Asset `httpd-<version>-webroot.img`, mit
-      SHA256 statt eines Reproduzierbarkeitsversprechens
-- [ ] **U6** **Update-Verhalten festlegen** — `.SAMPLE`-Name oder Existenzprüfung.
-      Ein `ufsd-utils upload --replace` im Update-Job wäre Datenverlust beim
-      Betreiber
+Umgesetzt:
 
-`[distribution] extra = [...]` kann eine Datei ins Archiv legen, ohne SMP zu
-behelligen — das ist der wahrscheinliche Weg für U5, sobald U6 entschieden ist.
+- **`make webroot`** baut `dist/httpd-webroot.img` aus `static/` mit einem
+  gepinnten `ufsd-utils` (1 MB = 256 Blöcke, `--owner`/`--group` gesetzt, damit
+  im Artefakt keine Build-Maschinen-Userid steht). `package` und `dist` hängen
+  davon ab, `[distribution] extra` legt es ins Archiv.
+- **`samplib/httpwebr`** allokiert `HTTPD.@VRM@.WEBROOT.UFS`
+  (`SPACE=(4096,256)`, `RECFM=U BLKSIZE=4096`, nur Primärextent).
+- **`docs/installation.md` §9** ist der Betreiberweg: allokieren, IND$FILE,
+  mounten, prüfen, ersetzen.
+
+Was dabei gemessen wurde und in der Doku steht:
+
+| Frage | Befund |
+|---|---|
+| Blockung | RECFM=U puffert über `__fputc` bis BLKSIZE (libc370 `@@fputc.c:24`) → `BLKSIZE(4096)` schreibt exakte 4096er-Blöcke; 1 MB = 256 ganze Blöcke |
+| Optionen | Binär ist Default, RECFM dann `U` (ind_file370 `indparse.c:249`) |
+| Vorher allokieren | IND$FILE nimmt ein existierendes Dataset DISP=SHR mitsamt DCB (`indmain.c:190`, `:273`) → Upload ohne jede Option, unabhängig vom IND$FILE-Build |
+| Falle | dasselbe DISP=SHR schreibt auch in ein *gemountetes* Dataset → `UNMOUNT PATH=/www` ist ein nummerierter Schritt |
+| Fehlerbild | BLKSIZE-Mismatch fällt beim MOUNT auf: `UFSD062E` (ufsd `ufsd#sbl.c:69`) |
+| Codepage | keine Entscheidung nötig: `http_send_file()` übersetzt UFS-Dateien fest mit IBM-1047 (`src/httpfile.c:70`), unabhängig von `CODEPAGE=` — genau was `ufsd-utils cp` schreibt. Round-Trip byteweise gemessen, inkl. UTF-8; nur `0x85` und `0xF7` überleben ihn nicht |
+
+Damit ist auch **U6** (Datenverlust beim Update) erledigt, ohne
+`.SAMPLE`-Konstruktion: das Dataset trägt die Version im Namen, kann also die
+Platte des Betreibers gar nicht treffen.
+
+Offen geblieben:
+
+- [ ] **U5-Rest** SHA256 der Release-Assets — mbt veröffentlicht heute keine
+      Prüfsummen. Das Image trägt einen Erstellungszeitstempel, ist also nicht
+      reproduzierbar; die Doku sagt das auch so, statt es zu versprechen.
 
 ### O4 — Setup-Job: ausliefern oder Handarbeit lassen?
 
@@ -153,7 +168,7 @@ abgearbeitet oder ersetzt:
   zurückzunehmen. Der Preis ist, dass die FMID selbst permanent wird: `RESTORE`
   scheitert, weil akzeptiert, und `REJECT`, weil der ACCEPT die MCS aus dem
   SMPPTS entfernt. Der Weg zurück ist `UCLIN`, beschrieben in
-  `docs/installation.md` §11. **Service (PTFs) wird weiterhin nie akzeptiert.**
+  `docs/installation.md` §12. **Service (PTFs) wird weiterhin nie akzeptiert.**
 
 ---
 

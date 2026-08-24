@@ -1,0 +1,35 @@
+//HTTPWEBR JOB (ACCT),'ALLOC HTTPD WEBROOT',CLASS=A,MSGCLASS=H,
+//             MSGLEVEL=(1,1),NOTIFY=&SYSUID
+//*
+//* HTTPWEBR - allocate the dataset the webroot disk is uploaded to
+//*
+//* The release archive carries httpd-webroot.img: a formatted UFS370
+//* filesystem holding the pages HTTPD serves from DOCROOT.  You upload
+//* it with IND$FILE and mount it with UFSD.  The installation guide
+//* has the whole procedure -- this job is only its first step.
+//*
+//* RUN THIS BEFORE THE UPLOAD.  IND$FILE allocates an existing dataset
+//* DISP=SHR and takes the DCB from its label; it invents one only when
+//* the dataset is not there.  Allocating it here is what pins
+//* BLKSIZE=4096, the block size the image was formatted with.  UFSD
+//* compares the two at MOUNT and refuses a mismatch with:
+//*
+//*     UFSD062E SUPERBLOCK VALIDATION FAILED FOR <dsn>
+//*
+//* Primary extent only, on purpose.  The filesystem is addressed by
+//* block number within the primary extent, so blocks in a secondary
+//* would never be reached.  SPACE is counted in blocks of 4096 here,
+//* which makes 256 blocks the 1 MB the shipped image occupies.  MVS
+//* rounds the request up to a track boundary; the few blocks that adds
+//* sit past the end of the filesystem, because the superblock -- not
+//* the dataset -- is what says how large the filesystem is.
+//*
+//* Change the dataset name, UNIT and VOLUME to suit.  The name below
+//* is the one the installation guide uses.  An image larger than the
+//* shipped one needs a matching SPACE: count it in 4096-byte blocks.
+//*
+//ALLOC    EXEC PGM=IEFBR14
+//WEBROOT  DD  DSN=HTTPD.@VRM@.WEBROOT.UFS,DISP=(NEW,CATLG),
+//             UNIT=SYSDA,SPACE=(4096,256),
+//             DCB=(DSORG=PS,RECFM=U,BLKSIZE=4096)
+//
