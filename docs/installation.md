@@ -664,8 +664,12 @@ Transfer(Direction=send,
 
 Leave `Recfm`, `Lrecl`, `Blksize` and the space fields **unset**: the dataset
 exists, so its label decides, and an emulator's allocation defaults are not
-worth auditing. Position the session on a cleared TSO **READY** screen (ISPF
-option 6 also works) before starting the transfer.
+worth auditing.
+
+Either way the session has to sit on an input field that can accept the command
+before the transfer starts — a cleared TSO **READY** screen, or ISPF option 6.
+The emulator types `IND$FILE` into whatever field the cursor is on; it does not
+find one for you.
 
 If you would rather let IND$FILE create the dataset, it needs to be told
 everything the allocation job otherwise says:

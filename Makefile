@@ -58,7 +58,12 @@ $(UFSD_UTILS_BIN):
 
 webroot: $(WEBROOT_IMG)
 
-$(WEBROOT_IMG): $(shell find $(WEBROOT_SRC) -type f) $(WEBROOT_TOOL_DEP)
+# The directories are prerequisites next to the files: a *new* file is picked
+# up either way, because make expands the wildcard when it parses this and the
+# file is then newer than the image -- but a *deleted* one leaves an image that
+# is newer than everything still there, and it would go on shipping the file.
+# A directory's mtime moves when an entry is added or removed, which covers it.
+$(WEBROOT_IMG): $(shell find $(WEBROOT_SRC) -type f -o -type d) $(WEBROOT_TOOL_DEP)
 	$(E) "[webroot] $(notdir $@) ($(WEBROOT_SIZE), from $(WEBROOT_SRC)/)"
 	@mkdir -p $(DISTDIR)
 	@rm -f $@

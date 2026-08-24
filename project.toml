@@ -318,7 +318,11 @@ headers = [
 #
 # Every value is a dataset name; the ddname SMP addresses it by is always the
 # last qualifier, so LINKLIB, SAMPLIB, HTTPLOAD and AHTTPLOD fall out of the
-# names.  @VRM@ becomes V4R0M0 at package time (V4R0M0D while the version still
+# names.  The webroot is the one name with a fourth qualifier
+# (HTTPD.@VRM@.WEBROOT.UFS) and it is deliberate: no ddname is derived from it
+# because nothing here allocates or receives it, and .UFS says at a glance that
+# the dataset is a filesystem image rather than a library.  Do not normalise it
+# into the three-qualifier pattern -- it is not part of that scheme.  @VRM@ becomes V4R0M0 at package time (V4R0M0D while the version still
 # carries -dev).  ufsd/ftpd spell these <product>LOAD / A<product>LOD, which for
 # a five-letter product would be nine characters; HTTPLOAD/AHTTPLOD keeps the
 # suffix and drops the letter, rather than keeping HTTPD and truncating the
