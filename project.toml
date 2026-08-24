@@ -1,6 +1,6 @@
 [project]
 name = "httpd"
-version = "4.0.0-dev"
+version = "4.0.0"
 type = "application"
 
 [toolchain]
