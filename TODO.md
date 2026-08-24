@@ -40,10 +40,12 @@ and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
 
 **What is left before the 4.0.0 tag is not in the tracker at all** — it is the
-install package, and [`smp-todo.md`](smp-todo.md) holds it: the `THTP400` check
-against CDS and ACDS on both stands (O1), and the dry run under the throwaway
-FMID (O2). O3 closed with #252, which put the document root in the archive as a
-UFS image; what remains of it is a checksum for the release assets.
+install package, and [`smp-todo.md`](smp-todo.md) holds it. One item now:
+**O2**, the dry run under the throwaway FMID `TTST400`. O1 closed on
+2026-08-24 — `THTP400` answered RC 04 with an empty list in the CDS *and* the
+ACDS on both stands — and O3 closed with #252, which put the document root in
+the archive as a UFS image; of it only a checksum for the release assets is
+left.
 
 ---
 

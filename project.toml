@@ -364,15 +364,15 @@ extra = ["build/webroot/httpd-webroot.img"]
 # E??nnnn namespace MVS 3.8j's own function SYSMODs occupy (EBB1102 is 3.8j
 # itself, alongside EAS1102, EBT1102, EDE1102, ...).
 #
-# NOT yet verified the way TFTP100 and TUFS120 were, and the difference matters.
-# What is measured is the SMPPTS on mvsdev -- 1544 SYSMODs scanned, no THTP400
-# (smp-todo.md §2) -- and the PTS shows only what was *received*.  The CDS and
-# ACDS store hashed member names, so LIST CDS SYSMOD(THTP400) and LIST ACDS
-# SYSMOD(THTP400) are the only way to see what is actually applied or accepted.
-# Both stands (mvsdev, drnmig3a) still have to answer RC 04 with an empty list
-# before the 4.0.0 tag.  A test install must use a throwaway id -- a
-# half-applied FMID leaves this one occupied, and smp-todo.md reserves TTST400
-# for exactly that.
+# Verified free the way TFTP100 and TUFS120 were, on both stands, 2026-08-24:
+# LIST CDS SYSMOD(THTP400) and LIST ACDS SYSMOD(THTP400) each answered RC 04
+# with "THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND" -- mvsdev (MVS/CE,
+# JOB01948) and drnmig3a (TK5, JOB00028), both HMASMP LVL 04.48.  That is the
+# check that counts: the SMPPTS scan done earlier shows only what was
+# *received*, while the CDS and ACDS store hashed member names, so a LIST
+# against both zones is the only way to see what is applied or accepted.
+# A test install must still use a throwaway id -- a half-applied FMID would
+# occupy this one, and smp-todo.md reserves TTST400 for exactly that.
 fmid = "THTP400"
 system = "Z038"
 

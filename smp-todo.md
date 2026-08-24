@@ -21,13 +21,9 @@ Dieses Dokument hält nur noch das, was **für httpd offen** ist.
 
 ## 1. Offen
 
-### O1 — `THTP400` im CDS und ACDS prüfen · **vor dem 4.0.0-Tag**
+### ~~O1 — `THTP400` im CDS und ACDS prüfen~~ · **erledigt 2026-08-24**
 
-Belegt ist bisher nur der **SMPPTS** auf `mvsdev`: 1544 SYSMODs gelesen, kein
-`THTP400` (§3). Der PTS zeigt aber nur, was *empfangen* wurde. CDS und ACDS
-speichern gehashte Membernamen — ein Namensvergleich dort liefert
-Scheinergebnisse, wie in §3 gemessen. Gewissheit gibt nur ein `LIST`-Job, auf
-**beiden** Ständen (`mvsdev` = MVS/CE, `drnmig3a` = TK5):
+Beide Stände melden die ID frei. Gefahren wurde auf jedem:
 
 ```
 //LIST    EXEC SMPAPP
@@ -37,13 +33,28 @@ Scheinergebnisse, wie in §3 gemessen. Gewissheit gibt nur ein `LIST`-Job, auf
 /*
 ```
 
-**RC 04 mit leerer Liste heißt frei.** Der Zonenoperand ist Pflicht; bares
-`LIST SYSMODS .` ist SMP/E-Syntax und endet in `HMA2033 SYNTAX ERROR`. Und
-qualifizieren: `LIST CDS .` gibt auf MVS/CE 116 000 Zeilen aus.
+| Stand | Job | CDS | ACDS |
+|---|---|---|---|
+| `mvsdev` (MVS/CE, HMASMP LVL 04.48) | `JOB01948` | RC 04, `NOT FOUND` | RC 04, `NOT FOUND` |
+| `drnmig3a` (TK5, HMASMP LVL 04.48) | `JOB00028` | RC 04, `NOT FOUND` | RC 04, `NOT FOUND` |
 
-Die FMID wird genau einmal vergeben. ufsd (`TUFS120`) und ftpd (`TFTP100`)
-haben diesen Job vor ihrem Tag gefahren, httpd noch nicht — der Kommentar in
-`project.toml` sagt das auch so.
+Damit ist `THTP400` so belegt wie `TUFS120` und `TFTP100` vor ihren Tags —
+der SMPPTS-Scan aus §3 zeigte nur *Empfangenes*, CDS und ACDS speichern
+gehashte Membernamen, und nur der `LIST`-Job sieht, was wirklich angewendet
+oder akzeptiert ist. Der Zonenoperand bleibt Pflicht (bares `LIST SYSMODS .`
+ist SMP/E-Syntax → `HMA2033`), und qualifizieren auch: `LIST CDS .` gibt auf
+MVS/CE 116 000 Zeilen aus.
+
+**Zwei Dinge, die dabei gemessen wurden und beim nächsten Mal Zeit sparen:**
+
+- Der `SMPAPP`-Procstep heißt auf beiden Ständen `HMASMP` und bringt **kein**
+  `SMPCNTL` mit. Beide Formen funktionieren — `//HMASMP.SMPCNTL DD *` wie
+  `//SMPCNTL DD *` unqualifiziert, weil die Prozedur nur einen Step hat.
+- **Das Kriterium ist der Report, nicht der Returncode.** RC 04 steht am Ende
+  jeder LIST-Ausführung; die Aussage steckt in `LIST SELECT SUMMARY REPORT`
+  plus `THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND` im **SMPOUT**. Wer nur
+  den Job-RC abfragt, kann eine leere von einer treffenden Liste nicht
+  unterscheiden.
 
 ### O2 — Testinstallation mit Wegwerf-FMID `TTST400`
 
@@ -61,8 +72,9 @@ man etwas dafür tun muss: `@VRM@` kommt aus der Projektversion, und
 lebt also in `HTTPD.V4R0M0D.*`, das Release in `HTTPD.V4R0M0.*`.
 
 Aufräumen danach: UCLIN-Job aus `docs/installation.md` §12 mit `TTST400`, dann
-die Datasets löschen, dann `LIST CDS/ACDS SYSMOD(THTP400)` — das ist zugleich
-O1.
+die Datasets löschen, dann denselben `LIST`-Job wie in O1 — diesmal auf
+`TTST400`, um zu sehen, dass die Wegwerf-ID wieder weg ist, und auf `THTP400`,
+um zu bestätigen, dass der Testlauf sie nicht angefasst hat.
 
 ### O3 — UFS-Webroot: entschieden und umgesetzt (Issue #252)
 
