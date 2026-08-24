@@ -28,9 +28,14 @@ PORT=8080
 MINTASK=3
 MAXTASK=9
 DOCROOT=/www
-MOD=MVSMF /zosmf/*
-MOD=LUA
+MOD=MVSMF   /zosmf/*   AUTH=TOKEN
+MOD=HTTPLUA *.lua      AUTH=BASIC
 ```
+
+Every route carries its own `AUTH=`, and one that does not is **public**: the
+3.x `LOGIN` policy is retired, so there is nothing left to fall back on. The
+modes are `NONE`, `FORM`, `BASIC` and `TOKEN` — see
+[configuration.md](configuration.md).
 
 Copy `samplib/httpprm0` from the distribution to `SYS2.PARMLIB(HTTPPRM0)` as a starting point. The JCL procedure references it via the `HTTPPRM` DD card.
 
@@ -74,7 +79,9 @@ The embedded Lua interpreter has been removed from the HTTPD core. The Lua modul
 
 ### Demo Modules
 
-The demo modules `hello.c`, `abend0c1.c`, and `test.c` have been removed. They were test programs from the original codebase.
+The demo modules `hello.c` and `test.c` have been removed. They were test programs from the original codebase.
+
+`abend0c1.c` stayed and **is shipped** in the load library. It is not a demo any more: it allocates (`?kb=n`, default 128) and then abends S0C1 without freeing, which is how the per-request storage reclaim is exercised on a live system. Like every module since 4.0.0 it is inert unless a `MOD=` line names it, and the shipped `HTTPPRM0` leaves that line commented out.
 
 ### DD-Based Document Root
 
@@ -118,15 +125,19 @@ See [docs/smf-records.md](smf-records.md) for the record format and field descri
 
 ### Extension-Based Module Routing
 
-In addition to URL prefix matching (e.g. `MOD=MVSMF /zosmf/*`), scripting modules can be registered without an explicit pattern. HTTPD automatically derives the file extension from the module name:
+In addition to URL prefix matching (e.g. `MOD=MVSMF /zosmf/*`), a module can be registered without an explicit pattern. HTTPD then derives the pattern from the **program name**, lower-cased: `MOD=LUA` handles `*.lua` from `DOCROOT`.
+
+That derivation is the whole rule, and it is why the shipped scripting modules do **not** use it. They are called `HTTPLUA` and `HTTPREXX` (separate products: [mvslovers/httplua](https://github.com/mvslovers/httplua), [mvslovers/httprexx](https://github.com/mvslovers/httprexx)), so a pattern-less line would register `*.httplua`. Name the extension instead:
 
 ```
-MOD=LUA                 Handles *.lua files from DOCROOT
-MOD=REXX                Handles *.rexx files from DOCROOT
-MOD=MVSMF /zosmf/*      All requests under /zosmf/ (explicit prefix)
+MOD=HTTPLUA  *.lua       AUTH=BASIC     Lua scripts from DOCROOT
+MOD=HTTPREXX *.rexx      AUTH=BASIC     REXX scripts from DOCROOT
+MOD=MVSMF    /zosmf/*    AUTH=TOKEN     all requests under /zosmf/
 ```
 
 This allows script files to live alongside static content in the normal document root, similar to how Apache handles PHP.
+
+**Write the `AUTH=`.** A route that carries none is public — there is no global `LOGIN` policy left to fall back on — and a script handler reached by anyone who can find the port is a shell on your system.
 
 ### Automatic Chunked Fallback for Modules
 
