@@ -310,8 +310,29 @@ Die, die noch gelten.
       lesbar — **nur wenn O3 bis dahin steht**; sonst gegen eine `MOD=`-Route
       prüfen und `HTTPD044W` als erwartet abhaken
 - [ ] `curl http://mvsdev:8080/…` antwortet
+- [ ] **Jede `MOD=`-Route der ausgelieferten `HTTPPRM0` einmal aufrufen**, nicht
+      nur eine beliebige. Bei der 4.0.0-Probe sind das die drei `/zosmf/*`-Zeilen
+      auf mvsMF — und `GET /zosmf/restjobs/jobs` ist der Aufruf, der #256
+      gefunden hätte
 - [ ] Aufräumen: UCLIN auf `TTST400`, Testdatasets gelöscht, `LIST CDS/ACDS
       SYSMOD(THTP400)` antwortet RC 04 mit leerer Liste
+
+**Was diese Liste bis 4.0.0 nicht geprüft hat, und warum #256 durchkam.** Jeder
+Punkt oben fragt, ob die *Installation* funktioniert: kopiert SMP die Module,
+startet die STC, antwortet der Server. Keiner fragt, ob die installierte Prozedur
+noch alloziert, was die Module öffnen, die sie lädt. Genau das war kaputt — die
+Generalprobe lief vollständig CC 0000 durch, während `samplib/httpd` die
+JES2-DDs nicht mehr hatte und mvsMFs Jobs-API damit tot war.
+
+Der Grund ist eine Grenze, die nicht die des Repos ist: ein CGI wird per LINK-SVC
+**in den Task der STC** geladen, hat also keine eigenen Allokationen und öffnet
+jeden DD-Namen gegen die der Prozedur. Was die STC-JCL bereitstellt, gehört damit
+zum Vertrag der Module, auch wenn keine Zeile Server-Quelltext es liest. Ein
+`curl` auf *irgendeine* Route sieht das nicht; nur ein Aufruf auf die Route, die
+das Modul tatsächlich benutzt.
+
+Für die nächste Generalprobe heißt das: die Route-Liste der ausgelieferten
+`HTTPPRM0` ist die Prüfliste, nicht ein einzelner Smoke-Test.
 
 ---
 
