@@ -11,10 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-25, five issues open (#256 filed
-that day with PR #257; #254; before them #252 filed and closed 2026-08-24 by
-PR #253, #250, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by
-PR #246 and #243 by PR #247).*
+*Last reconciled against the tracker: 2026-08-25 after v4.0.1 shipped, four
+issues open (#256 filed, fixed by PR #257 and closed the same day; #254; before
+them #252 filed and closed 2026-08-24 by PR #253, #250, #237 by PR #249, #245 by
+PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247).*
 
 ---
 
@@ -22,82 +22,53 @@ PR #246 and #243 by PR #247).*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #256 | **regression in a published release** | PR #257 merged, then a **decision** — below |
-| 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
-| 3 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
+| 1 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
+| 2 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-#256 outranks everything because it is the only item that is wrong on a system
-someone can install today, and because it is the only one whose fix is already
-written. #176 stays last for the reason it always did, not because it is small.
-
-#250 is still ranked above the two parked items even though it is milestoned
-out, and the two are not in conflict. The milestone says it is not a 4.0.0
-deliverable; the rank says it is the next thing to do once #256 is off the
-table, because it is read-only, costs minutes, and #198's second step cannot be
-estimated until it is answered.
-
-**One decision is open, and it is #256's second half.** The code fix is written
-(PR #257); what needs the maintainer is how 4.0.1 reaches a system that already
-installed 4.0.0. `THTP400` is ACCEPTed there, so a 4.0.1 full-function SYSMOD
-under the same FMID cannot simply be received over it — and it does not need to
-be. The corrected member is in the **sample library, which is not an SMP
-element** (the generated `inst.jcl` says so itself), so such a system needs one
-PROCLIB member replaced and nothing from SMP at all. That makes 4.0.1 a fresh
-install's package plus a one-line instruction for everyone else, but whether it
-ships as a re-tag over a deleted `v4.0.0` or beside it is not a call this file
-makes.
+**Nothing open waits on a decision, and nothing open is a code bug.** #254 is
+ranked first only because it costs no MVS time. #250 is above the two parked
+items even though it is milestoned out, and the two are not in conflict: the
+milestone says it is not a 4.0.x deliverable, the rank says it is the next thing
+worth doing, because it is read-only, costs minutes, and #198's second step
+cannot be estimated until it is answered. #176 stays last for the reason it
+always did, not because it is small.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
 and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
 
-**4.0.0 tagged and shipped on 2026-08-24, and is being replaced.** The release
-work was never in the tracker — it is in [`smp-todo.md`](smp-todo.md) — and it
-was done: `THTP400` free in the CDS *and* the ACDS on both stands (O1), the full
-install rehearsed under the throwaway FMID `TTST400` and cleaned back off with
-UCLIN, every step CC 0000 (O2), the document root shipping as a UFS image (O3,
-#252). What is left there is a checksum for the release assets and O4, a
-convenience sample nobody is blocked on.
+**4.0.0 shipped on 2026-08-24 and was withdrawn on 2026-08-25; v4.0.1 replaces
+it.** The release work was never in the tracker — it is in
+[`smp-todo.md`](smp-todo.md) — and it was done: `THTP400` free in the CDS *and*
+the ACDS on both stands (O1), the full install rehearsed under the throwaway
+FMID `TTST400` and cleaned back off with UCLIN, every step CC 0000 (O2), the
+document root shipping as a UFS image (O3, #252). What is left there is a
+checksum for the release assets and O4, a convenience sample nobody is blocked
+on.
 
-What none of that rehearsal caught is #256: the install was verified to *work*,
-never that the procedure it installed still allocated what the CGI it routes to
-needs. The published body is preserved at
-[`docs/release-notes/v4.0.0.md`](release-notes/v4.0.0.md) so the changelog
-survives the replacement — the 4.0.1 notes are built from it.
+What none of that rehearsal caught is #256: it verified that the install
+*works*, never that the procedure it installs still allocates what the CGI it
+routes to opens. Worth adding to `smp-todo.md` before the next cut — a rehearsal
+that ends at "the job ran CC 0000" cannot see this class of defect.
+
+**The FMID did not move.** No source changed between the two releases, so there
+is no functional level to cut: `THTP400` still names 4.0.x, and a system that
+installed 4.0.0 needs nothing from SMP — the corrected member is in the sample
+library, which is not an SMP element. It needs the two DD statements added to
+its PROCLIB member, and specifically *not* the new member copied over: that
+one's STEPLIB names `HTTPD.V4R0M1.LINKLIB`, which does not exist there.
+
+Both release bodies are preserved under
+[`docs/release-notes/`](release-notes/) — GitHub is not a source of record for
+a body that gets deleted with its release, or regenerated by a tag re-push.
+The `v4.0.0` **tag** was kept; only the release was removed.
 
 ---
 
-### 1 · #256 — the STC procedure stopped allocating what its modules open
-
-*fix written (PR #257); what is left is a release decision, not code*
-
-`c35ab59` took `HASPCKPT` and `HASPACE1` out of `samplib/httpd` because
-`HTTPJES2` was gone and nothing in `httpd/src/` opened them. Both halves of that
-were true and the conclusion was still wrong: a CGI module is dispatched by the
-LINK SVC **into HTTPD's task**, so it opens every ddname against the STC's
-allocations, and mvsMF's jobs API opens both data sets through libc370's
-`jesopen()`. 4.0.0 therefore shipped a procedure that breaks the API its own
-default configuration routes to.
-
-The rank is not about size — the diff is two lines and some prose. It is that
-this is the only open item that is wrong on a system someone can install today.
-
-Two things worth keeping out of the issue thread:
-
-- **`docs/migration.md` was the more severe half.** A missing DD breaks a *new*
-  install; that file told a *working* 3.3.x system to delete one it needs.
-  Damage that spreads by being read is worse than damage that sits in a package.
-- **The lesson generalises past this bug.** Every "nothing uses this any more"
-  check in the 4.0.0 removals was scoped to this repo, and three other repos
-  ship modules that run inside this address space. Re-running it for the neighbouring removals in
-  `c35ab59` (`stck2tv`, `httpds_`, `HTTPJES2`, `HTTPDSL` across mvsmf, httplua,
-  httprexx) found nothing — so this was the one instance, not the pattern. The
-  rule is now in `CLAUDE.md`.
-
-### 2 · #254 — six Parmlib keywords the parser accepts are undocumented
+### 1 · #254 — six Parmlib keywords the parser accepts are undocumented
 
 *nothing blocks it; it is small and nobody has picked it up*
 
@@ -105,7 +76,7 @@ Ranked above #250 only because it costs no MVS time. `httpprm.c` is the
 authority for what the parser accepts; `docs/configuration.md` is what an
 operator reads, and the two disagree by six keywords.
 
-### 3 · #250 — does a LINKed module survive in the Job Pack Area?
+### 2 · #250 — does a LINKed module survive in the Job Pack Area?
 
 *what is left of it needs a live server and nothing else*
 
@@ -210,6 +181,24 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#256** — the STC procedure stopped allocating what its modules open
+  (PR #257, shipped in v4.0.1). `HASPCKPT`/`HASPACE1` went out with `HTTPJES2`
+  because nothing in `httpd/src/` opened them. True, and the wrong question: a
+  CGI is dispatched by the LINK SVC *into HTTPD's task*, so it opens every
+  ddname against the STC's allocations, and mvsMF's jobs API opens both through
+  libc370's `jesopen()`. 4.0.0 shipped a procedure that broke the API its own
+  default configuration routes to.
+  Three things worth keeping out of the issue thread. **`migration.md` was the
+  more severe half** — a missing DD breaks a *new* install; that file told a
+  *working* 3.3.x system to delete one it needs. **The failure is not uniform**:
+  job list and spool read answer 500, but `find_job_by_name_and_id()` returns
+  NULL for an unreachable JES2 exactly as for an absent job, so single-job
+  lookup answers `404 job not found` for a job that exists — reported as
+  `mvslovers/mvsmf#357`, and the reason the console pair is the signal, not the
+  status. **The class was checked, not just the instance**: re-running the
+  removal audit for `stck2tv`, `httpds_`, `HTTPJES2` and `HTTPDSL` across mvsmf,
+  httplua and httprexx found nothing, so this was the one case. The rule is in
+  `CLAUDE.md` now.
 - **#250(a)** — module dispatch documented five ways, four of them wrong
   (PR #251). Corrected before 4.0.0, because `configuration.md` and
   `development.md` are what users read and they described an architecture the
