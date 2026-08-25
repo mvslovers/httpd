@@ -46,6 +46,20 @@
 //HTTPSTAT DD  SYSOUT=*
 //HTTPPRM  DD  DSN=&D(&M),DISP=SHR,FREE=CLOSE
 //*
-//* HASPCKPT / HASPACE1 were the JES2 spool datasets read by HTTPJES2.
-//* That module is no longer shipped (use mvsMF's jobs API), and nothing
-//* else in the server opens them, so the DDs are gone.
+//* HASPCKPT / HASPACE1 are the JES2 checkpoint and spool data sets.
+//* HTTPD itself never opens them.  They are allocated here for the CGI
+//* modules that run in this address space: mvsMF's jobs API calls
+//* jesopen(), which opens them by DD name, and a module is dispatched
+//* by the LINK SVC into this task - so the allocation has to be the
+//* server's.  Without them every job list, job lookup and spool read
+//* answers 500 and writes two console lines.  Job submit is unaffected,
+//* it dynallocs its own INTRDR.
+//*
+//* HTTPJES2 read the same two data sets and is no longer shipped.  That
+//* is why they were briefly dropped, which broke mvsMF (issue #256).
+//* Remove them only if no module in this server reaches JES2.
+//*
+//* UNIT and VOL=SER must match your own JES2 procedure - check them
+//* there before the first start.  DISP=SHR: JES2 owns these data sets.
+//HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
+//HASPACE1 DD  DISP=SHR,DSN=SYS1.HASPACE,UNIT=3350,VOL=SER=SPOOL1
