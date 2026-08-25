@@ -176,6 +176,38 @@ Comment the three lines out, or install mvsMF:
 STC's STEPLIB concatenation — HTTPD dispatches a module through the MVS LINK
 SVC, which searches the task's own libraries.
 
+#### mvsMF's jobs API needs the JES2 DDs
+
+The same mechanism decides more than where the module is found. A module runs
+**in HTTPD's task**, so every ddname it opens has to be allocated by the STC
+procedure — a CGI has no allocations of its own.
+
+mvsMF's jobs API reads the JES2 checkpoint and spool directly, by DD name, and
+the shipped procedure allocates them:
+
+```
+//HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
+//HASPACE1 DD  DISP=SHR,DSN=SYS1.HASPACE,UNIT=3350,VOL=SER=SPOOL1
+```
+
+**Check `UNIT` and `VOL=SER` against your own JES2 procedure** before the first
+start — they are site values, not constants, and the ones above are only what
+the pattern has always carried.
+
+Without the two DDs the server starts normally and everything else works. The
+jobs API does not: job list, single-job lookup and spool retrieval each answer
+500 and write two console lines per request:
+
+```
+Unable to open checkpoint dataset DD:HASPCKPT
+MVSMF201E UNABLE TO OPEN THE JES2 CHECKPOINT AND SPOOL DATA SETS
+```
+
+Job submit is unaffected; it dynallocs its own INTRDR.
+
+If you serve no JES2 traffic at all, the DDs can go. Nothing else in HTTPD opens
+them.
+
 ### RAKF is required for logins
 
 HTTPD has no user database of its own. Every login — the HTML form, HTTP Basic,

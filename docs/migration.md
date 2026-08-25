@@ -95,7 +95,11 @@ The 4-tier time-series statistics (`httpstat.c`, `httprepo.c`) with dataset pers
 
 The built-in web interfaces for JES2 job browsing (`HTTPJES2`) and dataset listing (`HTTPDSL`) are no longer built or shipped. [mvsMF](https://github.com/mvslovers/mvsmf)'s dataset and jobs REST APIs replace them.
 
-Two things to check when migrating a 3.3.x configuration: drop any `CGI=`/`MOD=` line naming `HTTPDSL` or `HTTPJES2` — the route is accepted but the program load fails on the first matching request — and drop the `HASPCKPT` and `HASPACE1` DDs from the STC procedure, which existed only so `HTTPJES2` could read the JES2 spool.
+When migrating a 3.3.x configuration, drop any `CGI=`/`MOD=` line naming `HTTPDSL` or `HTTPJES2` — the route is accepted but the program load fails on the first matching request.
+
+**Keep the `HASPCKPT` and `HASPACE1` DDs in the STC procedure.** `HTTPJES2` was not their only reader. A CGI module is dispatched by the MVS LINK SVC into HTTPD's own task, so it sees HTTPD's allocations — and mvsMF's jobs API opens both data sets by DD name, through libc370's `jesopen()`. Without them `GET /zosmf/restjobs/jobs`, single-job lookup and spool retrieval each answer 500 and write two console lines per request. Job submit still works; it dynallocs its own INTRDR.
+
+Remove them only if no module in your server reaches JES2. 4.0.0 shipped a procedure without them — see [issue #256](https://github.com/mvslovers/httpd/issues/256).
 
 The sources are kept under `tbd/` for reference and are outside the build.
 

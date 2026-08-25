@@ -181,6 +181,17 @@ httpx->http_printf(httpc, "Content-Type: text/html\r\n\r\n");
 
 In HTTPD 4.0.0, CGI registration moves from Lua defaults to Parmlib-only. No CGIs are active unless explicitly configured.
 
+**A module runs in HTTPD's task, so `samplib/httpd` is part of the modules'
+contract, not just the server's.** The LINK SVC dispatches into this task; a
+module has no allocations of its own and opens any ddname against the STC's.
+`HASPCKPT` / `HASPACE1` are there for exactly that reason — HTTPD never touches
+them, mvsMF's jobs API opens both through libc370's `jesopen()`. They were
+dropped in 4.0.0 on the reasoning that "nothing else in the server opens them",
+which was measured against `httpd/src/` alone and missed the four consumer
+repos; issue #256. **Before removing anything from the PROC, grep `../mvsmf`,
+`../httplua` and `../httprexx` too** — a `grep` that stops at this repo's edge
+cannot answer the question.
+
 ### HTTP/1.1 Design (implemented)
 
 **Response body framing — decision logic:**
