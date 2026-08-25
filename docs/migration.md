@@ -97,7 +97,7 @@ The built-in web interfaces for JES2 job browsing (`HTTPJES2`) and dataset listi
 
 When migrating a 3.3.x configuration, drop any `CGI=`/`MOD=` line naming `HTTPDSL` or `HTTPJES2` — the route is accepted but the program load fails on the first matching request.
 
-**Keep the `HASPCKPT` and `HASPACE1` DDs in the STC procedure.** `HTTPJES2` was not their only reader. A CGI module is dispatched by the MVS LINK SVC into HTTPD's own task, so it sees HTTPD's allocations — and mvsMF's jobs API opens both data sets by DD name, through libc370's `jesopen()`. Without them `GET /zosmf/restjobs/jobs`, single-job lookup and spool retrieval each answer 500 and write two console lines per request. Job submit still works; it dynallocs its own INTRDR.
+**Keep the `HASPCKPT` and `HASPACE1` DDs in the STC procedure.** `HTTPJES2` was not their only reader. A CGI module is dispatched by the MVS LINK SVC into HTTPD's own task, so it sees HTTPD's allocations — and mvsMF's jobs API opens both data sets by DD name, through libc370's `jesopen()`. Without them the job list and spool retrieval answer 500, and anything resolving a single job by name and id answers **404 job not found** — `find_job_by_name_and_id()` returns NULL for an unreachable JES2 exactly as it does for an absent job, so the status code misreports the cause. Every one of them writes two console lines per request; that is the reliable signal. Job submit still works — it dynallocs its own INTRDR.
 
 Remove them only if no module in your server reaches JES2. 4.0.0 shipped a procedure without them — see [issue #256](https://github.com/mvslovers/httpd/issues/256).
 

@@ -195,8 +195,18 @@ start — they are site values, not constants, and the ones above are only what
 the pattern has always carried.
 
 Without the two DDs the server starts normally and everything else works. The
-jobs API does not: job list, single-job lookup and spool retrieval each answer
-500 and write two console lines per request:
+jobs API does not — and it does not fail uniformly:
+
+| request | answer |
+|---|---|
+| job list (`GET /zosmf/restjobs/jobs`) | `500`, `REASON_INCORRECT_JES_VSAM_HANDLE` |
+| spool retrieval | `500`, same reason |
+| anything resolving one job by name and id | **`404` job not found** |
+
+The 404 is the one to know about. `find_job_by_name_and_id()` returns NULL
+whether JES2 is unreachable or the job genuinely is not there, and its callers
+report the second. A client is told the job does not exist while it does — so
+read the console, not the status code:
 
 ```
 Unable to open checkpoint dataset DD:HASPCKPT

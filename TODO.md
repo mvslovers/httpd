@@ -91,8 +91,8 @@ Two things worth keeping out of the issue thread:
   install; that file told a *working* 3.3.x system to delete one it needs.
   Damage that spreads by being read is worse than damage that sits in a package.
 - **The lesson generalises past this bug.** Every "nothing uses this any more"
-  check in the 4.0.0 removals was scoped to this repo, and four consumer repos
-  run inside this address space. Re-running it for the neighbouring removals in
+  check in the 4.0.0 removals was scoped to this repo, and three other repos
+  ship modules that run inside this address space. Re-running it for the neighbouring removals in
   `c35ab59` (`stck2tv`, `httpds_`, `HTTPJES2`, `HTTPDSL` across mvsmf, httplua,
   httprexx) found nothing — so this was the one instance, not the pattern. The
   rule is now in `CLAUDE.md`.
