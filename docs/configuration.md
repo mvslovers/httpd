@@ -9,6 +9,14 @@ one is in effect is reported by `F HTTPD,D CONFIG`, below.
 `PARM='CONFIG=...'` is a 3.x leftover and selects nothing; see
 [migration.md](migration.md).
 
+A member that is **not there** is not an error: `HTTPD020W` is written and the
+server starts on the built-in defaults — port 8080 and no routes at all. A
+member that is there and cannot be **read to the end** is fatal (`HTTPD038E`,
+`CC 0008`), because the difference between the two is invisible from inside the
+parser: everything past the failed block would simply be missing, and a server
+standing on half a member looks healthy while the routes that carry its `AUTH=`
+policies are absent.
+
 ## Reading back what the server parsed
 
 Startup does not echo the configuration — the banner stays short. To see what

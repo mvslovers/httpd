@@ -104,13 +104,70 @@ static int  do_bind(HTTPD *httpd);
 static int  close_stale_port(int port, int skip);
 static char *trim(char *s);
 
+__asm__("\n&FUNC    SETC 'http_prm_read'");
+/* http_prm_read() - defaults, then DD:HTTPPRM over the top of them.
+**
+** Split out of http_config() so it can be driven from a test (TSTPRM): what
+** follows it there binds the listener and initializes UFS, which a test must
+** not do.  Everything up to and including the read is here; nothing else
+** moved.  Returns 0, or 8 when the member could not be read to the end --
+** the same value http_config() returns and initialize() turns into CC 0008.
+**
+** A missing DD is NOT an error: the server starts on defaults with no routes
+** at all (HTTPD020W).  A member that is there and unreadable is, for the
+** reason below. */
+int
+http_prm_read(HTTPD *httpd)
+{
+    FILE    *fp;
+    char     line[256];
+    int      ioerr;
+
+    /* set defaults */
+    set_defaults(httpd);
+
+    /* read configuration from DD:HTTPPRM */
+    fp = fopen("DD:" HTTPD_PARMLIB_DD, "r");
+    if (!fp) {
+        wtof(MSG_CFG_NO_PARMLIB, HTTPD_PARMLIB_DD);
+        return 0;
+    }
+
+    /* The member is NOT announced here.  It used to be, so a parse error
+    ** below would already be attributed -- but every error this loop can
+    ** raise names the offending line itself, and F HTTPD,D CONFIG reports
+    ** the member on demand (HTTPD133I). */
+    while (fgets(line, (int)sizeof(line), fp)) {
+        parse_line(httpd, line);
+    }
+
+    /* A read error is not end of file.  Since libc370 1.0.4 the DCBs its
+    ** stdio layer opens carry a SYNAD, so an uncorrectable I/O error comes
+    ** back through fgets() as a NULL -- with feof() deliberately unset --
+    ** instead of ABEND S001, and the loop above then ends exactly as it does
+    ** at the end of the member.  Every line past the failed block would be
+    ** silently absent: routes with their AUTH= policies, the port, the
+    ** document root.  A server standing on half a Parmlib looks healthy and
+    ** is not gated the way the member says, which is the same hazard
+    ** HTTPD420E refuses to start on.  Read ferror() before fclose() -- the
+    ** flag lives on the FILE. */
+    ioerr = ferror(fp);
+
+    fclose(fp);
+
+    if (ioerr) {
+        wtof(MSG_CFG_READ_ERROR, HTTPD_PARMLIB_DD);
+        return 8;
+    }
+
+    return 0;
+}
+
 __asm__("\n&FUNC    SETC 'http_config'");
 int
 http_config(HTTPD *httpd, const char *member)
 {
     CLIBCRT *crt = __crtget();
-    FILE    *fp;
-    char     line[256];
     int      rc;
 
     /* CONFIG= has been read-and-discarded since the Parmlib migration, which
@@ -124,23 +181,12 @@ http_config(HTTPD *httpd, const char *member)
     /* store HTTPD pointer in CRT for CGI modules */
     crt->crtapp1 = httpd;
 
-    /* set defaults */
-    set_defaults(httpd);
-
-    /* read configuration from DD:HTTPPRM */
-    fp = fopen("DD:" HTTPD_PARMLIB_DD, "r");
-    if (!fp) {
-        wtof(MSG_CFG_NO_PARMLIB, HTTPD_PARMLIB_DD);
-    } else {
-        /* The member is NOT announced here.  It used to be, so a parse error
-        ** below would already be attributed -- but every error this loop can
-        ** raise names the offending line itself, and F HTTPD,D CONFIG reports
-        ** the member on demand (HTTPD133I). */
-        while (fgets(line, (int)sizeof(line), fp)) {
-            parse_line(httpd, line);
-        }
-        fclose(fp);
-    }
+    /* Defaults + DD:HTTPPRM.  A member that could not be read to the end
+    ** stops here, before the realm is settled and before any of the route
+    ** policy below is judged: the configuration this would be judging is not
+    ** the one the operator wrote.  http_prm_read() has written HTTPD038E. */
+    rc = http_prm_read(httpd);
+    if (rc) return rc;
 
     /* The Basic realm / server name: the REALM keyword's value, or the
        system's SMF ID when the Parmlib names none (#193, #191).  Settled once

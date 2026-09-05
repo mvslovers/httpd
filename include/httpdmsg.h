@@ -396,6 +396,9 @@
 /** HTTPD020W no Parmlib member; the server starts on built-in defaults */
 #define MSG_CFG_NO_PARMLIB	"HTTPD020W CANNOT OPEN DD:%s -- USING DEFAULTS"
 
+/** HTTPD038E the Parmlib member opened but could not be read to the end */
+#define MSG_CFG_READ_ERROR	"HTTPD038E READ ERROR ON DD:%s -- CONFIGURATION INCOMPLETE"
+
 /** HTTPD020E the debug DD is present but unusable */
 #define MSG_CFG_DBG_FAILED	"HTTPD020E FOPEN FOR DD:HTTPDBG FAILED, ERRNO=%d"
 
