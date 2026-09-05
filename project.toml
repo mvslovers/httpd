@@ -337,8 +337,15 @@ headers = [
 # (HTTPD.@VRM@.WEBROOT.UFS) and it is deliberate: no ddname is derived from it
 # because nothing here allocates or receives it, and .UFS says at a glance that
 # the dataset is a filesystem image rather than a library.  Do not normalise it
-# into the three-qualifier pattern -- it is not part of that scheme.  @VRM@ becomes V4R0M0 at package time (V4R0M0D while the version still
-# carries -dev).  ufsd/ftpd spell these <product>LOAD / A<product>LOD, which for
+# into the three-qualifier pattern -- it is not part of that scheme.  @VRM@ is
+# derived from the FULL version at package time and carries the patch level:
+# 4.0.1 packaged HTTPD.V4R0M1.*, 4.0.2 packages HTTPD.V4R0M2.* (V4R0M2D while
+# the version still carries -dev).  The FMID does not move with it -- THTP400
+# names all of 4.0.x -- so a patch release collides with its predecessor in the
+# SMP inventory while its libraries sit beside them, untouched.  Saying "V4R0M0
+# at package time" here was wrong for every release after 4.0.0, and the same
+# sentence in the uninstall guide is what scratched the wrong libraries in ftpd.
+# ufsd/ftpd spell these <product>LOAD / A<product>LOD, which for
 # a five-letter product would be nine characters; HTTPLOAD/AHTTPLOD keeps the
 # suffix and drops the letter, rather than keeping HTTPD and truncating the
 # suffix (HTTPDLOD/AHTTPDLD).  Both names go into the FMID's JCLIN, so this is a

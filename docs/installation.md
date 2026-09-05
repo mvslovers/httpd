@@ -27,11 +27,20 @@ Two placeholders are used throughout:
 
 | | |
 |---|---|
-| `<version>` | the release, e.g. `4.0.0` — it appears in every shipped file name |
-| `<vrm>` | the same release as MVS dataset qualifier, e.g. `V4R0M0` |
+| `<version>` | the release, e.g. `4.0.2` — it appears in every shipped file name |
+| `<vrm>` | the same release as MVS dataset qualifier, **patch level included** — `V4R0M0` for 4.0.0, `V4R0M1` for 4.0.1, `V4R0M2` for 4.0.2 |
 
 Both are already filled in inside the shipped jobs; you only need them to
-recognise which file is which.
+recognise which file is which. The one exception is the webroot disk in step 9:
+nothing allocates or receives it, so those commands are yours to type and
+`<vrm>` is yours to substitute.
+
+`<vrm>` and the FMID move at **different rates**, and that catches people out.
+The FMID is per *minor* release — `THTP400` names the whole of 4.0.x — while the
+qualifier is derived from the full version, so 4.0.1 installed into
+`HTTPD.V4R0M1.*` and 4.0.2 installs into `HTTPD.V4R0M2.*`. A patch release
+therefore collides with its predecessor in the SMP inventory while its libraries
+sit beside them, untouched. Section 12 is where that matters.
 
 ---
 
@@ -688,7 +697,7 @@ conversion. With the dataset allocated, the command carries no options at all �
 which also makes it independent of which IND$FILE build your system has:
 
 ```
-IND$FILE PUT HTTPD.V4R0M0.WEBROOT.UFS
+IND$FILE PUT HTTPD.<vrm>.WEBROOT.UFS
 ```
 
 Binary is IND$FILE's default; `ASCII` and `CRLF` are what you would have to add
@@ -700,7 +709,7 @@ one action, and their file-transfer dialog asks for the same fields:
 ```
 Transfer(Direction=send,
          LocalFile=httpd-webroot.img,
-         HostFile=HTTPD.V4R0M0.WEBROOT.UFS,
+         HostFile=HTTPD.<vrm>.WEBROOT.UFS,
          Host=tso, Mode=binary, Exist=replace)
 ```
 
@@ -717,7 +726,7 @@ If you would rather let IND$FILE create the dataset, it needs to be told
 everything the allocation job otherwise says:
 
 ```
-IND$FILE PUT HTTPD.V4R0M0.WEBROOT.UFS (RECFM(U) BLKSIZE(4096) TRACKS SPACE(70)
+IND$FILE PUT HTTPD.<vrm>.WEBROOT.UFS (RECFM(U) BLKSIZE(4096) TRACKS SPACE(70)
 ```
 
 70 tracks holds a megabyte even on a 3350, where a 4096-byte block packs four to
@@ -732,14 +741,14 @@ transfer, not a hang.
 The mount belongs to **UFSD**, not to HTTPD. In its Parmlib member:
 
 ```
-MOUNT    DSN(HTTPD.V4R0M0.WEBROOT.UFS)  PATH(/www)  MODE(RO)
+MOUNT    DSN(HTTPD.<vrm>.WEBROOT.UFS)  PATH(/www)  MODE(RO)
 ```
 
 or, without a restart — note that the operator command spells its operands with
 `=` and commas where the Parmlib statement uses parentheses:
 
 ```
-/F UFSD,MOUNT DSN=HTTPD.V4R0M0.WEBROOT.UFS,PATH=/www,MODE=RO
+/F UFSD,MOUNT DSN=HTTPD.<vrm>.WEBROOT.UFS,PATH=/www,MODE=RO
 ```
 
 `/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount it
@@ -775,7 +784,7 @@ happily rewrite a dataset UFSD has open — under the server's own buffers:
 ```
 /F UFSD,UNMOUNT PATH=/www
     ... upload ...
-/F UFSD,MOUNT DSN=HTTPD.V4R0M0.WEBROOT.UFS,PATH=/www,MODE=RO
+/F UFSD,MOUNT DSN=HTTPD.<vrm>.WEBROOT.UFS,PATH=/www,MODE=RO
 ```
 
 For pages of your own, build the image on your workstation with
@@ -923,6 +932,20 @@ What this release put on the system:
 | Target library | `HTTPD.<vrm>.LINKLIB` |
 | Distribution library | `HTTPD.<vrm>.AHTTPLOD` |
 | Sample library | `HTTPD.<vrm>.SAMPLIB` |
+
+**Read `<vrm>` as the release you are removing, and check the name against ISPF
+3.4 before running anything below.** It carries the patch level — `V4R0M0` for
+4.0.0, `V4R0M1` for 4.0.1, `V4R0M2` for 4.0.2 — while the FMID does not:
+`THTP400` names the whole 4.0.x functional level. That asymmetry is the reason
+this page is also where a **patch upgrade** is sent: 4.0.2 cannot be received
+while `THTP400` is still `REC APP ACC`, so step 2 below has to run first — but
+4.0.2 allocates its own `HTTPD.V4R0M2.*` libraries and never touches 4.0.1's.
+
+So for an upgrade, run step 2 and **stop there**. Step 4 scratches the
+predecessor's libraries, which the new install does not need scratched; running
+it removes an installation you meant to keep while the live one keeps standing,
+with SMP reporting success throughout. Steps 3 to 5 are for actually removing
+HTTPD.
 
 **1. Stop the server:** `/P HTTPD`
 
