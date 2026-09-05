@@ -95,8 +95,8 @@ HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
 **The first line is the cause**, and it is the only one that varies:
-`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E`, `HTTPD420E` or `HTTPD033E`,
-each naming what actually failed. There is no summary line under it: `HTTPD400E`
+`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E`, `HTTPD420E`, `HTTPD038E` or
+`HTTPD033E`, each naming what actually failed. There is no summary line under it: `HTTPD400E`
 used to follow every one of these and named the *configuration* on four of the
 five it could reach, sending the operator into the Parmlib after a mistake that
 was not there (#233).
@@ -108,7 +108,7 @@ nothing was served. Those absences are a hint, not a test: a server stopped
 right after a start it survived writes almost the same thing.
 
 **The step return code is the test.** A start refused by `initialize()` — the
-six ids above — ends `CC 0008` (#226); a clean `P HTTPD` ends `CC 0000`.
+seven ids above — ends `CC 0008` (#226); a clean `P HTTPD` ends `CC 0000`.
 Automation that has to recognize a failed start — `$DJ`, a COND CODE check, an
 IEFACTRT exit, a rule that restarts a dead STC — keys on that, never on a
 console string.
@@ -198,7 +198,10 @@ Everything in this range is written because an operator asked for it, so the
 
 Parsing errors are warnings and the line is skipped — **except** the two that
 would leave a route answering without the authorization it asked for. Those are
-fatal by design (see [configuration.md](configuration.md)).
+fatal by design (see [configuration.md](configuration.md)). A **read** error is
+the third fatal one, and it is not a parsing error at all: nothing past the
+failed block was ever seen, so the routes that would have carried those policies
+are simply absent (`HTTPD038E`).
 
 | Id | Text | Meaning and action |
 |---|---|---|
@@ -219,6 +222,7 @@ fatal by design (see [configuration.md](configuration.md)).
 | `HTTPD030E` | `BIND() FAILED FOR HTTP PORT, RC=n ERRNO=e` | The port is taken. Retried per `BIND_TRIES`, then fatal. |
 | `HTTPD030I` | `EADDRINUSE, WAITING FOR TCPIP TO RELEASE HTTP PORT p` | A retry is in progress. Normal after an abrupt restart. |
 | `HTTPD031E` | `LISTEN() FAILED, RC=n ERRNO=e` | Bound but will not accept; the server does not start. |
+| `HTTPD038E` | `READ ERROR ON DD:HTTPPRM -- CONFIGURATION INCOMPLETE` | **Fatal.** The member opened but could not be read to the end — a media or DCB problem, not a configuration one. Everything past the failed block was never seen, so the port, the document root and every `MOD=`/`LOC=` route beyond it are missing and the server would come up looking healthy on defaults: port 8080 and **no routes at all**. Before libc370 1.0.4 this was ABEND S001; the library now reports the error through `ferror()` instead, which is why the check exists. Check the data set and the DD's DCB attributes against it. |
 | `HTTPD037E` | `HTTPD IS ALREADY ACTIVE ON PORT p, THIS INSTANCE ENDS` | `S HTTPD` while a server is already serving that port. This instance ends with CC 0008 and the running one is untouched — it is refused *before* the stale-port sweep, which would otherwise close the live listener. Not a bind failure — no `HTTPD030E` accompanies it, and no summary line follows it: this message *is* the report. To run a second server deliberately, give it another port (`S HTTPD,M=HTTPPRM1`). |
 | `HTTPD035W` | `UNABLE TO REGISTER MODULE m FOR path` | The region ran out of storage while the Parmlib was being read. Nothing else reaches this message: there is no route-table limit, and a duplicate pattern is never detected (it registers as a second route and is simply unreachable, first match winning). **The path is not dark** — it is still served, statically from the document root and ungated, just without the CGI. Standing alone the message also tells you the route carried no binding auth policy; one that did would bring `HTTPD419E`/`HTTPD420E` and the server would not start. |
 | `HTTPD036I` | `MODULE m REGISTERED FOR path` | One active CGI route. One line per route at start. |

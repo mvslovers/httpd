@@ -672,6 +672,7 @@ extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("
 extern const char *http_realm(HTTPD *)                                     asm("HTTPGRLM");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
+extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
 extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");
 extern void httpsmf_session(HTTPD *httpd, HTTPC *httpc)				asm("HTTPSMFS");

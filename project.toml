@@ -13,7 +13,7 @@ type = "application"
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
-libc370 = "1.0.3"
+libc370 = "1.0.4"
 
 [build]
 # The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
@@ -49,7 +49,7 @@ cflags = [
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = ">=1.2.1"
+"mvslovers/ufsd" = ">=1.2.2"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
@@ -235,6 +235,21 @@ name = "TSTSPM"
 startup = "crt1"                # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
 sources = ["test/mvs/tstspm.c"]
 host = false                    # LINK target for TSTSP -> test-mvs
+
+# http_prm_read() Parmlib read-error guard.  Since libc370 1.0.4 an
+# uncorrectable I/O error is ferror() + errno EIO with feof() unset, so the
+# fgets() loop over DD:HTTPPRM ends exactly as it does at the end of the
+# member -- and HTTPD would start on a silently truncated configuration.  The
+# test carries its own error vector (a data set behind two DDs that disagree
+# about BLKSIZE, allocated with __dsalcf), so it needs nothing from the JCL.
+# MVS-only: a wrong-length record is a real BSAM condition with no host
+# equivalent.  http_prm_read (HTTPPRMR) resolves from the [internal] autocall
+# archive, so only the test root is listed here.
+[[test]]
+name = "TSTPRM"
+parm = "IBMUSER.HTTPD.TPRM"
+sources = ["test/mvs/tstprm.c"]
+host = false                    # BSAM I/O error + DD: names -> test-mvs
 
 # http_link() failure reporting (issue #131): a module that cannot be loaded
 # must not come out as an abend code.  Rests on a libc370 contract -- __linkds()
