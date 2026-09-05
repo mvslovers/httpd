@@ -11,10 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-08-25 after v4.0.1 shipped, four
-issues open (#256 filed, fixed by PR #257 and closed the same day; #254; before
-them #252 filed and closed 2026-08-24 by PR #253, #250, #237 by PR #249, #245 by
-PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247).*
+*Last reconciled against the tracker: 2026-09-05 after #260 was filed and closed
+the same day by PR #261 (the libc370 1.0.4 relink), five issues open — #259 newly
+filed by a user, #258, #254, #250, #198, #176. Before them: #256 filed and fixed
+by PR #257 on 2026-08-25, #252 filed and closed 2026-08-24 by PR #253, #237 by
+PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247.*
 
 ---
 
@@ -24,10 +25,20 @@ PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247).*
 |---|---|---|---|
 | 1 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
 | 2 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
+| 3 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
+| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **a decision**, and it is not a 4.0.x one — see below |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**Nothing open waits on a decision, and nothing open is a code bug.** #254 is
+**#259 is parked deliberately, and the reason is structural.** `lklib`, `target`
+and `distlib` go into the FMID's JCLIN, so the names are a one-shot choice per
+functional level: `THTP400` already carries `HTTPD.@VRM@.*` from 4.0.0, and
+changing them is a new functional level, not a patch. It was considered before
+cutting 4.0.2 and deferred rather than overlooked — it belongs with the next
+minor, where a fresh FMID has to be spent anyway. The request itself is
+reasonable; nothing about it is settled by leaving it here.
+
+**Nothing open is a code bug, and two — #258 and #259 — wait on a decision.** #254 is
 ranked first only because it costs no MVS time. #250 is above the two parked
 items even though it is milestoned out, and the two are not in conflict: the
 milestone says it is not a 4.0.x deliverable, the rank says it is the next thing
@@ -97,6 +108,34 @@ copy persists, a per-request disk fetch worth eliminating if it does not.
 The docs now record (b) as an open question and say not to write either answer
 down until it is measured. Honour that — a plausible guess written into
 `development.md` is exactly how the five wrong statements got there.
+
+### 3 · #258 — thirteen console lines that tell the operator nothing
+
+*the only open item that waits on a decision, and the fix is not in this repo*
+
+`C HTTPD` produced thirteen `libc370` recovery WTOs between `IEE301I` and
+`IEF450I … ABEND S222`. Both message sites are libc370's `SDWACLUP` guards
+(`@@abrpt.c` `recovery()`, `@@@try.c` `failed()`), the guards themselves are
+correct, and the burst grows with the worker pool and with `try()` nesting —
+mvsMF adds a layer of its own. It lands on any termination-time entry, an S878
+memterm included, not only on a cancel.
+
+The issue deliberately leaves the count unexplained: six of the thirteen come
+from the `try()` exit, and `try()` deletes its ESTAE before returning while an
+idle worker waits *outside* it, so the obvious per-task reading does not hold.
+That is question one, and it decides whether the burst is bounded by the task
+count or by something larger.
+
+Two things rank it below the measurement work rather than above it. The obvious
+fix — emit once — **cannot be built at the message site**: the path is
+deliberately CRT-free and a `static` counter is key-0 module storage (#197). And
+the two sites are asymmetric: `abendrpt()` already carries a caller option word,
+`try()` carries none, so "make it optional" solves one message and not the other.
+
+It is ranked at all because the decision is cheap and the measurement is one
+`/.dmtt` look — whether a `MCSFLAG=HRDCPY` WTO still reaches the Master Trace
+Table, which is the whole value of the middle option. Its deliverable is an
+implementing issue in libc370 (see *Cross-repo*), not a PR here.
 
 ---
 
@@ -268,6 +307,13 @@ documented it from the other. `mvslovers/libc370#142` is the fix that removes
 the class: `jesopen()` should dynalloc the checkpoint and spool the way
 `jesiropn()` already dynallocs the INTRDR, which also gets the site-specific
 `VOL=SER` out of every procedure in the ecosystem.
+
+#258 is filed here because httpd is where the noise was seen and where the pool
+size that multiplies it is configured, but both message sites are libc370's and
+every consumer shares them — ftpd, mvsmf, ufsd, rexx370, httplua, httprexx. It
+closes on an implementing issue in libc370, which should be settled together with
+`mvslovers/libc370#17` (consolidate the two `try()` wrappers): same file, and the
+`@@@try.c` message is the half with no cheap option channel.
 
 Closed *not planned* on 2026-08-23: `mvslovers/ufsd#65` — reasoning in its
 closing comment and in `docs/identity-redesign.md` §3.2. The per-client
