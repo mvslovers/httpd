@@ -11,11 +11,13 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-05 after #260 was filed and closed
-the same day by PR #261 (the libc370 1.0.4 relink), five issues open — #259 newly
-filed by a user, #258, #254, #250, #198, #176. Before them: #256 filed and fixed
-by PR #257 on 2026-08-25, #252 filed and closed 2026-08-24 by PR #253, #237 by
-PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247.*
+*Last reconciled against the tracker: 2026-09-06 after v4.0.2 shipped, nine
+issues open — #264, #263 and #262 filed out of the 4.0.2 work itself, #259 filed
+by a user, and #258, #254, #250, #198, #176 carried over. #260 was filed and
+closed on 2026-09-05 by PR #261, the relink 4.0.2 delivers. Before them: #256
+filed and fixed by PR #257 on 2026-08-25, #252 filed and closed 2026-08-24 by
+PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
+#243 by PR #247.*
 
 ---
 
@@ -23,9 +25,12 @@ PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and #243 by PR #247.*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
-| 2 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
-| 3 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
+| 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
+| 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
+| 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
+| 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
+| 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
+| — | #264 | `blocked:libc370` — a dead `HTTPDBG` is silent since 1.0.4 | **libc370#149**, the fail-fast decision |
 | — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **a decision**, and it is not a 4.0.x one — see below |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
@@ -38,20 +43,47 @@ cutting 4.0.2 and deferred rather than overlooked — it belongs with the next
 minor, where a fresh FMID has to be spent anyway. The request itself is
 reasonable; nothing about it is settled by leaving it here.
 
-**Nothing open is a code bug, and two — #258 and #259 — wait on a decision.** #254 is
-ranked first only because it costs no MVS time. #250 is above the two parked
-items even though it is milestoned out, and the two are not in conflict: the
-milestone says it is not a 4.0.x deliverable, the rank says it is the next thing
-worth doing, because it is read-only, costs minutes, and #198's second step
-cannot be estimated until it is answered. #176 stays last for the reason it
-always did, not because it is small.
+**That sentence used to read "nothing open is a code bug." It no longer does.**
+#263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error
+leaves `http_send_file()` with no state that notices, so the client gets a
+truncated body on a chunked stream that never receives its terminator, and the
+console blames `HTTPD901E SPIN` — a `9xx` id `docs/messages.md` tells the reader
+is worth a bug report about the state machine. It ranks first because it is the
+only item that changes what a client receives. It is not ranked first because it
+is quick: no error vector for UFS exists, #260's lying-`BLKSIZE` DD does not
+reach `ufs_fopen()`, and a guard shipped without one would be reviewed rather
+than measured.
+
+#254 stays high for the reason it always did — it costs no MVS time. #262 is
+above the other research items because a suite whose top line is permanently red
+stops being read at all, which costs more than the one test it hides. #250 is
+above the two parked items even though it is milestoned out, and the two are not
+in conflict: the milestone says it is not a 4.0.x deliverable, the rank says it
+is the next thing worth doing, because it is read-only, costs minutes, and
+#198's second step cannot be estimated until it is answered. #176 stays last for
+the reason it always did, not because it is small.
+
+**Three of the nine came out of the 4.0.2 work, and none of them is a
+regression.** #263 has behaved this way since 4.0.0; #262 reproduces on
+unmodified `main`; #264 is the write side of the libc370 change #260 fixed the
+read side of. They are visible now because the relink made that whole class of
+failure worth looking at, not because the relink caused them.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
 and `docs/messages.md` §*A refused start* is where the resulting contract is
 written down.
 
-**4.0.0 shipped on 2026-08-24 and was withdrawn on 2026-08-25; v4.0.1 replaces
+**v4.0.2 shipped on 2026-09-05:** the libc370 1.0.4 relink (#260/PR #261), plus
+the `<vrm>` correction to the shipped installation guide. `THTP400` again — an
+FMID names a functional level and 4.0.2 is a patch — so an upgrade runs the
+`UCLIN` step of section 12 and stops there. The libraries move where the FMID
+does not: 4.0.1 installed `HTTPD.V4R0M1.*`, 4.0.2 installs `HTTPD.V4R0M2.*`, and
+saying "V4R0M0 for 4.0.x" is what scratched the wrong generation in ftpd. That
+sentence was in httpd's guide too, which ships in the archive *as* `README.md`,
+so the 4.0.1 package named datasets its own install job never created.
+
+**4.0.0 shipped on 2026-08-24 and was withdrawn on 2026-08-25; v4.0.1 replaced
 it.** The release work was never in the tracker — it is in
 [`smp-todo.md`](smp-todo.md) — and it was done: `THTP400` free in the CDS *and*
 the ACDS on both stands (O1), the full install rehearsed under the throwaway
@@ -65,8 +97,9 @@ What none of that rehearsal caught is #256: it verified that the install
 routes to opens. Worth adding to `smp-todo.md` before the next cut — a rehearsal
 that ends at "the job ran CC 0000" cannot see this class of defect.
 
-**The FMID did not move.** No source changed between the two releases, so there
-is no functional level to cut: `THTP400` still names 4.0.x, and a system that
+**The FMID did not move**, then or since. No source changed between 4.0.0 and
+4.0.1, so there was no functional level to cut; 4.0.2 changed source but is still
+a patch, and `THTP400` names all of 4.0.x either way. A system that
 installed 4.0.0 needs nothing from SMP — the corrected member is in the sample
 library, which is not an SMP element. It needs the two DD statements added to
 its PROCLIB member, and specifically *not* the new member copied over: that
@@ -79,7 +112,29 @@ The `v4.0.0` **tag** was kept; only the release was removed.
 
 ---
 
-### 1 · #254 — six Parmlib keywords the parser accepts are undocumented
+### 1 · #263 — a UFS read error is served as a truncated body
+
+*the only open item that changes what a client receives*
+
+`http_send_file()` asks `ufs_feof()` and never `ufs_ferror()`, though libufs
+exports it (`libufs.h:243`). On a read error `ufs_fread()` returns 0 with EOF
+unset, so `substate` stays `SSTATE_SENDING` and no pass of the function can ever
+notice. `serve_client()`'s spin guard ends it at 1000 fruitless passes, which
+bounds the damage and mislabels it: the client keeps a chunked body that never
+got its `0\r\n\r\n`, and the console says `HTTPD901E SPIN` — an id
+`docs/messages.md` tells the reader to file a bug about the state machine.
+
+**The work is the error vector, not the check.** #260's — one data set behind two
+DDs that disagree about `BLKSIZE` — cannot reach `ufs_fopen()`, which goes
+through UFSD rather than a DD. Without one, a guard is reviewed and not measured,
+and `CLAUDE.md` is explicit that "feels fixed" is not fixed. Finding it may be
+the larger half, and it may belong in ufsd rather than here.
+
+The second decision is what to tell a client once the status line has gone out.
+An unterminated chunked body is the only honest signal left on the wire; that is
+a deliberate choice to make, not a fallback to stumble into.
+
+### 2 · #254 — six Parmlib keywords the parser accepts are undocumented
 
 *nothing blocks it; it is small and nobody has picked it up*
 
@@ -87,7 +142,31 @@ Ranked above #250 only because it costs no MVS time. `httpprm.c` is the
 authority for what the parser accepts; `docs/configuration.md` is what an
 operator reads, and the two disagree by six keywords.
 
-### 2 · #250 — does a LINKed module survive in the Job Pack Area?
+### 3 · #262 — TSTSP keeps the whole suite red
+
+*it hides one test and devalues the other seventeen*
+
+490 assertions pass and `make test-mvs` still reports `2 step(s) FAILED`, because
+TSTSP's step ends `ABEND SA03` — the step task ending with a subtask still
+active. Ranked here, above the other research items, for what it costs rather
+than what it is: a suite whose top line is always red trains everyone to stop
+reading it, and then the next real failure is invisible too.
+
+It is not a product defect and not a 4.0.2 regression — it reproduces on
+unmodified `main` (JOB03098). The mechanism is specific: the test does wait, with
+`cthread_wait(&task->termecb)` before `cthread_delete(&task)`, and libc370 still
+answers "TCB has not ended, task and stack retained". So the termination ECB is
+posted before the subtask terminates, which is a libc370 question and not a
+`test/mvs/tstsp.c` one.
+
+Two things it should settle. Why httpd's own worker pool is unaffected — `P
+HTTPD` tears cthreads down cleanly, measured twice on 2026-09-05 — because that
+difference probably *is* the answer. And whether 1.0.4 introduced it, which is
+undetermined: the sysroot was already 1.0.4 before the relink work began, so
+1.0.3 was never measured. That test needs a sysroot rebuilt from a libc370 v1.0.3
+checkout, which is why it has not been run.
+
+### 4 · #250 — does a LINKed module survive in the Job Pack Area?
 
 *what is left of it needs a live server and nothing else*
 
@@ -109,7 +188,7 @@ The docs now record (b) as an open question and say not to write either answer
 down until it is measured. Honour that — a plausible guess written into
 `development.md` is exactly how the five wrong statements got there.
 
-### 3 · #258 — thirteen console lines that tell the operator nothing
+### 5 · #258 — thirteen console lines that tell the operator nothing
 
 *the only open item that waits on a decision, and the fix is not in this repo*
 
