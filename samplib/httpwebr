@@ -29,7 +29,7 @@
 //* shipped one needs a matching SPACE: count it in 4096-byte blocks.
 //*
 //ALLOC    EXEC PGM=IEFBR14
-//WEBROOT  DD  DSN=HTTPD.@VRM@.WEBROOT.UFS,DISP=(NEW,CATLG),
+//WEBROOT  DD  DSN=HTTPD.WEBROOT.UFS,DISP=(NEW,CATLG),
 //             UNIT=SYSDA,SPACE=(4096,256),
 //             DCB=(DSORG=PS,RECFM=U,BLKSIZE=4096)
 //

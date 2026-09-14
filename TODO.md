@@ -35,17 +35,35 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
 | 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
 | — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
-| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **a decision**, and it is not a 4.0.x one — see below |
+| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **nothing** — implemented on `issue-259-drop-vrm-qualifier`, pending the THTP410 check |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**#259 is parked deliberately, and the reason is structural.** `lklib`, `target`
-and `distlib` go into the FMID's JCLIN, so the names are a one-shot choice per
-functional level: `THTP400` already carries `HTTPD.@VRM@.*` from 4.0.0, and
-changing them is a new functional level, not a patch. It was considered before
-cutting 4.0.2 and deferred rather than overlooked — it belongs with the next
-minor, where a fresh FMID has to be spent anyway. The request itself is
-reasonable; nothing about it is settled by leaving it here.
+**#259 is no longer parked: it is the 4.1.0 cut, and `main` is now 4.1.0-dev.**
+It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,
+so the names are a one-shot choice per functional level — changing them is a new
+level, not a patch. Nothing but docs had landed since v4.0.2, so no 4.0.3 was
+owed and the cut cost nothing to take now; it would only have got more expensive
+once a code fix landed. `THTP400` → `THTP410`, `HTTPD.@VRM@.*` → `HTTPD.*`,
+following ftpd#121 which made the same change at `TFTP110`.
+
+**What that inverts, and why it is the interesting part rather than a rename.**
+One set of names means one installation that cannot drift from its inventory —
+but the libraries now collide, so an upgrade is a clean cut instead of an
+install beside the old one. Three consequences the guide had to be rewritten
+for: stopping the server is no longer optional (the APPLY writes into the
+library the running one loads from); section 12 runs *before* section 3 on an
+upgrade; and scratching `HTTPD.LINKLIB` now takes any other product's module
+copied in beside ours — `MVSMF` on mvsdev — which under versioned names could
+not happen. The webroot keeps a name of its own kind and is never scratched.
+
+**`THTP410` is verified free, on one stand.** `LIST CDS/ACDS SYSMOD(THTP410)`
+answered RC 04 `NOT FOUND` in both zones on mvsdev (FMIDCHK `JOB00288`,
+2026-09-14). It was **not** run on drnmig3a, where `THTP400` and `TFTP110` both
+were — run it there before the 4.1.0 tag, not before the merge. The same job
+found `THTP400` `REC APP ACC` on mvsdev with all five modules, so that stand is
+a live 4.0.x installation and the first real test of the section 12 upgrade
+path.
 
 **That sentence used to read "nothing open is a code bug." It no longer does.**
 #263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error

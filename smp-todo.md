@@ -11,6 +11,15 @@ Dieses Dokument hält nur noch das, was **für httpd offen** ist.
 
 > *Stand: 2026-08-24, gegen `[distribution]` in `project.toml` abgeglichen.*
 
+> **Seit 4.1.0 (#259) tragen die Datasetnamen keine Version mehr:**
+> `HTTPD.LINKLIB` statt `HTTPD.@VRM@.LINKLIB`, und die FMID ist `THTP410`.
+> Alles unten Gemessene stammt vom 4.0.0-dev-Paket und ist gegen das
+> **versionierte** Schema gemessen — die Messungen bleiben stehen wie sie sind,
+> die Namen darin sind historisch. Der Mechanismus (SMP kopiert statt zu binden,
+> DDNAME = letzter Qualifier, `@LINKLIB@`-Ersetzung) gilt unverändert; nur die
+> `@VRM@`-Ersetzung entfällt für die drei Bibliotheken und die Webroot-Platte.
+> Maßgeblich ist `docs/installation.md`.
+
 > **Die frühere Fassung verwies auf `../SMP-COOKBOOK.md` und
 > `../SMP-INSTALLATION.md`. Beide Dateien gibt es nicht mehr.** Der Spike liegt
 > noch in [`../smptest`](../smptest) — er hat 2026-08-08 gezeigt, dass SMP das

@@ -1,6 +1,6 @@
 [project]
 name = "httpd"
-version = "4.0.3-dev"
+version = "4.1.0-dev"
 type = "application"
 
 [toolchain]
@@ -301,9 +301,9 @@ headers = [
 # Turns `make package` into an installable product, on the two transports ufsd
 # and ftpd ship with, plus a third one they have no need for:
 #
-#   load modules -> XMIT -> staging HTTPLOAD -> SMP ++MOD -> HTTPD.<vrm>.LINKLIB
-#   samplib/     -> XMIT -> TSO RECEIVE                   -> HTTPD.<vrm>.SAMPLIB
-#   static/      -> UFS370 image -> IND$FILE              -> HTTPD.<vrm>.WEBROOT.UFS
+#   load modules -> XMIT -> staging HTTPLOAD -> SMP ++MOD -> HTTPD.LINKLIB
+#   samplib/     -> XMIT -> TSO RECEIVE                   -> HTTPD.SAMPLIB
+#   static/      -> UFS370 image -> IND$FILE              -> HTTPD.WEBROOT.UFS
 #
 # The webroot disk (issue #252) rides neither of the first two, and not because
 # of a gap in the tooling: SMP has no element type for a DSORG=PS/RECFM=U image
@@ -319,12 +319,15 @@ headers = [
 # entry point exactly as ld370 set them.  The sample library stays outside SMP:
 # an MCS card ends at column 72 and HTTPPRM0 has comment lines reaching column
 # 80, so routing the configuration pattern through the SYSMOD would make it
-# answer to a delivery mechanism.  The datasets are versioned, so every release
-# brings a fresh SAMPLIB anyway -- there is no in-place update for SMP to
-# manage.
+# answer to a delivery mechanism.  Since #259 the names carry no version, so a
+# RECEIVE into an existing HTTPD.SAMPLIB would be refused -- which is why the
+# generated install job opens with a DELOLD step (IDCAMS) that scratches the two
+# RECEIVE targets, HTTPD.HTTPLOAD and HTTPD.SAMPLIB, before RECV1 runs.  The
+# operator does not scratch those by hand; section 12 covers LINKLIB and
+# AHTTPLOD only.  There is still no in-place update for SMP to manage.
 #
 # samplib/httpd carries @LINKLIB@ in its STEPLIB, which mbtdist replaces with
-# the versioned target while staging -- the same placeholder ufsd's and ftpd's
+# the configured target while staging -- the same placeholder ufsd's and ftpd's
 # procs use, and the reason the shipped proc points at the library SMP actually
 # installed into rather than at a name fixed when the file was written.  Do not
 # mention a placeholder in a nearby comment: the substitution runs over the
@@ -334,22 +337,38 @@ headers = [
 # Every value is a dataset name; the ddname SMP addresses it by is always the
 # last qualifier, so LINKLIB, SAMPLIB, HTTPLOAD and AHTTPLOD fall out of the
 # names.  The webroot is the one name with a fourth qualifier
-# (HTTPD.@VRM@.WEBROOT.UFS) and it is deliberate: no ddname is derived from it
+# (HTTPD.WEBROOT.UFS) and it is deliberate: no ddname is derived from it
 # because nothing here allocates or receives it, and .UFS says at a glance that
 # the dataset is a filesystem image rather than a library.  Do not normalise it
-# into the three-qualifier pattern -- it is not part of that scheme.  @VRM@ is
-# derived from the FULL version at package time and carries the patch level:
-# 4.0.1 packaged HTTPD.V4R0M1.*, 4.0.2 packages HTTPD.V4R0M2.* (V4R0M2D while
-# the version still carries -dev).  The FMID does not move with it -- THTP400
-# names all of 4.0.x -- so a patch release collides with its predecessor in the
-# SMP inventory while its libraries sit beside them, untouched.  Saying "V4R0M0
-# at package time" here was wrong for every release after 4.0.0, and the same
-# sentence in the uninstall guide is what scratched the wrong libraries in ftpd.
+# into the three-qualifier pattern -- it is not part of that scheme.
+#
+# THE NAMES CARRY NO VERSION (#259), and that inverts how an upgrade works.
+# They used to expand @VRM@ to the *patch* level -- HTTPD.V4R0M2.LINKLIB for
+# 4.0.2 -- while the FMID moved per minor, so two releases never collided on
+# their libraries, only on the FMID.  That is why a patch install needed UCLIN
+# to free the id, and why "V4R0M0 at package time" was wrong for every release
+# after 4.0.0: the same sentence in ftpd's uninstall guide is what scratched
+# libraries nobody was using while the live installation stood untouched, with
+# SMP reporting accepted throughout.
+#
+# With one set of names there is one installation, and the two can no longer
+# drift apart.  The cost is that the libraries now DO collide: the alloc job is
+# IEFBR14 with DISP=(NEW,CATLG,DELETE) and will not run twice, so an upgrade is
+# a clean cut -- UCLIN the old FMID out, scratch the libraries, allocate,
+# install.  In exchange the DELETE step means what it says, and nobody has to
+# work out which release a dataset name belongs to.  The webroot is NOT in that
+# scratch list: it holds site content, an operator updates it in place, and
+# step 9 of the guide is skipped on an upgrade rather than re-run.
+#
+# Stop the started task before replacing the load library.  It is the one HTTPD
+# loads from.
+#
 # ufsd/ftpd spell these <product>LOAD / A<product>LOD, which for
 # a five-letter product would be nine characters; HTTPLOAD/AHTTPLOD keeps the
 # suffix and drops the letter, rather than keeping HTTPD and truncating the
 # suffix (HTTPDLOD/AHTTPDLD).  Both names go into the FMID's JCLIN, so this is a
-# one-shot choice -- changing it later is a new functional level.
+# one-shot choice -- changing it later is a new functional level, which is
+# exactly why #259 waited for THTP410 rather than riding a 4.0.x patch.
 #
 # All five [[module]] entries ship, ABEND0C1 included: mbtdist packages every
 # module and offers no exclude.  Deliberate rather than overlooked -- since
@@ -381,21 +400,42 @@ extra = ["build/webroot/httpd-webroot.img"]
 [distribution.smp]
 # One FMID per minor release, spent exactly once: it names a functional level,
 # and a changed one is a new level.  Patches on top of it ship as PTFs.  4.0.x
-# is THTP400; a later 4.1.0 becomes THTP410 and is installed as a clean cut
-# (RESTORE + REJECT the old, then receive the new).  The T stays clear of the
-# E??nnnn namespace MVS 3.8j's own function SYSMODs occupy (EBB1102 is 3.8j
-# itself, alongside EAS1102, EBT1102, EDE1102, ...).
+# was THTP400; 4.1.x is THTP410, installed as a clean cut.  Since #259 the
+# libraries are shared rather than versioned, so that cut is required and not
+# merely tidy.  The T stays clear of the E??nnnn namespace MVS 3.8j's own
+# function SYSMODs occupy (EBB1102 is 3.8j itself, alongside EAS1102, EBT1102,
+# EDE1102, ...).
 #
-# Verified free the way TFTP100 and TUFS120 were, on both stands, 2026-08-24:
-# LIST CDS SYSMOD(THTP400) and LIST ACDS SYSMOD(THTP400) each answered RC 04
-# with "THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND" -- mvsdev (MVS/CE,
-# JOB01948) and drnmig3a (TK5, JOB00028), both HMASMP LVL 04.48.  That is the
-# check that counts: the SMPPTS scan done earlier shows only what was
-# *received*, while the CDS and ACDS store hashed member names, so a LIST
-# against both zones is the only way to see what is applied or accepted.
+# THE CUT IS NOT RESTORE + REJECT.  Both are refused once the FMID has been
+# accepted, and the shipped install job accepts in the same run as the APPLY.
+# The replacement is the UCLIN job in section 12 of the installation guide,
+# which deletes the *element* entries -- DEL MOD() and DEL LMOD() -- and not
+# only the SYSMOD: in SMP4 an element belongs to the FMID that installed it,
+# and THTP410 does not replace an element THTP400 owns.  Skip that and every
+# step reports RC 00 while the target library stays empty (#266, measured on
+# ftpd as JOB00269).  Verify an install by LISTing the target library's
+# members, never by the condition codes.
+#
+# Verified free the way TFTP110 and TUFS120 were, on 2026-09-14: LIST CDS
+# SYSMOD(THTP410) and LIST ACDS SYSMOD(THTP410) each answered RC 04 with "THE
+# FOLLOWING SELECTED ENTRIES WERE NOT FOUND" -- mvsdev (MVS/CE, FMIDCHK
+# JOB00288, HMASMP LVL 04.48).  That is the check that counts: the SMPPTS scan
+# shows only what was *received*, while the CDS and ACDS store hashed member
+# names, so a LIST against both zones is the only way to see what is applied or
+# accepted.
+# ** ONE STAND ONLY.**  THTP400 and TFTP110 were each checked on mvsdev AND
+# drnmig3a (TK5); this one was not run on drnmig3a.  An id present there and
+# absent here would not have been caught -- run it before the 4.1.0 tag.
+# The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
+# five modules: 4.0.x is installed there, so that stand is the upgrade case the
+# installation guide's section 12 describes.  THTP400 is spent either way and
+# must never be reused.
 # A test install must still use a throwaway id -- a half-applied FMID would
-# occupy this one, and smp-todo.md reserves TTST400 for exactly that.
-fmid = "THTP400"
+# occupy this one.  TTST400 is NOT available for it: smp-todo.md O2 records it
+# spent on the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and
+# a spent id is never reused.  Pick a fresh one, the way ftpd used TTMP110 and
+# TTMP111 for its two 1.1.0 runs.
+fmid = "THTP410"
 system = "Z038"
 
 # Empty despite the [dependencies] entry on ufsd, which is a *build* time one:
@@ -410,13 +450,13 @@ system = "Z038"
 prereq = []
 
 accept_fmid = true              # accept the FMID once so a PTF can be RESTOREd
-lklib = "HTTPD.@VRM@.HTTPLOAD"  # staging: what the load XMIT is received into
-target = "HTTPD.@VRM@.LINKLIB"  # where the load modules end up
-distlib = "HTTPD.@VRM@.AHTTPLOD"
+lklib = "HTTPD.HTTPLOAD"        # staging: what the load XMIT is received into
+target = "HTTPD.LINKLIB"        # where the load modules end up
+distlib = "HTTPD.AHTTPLOD"
 
 [[distribution.library]]
 dir = "samplib"
-target = "HTTPD.@VRM@.SAMPLIB"
+target = "HTTPD.SAMPLIB"
 
 # -- Release ------------------------------------------------------
 [release]
