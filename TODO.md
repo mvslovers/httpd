@@ -11,10 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-14 after the mbt bump to
-`1c4ac5b`, twelve issues open — #269 filed out of the ecosystem-wide FMID
-policy change, #266 out of the ftpd 1.1.0 test install and #265 out of the
-libc370 v1.0.6 release; #264, #263 and #262 filed
+*Last reconciled against the tracker: 2026-09-14 after PR #267 merged, ten
+issues open — #266 filed out of the ftpd 1.1.0 test install and #265 out of the
+libc370 v1.0.6 release; #259 and #269 closed by #267; #264, #263 and #262 filed
 out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
 #176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
 relink 4.0.2 delivers. Before them: #256 filed and fixed by PR #257 on
@@ -35,13 +34,12 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
 | 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
-| — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
-| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **review** — PR #267, together with #269 |
-| — | #269 | the per-release FMID policy — `THTP410` deletes `THTP400` | **review** — PR #267; both its blockers are resolved there |
+| — | #266 | packaging; only its `IEHLIST` item is left | **the 4.1.0 tag** — see below |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
+| — | — | **two gates on the 4.1.0 tag, not issues yet** | see *Before the tag* |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**#259 is no longer parked: it is the 4.1.0 cut, and `main` is now 4.1.0-dev.**
+**#259 and #269 landed together as PR #267 — `main` is 4.1.0-dev.**
 It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,
 so the names are a one-shot choice per functional level — changing them is a new
 level, not a patch. Nothing but docs had landed since v4.0.2, so no 4.0.3 was
@@ -103,7 +101,7 @@ is the next thing worth doing, because it is read-only, costs minutes, and
 #198's second step cannot be estimated until it is answered. #176 stays last for
 the reason it always did, not because it is small.
 
-**Three of the twelve came out of the 4.0.2 work, and none of them is a
+**Three of the ten came out of the 4.0.2 work, and none of them is a
 regression.** #263 has behaved this way since 4.0.0; #262 reproduces on
 unmodified `main`; #264 is the write side of the libc370 change #260 fixed the
 read side of. They are visible now because the relink made that whole class of
@@ -122,6 +120,20 @@ get wrong. What survives of #266 is its item 3 — end the install instructions
 with an `IEHLIST LISTPDS` of the target library, because condition codes cannot
 tell a real install from a silent one. That is still worth doing and is all
 #266 should stay open for.
+
+### Before the tag
+
+Two things must happen before `v4.1.0`, and neither has an issue:
+
+1. **`THTP410` free on drnmig3a.** Checked only on mvsdev (`FMIDCHK JOB00288`).
+   `THTP400` and `TFTP110` were each checked on both stands.
+2. **The 4.0.x → 4.1.0 upgrade, run for real.** Section 12a of the installation
+   guide is written from ufsd's measurement of the same crossing, not from one
+   of ours. drnmig3a is the right stand for it *because* it is clean: install
+   4.0.2 there first, then upgrade across the rename, and mvsdev's live server
+   is never at risk. A test install needs throwaway module names as well as a
+   throwaway id — with a throwaway id alone the run measures the ownership wall
+   instead of the thing under test.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
