@@ -38,7 +38,15 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**#259 and #269 landed together as PR #267 — `main` is 4.1.0-dev.**
+**v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
+file changed since 4.0.2 — the release is the libc370 1.0.6 relink plus the
+packaging change: `HTTPD.LINKLIB` without a version qualifier, `THTP410`
+deleting `THTP400`, and an upgrade that needs no `UCLIN`. `main` is now
+4.1.1-dev and already carries `THTP411` / `delete = ["THTP410"]`; that id is
+verified free on mvsdev only (`FMIDCHK JOB00343`) and still needs drnmig3a
+before 4.1.1 is tagged.
+
+**#259 and #269 landed together as PR #267.**
 It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,
 so the names are a one-shot choice per functional level — changing them is a new
 level, not a patch. Nothing but docs had landed since v4.0.2, so no 4.0.3 was
@@ -131,7 +139,7 @@ The open question is the shape of the fix, not where it goes — report once by
 WTO and disable tracing deliberately, or simply stop `dbgs()`/`dbgf()` and the
 rest from returning a decorative `int rc = 0` that no write ever touches.
 
-### Right after the tag
+### Right after the tag — done for 4.1.0, do it again next time
 
 **Move `fmid` and `delete` in the commit that follows the version bump.**
 `make release` bumps `VERSION` and stops, so the tree comes out of v4.1.0 at
