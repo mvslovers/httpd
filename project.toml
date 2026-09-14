@@ -13,7 +13,7 @@ type = "application"
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
-libc370 = "1.0.4"
+libc370 = "1.0.6"
 
 [build]
 # The build stamp behind HTTPD000I/001I/006W is not injected here: mbt

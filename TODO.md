@@ -11,11 +11,13 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-06 after v4.0.2 shipped, nine
-issues open — #264, #263 and #262 filed out of the 4.0.2 work itself, #259 filed
-by a user, and #258, #254, #250, #198, #176 carried over. #260 was filed and
-closed on 2026-09-05 by PR #261, the relink 4.0.2 delivers. Before them: #256
-filed and fixed by PR #257 on 2026-08-25, #252 filed and closed 2026-08-24 by
+*Last reconciled against the tracker: 2026-09-14 after the libc370 1.0.6
+toolchain bump, eleven issues open — #266 filed out of the ftpd 1.1.0 test
+install and #265 out of the libc370 v1.0.6 release; #264, #263 and #262 filed
+out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
+#176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
+relink 4.0.2 delivers. Before them: #256 filed and fixed by PR #257 on
+2026-08-25, #252 filed and closed 2026-08-24 by
 PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 #243 by PR #247.*
 
@@ -30,7 +32,9 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
-| — | #264 | `blocked:libc370` — a dead `HTTPDBG` is silent since 1.0.4 | **libc370#149**, the fail-fast decision |
+| 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
+| 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
+| — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
 | — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **a decision**, and it is not a 4.0.x one — see below |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
@@ -63,11 +67,21 @@ is the next thing worth doing, because it is read-only, costs minutes, and
 #198's second step cannot be estimated until it is answered. #176 stays last for
 the reason it always did, not because it is small.
 
-**Three of the nine came out of the 4.0.2 work, and none of them is a
+**Three of the eleven came out of the 4.0.2 work, and none of them is a
 regression.** #263 has behaved this way since 4.0.0; #262 reproduces on
 unmodified `main`; #264 is the write side of the libc370 change #260 fixed the
 read side of. They are visible now because the relink made that whole class of
 failure worth looking at, not because the relink caused them.
+
+**#265 and #264 are one pass through the write side, which is why they rank
+together.** libc370#149 shipped in v1.0.6, so #264 is not blocked upstream any
+more; the `[toolchain]` pin is bumped and the tree rebuilds clean, so what is
+left of #265 is the audit. Appended at the tail rather than ranked against the
+existing five — #264 is `priority:low`. See #265.
+
+**#266 lands on the 4.1.0 cut, not before.** It costs nothing until `THTP400`
+becomes `THTP410` and is unskippable then. Root `CLAUDE.md` §*SMP4 FMIDs* has
+the mechanism.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
