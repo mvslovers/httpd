@@ -455,14 +455,13 @@ extra = ["build/webroot/httpd-webroot.img"]
 # drnmig3a (TK5); this one was not run on drnmig3a.  An id present there and
 # absent here would not have been caught -- run it before the 4.1.0 tag.
 # The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
-# five modules: 4.0.x is installed there, so that stand is where the 4.0.x ->
-# 4.1.0 hop can actually be measured.  NOTE that hop is the UNMEASURED one:
-# mbt#98 proved DELETE with predecessor and successor in the SAME library
-# (JOB00296/97), which is 4.1.0 -> 4.1.1.  Here the names change too, so SMP is
-# asked to delete THTP400's LMODs through a LINKLIB DD that now points at a
-# fresh, empty HTTPD.LINKLIB while the old modules sit in HTTPD.V4R0M2.LINKLIB,
-# which nothing in the new job references.  Whether SMP tolerates the physical
-# delete finding no member is not known -- test it before the 4.1.0 tag.  THTP400 is spent either way and must never be reused;
+# five modules: 4.0.x is installed there, so that stand is the 4.0.x -> 4.1.0
+# hop.  DELETE DOES NOT CARRY THAT HOP, and the guide's section 12a is why:
+# DELETE(THTP400) is pointed at HTTPD.LINKLIB and THTP400's modules are not in
+# that library, so the FMID is freed by hand once and the old datasets are
+# scratched last.  ufsd measured the same crossing at TUFS130 (ufsd#75).  From
+# THTP411 on, DELETE is the whole upgrade story -- both sides share the names
+# by then, which is the case mbt#98 measured (JOB00296/97).  THTP400 is spent either way and must never be reused;
 # after this release it is a tombstone (TYPE = FUNCTION / DELBY = THTP410),
 # which LIST reports at RC 00 -- so the "RC 04 + empty list = free" rule reads
 # it as occupied, which is correct.

@@ -77,8 +77,11 @@ answered RC 04 `NOT FOUND` in both zones on mvsdev (FMIDCHK `JOB00288`,
 were — run it there before the 4.1.0 tag, not before the merge. The same job
 found `THTP400` `REC APP ACC` on mvsdev with all five modules, so that stand is
 a live 4.0.x installation and the first real test of the `DELETE` upgrade path.
-Nothing on this branch has been installed on MVS — the `DELETE` mechanics are
-measured, but in mbt's own runs, not against `THTP410`.
+Nothing on this branch has been installed on MVS. The `DELETE` mechanics are
+measured — in mbt's runs (`JOB00296`/`97`) and by ufsd at `TUFS130` — but not
+against `THTP410`. What ufsd's run settled is that `DELETE` does *not* carry
+the hop across the rename, which is why the guide grew a section 12a: freeing
+the FMID by hand once, and scratching the old datasets last rather than first.
 
 **That sentence used to read "nothing open is a code bug." It no longer does.**
 #263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error
