@@ -297,6 +297,26 @@ headers = [
 	"include/types.h",
 ]
 
+# -- Deploy (development, does not touch the SMP installation) -----
+# Without this, mbtdeploy derives the target from the version --
+# HTTPD.V4R0M2D.LINKLIB and so on -- so the name moved with every release and
+# a stale one was left behind each time.  A fixed name keeps the development
+# library in one place.
+#
+# THE POINT OF NAMING IT IS TO KEEP IT AWAY FROM HTTPD.LINKLIB.  `make deploy`
+# DELETES its target before receiving into it (RECEIVE refuses to merge), so a
+# started task whose STEPLIB names the deploy target loses its load library
+# mid-deploy.  HTTPD.LINKLIB is what SMP installs into and what the shipped
+# procedure points at; this one is for `make deploy` alone, and the two must
+# never be the same string.
+#
+# Deploying does not activate anything.  To run a development build, point a
+# STEPLIB at HTTPD.DEV.LINKLIB deliberately -- a second instance on another
+# port is the usual way, since HTTPD refuses a second listener on a port that
+# is already served (HTTPD037E) and the production STC keeps running.
+[deploy]
+target = "HTTPD.DEV.LINKLIB"
+
 # -- Distribution (SMP4 install package) --------------------------
 # Turns `make package` into an installable product, on the two transports ufsd
 # and ftpd ship with, plus a third one they have no need for:
