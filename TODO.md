@@ -125,15 +125,26 @@ tell a real install from a silent one. That is still worth doing and is all
 
 Two things must happen before `v4.1.0`, and neither has an issue:
 
-1. **`THTP410` free on drnmig3a.** Checked only on mvsdev (`FMIDCHK JOB00288`).
-   `THTP400` and `TFTP110` were each checked on both stands.
+1. ~~`THTP410` free on drnmig3a.~~ **Done 2026-09-14**, `FMIDCHK JOB00034`:
+   RC 04, `NOT FOUND` in both zones. `THTP400` is free there too, so no httpd
+   is installed on that stand.
 2. **The 4.0.x → 4.1.0 upgrade, run for real.** Section 12a of the installation
    guide is written from ufsd's measurement of the same crossing, not from one
    of ours. drnmig3a is the right stand for it *because* it is clean: install
    4.0.2 there first, then upgrade across the rename, and mvsdev's live server
-   is never at risk. A test install needs throwaway module names as well as a
-   throwaway id — with a throwaway id alone the run measures the ownership wall
-   instead of the thing under test.
+   is never at risk.
+
+   **This test is the documented exception to "throwaway module names".** Root
+   `CLAUDE.md` requires them so a test install measures its own subject rather
+   than the element-ownership wall — but here the wall *is* the subject:
+   `THTP400` has to genuinely own `MOD(HTTPD)` for the crossing to mean
+   anything. So real module names, real dataset names, and a throwaway id on
+   the 4.1.0 side only.
+
+   Worth running **both ways**: what ufsd settled is that the UCLIN-first path
+   works, not what happens without it. Whether skipping it fails loud, fails
+   silent, or quietly succeeds decides whether 12a's step 2 is a hard
+   requirement or belt-and-braces, and nothing on record answers it.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
