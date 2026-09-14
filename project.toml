@@ -352,13 +352,15 @@ headers = [
 # SMP reporting accepted throughout.
 #
 # With one set of names there is one installation, and the two can no longer
-# drift apart.  The cost is that the libraries now DO collide: the alloc job is
-# IEFBR14 with DISP=(NEW,CATLG,DELETE) and will not run twice, so an upgrade is
-# a clean cut -- UCLIN the old FMID out, scratch the libraries, allocate,
-# install.  In exchange the DELETE step means what it says, and nobody has to
-# work out which release a dataset name belongs to.  The webroot is NOT in that
-# scratch list: it holds site content, an operator updates it in place, and
-# step 9 of the guide is skipped on an upgrade rather than re-run.
+# drift apart.  Nor is there anything to uninstall first: ++VER DELETE (below)
+# replaces the modules in place during the APPLY, so an upgrade from 4.1.0
+# onward SKIPS the allocation step -- the libraries are already there and
+# already hold the predecessor, which is what the APPLY expects to find.  Only
+# the 4.0.x -> 4.1.0 hop allocates, because that is the one where the names
+# change; it leaves the old HTTPD.V4R0M*.* libraries orphaned for the operator
+# to scratch.  The webroot is never touched either way: it holds site content,
+# an operator updates it in place, and step 9 of the guide is skipped on an
+# upgrade rather than re-run.
 #
 # Stop the started task before replacing the load library.  It is the one HTTPD
 # loads from.
@@ -398,23 +400,49 @@ readme = "docs/installation.md"
 extra = ["build/webroot/httpd-webroot.img"]
 
 [distribution.smp]
-# One FMID per minor release, spent exactly once: it names a functional level,
-# and a changed one is a new level.  Patches on top of it ship as PTFs.  4.0.x
-# was THTP400; 4.1.x is THTP410, installed as a clean cut.  Since #259 the
-# libraries are shared rather than versioned, so that cut is required and not
-# merely tidy.  The T stays clear of the E??nnnn namespace MVS 3.8j's own
-# function SYSMODs occupy (EBB1102 is 3.8j itself, alongside EAS1102, EBT1102,
-# EDE1102, ...).
+# ONE FMID PER RELEASE, spent exactly once: T + three product letters + the
+# three version digits.  httpd 4.1.0 is THTP410, 4.1.1 would be THTP411.  There
+# is no room in a 7-character id for a second digit, so NO VERSION COMPONENT MAY
+# EVER EXCEED 9 -- at patch 9 cut the next minor, at minor 9 the next major;
+# 4.1.10 cannot be expressed and must not be released.  Service SYSMODs (U...)
+# stay reserved and unused: mbt emits ++FUNCTION only and there is no `make
+# ptf`, so a patch is a new function level rather than a PTF on an old one.
+# The T stays clear of the E??nnnn namespace MVS 3.8j's own function SYSMODs
+# occupy (EBB1102 is 3.8j itself, alongside EAS1102, EBT1102, EDE1102, ...).
 #
-# THE CUT IS NOT RESTORE + REJECT.  Both are refused once the FMID has been
-# accepted, and the shipped install job accepts in the same run as the APPLY.
-# The replacement is the UCLIN job in section 12 of the installation guide,
-# which deletes the *element* entries -- DEL MOD() and DEL LMOD() -- and not
-# only the SYSMOD: in SMP4 an element belongs to the FMID that installed it,
-# and THTP410 does not replace an element THTP400 owns.  Skip that and every
-# step reports RC 00 while the target library stays empty (#266, measured on
-# ftpd as JOB00269).  Verify an install by LISTing the target library's
-# members, never by the condition codes.
+# EACH RELEASE DELETES ITS PREDECESSOR, and without that it cannot install at
+# all.  SMP keys element ownership on MOD(name) in the CDS, NOT on the library
+# the element lives in, so a SYSMOD that does not own MOD(HTTPD) may not install
+# it: the element summary prints "MOD HTTPD NOT SEL", nothing is copied, and
+# every condition code still reads success -- RECEIVE/APPLY CHECK/APPLY/ACCEPT
+# all RC 00, HMA2270 SUCCESSFULLY COMPLETED, REC APP ACC in both zones, empty
+# target library.  Measured on mvsdev 2026-09-14 (mbt#98, JOB00291) with a
+# FRESH, FREE fmid installing into a dataset unrelated to any other install:
+# it still lost to the owner of the module name.  So versioning the datasets
+# never bought a clean cut -- the collision was never on the dataset.
+#
+# `delete` below puts DELETE(THTP400) on the ++VER.  SMP then deletes the
+# predecessor's LMODs from the target (HMA2240) and copies the new ones in
+# (HMA2380), and MOD(HTTPD) comes back carrying the new FMID and RMID --
+# ownership transfers.  Each zone is deleted by its own pass: APPLY the CDS,
+# ACCEPT the ACDS, and skipping the ACCEPT leaves the old id alive as
+# REC APP ACC RGN in the ACDS.
+#
+# THIS REPLACES THE UCLIN UPGRADE STEP.  Section 12 of the installation guide
+# keeps its UCLIN job, but only for what it is actually for: removing HTTPD,
+# and cleaning up a test install.  An upgrade no longer runs it.
+#
+# One side effect, and mbt handles it: a deleted id has no SMPSCDS backup entry
+# and never will, so the APPLY ends RC 04 on HMA2461 ... NOT FOUND ON SMPSCDS
+# LIBRARY *after* reporting HMA2270 success.  A strict COND=(0,NE,APPLY.HMASMP)
+# would skip the ACCEPT without a word, so accept_cond() relaxes the gate to
+# (4,LT,...) whenever a DELETE is present and leaves it strict otherwise.  The
+# generated job shows (4,LT,APPLY.HMASMP); if it ever shows (0,NE,...) with a
+# delete set, the ACCEPT is silently skippable.
+#
+# Verify an install by LISTing the target library's members, never by the
+# condition codes.  HMA2380 COPY SUCCESSFUL is the message that separates a real
+# install from the silent one.
 #
 # Verified free the way TFTP110 and TUFS120 were, on 2026-09-14: LIST CDS
 # SYSMOD(THTP410) and LIST ACDS SYSMOD(THTP410) each answered RC 04 with "THE
@@ -427,15 +455,20 @@ extra = ["build/webroot/httpd-webroot.img"]
 # drnmig3a (TK5); this one was not run on drnmig3a.  An id present there and
 # absent here would not have been caught -- run it before the 4.1.0 tag.
 # The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
-# five modules: 4.0.x is installed there, so that stand is the upgrade case the
-# installation guide's section 12 describes.  THTP400 is spent either way and
-# must never be reused.
-# A test install must still use a throwaway id -- a half-applied FMID would
-# occupy this one.  TTST400 is NOT available for it: smp-todo.md O2 records it
-# spent on the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and
-# a spent id is never reused.  Pick a fresh one, the way ftpd used TTMP110 and
-# TTMP111 for its two 1.1.0 runs.
+# five modules: 4.0.x is installed there, so that stand is the live upgrade case
+# for the DELETE above.  THTP400 is spent either way and must never be reused;
+# after this release it is a tombstone (TYPE = FUNCTION / DELBY = THTP410),
+# which LIST reports at RC 00 -- so the "RC 04 + empty list = free" rule reads
+# it as occupied, which is correct.
+# A test install needs THROWAWAY MODULE NAMES AS WELL AS a throwaway id.  With
+# a throwaway id alone the run measures the ownership wall above -- MOD(HTTPD)
+# belongs to whoever installed it -- instead of whatever it meant to measure.
+# TTST400 is not available as that id either: smp-todo.md O2 records it spent on
+# the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and a spent
+# id is never reused.  TTST001-TTST004 went to the ++VER DELETE measurement.
+# Pick a fresh one, the way ftpd used TTMP110 and TTMP111 for its 1.1.0 runs.
 fmid = "THTP410"
+delete = ["THTP400"]            # the level this one replaces -- see above
 system = "Z038"
 
 # Empty despite the [dependencies] entry on ufsd, which is a *build* time one:

@@ -48,22 +48,35 @@ once a code fix landed. `THTP400` → `THTP410`, `HTTPD.@VRM@.*` → `HTTPD.*`,
 following ftpd#121 which made the same change at `TFTP110`.
 
 **What that inverts, and why it is the interesting part rather than a rename.**
-One set of names means one installation that cannot drift from its inventory —
-but the libraries now collide, so an upgrade is a clean cut instead of an
-install beside the old one. Three consequences the guide had to be rewritten
-for: stopping the server is no longer optional (the APPLY writes into the
-library the running one loads from); section 12 runs *before* section 3 on an
-upgrade; and scratching `HTTPD.LINKLIB` now takes any other product's module
-copied in beside ours — `MVSMF` on mvsdev — which under versioned names could
-not happen. The webroot keeps a name of its own kind and is never scratched.
+One set of names means one installation that cannot drift from its inventory.
+The upgrade mechanics came out of mbt#98, bumped onto this branch: the SYSMOD
+carries `DELETE(THTP400)`, so SMP deletes the old modules from the target and
+copies the new ones in during the same APPLY, and module ownership transfers.
+That settles what #266 described — **and it shows that versioning the datasets
+never bought a clean cut in the first place**, because SMP keys ownership on
+`MOD(name)` in the CDS and not on the library the element lives in (mbt#98
+measured a fresh, free FMID losing to the module-name owner while installing
+into an unrelated dataset, `JOB00291`).
+
+So the guide rewrite is smaller than it first looked, and different: there is
+nothing to uninstall before an upgrade, section 12 is for *removal* only, and
+an upgrade from 4.1.0 onward **skips the allocation step** because the
+libraries are already there holding the predecessor. What does still bind:
+stopping the server is no longer optional (the APPLY rewrites the library the
+running one loads from), the APPLY legitimately ends RC 04 on an upgrade
+(`HMA2461`, no SMPSCDS backup for a deleted level — the ACCEPT gate is relaxed
+to `(4,LT,…)` for it), and scratching `HTTPD.LINKLIB` during a *removal* takes
+any other product's module copied in beside ours — `MVSMF` on mvsdev. The
+webroot keeps a name of its own kind and is never scratched.
 
 **`THTP410` is verified free, on one stand.** `LIST CDS/ACDS SYSMOD(THTP410)`
 answered RC 04 `NOT FOUND` in both zones on mvsdev (FMIDCHK `JOB00288`,
 2026-09-14). It was **not** run on drnmig3a, where `THTP400` and `TFTP110` both
 were — run it there before the 4.1.0 tag, not before the merge. The same job
 found `THTP400` `REC APP ACC` on mvsdev with all five modules, so that stand is
-a live 4.0.x installation and the first real test of the section 12 upgrade
-path.
+a live 4.0.x installation and the first real test of the `DELETE` upgrade path.
+Nothing on this branch has been installed on MVS — the `DELETE` mechanics are
+measured, but in mbt's own runs, not against `THTP410`.
 
 **That sentence used to read "nothing open is a code bug." It no longer does.**
 #263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error

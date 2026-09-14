@@ -38,14 +38,25 @@ which release a name belongs to. Up to and including 4.0.2 they were versioned
 — `HTTPD.V4R0M2.LINKLIB` — and two releases could sit side by side; 4.1.0 ends
 that.
 
-What it costs you is that an upgrade is a **clean cut** rather than an install
-beside the old one: the allocate in step 4 is `DISP=(NEW,CATLG,DELETE)` and will
-not run twice, so section 12 comes first. If you are upgrading from 4.0.x, read
-**section 12 before section 3** — and note that its `DELETE` step now names the
-datasets you are actually using, which under the old scheme it did not.
+**Upgrading? The install job handles it — there is nothing to uninstall first.**
+Each release's SYSMOD carries `DELETE(<the previous FMID>)`, so SMP deletes the
+old modules from the target library and copies the new ones in during the same
+APPLY, and ownership of each module moves with them. 4.1.0 deletes `THTP400`.
+Section 12 is for **removing** HTTPD, not for upgrading it; earlier drafts of
+this guide sent you there first and that is no longer right.
 
-The webroot disk is the exception and is never scratched: it holds your content,
-not ours. See step 9.
+Two things an upgrade still needs from you, both in their own steps:
+
+- **Stop the server** (step 5). The APPLY writes into `HTTPD.LINKLIB`, which is
+  the library a running HTTPD has its modules loaded from.
+- **Skip step 4** if the datasets already exist — from 4.1.0 onward the names
+  no longer change between releases, so they are already there and the allocate
+  would fail on them. Coming from 4.0.x they do not exist yet and step 4 runs
+  normally; the old `HTTPD.V4R0M*.*` libraries are left orphaned and are yours
+  to scratch afterwards.
+
+The webroot disk is never touched by any of this: it holds your content, not
+ours. See step 9.
 
 ---
 
@@ -401,22 +412,23 @@ Expect `COND CODE 0000`.
 > [Removing HTTPD](#12-removing-httpd). It is `UCLIN`, not `REJECT`: an
 > accepted function SYSMOD refuses both `RESTORE` and `REJECT`.
 >
-> **`DISP=(NEW,CATLG,DELETE)` is also what stops an upgrade from installing on
-> top of itself.** Since 4.1.0 the names carry no version, so if this step fails
-> because the dataset already exists, you are upgrading and section 12 has not
-> been run yet. Read the name in the message before you act on it.
+> **Skip this step entirely when upgrading from 4.1.0 or later.** The names no
+> longer change between releases, so `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` are
+> already allocated and already hold the previous release — which is exactly
+> what the APPLY expects to find and replace. A failure here saying the dataset
+> exists is that situation, not an error to work around. Coming from 4.0.x the
+> names are new and this step runs normally.
 
 ---
 
 ## 5. Stop a running HTTPD
 
 Only relevant when you are upgrading, and since 4.1.0 it is **not optional**.
-The APPLY writes into `HTTPD.LINKLIB` — the one library, the same one a running
-HTTPD has its modules loaded from, because the names no longer carry a version.
-Up to 4.0.2 each release had its own library and an older server could keep
-running through the install; that is no longer true.
-
-Stop it before section 12 scratches the library, not merely before the APPLY.
+The APPLY deletes the old modules from `HTTPD.LINKLIB` and writes the new ones
+there — the one library, the same one a running HTTPD has its modules loaded
+from, because the names no longer carry a version. Up to 4.0.2 each release had
+its own library and an older server could keep running through the install;
+that is no longer true.
 
 ```
 /P HTTPD
@@ -457,8 +469,8 @@ the first failure rather than building on it:
 | `RECV2` | samplib XMIT → `HTTPD.SAMPLIB` |
 | `RECV` | receives the SYSMOD into the SMP inventory |
 | `APPLYCHK` | dry run — `APPLY` only proceeds if this ends RC 0 |
-| `APPLY` | copies the five load modules into `HTTPD.LINKLIB` |
-| `ACCEPT` | makes this level the base a later `RESTORE` returns to |
+| `APPLY` | deletes the previous release's modules from `HTTPD.LINKLIB`, then copies the five new ones in |
+| `ACCEPT` | makes this level the base a later `RESTORE` returns to, and deletes the previous level from the distribution zone |
 | `CLEANUP` | scratches the staging library, which is now spent |
 
 The SYSMOD travels inline in the job — there is no third file to upload.
@@ -468,17 +480,28 @@ output:
 
 ```
 HMA3930    SYSMOD THTP410 SUCCESSFULLY RECEIVED
+HMA2240    SUCCESSFULLY DELETED LMOD=HTTPD
 HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB
            - RETURN CODE=00
-HMA2050    APPLY PROCESSING COMPLETED - HIGHEST RETURN CODE IS 00
 ```
 
 There is one `HMA2380` line **per module** — five of them. A run that copies
-fewer has lost one, and the `APPLY` still ends RC 00, so count them.
+fewer has lost one, and the `APPLY` still ends successfully, so count them. The
+`HMA2240` lines appear only when a previous release was there to delete; on a
+first install there are none.
 
-Then check `HTTPD.LINKLIB` really holds all five (ISPF 3.4). Do look: SMP
+> **On an upgrade the `APPLY` ends `COND CODE 0004`, and that is correct.** The
+> deleted level has no `SMPSCDS` backup entry and never will, so SMP reports
+> `HMA2461 … NOT FOUND ON SMPSCDS LIBRARY` *after* `HMA2270 … SUCCESSFULLY
+> COMPLETED`. The `ACCEPT` step is gated `COND=(4,LT,APPLY.HMASMP)` for exactly
+> this, so it still runs. A first install ends RC 00 throughout.
+
+Then check `HTTPD.LINKLIB` really holds all five (ISPF 3.4). **Do this — it is
+the only check that distinguishes a real install from a silent one.** SMP
 reports the library by **ddname**, and a ddname says nothing about which dataset
-was behind it.
+was behind it; and a SYSMOD that does not own a module reports `NOT SEL` in one
+column of the element summary, copies nothing, and leaves every condition code
+reading success.
 
 SMP **copies** these modules rather than re-binding them, which is why the
 `AC(1)` authorisation code on `HTTPD` and every module's custom entry point are
@@ -953,30 +976,20 @@ What this release put on the system:
 | Distribution library | `HTTPD.AHTTPLOD` |
 | Sample library | `HTTPD.SAMPLIB` |
 
-**This page is also where an upgrade from 4.0.x is sent, and for that case the
-ids and names below change — read this paragraph first.** The job as written
-removes **4.1.0**: FMID `THTP410`, libraries `HTTPD.*`. To upgrade from 4.0.x,
-run the same steps with `THTP400` everywhere the job says `THTP410`, and with
-that release's versioned names in step 4 — `HTTPD.V4R0M2.*` for 4.0.2,
-`V4R0M1` for 4.0.1, `V4R0M0` for 4.0.0. **Check the name against ISPF 3.4
-before you scratch anything.**
+> **This is not the upgrade path.** Installing a newer HTTPD needs nothing from
+> this page: each release's SYSMOD carries `DELETE(<previous FMID>)` and SMP
+> replaces the modules during the APPLY. Use section 12 to remove HTTPD from a
+> system, or to clean up after a test install. An earlier draft of this guide
+> sent upgrades here; following it now would uninstall a working server for no
+> reason.
 
-**Step 2 is not optional on an upgrade, and skipping it fails silently.** In
-SMP4 an element belongs to the FMID that installed it, so a `THTP410` SYSMOD
-does not replace a `MOD(HTTPD)` that `THTP400` owns: SMP passes over it, prints
-`MOD HTTPD NOT SEL` in one column of the element summary, and reports RC 00
-through RECEIVE, APPLY and ACCEPT with `HMA2270 … SUCCESSFULLY COMPLETED`
-— into an **empty** target library. The `UCLIN` below deletes the `MOD` and
-`LMOD` entries and not merely the SYSMOD, which is what makes the new install
-own them. After installing, verify by listing the members of `HTTPD.LINKLIB`,
-never by the condition codes.
-
-Step 4 is safe to run on an upgrade now, and that is new: the 4.0.x libraries
-are genuinely orphaned once `THTP410` is installed under its own names, so
-scratching them removes an installation nobody is using. Under the old versioned
-scheme the same step named the *predecessor* of the release you were keeping,
-which is how it removed the wrong generation while the live one stood untouched,
-with SMP reporting success throughout.
+**Leftovers from 4.0.x.** If this system was upgraded from 4.0.x rather than
+installed fresh, the old versioned libraries are still catalogued and are no
+longer referenced by anything — `HTTPD.V4R0M2.*` for 4.0.2, `V4R0M1` for 4.0.1,
+`V4R0M0` for 4.0.0. Their SMP inventory entries went with the `DELETE` at
+upgrade time, so only the datasets remain. Scratch them at your leisure; check
+each name against ISPF 3.4 first, and do not confuse them with the unversioned
+`HTTPD.*` libraries that are in use.
 
 **1. Stop the server:** `/P HTTPD`
 
@@ -1047,6 +1060,13 @@ free.** Both zones matter: the CDS records what is applied, the ACDS what is
 accepted, and they are separate inventories — an id gone from one and present in
 the other is not free.
 
+> A system that was upgraded also carries the **tombstone** of each earlier
+> level — `THTP400` listed as `TYPE = FUNCTION` with `DELBY = THTP410` and
+> nothing else. `LIST` answers **RC 00** for those, not RC 04. They are inert
+> records of an id that is spent and can never be reused; leave them, or add
+> `DEL SYSMOD(THTP400) .` to the `UCLIN` above if you want the inventory
+> completely clean.
+
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
 
@@ -1088,9 +1108,10 @@ Those are yours to delete — unmount the disk before you scratch it.
 
 | Symptom | Likely cause |
 |---------|--------------|
-| Allocation job fails, dataset already exists | Either it was already run, or you are upgrading and section 12 has not been. The names carry no version since 4.1.0 — see the warning in step 4. Do not force it |
+| Allocation job fails, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it |
 | `RECV1`/`RECV2` fails, target exists | A previous release's `HTTPD.HTTPLOAD`/`HTTPD.SAMPLIB`, or something else allocated it. RECEIVE refuses to merge; scratch it and re-run |
-| `APPLY` RC 00, no `HMA2380` at all, library empty | The elements still belong to the previous FMID (`MOD … NOT SEL`). Section 12's `UCLIN` was skipped or deleted only the SYSMOD and not the `MOD`/`LMOD` entries |
+| `APPLY` RC 00, no `HMA2380` at all, library empty | The modules still belong to another FMID (`MOD … NOT SEL` in the element summary). The SYSMOD's `++VER` is missing the `DELETE` for whatever owns them — this is a packaging fault, not an operator one; report it |
+| `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The `ACCEPT` is gated `(4,LT,…)` and still runs |
 | `APPLYCHK` ends non-zero, `APPLY` skipped | Read the SMP output — the check exists to stop before anything is written. A missing DD is the usual cause |
 | `APPLY` RC 00 but fewer than five `HMA2380` lines | A module was lost. Count them, then look in the library itself |
 | SMP reports success, but a module is not where you expected | A ddname says nothing about the dataset behind it. Check the JCL, then look at the library itself |
