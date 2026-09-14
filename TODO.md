@@ -32,11 +32,10 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
-| 6 | #265 | the libc370 v1.0.6 relink | **nothing** — audit posted, ready to close |
+| 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
+| — | #265 | the libc370 v1.0.6 relink | **nothing** — audit posted, ready to close |
 | — | #266 | packaging | **nothing** — all three items landed, ready to close |
-| 8 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
-| — | — | **two gates on the 4.1.0 tag, not issues yet** | see *Before the tag* |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **#259 and #269 landed together as PR #267 — `main` is 4.1.0-dev.**
@@ -134,7 +133,8 @@ rest from returning a decorative `int rc = 0` that no write ever touches.
 
 ### Before the tag
 
-Two things must happen before `v4.1.0`, and neither has an issue:
+Both gates are closed — kept here because the reasoning is what the runs
+corrected, and because the second one is the evidence behind section 12a:
 
 1. ~~`THTP410` free on drnmig3a.~~ **Done 2026-09-14**, `FMIDCHK JOB00034`:
    RC 04, `NOT FOUND` in both zones. `THTP400` is free there too, so no httpd
