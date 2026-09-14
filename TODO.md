@@ -11,9 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-14 after the libc370 1.0.6
-toolchain bump, eleven issues open — #266 filed out of the ftpd 1.1.0 test
-install and #265 out of the libc370 v1.0.6 release; #264, #263 and #262 filed
+*Last reconciled against the tracker: 2026-09-14 after the mbt bump to
+`1c4ac5b`, twelve issues open — #269 filed out of the ecosystem-wide FMID
+policy change, #266 out of the ftpd 1.1.0 test install and #265 out of the
+libc370 v1.0.6 release; #264, #263 and #262 filed
 out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
 #176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
 relink 4.0.2 delivers. Before them: #256 filed and fixed by PR #257 on
@@ -35,17 +36,52 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
 | 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
 | — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
-| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **a decision**, and it is not a 4.0.x one — see below |
+| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **review** — PR #267, together with #269 |
+| — | #269 | the per-release FMID policy — `THTP410` deletes `THTP400` | **review** — PR #267; both its blockers are resolved there |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
-**#259 is parked deliberately, and the reason is structural.** `lklib`, `target`
-and `distlib` go into the FMID's JCLIN, so the names are a one-shot choice per
-functional level: `THTP400` already carries `HTTPD.@VRM@.*` from 4.0.0, and
-changing them is a new functional level, not a patch. It was considered before
-cutting 4.0.2 and deferred rather than overlooked — it belongs with the next
-minor, where a fresh FMID has to be spent anyway. The request itself is
-reasonable; nothing about it is settled by leaving it here.
+**#259 is no longer parked: it is the 4.1.0 cut, and `main` is now 4.1.0-dev.**
+It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,
+so the names are a one-shot choice per functional level — changing them is a new
+level, not a patch. Nothing but docs had landed since v4.0.2, so no 4.0.3 was
+owed and the cut cost nothing to take now; it would only have got more expensive
+once a code fix landed. `THTP400` → `THTP410`, `HTTPD.@VRM@.*` → `HTTPD.*`,
+following ftpd#121 which made the same change at `TFTP110`.
+
+**What that inverts, and why it is the interesting part rather than a rename.**
+One set of names means one installation that cannot drift from its inventory.
+The upgrade mechanics came out of mbt#98, bumped onto this branch: the SYSMOD
+carries `DELETE(THTP400)`, so SMP deletes the old modules from the target and
+copies the new ones in during the same APPLY, and module ownership transfers.
+That settles what #266 described — **and it shows that versioning the datasets
+never bought a clean cut in the first place**, because SMP keys ownership on
+`MOD(name)` in the CDS and not on the library the element lives in (mbt#98
+measured a fresh, free FMID losing to the module-name owner while installing
+into an unrelated dataset, `JOB00291`).
+
+So the guide rewrite is smaller than it first looked, and different: there is
+nothing to uninstall before an upgrade, section 12 is for *removal* only, and
+an upgrade from 4.1.0 onward **skips the allocation step** because the
+libraries are already there holding the predecessor. What does still bind:
+stopping the server is no longer optional (the APPLY rewrites the library the
+running one loads from), the APPLY legitimately ends RC 04 on an upgrade
+(`HMA2461`, no SMPSCDS backup for a deleted level — the ACCEPT gate is relaxed
+to `(4,LT,…)` for it), and scratching `HTTPD.LINKLIB` during a *removal* takes
+any other product's module copied in beside ours — `MVSMF` on mvsdev. The
+webroot keeps a name of its own kind and is never scratched.
+
+**`THTP410` is verified free, on one stand.** `LIST CDS/ACDS SYSMOD(THTP410)`
+answered RC 04 `NOT FOUND` in both zones on mvsdev (FMIDCHK `JOB00288`,
+2026-09-14). It was **not** run on drnmig3a, where `THTP400` and `TFTP110` both
+were — run it there before the 4.1.0 tag, not before the merge. The same job
+found `THTP400` `REC APP ACC` on mvsdev with all five modules, so that stand is
+a live 4.0.x installation and the first real test of the `DELETE` upgrade path.
+Nothing on this branch has been installed on MVS. The `DELETE` mechanics are
+measured — in mbt's runs (`JOB00296`/`97`) and by ufsd at `TUFS130` — but not
+against `THTP410`. What ufsd's run settled is that `DELETE` does *not* carry
+the hop across the rename, which is why the guide grew a section 12a: freeing
+the FMID by hand once, and scratching the old datasets last rather than first.
 
 **That sentence used to read "nothing open is a code bug." It no longer does.**
 #263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error
@@ -67,7 +103,7 @@ is the next thing worth doing, because it is read-only, costs minutes, and
 #198's second step cannot be estimated until it is answered. #176 stays last for
 the reason it always did, not because it is small.
 
-**Three of the eleven came out of the 4.0.2 work, and none of them is a
+**Three of the twelve came out of the 4.0.2 work, and none of them is a
 regression.** #263 has behaved this way since 4.0.0; #262 reproduces on
 unmodified `main`; #264 is the write side of the libc370 change #260 fixed the
 read side of. They are visible now because the relink made that whole class of
@@ -79,9 +115,13 @@ more; the `[toolchain]` pin is bumped and the tree rebuilds clean, so what is
 left of #265 is the audit. Appended at the tail rather than ranked against the
 existing five — #264 is `priority:low`. See #265.
 
-**#266 lands on the 4.1.0 cut, not before.** It costs nothing until `THTP400`
-becomes `THTP410` and is unskippable then. Root `CLAUDE.md` §*SMP4 FMIDs* has
-the mechanism.
+**#266 is mostly answered by #269 rather than by documentation.** It described
+the element-ownership wall and asked the guide to warn about it; `++VER DELETE`
+removes the wall instead, so PR #267 carries no "run the UCLIN first" step to
+get wrong. What survives of #266 is its item 3 — end the install instructions
+with an `IEHLIST LISTPDS` of the target library, because condition codes cannot
+tell a real install from a silent one. That is still worth doing and is all
+#266 should stay open for.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
