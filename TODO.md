@@ -32,9 +32,9 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
-| 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
-| 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
-| — | #266 | packaging; only its `IEHLIST` item is left | **the 4.1.0 tag** — see below |
+| 6 | #265 | the libc370 v1.0.6 relink | **nothing** — audit posted, ready to close |
+| — | #266 | packaging | **nothing** — all three items landed, ready to close |
+| 8 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | — | **two gates on the 4.1.0 tag, not issues yet** | see *Before the tag* |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
@@ -114,13 +114,23 @@ more; the `[toolchain]` pin is bumped and the tree rebuilds clean, so what is
 left of #265 is the audit. Appended at the tail rather than ranked against the
 existing five — #264 is `priority:low`. See #265.
 
-**#266 is mostly answered by #269 rather than by documentation.** It described
-the element-ownership wall and asked the guide to warn about it; `++VER DELETE`
-removes the wall instead, so PR #267 carries no "run the UCLIN first" step to
-get wrong. What survives of #266 is its item 3 — end the install instructions
-with an `IEHLIST LISTPDS` of the target library, because condition codes cannot
-tell a real install from a silent one. That is still worth doing and is all
-#266 should stay open for.
+**#266 is done, by a mix of tooling and documentation.** Items 1 and 2 were
+answered by #269 rather than by prose: `++VER DELETE` removes the
+element-ownership wall, so there is no "run the UCLIN first" step left to get
+wrong. Item 3 — the `IEHLIST LISTPDS` at the end of the install — landed in
+`58e4ad4`, copied from ftpd and ufsd, who both had it. Ready to close.
+
+**#265 is answered too.** The write-path audit found nine unchecked stdio write
+sites — the seven `dbg*.c` writers and the two streams `cgistart.c` installs as
+a module's `stdout`/`stderr` — and **none of them on the request path**.
+`http_send()` goes to `send()` on the socket, never through a `FILE*`, so
+libc370's fail-fast cannot reach an HTTP response. What is left is diagnostic
+output only, which is #264.
+
+**#264 is now the only open half, and its scope is exact:** those nine sites.
+The open question is the shape of the fix, not where it goes — report once by
+WTO and disable tracing deliberately, or simply stop `dbgs()`/`dbgf()` and the
+rest from returning a decorative `int rc = 0` that no write ever touches.
 
 ### Before the tag
 
