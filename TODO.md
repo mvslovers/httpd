@@ -11,9 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-14 after the libc370 1.0.6
-toolchain bump, eleven issues open — #266 filed out of the ftpd 1.1.0 test
-install and #265 out of the libc370 v1.0.6 release; #264, #263 and #262 filed
+*Last reconciled against the tracker: 2026-09-14 after the mbt bump to
+`1c4ac5b`, twelve issues open — #269 filed out of the ecosystem-wide FMID
+policy change, #266 out of the ftpd 1.1.0 test install and #265 out of the
+libc370 v1.0.6 release; #264, #263 and #262 filed
 out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
 #176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
 relink 4.0.2 delivers. Before them: #256 filed and fixed by PR #257 on
@@ -35,7 +36,8 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
 | 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
 | — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
-| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **review** — PR #267 |
+| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **review** — PR #267, together with #269 |
+| — | #269 | the per-release FMID policy — `THTP410` deletes `THTP400` | **review** — PR #267; both its blockers are resolved there |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
@@ -98,7 +100,7 @@ is the next thing worth doing, because it is read-only, costs minutes, and
 #198's second step cannot be estimated until it is answered. #176 stays last for
 the reason it always did, not because it is small.
 
-**Three of the eleven came out of the 4.0.2 work, and none of them is a
+**Three of the twelve came out of the 4.0.2 work, and none of them is a
 regression.** #263 has behaved this way since 4.0.0; #262 reproduces on
 unmodified `main`; #264 is the write side of the libc370 change #260 fixed the
 read side of. They are visible now because the relink made that whole class of
@@ -110,9 +112,13 @@ more; the `[toolchain]` pin is bumped and the tree rebuilds clean, so what is
 left of #265 is the audit. Appended at the tail rather than ranked against the
 existing five — #264 is `priority:low`. See #265.
 
-**#266 lands on the 4.1.0 cut, not before.** It costs nothing until `THTP400`
-becomes `THTP410` and is unskippable then. Root `CLAUDE.md` §*SMP4 FMIDs* has
-the mechanism.
+**#266 is mostly answered by #269 rather than by documentation.** It described
+the element-ownership wall and asked the guide to warn about it; `++VER DELETE`
+removes the wall instead, so PR #267 carries no "run the UCLIN first" step to
+get wrong. What survives of #266 is its item 3 — end the install instructions
+with an `IEHLIST LISTPDS` of the target library, because condition codes cannot
+tell a real install from a silent one. That is still worth doing and is all
+#266 should stay open for.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
