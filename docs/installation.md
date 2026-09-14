@@ -50,9 +50,10 @@ step 4 because the libraries are already there, and submit the install job.
 4.0.x.** `HTTPD.LINKLIB` does not exist on those systems — they have
 `HTTPD.V4R0M2.*` — so nothing of this release lands on top of anything, and
 `DELETE(THTP400)` has no modules to find in the library it is pointed at. That
-first upgrade is a **move, not a replacement**: it runs step 4, it needs the
-FMID freed by hand first, and it re-points `STEPLIB` once. [Section 12a](#12a-upgrading-from-40x)
-has the order; follow it instead of this list.
+first upgrade is a **move, not a replacement**: it runs step 4 and it re-points
+`STEPLIB` once. Nothing has to be uninstalled first there either.
+[Section 12a](#12a-upgrading-from-40x) has the order; follow it instead of this
+list.
 
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
@@ -1106,37 +1107,44 @@ Those are yours to delete — unmount the disk before you scratch it.
 
 ## 12a. Upgrading from 4.0.x
 
-The one upgrade that is not just "stop, install, start". Those releases put
-their datasets in `HTTPD.V4R0M0.*`, `HTTPD.V4R0M1.*` or `HTTPD.V4R0M2.*`.
-Nothing of this release lands on top of them, so this is a **move**, and the
-old installation stays intact and runnable until the last step.
+Those releases put their datasets in `HTTPD.V4R0M0.*`, `HTTPD.V4R0M1.*` or
+`HTTPD.V4R0M2.*`, so nothing of this release lands on top of them. That makes
+this upgrade a **move** rather than a replacement — but it is still just the
+ordinary install, in order, with three extra things to remember.
+
+**There is nothing to uninstall first.** `DELETE(THTP400)` does the inventory
+work even though the old modules are in a library this release never names.
+Measured on drnmig3a 2026-09-14 with throwaway ids (`T410INST JOB00040`): SMP
+reported `HMA2240 SUCCESSFULLY DELETED LMOD …` for each module against the new,
+still-empty library without complaint, copied all five in
+(`HMA2380 … SYSMOD=<new>`), and `MOD(HTTPD)` came back reading
+`FMID = <new>  RMID = <new>`. The predecessor became a `DELBY` tombstone in both
+zones, and **its library was left untouched, every member still in place.**
 
 1. **`/P HTTPD`.**
-2. **Free `THTP400`** — section 12 step 2, run with `THTP400` in place of
-   `THTP410`, and read its `LIST` output (step 3). `DELETE(THTP400)` on this
-   release's SYSMOD cannot do it for you here: it is pointed at
-   `HTTPD.LINKLIB`, and `THTP400`'s modules are not in that library.
-3. **Leave the old datasets alone.** Do *not* run section 12 step 4 yet —
-   scratching them is the last thing you do, not the first. The `UCLIN` has
-   already released their hold on the SMP inventory.
-4. **Steps 4 and 3 and 6 of this guide, unchanged**: allocate `HTTPD.LINKLIB`
-   and `HTTPD.AHTTPLOD` beside the old ones, upload, install.
-5. **Re-point what names the library.** `STEPLIB` in your `HTTPD` procedure,
+2. **Run step 4.** This is the one upgrade that allocates: `HTTPD.LINKLIB` and
+   `HTTPD.AHTTPLOD` are new names on this system. They are created beside the
+   old libraries, not over them.
+3. **Steps 3 and 6, unchanged** — upload and install. Expect the `APPLY` to end
+   `COND CODE 0004` on `HMA2461`; that is the deleted level having no `SMPSCDS`
+   backup entry, and the `ACCEPT` still runs.
+4. **Re-point what names the library.** `STEPLIB` in your `HTTPD` procedure,
    and the entry in `SYS1.PARMLIB(IEAAPF00)` if you took the APF route rather
    than RAKF. **That is one more IPL, and the last one** — the name does not
    change again.
-6. **Copy over anything that was not ours.** A CGI module from another product
+5. **Copy over anything that was not ours.** A CGI module from another product
    lives in the same library and SMP knows nothing about it — `MVSMF` is the
    usual one. It is still in the old `HTTPD.V4R0M*.LINKLIB` and it is *not* in
    the new one. Its own installation is the right way to put it back; a plain
    `IEBCOPY` works if you only need the server up.
-7. **Copy what you want out of the old `SAMPLIB`**, then `/S HTTPD` and check
+6. **Copy what you want out of the old `SAMPLIB`**, then `/S HTTPD` and check
    `HTTPD000I` / `HTTPD005I` (step 10).
-8. **Only now scratch the release you came from:**
+7. **Only now scratch the release you came from:**
    `DELETE HTTPD.V4R0M*.LINKLIB / .AHTTPLOD / .SAMPLIB NONVSAM SCRATCH PURGE`.
 
-Until step 8 both installations sit on the disk side by side and the old one is
-intact, so a problem at step 7 is one PROC edit away from being undone.
+Until step 7 both installations sit on the disk side by side and the old one is
+intact, so a problem at step 6 is one PROC edit away from being undone. That is
+a property of the rename, and it is the last upgrade that has it.
 
 The webroot disk is not part of this. It keeps its name, it is not SMP's, and
 nothing above touches it.

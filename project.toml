@@ -456,12 +456,17 @@ extra = ["build/webroot/httpd-webroot.img"]
 # absent here would not have been caught -- run it before the 4.1.0 tag.
 # The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
 # five modules: 4.0.x is installed there, so that stand is the 4.0.x -> 4.1.0
-# hop.  DELETE DOES NOT CARRY THAT HOP, and the guide's section 12a is why:
-# DELETE(THTP400) is pointed at HTTPD.LINKLIB and THTP400's modules are not in
-# that library, so the FMID is freed by hand once and the old datasets are
-# scratched last.  ufsd measured the same crossing at TUFS130 (ufsd#75).  From
-# THTP411 on, DELETE is the whole upgrade story -- both sides share the names
-# by then, which is the case mbt#98 measured (JOB00296/97).  THTP400 is spent either way and must never be reused;
+# hop.  DELETE CARRIES THAT HOP TOO -- measured end to end on drnmig3a
+# 2026-09-14 with throwaway ids TTMP400 -> TTMP410 and the real module names,
+# under an isolated TSTH HLQ (T402INST JOB00038, T410INST JOB00040).  SMP
+# reported HMA2240 SUCCESSFULLY DELETED LMOD for each module against the NEW,
+# still-empty library without complaint, copied all five in, and MOD(HTTPD)
+# came back FMID = RMID = TTMP410 with TTMP400 a DELBY tombstone in both zones
+# (OWNCHK JOB00042).  The predecessor's library was left untouched, every
+# member in place -- so the crossing is safe as well as automatic.  No UCLIN is
+# needed for it; the guide said otherwise until this was run.  APPLY ends
+# RC 04 on HMA2461 and the ACCEPT still runs, which is the relaxed gate earning
+# its keep: COND CODE 0004 / 0000 in that order on JOB00040.  THTP400 is spent either way and must never be reused;
 # after this release it is a tombstone (TYPE = FUNCTION / DELBY = THTP410),
 # which LIST reports at RC 00 -- so the "RC 04 + empty list = free" rule reads
 # it as occupied, which is correct.
