@@ -498,16 +498,30 @@ first install there are none.
 > COMPLETED`. The `ACCEPT` step is gated `COND=(4,LT,APPLY.HMASMP)` for exactly
 > this, so it still runs. A first install ends RC 00 throughout.
 
-Then check `HTTPD.LINKLIB` really holds all five (ISPF 3.4). **Do this — it is
-the only check that distinguishes a real install from a silent one.** SMP
-reports the library by **ddname**, and a ddname says nothing about which dataset
-was behind it; and a SYSMOD that does not own a module reports `NOT SEL` in one
+**Then list the target library, and treat that as the actual result.** It is
+the only check that distinguishes a real install from a silent one: SMP reports
+the library by **ddname**, and a ddname says nothing about which dataset was
+behind it, while a SYSMOD that does not own a module reports `NOT SEL` in one
 column of the element summary, copies nothing, and leaves every condition code
-reading success.
+reading success. ISPF 3.4 does, or:
+
+```jcl
+//LIST    EXEC PGM=IEHLIST
+//SYSPRINT DD  SYSOUT=*
+//DD1      DD  UNIT=SYSALLDA,VOL=SER=your-volume,DISP=SHR
+//SYSIN    DD  *
+ LISTPDS DSNAME=HTTPD.LINKLIB,VOL=SYSALLDA=your-volume
+/*
+```
+
+Five members — `HTTPD`, `HTTPDSRV`, `HTTPDM`, `HTTPDMTT`, `ABEND0C1` — with
+`AUTH REQ = YES` on `HTTPD`.
 
 SMP **copies** these modules rather than re-binding them, which is why the
 `AC(1)` authorisation code on `HTTPD` and every module's custom entry point are
-exactly what the build produced.
+exactly what the build produced. `AMBLIST LISTLOAD OUTPUT=MODLIST` on `HTTPD`
+reports `APFCODE 00000001` with `RENT`/`REUS` intact, so the library only needs
+to be APF-authorised — the module already carries what it needs.
 
 ---
 
@@ -1114,12 +1128,31 @@ ordinary install, in order, with three extra things to remember.
 
 **There is nothing to uninstall first.** `DELETE(THTP400)` does the inventory
 work even though the old modules are in a library this release never names.
+
+The reason is that **SMP does not record which data set an element lives in —
+it records the ddname the install job used.** Both generations' libraries end
+in `LINKLIB`, and the ddname comes from that last qualifier, so both installs
+use ddname `LINKLIB`: pointing at `HTTPD.V4R0M2.LINKLIB` in the one case and
+`HTTPD.LINKLIB` in the other. When this release's `APPLY` deletes the
+predecessor's load modules it resolves `LINKLIB` **in its own job**, which
+points at the new library. It deletes from there, reports success, and copies
+the new modules in. `HTTPD.V4R0M2.LINKLIB` is never opened, and nothing in the
+job log mentions it. (That explanation is `mvslovers/ftpd`'s, from the same
+crossing at `TFTP110`.)
+
 Measured on drnmig3a 2026-09-14 with throwaway ids (`T410INST JOB00040`): SMP
 reported `HMA2240 SUCCESSFULLY DELETED LMOD …` for each module against the new,
 still-empty library without complaint, copied all five in
 (`HMA2380 … SYSMOD=<new>`), and `MOD(HTTPD)` came back reading
 `FMID = <new>  RMID = <new>`. The predecessor became a `DELBY` tombstone in both
-zones, and **its library was left untouched, every member still in place.**
+zones, and **its library was left untouched, every member still in place.** ftpd
+measured the identical shape on mvsdev (`JOB00323`/`325`/`326`) — two stands,
+two products, same result.
+
+**So the old library keeps a working, `AC(1)` copy of the previous release**,
+and that is what makes steps 4 and 5 below the ones that decide whether you are
+running 4.1.0 at all. Miss them and HTTPD starts, serves, and logs no error —
+it is simply the old build.
 
 1. **`/P HTTPD`.**
 2. **Run step 4.** This is the one upgrade that allocates: `HTTPD.LINKLIB` and
