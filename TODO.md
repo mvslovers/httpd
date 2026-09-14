@@ -35,7 +35,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #265 | the libc370 v1.0.6 relink | **the write-path audit** — the `[toolchain]` pin is in |
 | 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **nothing upstream any more** — see below |
 | — | #266 | packaging, and it lands on the 4.1.0 cut | **that cut** — see below |
-| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **nothing** — implemented on `issue-259-drop-vrm-qualifier`, pending the THTP410 check |
+| — | #259 | user request — drop the `<vrm>` qualifier from the dataset names | **review** — PR #267 |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
