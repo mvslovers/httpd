@@ -129,7 +129,10 @@ Two things must happen before `v4.1.0`, and neither has an issue:
 1. ~~`THTP410` free on drnmig3a.~~ **Done 2026-09-14**, `FMIDCHK JOB00034`:
    RC 04, `NOT FOUND` in both zones. `THTP400` is free there too, so no httpd
    is installed on that stand.
-2. **The 4.0.x → 4.1.0 upgrade, run for real.** Section 12a of the installation
+2. ~~**The 4.0.x → 4.1.0 upgrade, run for real.**~~ **Done 2026-09-14** on
+   drnmig3a — see below. Both gates are closed; the tag is not blocked.
+
+   *(original note, kept because the reasoning is what the run corrected)* Section 12a of the installation
    guide is written from ufsd's measurement of the same crossing, not from one
    of ours. drnmig3a is the right stand for it *because* it is clean: install
    4.0.2 there first, then upgrade across the rename, and mvsdev's live server
@@ -146,6 +149,15 @@ Two things must happen before `v4.1.0`, and neither has an issue:
    works, not what happens without it. Whether skipping it fails loud, fails
    silent, or quietly succeeds decides whether 12a's step 2 is a hard
    requirement or belt-and-braces, and nothing on record answers it.
+
+   **Answered: it quietly succeeds, so the step is gone.** The no-UCLIN run was
+   the first one tried and it worked, which made the UCLIN-first variant moot
+   — nobody should now be told to take it. It was therefore not run, and that
+   is the one thing this rehearsal leaves untested. It still matters to
+   `mvslovers/ufsd`, whose 1.3.0 guide ships that instruction: worth telling
+   them the step is unnecessary, and worth someone checking that following it
+   anyway is at least harmless, since the SYSMOD's `DELETE` would then name an
+   id that no longer exists.
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
