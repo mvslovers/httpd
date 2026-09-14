@@ -469,7 +469,12 @@ extra = ["build/webroot/httpd-webroot.img"]
 # still-empty library without complaint, copied all five in, and MOD(HTTPD)
 # came back FMID = RMID = TTMP410 with TTMP400 a DELBY tombstone in both zones
 # (OWNCHK JOB00042).  The predecessor's library was left untouched, every
-# member in place -- so the crossing is safe as well as automatic.  No UCLIN is
+# member in place -- so the crossing is safe as well as automatic.
+# CONFIRMED FOR REAL on mvsdev 2026-09-14 with the published 4.1.0 package and
+# the real ids: HTTPDINS JOB00347 installed THTP410 over an installed THTP400
+# (APPLY 0004 / ACCEPT 0000, HMA2240 x10, HMA2380 x10), MOD(HTTPD) came back
+# FMID = RMID = THTP410 and THTP400 became a DELBY tombstone (OWNCHK JOB00348).
+# HTTPD.V4R0M1.LINKLIB kept all six of its members, MVSMF included.  No UCLIN is
 # needed for it; the guide said otherwise until this was run.  APPLY ends
 # RC 04 on HMA2461 and the ACCEPT still runs, which is the relaxed gate earning
 # its keep: COND CODE 0004 / 0000 in that order on JOB00040.  THTP400 is spent either way and must never be reused;
