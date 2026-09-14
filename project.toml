@@ -477,6 +477,17 @@ extra = ["build/webroot/httpd-webroot.img"]
 # the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and a spent
 # id is never reused.  TTST001-TTST004 went to the ++VER DELETE measurement.
 # Pick a fresh one, the way ftpd used TTMP110 and TTMP111 for its 1.1.0 runs.
+# AFTER A RELEASE, MOVE BOTH OF THESE BEFORE ANYTHING IS BUILT FROM THE TREE.
+# `make release` bumps VERSION and the project version and stops -- it does NOT
+# move the id -- so the tree comes out of a release carrying the id that was
+# just spent.  4.1.0 ships under THTP410; the commit that follows the bump to
+# 4.1.1-dev has to set fmid = "THTP411" and delete = ["THTP410"].  Miss it and
+# 4.1.1 packages under an id that is already REC APP ACC somewhere, which SMP
+# refuses to receive -- or worse, receives on a stand that never saw 4.1.0.
+# Measured elsewhere rather than here: mvslovers/ftpd sat in exactly this state
+# after releasing 1.1.0 on 2026-09-14, VERSION at 1.1.1-dev and fmid still
+# TFTP110.  ufsd does the move in the commit right after the bump (3db6866 ->
+# 20988c3); copy that habit.
 fmid = "THTP410"
 delete = ["THTP400"]            # the level this one replaces -- see above
 system = "Z038"

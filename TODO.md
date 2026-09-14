@@ -131,6 +131,16 @@ The open question is the shape of the fix, not where it goes — report once by
 WTO and disable tracing deliberately, or simply stop `dbgs()`/`dbgf()` and the
 rest from returning a decorative `int rc = 0` that no write ever touches.
 
+### Right after the tag
+
+**Move `fmid` and `delete` in the commit that follows the version bump.**
+`make release` bumps `VERSION` and stops, so the tree comes out of v4.1.0 at
+`4.1.1-dev` with `fmid = "THTP410"` — the id that release just spent. Set
+`THTP411` / `delete = ["THTP410"]` before anything is built from that tree.
+`project.toml` carries the warning at the `fmid` line now; this is the reminder
+that the moment to read it is the bump, not the next package. ftpd was sitting
+in exactly this state an hour after releasing 1.1.0.
+
 ### Before the tag
 
 Both gates are closed — kept here because the reasoning is what the runs
