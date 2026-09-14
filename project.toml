@@ -451,9 +451,12 @@ extra = ["build/webroot/httpd-webroot.img"]
 # shows only what was *received*, while the CDS and ACDS store hashed member
 # names, so a LIST against both zones is the only way to see what is applied or
 # accepted.
-# ** ONE STAND ONLY.**  THTP400 and TFTP110 were each checked on mvsdev AND
-# drnmig3a (TK5); this one was not run on drnmig3a.  An id present there and
-# absent here would not have been caught -- run it before the 4.1.0 tag.
+# BOTH STANDS, and say so explicitly rather than letting a reader infer it from
+# the line above: mvsdev (MVS/CE) FMIDCHK JOB00288, and drnmig3a (TK5) FMIDCHK
+# JOB00034, each RC 04 NOT FOUND in CDS and ACDS.  Name the stands every time.
+# A round that silently covers one stand where the previous line covered two
+# reads as equally thorough and is not -- an id present on the stand you skipped
+# and absent on the one you checked is exactly what the second check is for.
 # The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
 # five modules: 4.0.x is installed there, so that stand is the 4.0.x -> 4.1.0
 # hop.  DELETE CARRIES THAT HOP TOO -- measured end to end on drnmig3a

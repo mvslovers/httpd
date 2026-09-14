@@ -146,9 +146,11 @@ in exactly this state an hour after releasing 1.1.0.
 Both gates are closed — kept here because the reasoning is what the runs
 corrected, and because the second one is the evidence behind section 12a:
 
-1. ~~`THTP410` free on drnmig3a.~~ **Done 2026-09-14**, `FMIDCHK JOB00034`:
-   RC 04, `NOT FOUND` in both zones. `THTP400` is free there too, so no httpd
-   is installed on that stand.
+1. ~~`THTP410` free on both stands.~~ **Done 2026-09-14** — mvsdev `FMIDCHK
+   JOB00288` and drnmig3a `FMIDCHK JOB00034`, each RC 04 `NOT FOUND` in both
+   zones. `THTP400` is free on drnmig3a too, so no httpd is installed there.
+   Name both stands whenever this is recorded: a check that quietly covers one
+   where the previous release covered two reads as equally thorough.
 2. ~~**The 4.0.x → 4.1.0 upgrade, run for real.**~~ **Done 2026-09-14** on
    drnmig3a — see below. Both gates are closed; the tag is not blocked.
 
