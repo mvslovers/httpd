@@ -1075,12 +1075,31 @@ free.** Both zones matter: the CDS records what is applied, the ACDS what is
 accepted, and they are separate inventories — an id gone from one and present in
 the other is not free.
 
-> A system that was upgraded also carries the **tombstone** of each earlier
-> level — `THTP400` listed as `TYPE = FUNCTION` with `DELBY = THTP410` and
-> nothing else. `LIST` answers **RC 00** for those, not RC 04, so they read as
-> occupied — which is correct: the id is spent and can never be reused. Leave
-> them. They are inert records, they own no elements, and no job here has been
-> run against one.
+### The tombstones — one `DEL SYSMOD` each, and there may be several
+
+A system that was upgraded also carries the **tombstone** of every level it
+came through: `THTP400` listed as `TYPE = FUNCTION` with `DELBY = THTP410` and
+nothing else. `LIST` answers **RC 00** for those, not RC 04, so the
+"RC 04 + empty list = free" rule above reads them as occupied — which is
+correct, the ids are spent and can never be reused.
+
+They own no elements, so leaving them harms nothing. To clear them, add one
+line per tombstone to the `UCLIN` above, in **both** zones:
+
+```
+  DEL SYSMOD(THTP400) .
+```
+
+**Do not write that list from memory.** A system that went 4.0.x → 4.1.0 →
+4.1.1 carries *two* — `THTP400 DELBY=THTP410` and `THTP410 DELBY=THTP411` — and
+a job that names only the release you are removing and its immediate
+predecessor leaves the older one standing for good. `LIST CDS SYSMOD(THTP4??)`
+before you write the job and delete what it actually reports.
+
+`DEL SYSMOD` does work on a tombstone — measured on drnmig3a 2026-09-14,
+`TSTHCLN JOB00043`: 29 × `HMA2550 UPDATE COMPLETE`, `COND CODE 0000`, and both
+ids gone from both zones afterwards. On a system that was never upgraded the
+line simply finds nothing, which is why it can stand unconditionally.
 
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
@@ -1175,9 +1194,26 @@ it is simply the old build.
 7. **Only now scratch the release you came from:**
    `DELETE HTTPD.V4R0M*.LINKLIB / .AHTTPLOD / .SAMPLIB NONVSAM SCRATCH PURGE`.
 
-Until step 7 both installations sit on the disk side by side and the old one is
-intact, so a problem at step 6 is one PROC edit away from being undone. That is
-a property of the rename, and it is the last upgrade that has it.
+> **If you stop after step 3 you have not upgraded.** The install succeeded, SMP
+> is satisfied, every condition code says so — and HTTPD is still loading the old
+> modules out of the old library, because `STEPLIB` still names it. There is no
+> message for this. `HTTPD000I` at startup gives the release and `HTTPD005I` the
+> runtime it was linked against; if either still reads the version you came from,
+> step 4 did not take. That is the one failure this order can produce, and it is
+> silent, so read the banner rather than the job log.
+
+Steps 4 to 7 are a **deliberate rollback window, then a scratch**: both
+installations sit on the disk side by side until you close it, so a bad start at
+step 6 is one procedure edit away from being undone. Treat it as a window you
+chose and then closed, not a state to leave the system in. The window exists
+only because the names change, so this is the last upgrade that has one.
+
+> `mvslovers/ftpd` scratches the old libraries *before* repointing `STEPLIB`, and
+> trades the other way: a forgotten repoint then fails loudly with `S806` instead
+> of running the old build quietly, at the cost of the rollback. Both orders
+> defend the same mistake. This guide keeps the window because HTTPD is usually
+> the front end for mvsMF, and a bad start you cannot back out of takes the
+> REST API with it.
 
 The webroot disk is not part of this. It keeps its name, it is not SMP's, and
 nothing above touches it.
