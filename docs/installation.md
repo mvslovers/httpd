@@ -1180,40 +1180,48 @@ it is simply the old build.
 3. **Steps 3 and 6, unchanged** — upload and install. Expect the `APPLY` to end
    `COND CODE 0004` on `HMA2461`; that is the deleted level having no `SMPSCDS`
    backup entry, and the `ACCEPT` still runs.
-4. **Re-point what names the library.** `STEPLIB` in your `HTTPD` procedure,
-   and the entry in `SYS1.PARMLIB(IEAAPF00)` if you took the APF route rather
-   than RAKF. **That is one more IPL, and the last one** — the name does not
-   change again.
-5. **Copy over anything that was not ours.** A CGI module from another product
+4. **Re-point `STEPLIB`** in your `HTTPD` procedure to `HTTPD.LINKLIB`.
+5. **Replace the APF entry — do not add one.** If you took the APF route rather
+   than RAKF, `SYS1.PARMLIB(IEAAPF00)` names the old library. **Remove that
+   line**, then add the new one. An entry is `dsname volser` and the list is
+   read only at IPL, so an old entry left beside the new one survives until the
+   next one — and it stays dangerous after the library is scratched: allocate
+   anything with that name on that volume later and it is APF-authorised
+   without anyone asking. For an `AC(1)` product that is a loaded weapon lying
+   in a drawer. **This is the last time the entry needs changing**, because the
+   name no longer carries a version.
+6. **Copy over anything that was not ours.** A CGI module from another product
    lives in the same library and SMP knows nothing about it — `MVSMF` is the
    usual one. It is still in the old `HTTPD.V4R0M*.LINKLIB` and it is *not* in
    the new one. Its own installation is the right way to put it back; a plain
    `IEBCOPY` works if you only need the server up.
-6. **Copy what you want out of the old `SAMPLIB`**, then `/S HTTPD` and check
-   `HTTPD000I` / `HTTPD005I` (step 10).
-7. **Only now scratch the release you came from:**
+7. **Copy what you want out of the old `SAMPLIB`.**
+8. **`/S HTTPD`, and read the banner before going further.** This is a gate,
+   not a formality:
+
+   ```
+   HTTPD000I HTTPD 4.1.0 (xxxxxxx) STARTING
+   HTTPD005I LIBC370 1.0.6
+   ```
+
+   Either line still showing the release you came from means step 4 did not
+   take and you are running the **old** build out of the old library. Nothing
+   else reports this — the install succeeded, SMP is satisfied, and every
+   condition code says so. Do not continue to step 9 until the banner is right.
+9. **Only now scratch the release you came from:**
    `DELETE HTTPD.V4R0M*.LINKLIB / .AHTTPLOD / .SAMPLIB NONVSAM SCRATCH PURGE`.
 
-> **If you stop after step 3 you have not upgraded.** The install succeeded, SMP
-> is satisfied, every condition code says so — and HTTPD is still loading the old
-> modules out of the old library, because `STEPLIB` still names it. There is no
-> message for this. `HTTPD000I` at startup gives the release and `HTTPD005I` the
-> runtime it was linked against; if either still reads the version you came from,
-> step 4 did not take. That is the one failure this order can produce, and it is
-> silent, so read the banner rather than the job log.
+**If you stop after step 3 you have not upgraded**, and that is why step 8 is a
+step rather than a footnote. Steps 4 to 9 are a **deliberate rollback window,
+then a scratch**: both installations sit on the disk side by side until you
+close it, so a bad start is one procedure edit away from being undone. Treat it
+as a window you chose and then closed, not a state to leave the system in. It
+exists only because the names change, so this is the last upgrade that has one.
 
-Steps 4 to 7 are a **deliberate rollback window, then a scratch**: both
-installations sit on the disk side by side until you close it, so a bad start at
-step 6 is one procedure edit away from being undone. Treat it as a window you
-chose and then closed, not a state to leave the system in. The window exists
-only because the names change, so this is the last upgrade that has one.
-
-> `mvslovers/ftpd` scratches the old libraries *before* repointing `STEPLIB`, and
-> trades the other way: a forgotten repoint then fails loudly with `S806` instead
-> of running the old build quietly, at the cost of the rollback. Both orders
-> defend the same mistake. This guide keeps the window because HTTPD is usually
-> the front end for mvsMF, and a bad start you cannot back out of takes the
-> REST API with it.
+The alternative — scratching the old libraries *first*, so a forgotten repoint
+fails loudly with `S806` instead of quietly running the old build — buys that
+safety by giving up the rollback. A positive check is worth more than an absent
+crash, which is why the banner gate replaces it here.
 
 The webroot disk is not part of this. It keeps its name, it is not SMP's, and
 nothing above touches it.
