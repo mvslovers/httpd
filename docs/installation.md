@@ -1062,10 +1062,10 @@ the other is not free.
 
 > A system that was upgraded also carries the **tombstone** of each earlier
 > level — `THTP400` listed as `TYPE = FUNCTION` with `DELBY = THTP410` and
-> nothing else. `LIST` answers **RC 00** for those, not RC 04. They are inert
-> records of an id that is spent and can never be reused; leave them, or add
-> `DEL SYSMOD(THTP400) .` to the `UCLIN` above if you want the inventory
-> completely clean.
+> nothing else. `LIST` answers **RC 00** for those, not RC 04, so they read as
+> occupied — which is correct: the id is spent and can never be reused. Leave
+> them. They are inert records, they own no elements, and no job here has been
+> run against one.
 
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
