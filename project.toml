@@ -451,9 +451,12 @@ extra = ["build/webroot/httpd-webroot.img"]
 # shows only what was *received*, while the CDS and ACDS store hashed member
 # names, so a LIST against both zones is the only way to see what is applied or
 # accepted.
-# BOTH STANDS, and say so explicitly rather than letting a reader infer it from
-# the line above: mvsdev (MVS/CE) FMIDCHK JOB00288, and drnmig3a (TK5) FMIDCHK
-# JOB00034, each RC 04 NOT FOUND in CDS and ACDS.  Name the stands every time.
+# THTP411: mvsdev (MVS/CE) FMIDCHK JOB00343, RC 04 NOT FOUND in CDS and ACDS,
+# 2026-09-14.  ONE STAND ONLY -- drnmig3a was unreachable that day, so check it
+# there before 4.1.1 is tagged.
+# THTP410 (spent by 4.1.0) was checked on BOTH: mvsdev FMIDCHK JOB00288 and
+# drnmig3a FMIDCHK JOB00034, each RC 04 NOT FOUND in CDS and ACDS.
+# Name the stands every time.
 # A round that silently covers one stand where the previous line covered two
 # reads as equally thorough and is not -- an id present on the stand you skipped
 # and absent on the one you checked is exactly what the second check is for.
@@ -491,8 +494,8 @@ extra = ["build/webroot/httpd-webroot.img"]
 # after releasing 1.1.0 on 2026-09-14, VERSION at 1.1.1-dev and fmid still
 # TFTP110.  ufsd does the move in the commit right after the bump (3db6866 ->
 # 20988c3); copy that habit.
-fmid = "THTP410"
-delete = ["THTP400"]            # the level this one replaces -- see above
+fmid = "THTP411"
+delete = ["THTP410"]            # the level this one replaces -- see above
 system = "Z038"
 
 # Empty despite the [dependencies] entry on ufsd, which is a *build* time one:
