@@ -42,8 +42,9 @@ that.
 Each release's SYSMOD carries `DELETE(<the previous FMID>)`, so SMP deletes the
 old modules from the target library and copies the new ones in during the same
 APPLY, and ownership of each module moves with them. 4.1.0 deletes `THTP400`.
-Section 12 is for **removing** HTTPD, not for upgrading it; earlier drafts of
-this guide sent you there first and that is no longer right.
+Section 12 is for **removing** HTTPD, not for upgrading it. If you are working
+from the 4.0.x guide, note that it *did* send a patch upgrade there first —
+that instruction is obsolete, not merely rephrased.
 
 Two things an upgrade still needs from you, both in their own steps:
 
@@ -979,9 +980,8 @@ What this release put on the system:
 > **This is not the upgrade path.** Installing a newer HTTPD needs nothing from
 > this page: each release's SYSMOD carries `DELETE(<previous FMID>)` and SMP
 > replaces the modules during the APPLY. Use section 12 to remove HTTPD from a
-> system, or to clean up after a test install. An earlier draft of this guide
-> sent upgrades here; following it now would uninstall a working server for no
-> reason.
+> system, or to clean up after a test install. The 4.0.x guide sent upgrades
+> here; following that now would uninstall a working server for no reason.
 
 **Leftovers from 4.0.x.** If this system was upgraded from 4.0.x rather than
 installed fresh, the old versioned libraries are still catalogued and are no
