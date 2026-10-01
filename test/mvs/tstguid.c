@@ -23,7 +23,7 @@
 */
 #define HTTP_PRIVATE
 #include "httpd.h"
-#include <clibauth.h>   /* __autask() -- APF-authorise for racf_login() */
+#include <mvs/apf.h>    /* __autask() -- APF-authorise for racf_login() */
 #include <mbtcheck.h>
 
 /* fabricate an ACEE carrying a length-prefixed userid in aceeuser (byte 0 =

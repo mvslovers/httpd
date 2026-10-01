@@ -1,7 +1,7 @@
 /* HTTPDSRV.C - CGI Program, Display Server */
 #include "httpd.h"
 #include "httpdmsg.h"
-#include "osdcb.h"      /* DCB -- was transitively included via ufs.h */
+#include <ibm/mvs/dcbd.h> /* DCB -- was transitively included via ufs.h */
 
 /* C stack for this load module; the @@crt0 default demands 256 KB of
 ** contiguous subpool 0 per request.  Must live in the module's own TU,

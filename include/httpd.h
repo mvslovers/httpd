@@ -14,34 +14,35 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <time.h>
-#include <time64.h>					/* 64 bit time prototypes		*/
+#include <ext/time64.h>					/* 64 bit time prototypes		*/
 #include <errno.h>
-#include "clibos.h"                 /* __setsp()/__getmsp() subpool */
-#include "clibppa.h"                /* C runtime program properties */
-#include "clibcrt.h"                /* C runtime area for each task */
-#include "clibenv.h"                /* C runtime environment vars   */
-#include "clibstae.h"               /* C runtime recovery routines  */
-#include "clibwto.h"                /* write to operator            */
-#include "clibcib.h"                /* console information block    */
-#include "clibthrd.h"               /* basic threads                */
-#include "clibthdi.h"               /* thread management            */
-#include "cliblink.h"               /* link to external program     */
-#include "clibary.h"                /* dynamic arrays               */
-#include "sha256.h"					/* SHA 256 function				*/
-#include "clibb64.h"				/* base64 encode/decode			*/
-#include "clibssib.h"				/* SSIB, __ssib(), __jobid()	*/
-#include "clibtiot.h"				/* TIOT, __tiot(), __jobname()	*/
-#include "clibsmf.h"                /* __smfid()                    */
-#include "clibtry.h"                /* try(), tryrc()               */
+#include <mvs/storage.h>            /* __setsp()/__getmsp() subpool */
+#include <mvs/crt.h>                /* C runtime PPA, CRT and GRT   */
+#include <mvs/env.h>                /* C runtime environment vars   */
+#include <mvs/recovery.h>           /* recovery, try(), tryrc()     */
+#include <mvs/wto.h>                /* write to operator            */
+#include <mvs/console.h>            /* console information block    */
+#include <mvs/thread.h>             /* threads, thread management   */
+#include <mvs/link.h>               /* link to external program     */
+#include <ext/array.h>              /* dynamic arrays               */
+#include <sha256.h>					/* SHA 256 function				*/
+#include <base64.h>				/* base64 encode/decode			*/
+#include <mvs/subsys.h>				/* SSIB, __ssib(), __jobid()	*/
+#include <mvs/dd.h>				/* TIOT, __tiot(), __jobname()	*/
+#include <mvs/smf.h>                /* __smfid()                    */
+#include <ext/strutil.h>            /* __patmat(), strcpyp(), memcpyp() */
 
 /* ufs headers */
 #include "libufs.h"                 /* UFS client stubs via UFSD STC */
 
 /* our headers */
-#include "socket.h"                 /* sockets via DYN75            */
+#include <sys/socket.h>             /* sockets via DYN75            */
+#include <netinet/in.h>
+#include <sys/select.h>
+#include <mvs/socket.h>
 #include "dbg.h"                    /* debugging goodies            */
 #include "errors.h"                 /* the missing errno values     */
-#include "racf.h"                   /* security environment         */
+#include <mvs/racf.h>               /* security environment         */
 #include "types.h"                  /* UCHAR, USHRT, UINT, ULONG    */
 #include "cred.h"					/* Credentials					*/
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */

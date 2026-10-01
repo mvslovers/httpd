@@ -13,21 +13,19 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <time.h>
-#include <time64.h>					/* 64 bit time prototypes		*/
+#include <ext/time64.h>					/* 64 bit time prototypes		*/
 #include <errno.h>
-#include <clibos.h>					/* __setsp()/__getmsp() subpool		*/
-#include "clibppa.h"                /* C runtime program properties */
-#include "clibcrt.h"                /* C runtime area for each task */
-#include "clibenv.h"                /* C runtime environment vars   */
-#include "clibstae.h"               /* C runtime recovery routines  */
-#include "clibwto.h"                /* write to operator            */
-#include "cliblock.h"               /* lock prototypes              */
-#include "clibary.h"                /* dynamic arrays               */
-#include "sha256.h"					/* SHA 256 function				*/
-#include "blowfish.h"				/* Blow Fish Encryption			*/
-#include "socket.h"                 /* sockets via DYN75            */
+#include <mvs/storage.h>					/* __setsp()/__getmsp() subpool		*/
+#include <mvs/crt.h>                /* C runtime PPA, CRT and GRT   */
+#include <mvs/env.h>                /* C runtime environment vars   */
+#include <mvs/recovery.h>           /* recovery, try(), tryrc()     */
+#include <mvs/wto.h>                /* write to operator            */
+#include <mvs/lock.h>               /* lock prototypes              */
+#include <ext/array.h>              /* dynamic arrays               */
+#include <sha256.h>					/* SHA 256 function				*/
+#include <blowfish.h>				/* Blow Fish Encryption			*/
 #include "errors.h"                 /* the missing errno values     */
-#include "racf.h"                   /* security environment         */
+#include <mvs/racf.h>               /* security environment         */
 
 /* Client credentials */
 typedef struct cred 	CRED;		/* Credential					*/

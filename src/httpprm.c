@@ -11,10 +11,10 @@
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
 #include "httpxlat.h"
-#include "clibenq.h"        /* ENQ()       -- port single-instance (#223)   */
-#include "clibdsab.h"       /* get_dsab()  -- DD -> DSAB                    */
-#include "ieftiot.h"        /* TIOTDD      -- DSAB -> TIOT entry            */
-#include "osjfcb.h"         /* JFCB        -- TIOT entry -> dsname(member)  */
+#include <mvs/enq.h>        /* ENQ()       -- port single-instance (#223)   */
+#include <mvs/dd.h>         /* get_dsab()  -- DD -> DSAB                    */
+#include <ibm/mvs/ieftiot1.h> /* TIOTDD      -- DSAB -> TIOT entry            */
+#include <ibm/mvs/iefjfcbn.h> /* JFCB        -- TIOT entry -> dsname(member)  */
 
 /* libc370 ships sleep() (src/clib/sleep.c) and __tzget() (src/clib/@@tzget.c)
 ** but declares neither in any header, so both were implicit declarations here.

@@ -1,6 +1,10 @@
 {
+  "mvslovers/crypto370": {
+    "sha256": "f5686240265baf69773e887bb7abd2c3f8da84d77bd377df38f95f4aa879fb6f",
+    "version": "1.0.1"
+  },
   "mvslovers/ufsd": {
-    "sha256": "5d19014572a7dfca0f9081f92ca74ba678a127285784e6dc2558c272bba198d6",
-    "version": "1.2.2"
+    "sha256": "09860edcafb7215838b9086420c051686b6c0f4519609f4a9b8b2119074a1a6b",
+    "version": "1.4.0-dev"
   }
 }

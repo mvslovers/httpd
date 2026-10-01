@@ -42,9 +42,10 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 file changed since 4.0.2 — the release is the libc370 1.0.6 relink plus the
 packaging change: `HTTPD.LINKLIB` without a version qualifier, `THTP410`
 deleting `THTP400`, and an upgrade that needs no `UCLIN`. `main` is now
-4.1.1-dev and already carries `THTP411` / `delete = ["THTP410"]`; that id is
-verified free on mvsdev only (`FMIDCHK JOB00343`) and still needs drnmig3a
-before 4.1.1 is tagged.
+4.2.0-dev -- the libc370 2.0 port makes the next release a minor, so 4.1.1 is
+never cut and `THTP411` stays unassigned -- and carries `THTP420` /
+`delete = ["THTP410"]`. `THTP420` is not yet checked on any stand: LIST it on
+mvsdev and drnmig3a before 4.2.0 is tagged.
 
 **#259 and #269 landed together as PR #267.**
 It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,

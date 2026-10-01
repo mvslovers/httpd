@@ -31,9 +31,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <clibos.h>
-#include <cliblink.h>
-#include <clibthrd.h>
+#include <mvs/storage.h>
+#include <mvs/link.h>
+#include <mvs/thread.h>
 #include <mbtcheck.h>
 
 #define PROBE_SP    7           /* problem-state range is 1-127             */

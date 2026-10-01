@@ -417,17 +417,18 @@ its predecessor:
 
 ```toml
 [distribution.smp]
-fmid   = "THTP410"
-delete = ["THTP400"]
+fmid   = "THTP420"
+delete = ["THTP410"]
 ```
 
 **No version component may ever exceed 9** — a 7-character id has no room for
 a second digit. At patch 9 cut the next minor, at minor 9 the next major;
 httpd 4.1.10 cannot be expressed and must not be released.
 
-Current: **`THTP410`** for 4.1.0, deleting `THTP400`. `THTP410` is still unspent
-(4.1.0 is unreleased), so it stays; `THTP400` is `REC APP ACC` on mvsdev and is
-burned.
+Current: **`THTP420`** for 4.2.0, deleting `THTP410`, not yet checked on any
+stand. 4.1.0 shipped under `THTP410` and 4.0.x under `THTP400`; both are
+burned. 4.1.1 was never cut -- the libc370 2.0 port (#272) made the next
+release a minor -- so `THTP411` stays unassigned.
 
 Never re-spend an id, and never install a test package under the real one: a
 test needs a throwaway id **and** throwaway module names, because SMP keys

@@ -1,7 +1,7 @@
 /* HTTPDMTT.C - CGI Program, Display Master Trace Table */
 #include "httpd.h"
 #include "httpdmsg.h"
-#include "clibmtt.h"
+#include <mvs/mtt.h>
 
 /* C stack for this load module; the @@crt0 default demands 256 KB of
 ** contiguous subpool 0 per request.  Must live in the module's own TU,
