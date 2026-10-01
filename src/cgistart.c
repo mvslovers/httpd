@@ -25,11 +25,10 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <clibgrt.h>
-#include <clibos.h>     /* __setsp() -- heap subpool (issue #154)   */
-#include <clibppa.h>
-#include <clibary.h>
-#include <clibenv.h>
+#include <mvs/crt.h>
+#include <mvs/storage.h> /* __setsp() -- heap subpool (issue #154)   */
+#include <ext/array.h>
+#include <mvs/env.h>
 #include "httpcgi.h"
 
 #define MAXPARMS 50 /* maximum number of arguments we can handle */

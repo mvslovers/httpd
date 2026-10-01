@@ -29,7 +29,7 @@
 */
 #define HTTP_PRIVATE
 #include "httpd.h"
-#include <clibauth.h>   /* __autask() -- APF-authorise for racf_login() */
+#include <mvs/apf.h>    /* __autask() -- APF-authorise for racf_login() */
 #include <mbtcheck.h>
 
 /* build an encrypted CREDID exactly as cred_login() does: plaintext update

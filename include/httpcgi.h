@@ -24,7 +24,7 @@
 #include <stddef.h>     /* size_t                   */
 #include <stdio.h>      /* FILE                     */
 #include <stdarg.h>     /* va_list                  */
-#include <time64.h>     /* time64_t (crent370)      */
+#include <ext/time64.h> /* time64_t (crent370)      */
 
 #include "dbg.h"        /* debug helpers            */
 #include "errors.h"     /* errno values             */
@@ -58,7 +58,7 @@ typedef struct cib      CIB;        /* Console info block   — opaque    */
 ** pointer and never look inside it, which is exactly the contract HTTPD and
 ** CRED already have here.  One definition, in httpd.h, cannot diverge. */
 typedef struct httproute HTTPROUTE; /* Route                — opaque    */
-#include <socket.h>                 /* struct in_addr                   */
+#include <netinet/in.h>             /* struct in_addr                   */
 
 /* ------------------------------------------------------------------ */
 /* Types with full definitions required by CGI modules                 */

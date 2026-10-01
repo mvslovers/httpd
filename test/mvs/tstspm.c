@@ -44,7 +44,7 @@
 */
 #include <stdlib.h>
 #include <string.h>
-#include <clibos.h>
+#include <mvs/storage.h>
 
 #define PROBE_SP    7           /* problem-state range is 1-127             */
 #define LEAK_KB     512         /* per LEAK call -- 64 of these is 32 MB,   */

@@ -1,8 +1,9 @@
 #include "cred.h"
-#include <clibauth.h>	/* __autask() */
-#include <clibb64.h>	/* base64 encode/decode */
-#include <clibssib.h>	/* __jobid() */
-#include <clibtiot.h>	/* __jobname() */
+#include <mvs/apf.h>	/* __autask() */
+#include <base64.h>	/* base64 encode/decode */
+#include <mvs/subsys.h>	/* __jobid() */
+#include <mvs/dd.h>	/* __jobname() */
+#include <arpa/inet.h>
 
 #undef array_count
 
@@ -44,7 +45,7 @@ int main(int argc, char **argv)
 		// wtodumpf(key, sizeof(CREDKEY), "CREDKEY");
 	}
 	
-	inet_aton("192.168.1.123", (in_addr_t*)&addr);
+	inet_aton("192.168.1.123", (struct in_addr *)&addr);
 
 	cred = cred_login(addr, "HERC01", "CUL8TR", 0);   /* 0 = no max-age */
 	if (cred) {

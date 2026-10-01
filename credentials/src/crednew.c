@@ -1,4 +1,4 @@
-#include <clibos.h>		/* __getmsp() -- subpool pin (issue #154)	*/
+#include <mvs/storage.h>		/* __getmsp() -- subpool pin (issue #154)	*/
 #include "cred.h"
 
 CRED *

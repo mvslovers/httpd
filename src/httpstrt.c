@@ -4,9 +4,9 @@
 #include "string.h"
 #include "stddef.h"
 #include "time.h"
-#include "clibcrt.h"
-#include "clibenv.h"                /* loadenv()                        */
-#include "clibwto.h"                /* wtof()                           */
+#include <mvs/crt.h>
+#include <mvs/env.h>                /* loadenv()                        */
+#include <mvs/wto.h>                /* wtof()                           */
 #include "httpdmsg.h"               /* MSG_DD_* operator messages       */
 
 #define MAXPARMS 50 /* maximum number of arguments we can handle */

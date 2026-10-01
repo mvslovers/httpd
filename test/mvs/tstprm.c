@@ -44,8 +44,9 @@
 */
 #include "httpd.h"
 
-#include <clibio.h>
-#include <clibwto.h>
+#include <stdio.h>
+#include <mvs/dynalloc.h>
+#include <mvs/wto.h>
 #include <mbtcheck.h>
 
 #define DFLT_DSN        "IBMUSER.HTTPD.TPRM"

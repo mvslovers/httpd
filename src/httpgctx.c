@@ -3,7 +3,7 @@
 */
 #define HTTP_PRIVATE
 #include "httpd.h"
-#include "mvssupa.h"                /* __getm() raw GETMAIN in subpool 0    */
+#include <mvs/storage.h>            /* __getm() raw GETMAIN in subpool 0    */
 
 __asm__("\n&FUNC SETC 'HTTPGCTX'");
 

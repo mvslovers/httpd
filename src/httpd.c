@@ -12,10 +12,10 @@
 #include "httpd.h"
 #include "httpdmsg.h"               /* operator message catalog         */
 #include "httpracf.h"               /* HTTP_RACF_NOTPROT (res_probe)    */
-#include "clibgrt.h"
-#include "clibsock.h"
-#include "clibver.h"                /* libc370_version()                */
-#include "clibauth.h"               /* __autask/__austep/__uatask/__uastep */
+#include <mvs/crt.h>
+#include <mvs/socket.h>
+#include <ext/version.h>            /* libc370_version()                */
+#include <mvs/apf.h>                /* __autask/__austep/__uatask/__uastep */
 
 static int socket_thread(void *arg1, void *arg2);
 static int worker_thread(void *udata, CTHDWORK *work);
@@ -1079,7 +1079,7 @@ build_ecblist(COM *com, unsigned **ecblist)
     return pos;
 }
 
-#include "cde.h"
+#include <ibm/mvs/ihacde.h>
 static CDE *
 find_cde(const char *name)
 {

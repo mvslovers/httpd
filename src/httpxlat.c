@@ -13,7 +13,7 @@
 #define HTTP_PRIVATE
 #include "httpd.h"
 #include "httpdmsg.h"
-#include "clibgrt.h"                /* __grtget() for http_codepage()   */
+#include <mvs/crt.h>                /* __grtget() for http_codepage()   */
 
 /* ------------------------------------------------------------------ */
 /* Codepage pair struct                                                */
