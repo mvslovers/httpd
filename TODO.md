@@ -11,8 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-09-14 after PR #267 merged, ten
-issues open — #266 filed out of the ftpd 1.1.0 test install and #265 out of the
+*Last reconciled against the tracker: 2026-10-01 after PR #273 merged (the
+libc370 2.0 port, #272) and v4.2.0-dev was published, ten issues open — #270
+and #271 filed since and not yet ranked; #265 and #266 closed. Before that,
+2026-09-14 after PR #267 merged — #266 filed out of the ftpd 1.1.0 test install and #265 out of the
 libc370 v1.0.6 release; #259 and #269 closed by #267; #264, #263 and #262 filed
 out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
 #176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
@@ -33,8 +35,8 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
-| — | #265 | the libc370 v1.0.6 relink | **nothing** — audit posted, ready to close |
-| — | #266 | packaging | **nothing** — all three items landed, ready to close |
+| — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
+| — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
@@ -46,6 +48,13 @@ deleting `THTP400`, and an upgrade that needs no `UCLIN`. `main` is now
 never cut and `THTP411` stays unassigned -- and carries `THTP420` /
 `delete = ["THTP410"]`. `THTP420` is not yet checked on any stand: LIST it on
 mvsdev and drnmig3a before 4.2.0 is tagged.
+
+**The libc370 2.0 port landed on 2026-10-01** (#272, PR #273) and ships as the
+prerelease **v4.2.0-dev** (tag on `e628477`). It stays a prerelease until
+mvsMF, httplua and httprexx are on libc370 2.0: `httpcgi.h` in `libhttpd` now
+includes 2.0 headers, and their `>=` ranges would pick up a stable release. Its
+SMP package already carries `THTP420`, so an SMP install of it spends that id
+on a dev build.
 
 **#259 and #269 landed together as PR #267.**
 It was parked because `lklib`, `target` and `distlib` go into the FMID's JCLIN,
