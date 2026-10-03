@@ -249,6 +249,7 @@ d_config(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
     static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
     char        name[64];
+    (void)buf;
 
     lock(httpd, LOCK_SHR);
 
@@ -299,6 +300,7 @@ d_login(char *buf)
     CRED 		***array= cred_array();
     CRED		*cred;
     unsigned	count, n;
+    (void)buf;
 
 	/* The httpd lock this used to take was for the global policy line (#105);
 	   nothing here reads httpd any more.  Who is logged in is a fact about the
@@ -328,6 +330,7 @@ d_port(char *buf)
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
+    (void)buf;
 
     wtof(MSG_D_PORT, httpd->port);
 
@@ -340,6 +343,7 @@ d_stats(char *buf)
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
 	static const char *levels[] = {"NONE","ERROR","AUTH","ALL"};
+    (void)buf;
 
 	wtof(MSG_D_STATS_SMF,
 		levels[httpd->smf_level], (int)httpd->smf_type);
@@ -358,6 +362,7 @@ d_version(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
     char        vers[24];
     char        commit[24];
+    (void)buf;
 
     wtof(MSG_D_VERSION,
         http_upcase(vers, sizeof(vers), httpd->version),
@@ -372,7 +377,7 @@ d_memory(char *buf)
 	char		*next = NULL;
 	char		*mem;
 	int			len;
-	unsigned    rc;
+	int         rc;
 
 	/* D M with no address would strtoul(NULL) -> deref NULL on the console
 	   thread; an address is required */
@@ -623,6 +628,7 @@ d_thread(char *buf)
     CTHDMGR     *mgr;
     unsigned    count;
     unsigned    n;
+    (void)buf;
 
     /* obtain a shared lock on httpd */
     lock(httpd,1);

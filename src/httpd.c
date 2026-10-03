@@ -712,6 +712,11 @@ process_clients(fd_set *read, fd_set *write, fd_set *excp)
     unsigned    count;
     unsigned    n;
     HTTPC       *httpc;
+    /* select() is only the wakeup: http_process_clients() walks every
+    ** client, so which descriptors became ready is not needed here. */
+    (void)read;
+    (void)write;
+    (void)excp;
 
     /* process all the http clients (does its own locking) */
     http_process_clients();
@@ -772,6 +777,8 @@ socket_thread(void *arg1, void *arg2)
     struct sockaddr_in addr;
     struct sockaddr_in *a = (struct sockaddr_in *)&addr;
     time64_t    last_sweep = time64(NULL);  /* credential reaper throttle (M2) */
+    (void)arg1;
+    (void)arg2;
 
     http_enter("socket_thread()\n");
 
@@ -1008,6 +1015,7 @@ worker_thread(void *udata, CTHDWORK *work)
     char        *data   = NULL;
     HTTPC       *httpc  = NULL;
     char        name[20];   /* "WORKER(xxxxxx)" for HTTPD060I/061I */
+    (void)udata;
 
     http_enter("worker_thread()\n");
 
@@ -1162,6 +1170,7 @@ identify_cthread(void)
 static int auth_setup(const char *name)
 {
     int     rc = 0;
+    (void)name;
 
     return rc;
 }

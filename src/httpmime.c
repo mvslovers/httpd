@@ -141,7 +141,7 @@ httpmime(const UCHAR *path)
         ext++;    /* skip past '.' or ':' character */
 
         len = strlen(ext);
-        if (len >= sizeof(buf)) len = sizeof(buf)-1;
+        if (len >= (int)sizeof(buf)) len = sizeof(buf)-1;
         memcpy(buf,ext,len);
         buf[len] = 0;
 

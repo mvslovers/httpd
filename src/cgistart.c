@@ -109,6 +109,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     char        parmbuf[310];
     UCHAR       cgisp;              /* heap subpool for main() (#154)   */
     UCHAR       prevsp  = 0;        /* ... what it replaced             */
+    (void)tsojbid;
 
     /* we're going to process the callers parameter list first so we
        can decide is we'll bypass the opens for the permanent datasets.
@@ -195,7 +196,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     /* initialize time zone offset for this thread */
     tzset();
 
-    if (parmLen >= sizeof(parmbuf) - 2) {
+    if (parmLen >= (int)sizeof(parmbuf) - 2) {
         parmLen = sizeof(parmbuf) - 1 - 2;
     }
     if (parmLen < 0) parmLen = 0;

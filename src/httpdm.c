@@ -36,6 +36,7 @@ int main(int argc, char **argv)
     char        *length = NULL;
     char        *chunk  = NULL;
     char        *data   = NULL;
+    (void)argc;
 
     if (!httpd) {
         wtof(MSG_NOT_UNDER_HTTPD, argv[0]);

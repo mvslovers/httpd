@@ -22,7 +22,9 @@ int main(int argc, char **argv)
 	utime64_t	before;
 	utime64_t	after;
 	__64		usec;
-	
+	(void)argc;
+	(void)argv;
+
 	wtof("jobname=\"%8.8s\"", __jobname());
 	wtof("jobid=\"%8.8s\"", __jobid());
 

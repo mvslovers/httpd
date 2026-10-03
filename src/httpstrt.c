@@ -28,6 +28,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     int         parmLen;
     int         progLen = 0;
     char        parmbuf[310];
+    (void)tsojbid;
 
     /* GRTFLAG1_TSO records the SHAPE OF THE PARAMETER LIST, not the
        environment -- see the longer note at the same point in cgistart.c.  It
@@ -106,7 +107,7 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
     /* initialize time zone offset for this thread */
     tzset();
 
-    if (parmLen >= sizeof(parmbuf) - 2) {
+    if (parmLen >= (int)sizeof(parmbuf) - 2) {
         parmLen = sizeof(parmbuf) - 1 - 2;
     }
     if (parmLen < 0) parmLen = 0;

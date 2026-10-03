@@ -34,7 +34,7 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
 
     int saw_cr = 0;
 
-    for(i=0; i < max; ) {
+    for(i=0; i < (int)max; ) {
         /* get one character from client socket */
         c = http_getc(httpc);
         if (c < 0) {

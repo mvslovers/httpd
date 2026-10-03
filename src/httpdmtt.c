@@ -18,6 +18,7 @@ int main(int argc, char **argv)
     HTTPD       *httpd  = grt->grtapp1;
     HTTPC       *httpc  = grt->grtapp2;
     char        *data   = NULL;
+    (void)argc;
 
     if (!httpd) {
         wtof(MSG_NOT_UNDER_HTTPD, argv[0]);

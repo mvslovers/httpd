@@ -50,6 +50,7 @@ int main(int argc, char **argv)
     HTTPC       *httpc  = grt->grtapp2;
     char        *target = NULL;
     unsigned    len;    
+    (void)argc;
 
     if (!httpd) {
         wtof(MSG_NOT_UNDER_HTTPD, argv[0]);

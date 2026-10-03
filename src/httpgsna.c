@@ -7,5 +7,6 @@
 extern UCHAR *
 httpgsna(HTTPD *httpd)
 {
+    (void)httpd;
     return "HTTPD Server";
 }
