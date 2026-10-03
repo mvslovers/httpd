@@ -21,7 +21,7 @@ http_open(HTTPC *httpc, const UCHAR *path, const HTTPM *mime)
     if (strstr(path, "..")) goto quit;
 
     len = strlen(path);
-    if (len >= sizeof(buf)) len = sizeof(buf)-1;
+    if (len >= (int)sizeof(buf)) len = sizeof(buf)-1;
 
     memcpy(buf, path, len);
     buf[len]=0;

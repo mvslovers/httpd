@@ -155,12 +155,12 @@ ssi_file_read(HTTPC *httpc)
 	// wtof("%s: SSTATE_SENDING", __func__);
 
 	/* do we have any room in our buffer? */
-	if (avail <= (sizeof(tmp) * 2)) {
+	if (avail <= (int)(sizeof(tmp) * 2)) {
 		ssi_send_buffer(httpc);
 		avail	= CBUFSIZE - httpc->len;
 	}
 
-	if (avail <= (sizeof(tmp) * 2)) goto quit;
+	if (avail <= (int)(sizeof(tmp) * 2)) goto quit;
 
 	// wtof("%s: fgets()", __func__);
 	
@@ -613,7 +613,7 @@ ssi_buffer(HTTPC *httpc, const char *buf, int len)
 {
 	int		avail;
 	
-	if (httpc->len >= (CBUFSIZE - len)) {
+	if ((int)httpc->len >= (CBUFSIZE - len)) {
 		/* try to send what we have in the buffer */
 		ssi_send_buffer(httpc);
 	}

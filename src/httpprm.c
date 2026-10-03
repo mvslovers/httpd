@@ -659,6 +659,7 @@ static void
 parse_kv_tail(HTTPD *httpd, char **tok, int start, int ntok, ROUTE_POLICY *pol)
 {
     int i;
+    (void)httpd;
 
     for (i = start; i < ntok; i++) {
         char *t = tok[i];
