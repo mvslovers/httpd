@@ -320,7 +320,7 @@ copy persists, a per-request disk fetch worth eliminating if it does not.
 
 The docs now record (b) as an open question and say not to write either answer
 down until it is measured. Honour that — a plausible guess written into
-`development.md` is exactly how the five wrong statements got there.
+`docs/server-modules.md` is exactly how the five wrong statements got there.
 
 ### 5 · #258 — thirteen console lines that tell the operator nothing
 
@@ -393,7 +393,7 @@ stay open and stay ranked out — not closed, not forgotten, and not waited on.
 *security · `blocked:rakf`*
 
 ASXBSENV is address-space-wide and 3.8j has no per-task ACEE. The measured
-fail-open chain is **not restated here** — `docs/identity-redesign.md` §1.5 owns
+fail-open chain is **not restated here** — `internals/identity-redesign.md` §1.5 owns
 it, with the source citations (`credfree.c:33`, `raclgout.c:68-74`,
 `ICHSFR00.hlasm:116`) and the cross-project picture this file cannot hold.
 
@@ -412,7 +412,7 @@ it is a two-project agreement on a TCB word, not a RAKF feature toggle.
   `mvslovers/ftpd#97` (hardcoded literals; that issue is now about configuring
   them). ufsd has none and is staying that way: `mvslovers/ufsd#65` closed
   *not planned* on 2026-08-23, because nothing untrusted can steer an OPEN in
-  that address space (`docs/identity-redesign.md` §3.2). The cost of the
+  that address space (`internals/identity-redesign.md` §3.2). The cost of the
   fallback therefore lands on httpd and ftpd, not there. ftpd#97 is unblocked.
 - **The §1.5 verification** is unblocked but not free. Before booking a run:
   link 1 of the chain is a *denied* access abending, and `mvslovers/mvsmf#228`
@@ -505,7 +505,7 @@ project already writes it down properly.
 
 ## Cross-repo
 
-This file is httpd-only, and the identity work is not. `docs/identity-redesign.md`
+This file is httpd-only, and the identity work is not. `internals/identity-redesign.md`
 owns that story across httpd, mvsMF, ftpd, ufsd and RAKF. Do not rank those here;
 update the status line there.
 
@@ -529,5 +529,5 @@ closes on an implementing issue in libc370, which should be settled together wit
 `@@@try.c` message is the half with no cheap option channel.
 
 Closed *not planned* on 2026-08-23: `mvslovers/ufsd#65` — reasoning in its
-closing comment and in `docs/identity-redesign.md` §3.2. The per-client
+closing comment and in `internals/identity-redesign.md` §3.2. The per-client
 permission question that replaces it is `mvslovers/ufsd#67`.

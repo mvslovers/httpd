@@ -11,7 +11,7 @@ several credential sources, per-route policy** — and retire mvsMF's parallel
 auth track.
 
 This document is the basis for a joint httpd ↔ mvsMF review. See also the
-`docs/refactoring-backlog.md` *Security architecture* section and the
+`internals/refactoring-backlog.md` *Security architecture* section and the
 `credential-package-unification` memory.
 
 ---
@@ -119,7 +119,7 @@ Bearer <token>`**, each → `httpc->cred`.
 
 Each **route** (a path prefix) declares its own policy; the global `LOGIN` stays
 as the default. *(Superseded by #105: the global `LOGIN` bitmask is retired and
-a route without `AUTH=` is public. See [configuration.md](configuration.md).)*
+a route without `AUTH=` is public. See [configuration.md](../docs/configuration.md).)*
 Two kinds of route carry the *same* policy:
 
 - **`MOD=`** — a route **with a program** (CGI), as today.

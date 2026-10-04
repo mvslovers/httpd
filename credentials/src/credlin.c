@@ -84,7 +84,7 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 		   this one chokepoint rather than at each caller.
 
 		   Freeing on the request path is the reaper's known borrow window (the
-		   M2 note in docs/refactoring-backlog.md: testlock catches a concurrent
+		   M2 note in internals/refactoring-backlog.md: testlock catches a concurrent
 		   free, not a borrow), guarded by the same invariant -- SESSION_MAXAGE
 		   >> the longest request, which HTTPD032E warns about at startup.
 		   Merely rejecting it is not an option here: cred_login() would keep

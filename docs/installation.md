@@ -969,7 +969,7 @@ default for 1.1 clients; 1.0 clients always get `Connection: close`.
 The full reference is
 [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md);
 writing your own module is
-[development.md](https://github.com/mvslovers/httpd/blob/main/docs/development.md).
+[server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md).
 
 ---
 

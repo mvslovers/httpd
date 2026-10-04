@@ -317,7 +317,7 @@ the parse buffer, so the original NULL-deref was not reachable.
   UFS root — bounded to the UFS namespace but not to a subtree. Not the SSI
   traversal (S4), but a config-hardening gap: consider requiring `DOCROOT` (or
   defaulting to a safe subtree) rather than serving the UFS root.
-- **Auth redesign — see [`docs/auth-redesign.md`](auth-redesign.md).** The joint
+- **Auth redesign — see [`internals/auth-redesign.md`](auth-redesign.md).** The joint
   httpd ↔ mvsMF analysis is written up there (2026-07-04): one `credentials/`
   store, **three sources** (Form / Basic / z/OSMF token API), **per-route auth
   policy** (replacing the coarse global `LOGIN` bitmask), decoupled login

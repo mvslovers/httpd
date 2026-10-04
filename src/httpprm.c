@@ -300,7 +300,7 @@ set_defaults(HTTPD *httpd)
        forever, so without this a credential cached at login stays valid --
        and with it a RACF identity that may since have been REVOKEd or had its
        password changed.  8 hours is deliberately generous: every reap calls
-       racf_logout(), which clears ASXBSENV (see docs/identity-redesign.md §1),
+       racf_logout(), which clears ASXBSENV (see internals/identity-redesign.md §1),
        so reaping often is its own hazard until that plank lands. */
     httpd->cfg_session_maxage    = 480;     /* credential max-age (min), 0=off */
 

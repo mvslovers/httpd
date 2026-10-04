@@ -120,7 +120,7 @@ MOD=REXX                 Extension — *.rexx files served from DOCROOT
 
 Scripting modules like LUA and REXX don't need an explicit pattern — HTTPD derives the file extension from the module name automatically.
 
-Debug modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not enabled by default. They are intended for development and troubleshooting only. See [docs/development.md](docs/development.md) for details on writing your own modules.
+Debug modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not enabled by default. They are intended for development and troubleshooting only. See [docs/server-modules.md](docs/server-modules.md) for details on writing your own modules.
 
 ## Ecosystem
 
@@ -135,7 +135,7 @@ HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosy
 
 ## For Developers
 
-Build instructions, architecture overview, the ASCII/EBCDIC translation system, and how to write your own server modules are documented in [docs/development.md](docs/development.md).
+Build instructions, the architecture overview and the ASCII/EBCDIC translation system are documented in [internals/development.md](internals/development.md); how to write your own server modules is in [docs/server-modules.md](docs/server-modules.md).
 
 ## Credits
 
