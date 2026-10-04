@@ -191,7 +191,7 @@ cred_overage(HTTPD *httpd, CRED *cred)
 ** reclamation is left to the sweep on purpose.  Freeing it on this path would
 ** open a borrow window the idle design does not have -- a second worker holding
 ** the same CRED for an in-flight request would be left with freed storage (the
-** M2 note in docs/refactoring-backlog.md: testlock catches a concurrent free,
+** M2 note in internals/refactoring-backlog.md: testlock catches a concurrent free,
 ** not a borrow).  Leaving it linked costs one dead CRED for up to a minute and
 ** resolves nothing in the meantime, because every lookup re-checks the age.
 */

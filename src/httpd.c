@@ -682,7 +682,7 @@ build_fd_set(fd_set *read, fd_set *write, fd_set *excp)
      * and we check for NULL below".  It does not: arraydel() shifts every later
      * element left and NULLs only the slot past the new count (libc370
      * @@ardel.c).  The check that argument justified is gone with the
-     * single-writer finding; see docs/development.md, "Dynamic arrays: no holes
+     * single-writer finding; see internals/development.md, "Dynamic arrays: no holes
      * below the count".
      */
     for(n=0; n < count; n++) {
