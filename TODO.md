@@ -11,7 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-04 after PR #276 merged (the
+*Last reconciled against the tracker: 2026-10-04 after PR #279 merged (the
+docs/ / internals/ split, #278; #277 moved mbt to v2.1.3 before it), eleven
+issues open, none ranked or closed by either. Before that, 2026-10-04 after PR #276 merged (the
 `-Wextra` warnings cleared on mbt 37b889b; #274 bumped mbt just before it),
 eleven issues open — #275 filed out of that PR and not yet ranked. Before that,
 2026-10-01 after PR #273 merged (the
