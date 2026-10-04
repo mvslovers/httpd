@@ -36,8 +36,10 @@
 extern int main(int argc, char **argv);
 extern void __exita(int status);
 
-/* initialize to 0 to prevent linkage editor from trying to resolve httpx */
-HTTPX *httpx = 0;
+/* initialize to 0 to prevent linkage editor from trying to resolve httpx.
+   const: nothing writes it (the #define below shadows it), and a writable
+   global would be shared by every task using a RENT module (cc370#100). */
+HTTPX *const httpx = 0;
 
 /* we want to use the httpx pointer in the httpd struct for the various
    http_xxx functions, so we define httpx to do just that
