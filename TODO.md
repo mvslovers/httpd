@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-01 after PR #273 merged (the
+*Last reconciled against the tracker: 2026-10-04 after PR #276 merged (the
+`-Wextra` warnings cleared on mbt 37b889b; #274 bumped mbt just before it),
+eleven issues open — #275 filed out of that PR and not yet ranked. Before that,
+2026-10-01 after PR #273 merged (the
 libc370 2.0 port, #272) and v4.2.0-dev was published, ten issues open — #270
 and #271 filed since and not yet ranked; #265 and #266 closed. Before that,
 2026-09-14 after PR #267 merged — #266 filed out of the ftpd 1.1.0 test install and #265 out of the
@@ -37,6 +40,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
+| — | #275 | latent bug — `__start` `parmLen` clamp before the TSO `-= 4` | **nothing**; needs a malformed parameter list to trigger. Not yet ranked |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
