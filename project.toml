@@ -14,9 +14,11 @@ type = "application"
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
 # 2.4.0: the current release; it needs cc370 >= 1.4.0 (its headers #error
-# otherwise).  The C runtime startup is a member of libc.a since 2.3.0, so no
-# module names a startup object (mvslovers/mbt#158); an older libc.a would
-# quietly link crt0 where these modules used to have crt1.
+# otherwise).  It is also the floor: HTTPD's startup step is libc370's
+# __premain() hook (#281, mvslovers/libc370#440), and an older libc.a would
+# never call it -- HTTPD would open SYSPRINT/SYSTERM/SYSIN as its streams
+# instead of refusing them.  The C runtime startup is a member of libc.a since
+# 2.3.0, so no module names a startup object (mvslovers/mbt#158).
 libc370 = "2.4.0"
 
 [build]
@@ -68,10 +70,11 @@ sources = ["src/*.c", "credentials/src/*.c"]
 # Module entry points are kept OUT of the autocall pool so their custom __start
 # can never shadow another module's (or a test's) entry by autocall:
 #   - cgistart: the CGI launcher (a per-module root, also shipped in [lib]).
-#   - httpstrt: HTTPD's own __start (rejects SYSPRINT, opens HTTPDOUT/ERR/IN).
-# The HTTPD module lists httpstrt.c in its own [[module]] sources, so it still
-# gets it; everything else (CGI modules, [[test]] modules) resolves the default
-# libc __start instead.
+#   - httpstrt: HTTPD's __premain() hook (rejects SYSPRINT, opens
+#     HTTPDOUT/ERR/IN).  libc370's startup refers to it weakly, and a weak
+#     reference does not pull a member out of an archive, so it has to be
+#     named: the HTTPD module lists httpstrt.c in its own [[module]] sources;
+#     everything else (CGI modules, [[test]] modules) runs without the hook.
 exclude = ["src/cgistart.c", "src/httpstrt.c"]
 
 # -- Load Modules -------------------------------------------------
