@@ -123,7 +123,7 @@ code is the test and the sequence is not.
 
 | Failure | Ends |
 |---|---|
-| `HTTPD014E`–`HTTPD019W` — a reserved DD present, or a required one missing | `EXIT_FAILURE` from `__start`, before `main()` runs |
+| `HTTPD014E`–`HTTPD019W` — a reserved DD present, or a required one missing | `EXIT_FAILURE` from HTTPD's startup step (`__premain()`), before `main()` runs |
 | `HTTPD012E` — APF authorization could not be obtained | the failing setup's return code, passed through unchanged |
 
 ## HTTPD0xx — server lifecycle

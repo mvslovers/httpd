@@ -1,49 +1,29 @@
-/*#define LIB_STDIO*/
+/* httpstrt.c - HTTPD's own startup step, run by libc370's __start() through
+   the __premain() hook before the standard streams are opened and before
+   main().  Everything else (environment, time zone, parameter list, argv)
+   is libc370's startup.
+
+   HTTPD refuses SYSPRINT, SYSTERM and SYSIN: those are the ddnames the
+   default streams open, so their presence means the PROC is not HTTPD's.
+   The streams are HTTPDOUT, HTTPDERR and HTTPDIN (else 'NULLFILE') instead.
+
+   The startup refers to __premain weakly, and a weak reference does not
+   pull an object out of an archive -- so this source is listed in the HTTPD
+   module's own sources, not left to autocall. */
 #include "stdio.h"
 #include "stdlib.h"
-#include "string.h"
-#include "stddef.h"
-#include "time.h"
-#include <mvs/crt.h>
-#include <mvs/env.h>                /* loadenv()                        */
+#include <mvs/crt.h>                /* __premain()                      */
 #include <mvs/wto.h>                /* wtof()                           */
 #include "httpdmsg.h"               /* MSG_DD_* operator messages       */
 
-#define MAXPARMS 50 /* maximum number of arguments we can handle */
-
-extern int main(int argc, char **argv);
-extern void __exita(int status);
-
 int
-__start(char *p, char *pgmname, int tsojbid, void **pgmr1)
+__premain(char *parm, char *pgmname, void **pgmr1)
 {
-    CLIBGRT     *grt    = __grtget();
     int         errors  = 0;
     FILE        *fp;
-    int         x;
-    int         argc;
-    unsigned    u;
-    char        *argv[MAXPARMS + 1];
-    int         rc;
-    int         parmLen;
-    int         progLen = 0;
-    char        parmbuf[310];
-    (void)tsojbid;
-
-    /* GRTFLAG1_TSO records the SHAPE OF THE PARAMETER LIST, not the
-       environment -- see the longer note at the same point in cgistart.c.  It
-       means "bytes 0-3 are a TSO command-style prefix, the parm starts at byte
-       4", which is what the argv[0] parsing further down needs and all it is
-       used for.  Measured clear in batch, TSO background and TSO foreground on
-       a parameterless call (issue #141), so it cannot answer "am I under TSO".
-
-       The old comment claimed this determines how the permanent files are
-       opened.  It does not; the fopen() calls below never looked at it. */
-    parmLen = ((unsigned int)p[0] << 8) | (unsigned int)p[1];
-    if ((parmLen > 0) && (p[2] == 0)) {
-        grt->grtflag1 |= GRTFLAG1_TSO;
-        progLen = (unsigned int)p[3];
-    }
+    (void)parm;
+    (void)pgmname;
+    (void)pgmr1;
 
     /* Check for SYSPRINT DD allocation */
     fp = fopen("DD:SYSPRINT", "w");
@@ -69,9 +49,9 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
         fclose(fp);
     }
 
-    if (errors) __exita(EXIT_FAILURE);
+    if (errors) return EXIT_FAILURE;
 
-    /* open our HTTPD datasest */
+    /* open our HTTPD datasets */
     stdout = fopen("DD:HTTPDOUT", "w");
     if (!stdout) {
         errors++;
@@ -90,99 +70,14 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
         errors++;
         wtof(MSG_DD_NO_STDIN);
     }
-    
+
     if (errors) {
-        if (stdin)  fclose(stdin);
-        if (stderr) fclose(stderr);
-        if (stdout) fclose(stdout);
-        __exita(EXIT_FAILURE);
-    }
-    
-    /* load any environment variables */
-    if (loadenv("dd:SYSENV")) {
-        /* no SYSENV DD, try ENVIRON DD */
-        loadenv("dd:ENVIRON");
+        /* leave no stream pointing at a closed FILE */
+        if (stdin)  { fclose(stdin);  stdin  = NULL; }
+        if (stderr) { fclose(stderr); stderr = NULL; }
+        if (stdout) { fclose(stdout); stdout = NULL; }
+        return EXIT_FAILURE;
     }
 
-    /* initialize time zone offset for this thread */
-    tzset();
-
-    if (parmLen >= (int)sizeof(parmbuf) - 2) {
-        parmLen = sizeof(parmbuf) - 1 - 2;
-    }
-    if (parmLen < 0) parmLen = 0;
-
-    /* We copy the parameter into our own area because
-       the caller hasn't necessarily allocated room for
-       a terminating NUL, nor is it necessarily correct
-       to clobber the caller's area with NULs. */
-    memset(parmbuf, 0, sizeof(parmbuf));
-    if (grt->grtflag1 & GRTFLAG1_TSO) {
-        parmLen -= 4;
-        memcpy(parmbuf, p+4, parmLen);
-    }
-    else {
-        memcpy(parmbuf, p+2, parmLen);
-    }
-    p = parmbuf;
-
-    if (pgmr1) {
-        /* save the program parameter list values (max 10 pointers)
-           note: the first pointer is always the raw EXEC PGM=...,PARM
-           or CPPL (TSO) address.
-        */
-        for(x=0; x < 10; x++) {
-            u = (unsigned)pgmr1[x];
-            /* add to array of pointers from caller */
-            arrayadd(&grt->grtptrs, (void*)(u&0x7FFFFFFF));
-            if (u&0x80000000) break; /* end of VL style address list */
-        }
-    }
-
-    if (grt->grtflag1 & GRTFLAG1_TSO) {
-        argv[0] = p;
-        for(x=0;x<=progLen;x++) {
-            if (argv[0][x]==' ') {
-                argv[0][x]=0;
-                break;
-            }
-        }
-        p += progLen;
-    }
-    else {       /* batch or tso "call" */
-        argv[0] = pgmname;
-        pgmname[8] = '\0';
-        pgmname = strchr(pgmname, ' ');
-        if (pgmname) *pgmname = '\0';
-    }
-
-    while (*p == ' ') p++;
-
-    x = 1;
-    if (*p) {
-        while(x < MAXPARMS) {
-            char srch = ' ';
-
-            if (*p == '"') {
-                p++;
-                srch = '"';
-            }
-            argv[x++] = p;
-            p = strchr(p, srch);
-            if (!p) break;
-
-            *p = '\0';
-            p++;
-            /* skip trailing blanks */
-            while (*p == ' ') p++;
-            if (*p == '\0') break;
-        }
-    }
-    argv[x] = NULL;
-    argc = x;
-
-    rc = main(argc, argv);
-
-    __exit(rc);
-    return (rc);
+    return 0;
 }
