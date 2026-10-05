@@ -167,7 +167,10 @@ __start(char *p, char *pgmname, int tsojbid, void **pgmr1)
        opened.  It does not, and did not: the fopen() calls below never looked
        at it. */
     parmLen = ((unsigned int)p[0] << 8) | (unsigned int)p[1];
-    if ((parmLen > 0) && (p[2] == 0)) {
+    /* TSO-shaped only if the length covers the 4-byte prefix it then
+       skips: a length of 1..3 with a zero third byte made parmLen - 4
+       negative below, and memcpy() took it as a huge size (#275) */
+    if ((parmLen >= 4) && (p[2] == 0)) {
         grt->grtflag1 |= GRTFLAG1_TSO;
         progLen = (unsigned int)p[3];
     }
