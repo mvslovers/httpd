@@ -11,7 +11,12 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-04 after PR #279 merged (the
+*Last reconciled against the tracker: 2026-10-05 after PR #283 merged (#275,
+cgistart's parameter-length check, mirroring libc370#446; its probe is not in
+the suite, mvslovers/mbt#163), ten issues open. The same day: #281 closed by
+PR #282 (HTTPD's startup step is libc370 2.4.0's `__premain()` hook), the
+libc370 pin moved to 2.4.0 in acdcb42, and #280 moved mbt to v2.2.0. None of
+the ranked items moved. Before that, 2026-10-04 after PR #279 merged (the
 docs/ / internals/ split, #278; #277 moved mbt to v2.1.3 before it), eleven
 issues open, none ranked or closed by either. Before that, 2026-10-04 after PR #276 merged (the
 `-Wextra` warnings cleared on mbt 37b889b; #274 bumped mbt just before it),
@@ -42,7 +47,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #275 | latent bug — `__start` `parmLen` clamp before the TSO `-= 4` | **nothing**; needs a malformed parameter list to trigger. Not yet ranked |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
