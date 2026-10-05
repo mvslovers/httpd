@@ -13,7 +13,11 @@ type = "application"
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
-libc370 = "2.0.0"
+# 2.3.1: the C runtime startup is a member of libc.a from 2.3.0 on,
+# so no module names a startup object (mvslovers/mbt#158). An older libc.a
+# would quietly link crt0 where these modules used to have crt1. 2.3.1
+# rather than 2.3.0 for the subtask cleanup fix (mvslovers/libc370#431).
+libc370 = "2.3.1"
 
 [build]
 # The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
@@ -71,15 +75,15 @@ sources = ["src/*.c", "credentials/src/*.c"]
 exclude = ["src/cgistart.c", "src/httpstrt.c"]
 
 # -- Load Modules -------------------------------------------------
-# v1 'include = ["@@CRT1", <members>]' -> startup = "crt1" + the member
-# roots as 'sources'; the shared body resolves from [internal] by autocall.
+# v1 'include = ["@@CRT1", <members>]' -> the member roots as 'sources'
+# (the C runtime startup comes out of libc.a); the shared body resolves from
+# [internal] by autocall.
 
 # Main HTTPD server (APF-authorized)
 [[module]]
 name = "HTTPD"
 rent = true
 reus = true
-startup = "crt1"
 sources = ["src/httpstrt.c", "src/httpd.c", "src/httpprm.c"]
 ac = 1
 
@@ -88,21 +92,18 @@ ac = 1
 name = "HTTPDM"
 rent = true
 reus = true
-startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdm.c"]
 
 [[module]]
 name = "HTTPDMTT"
 rent = true
 reus = true
-startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdmtt.c"]
 
 [[module]]
 name = "HTTPDSRV"
 rent = true
 reus = true
-startup = "crt1"
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
 
 # Acceptance vehicle for issues #154/#174: allocates, then abends S0C1
@@ -113,7 +114,6 @@ sources = ["src/cgistart.c", "src/httpdsrv.c"]
 name = "ABEND0C1"
 rent = true
 reus = true
-startup = "crt1"
 sources = ["src/cgistart.c", "src/abend0c1.c"]
 
 # HTTPDSL (/dsl/*) and HTTPJES2 (/jes/*) are no longer built.  Both were
@@ -273,7 +273,6 @@ host = false                   # cthreads + LINK + GETMAIN are SVCs -> test-mvs
 name = "TSTSPM"
 rent = true
 reus = true
-startup = "crt1"                # like a CGI module: @@CRT0 without the CTHREAD IDENTIFY
 sources = ["test/mvs/tstspm.c"]
 host = false                    # LINK target for TSTSP -> test-mvs
 
@@ -308,14 +307,13 @@ host = false                    # LINK SVC + httpd.h internals -> test-mvs
 
 # TSTLNKM is the LINK target for TSTLINK's T5, not a test of its own: it runs
 # to completion and returns a negative rc, the case httppcgi() used to report
-# as an abend.  crt1 on purpose -- cgistart clamps a negative main() rc to 0,
-# so a module with its own __start is the only thing that can still produce
-# one.  Run standalone by the runner (no parm) it returns 0.
+# as an abend.  No cgistart on purpose -- it clamps a negative main() rc to
+# 0, so a module with its own __start is the only thing that can still
+# produce one.  Run standalone by the runner (no parm) it returns 0.
 [[test]]
 name = "TSTLNKM"
 rent = true
 reus = true
-startup = "crt1"                # own __start, i.e. no cgistart clamp
 sources = ["test/mvs/tstlnkm.c"]
 host = false                    # LINK target for TSTLINK -> test-mvs
 
