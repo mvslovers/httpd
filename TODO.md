@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-07 after PR #285 merged (#284,
+*Last reconciled against the tracker: 2026-10-07 after PR #287 merged (#286,
+the move to mbt 3: mbt.toml, the webroot image through the mbt-ufs plugin,
+objects and load modules byte-identical to mbt 2), ten issues open, none of
+the ranked items moved. Before that, the same day after PR #285 merged (#284,
 the `[toolchain]` pin: cc370 1.4.0, libc370 2.6.0), ten issues open, none of
 the ranked items moved. libc370 2.5.0's stdio lock skip leaves `DEBUG=1`
 writes to `httpd->dbg` from module context unserialized; that is
@@ -163,15 +166,16 @@ The open question is the shape of the fix, not where it goes — report once by
 WTO and disable tracing deliberately, or simply stop `dbgs()`/`dbgf()` and the
 rest from returning a decorative `int rc = 0` that no write ever touches.
 
-### Right after the tag — done for 4.1.0, do it again next time
+### Right after the tag — mbt 3 does it now, except for a patch
 
-**Move `fmid` and `delete` in the commit that follows the version bump.**
-`make release` bumps `VERSION` and stops, so the tree comes out of v4.1.0 at
-`4.1.1-dev` with `fmid = "THTP410"` — the id that release just spent. Set
-`THTP411` / `delete = ["THTP410"]` before anything is built from that tree.
-`project.toml` carries the warning at the `fmid` line now; this is the reminder
-that the moment to read it is the bump, not the next package. ftpd was sitting
-in exactly this state an hour after releasing 1.1.0.
+**The FMID follows the version.** Under mbt 2 `make release` bumped `VERSION`
+and stopped, so the tree came out of v4.1.0 at `4.1.1-dev` still carrying
+`fmid = "THTP410"`, the id that release had just spent (ftpd sat in exactly
+that state an hour after releasing 1.1.0). Since #286 `[smp] prefix = "THTP"`
+derives fmid and delete from `[project] version`, so a minor needs nothing.
+A patch release still does: 4.2.1 needs an explicit `fmid = "THTP421"` with
+`delete = ["THTP420"]`, LISTed free on the stands first; mbt refuses to spend
+the minor's id twice. `mbt.toml` carries that at the `prefix` line.
 
 ### Before the tag
 
@@ -290,7 +294,7 @@ operator reads, and the two disagree by six keywords.
 
 *it hides one test and devalues the other seventeen*
 
-490 assertions pass and `make test-mvs` still reports `2 step(s) FAILED`, because
+490 assertions pass and `mbt test --mvs` (then `make test-mvs`) still reports `2 step(s) FAILED`, because
 TSTSP's step ends `ABEND SA03` — the step task ending with a subtask still
 active. Ranked here, above the other research items, for what it costs rather
 than what it is: a suite whose top line is always red trains everyone to stop
