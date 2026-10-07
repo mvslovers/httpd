@@ -11,7 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-05 after PR #283 merged (#275,
+*Last reconciled against the tracker: 2026-10-07 after PR #285 merged (#284,
+the `[toolchain]` pin: cc370 1.4.0, libc370 2.6.0), ten issues open, none of
+the ranked items moved. libc370 2.5.0's stdio lock skip leaves `DEBUG=1`
+writes to `httpd->dbg` from module context unserialized; that is
+libc370#470, nothing to change here. Before that, 2026-10-05 after PR #283 merged (#275,
 cgistart's parameter-length check, mirroring libc370#446; its probe is not in
 the suite, mvslovers/mbt#163), ten issues open. The same day: #281 closed by
 PR #282 (HTTPD's startup step is libc370 2.4.0's `__premain()` hook), the
