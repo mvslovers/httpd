@@ -6,21 +6,32 @@ This document covers building HTTPD from source, the server architecture, and th
 
 ### Prerequisites
 
-- `mbt` build system ([mvslovers/mbt](https://github.com/mvslovers/mbt))
-- `c2asm370` cross-compiler
-- [crent370](https://github.com/mvslovers/crent370) — C runtime library (build dependency)
-- Access to an MVS 3.8j system (Hercules) for linking and testing
+- [mbt](https://github.com/mvslovers/mbt) 3, the build tool, on `PATH`
+- the [cc370](https://github.com/mvslovers/cc370) toolchain with the
+  [libc370](https://github.com/mvslovers/libc370) sysroot installed; the
+  versions are pinned under `[toolchain]` in `mbt.toml`
+- for deploying and the MVS test suite: an MVS 3.8j system running mvsMF,
+  configured once per machine with `mbt target import` (see mbt's
+  `docs/MIGRATION.md`)
 
 ### Build Commands
 
+The build runs on the host; only `mbt deploy` and `mbt test --mvs` touch MVS.
+
 ```bash
-make clean build link        # Full build
-make build                   # Compile only
-make link                    # Link only (after compile)
-make install                 # Install load modules to MVS
+mbt deps                # fetch ufsd, crypto370, ufsd-utils and the mbt-ufs plugin
+mbt build --all         # load modules + the CGI library (build/httpd.a)
+mbt test                # build and run the host tests
+mbt test --mvs          # deploy the test modules and run the suite on MVS
+mbt package             # release artifacts in dist/, the webroot image included
+mbt run webroot         # build only the webroot image (build/webroot/)
+mbt deploy              # load modules -> HTTPD.DEV.LINKLIB
+mbt doctor --offline    # check the toolchain without contacting MVS
 ```
 
-The build system uses `project.toml` for project metadata and dependency management. Dependencies (crent370, ufsd) are resolved automatically by `mbt`.
+`mbt.toml` holds the project metadata, the modules and tests, the dependencies
+(pinned in the committed `mbt.lock`) and the SMP distribution. `mbt/init.lua`
+builds the webroot image.
 
 ### Project Structure
 
@@ -34,7 +45,8 @@ httpd/
   samplib/           Sample JCL procedure and Parmlib member
   docs/              Documentation for users (configuration, installation, ...)
   internals/         Documentation for maintainers (design notes, backlog)
-  project.toml       Build configuration and dependencies
+  mbt.toml           Build configuration and dependencies
+  mbt/init.lua       The webroot image task
 ```
 
 ### C Standard

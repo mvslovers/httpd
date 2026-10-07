@@ -698,8 +698,8 @@ HTTPD had one test (`TSTGCTX`); a small suite is now being grown alongside these
 refactorings (the working policy: **when a fix lands and a unit test is
 sensible, add it in the same PR**). Because `httpd.h` pulls the non-host-portable
 crent370/libc370 runtime stack, tests that reach through it are **MVS-target**
-(`make test-mvs`) and carry `host = false` so `make test-host` skips them
-cleanly (needs mbt ≥ `d57d447`). **Where a fix extracts a pure helper, keep that
+(`mbt test --mvs`) and carry `host = false` so `mbt test` skips them
+cleanly. **Where a fix extracts a pure helper, keep that
 helper free of `httpd.h`** (only `<stddef.h>` + char literals): the test then
 runs **DUAL** (host *and* MVS), so the logic is actually *executed* on the host
 — real signal, not just a cc370 compile. Assertions on decoded/translated bytes
