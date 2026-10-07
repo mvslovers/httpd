@@ -4,7 +4,15 @@
     "version": "1.0.1"
   },
   "mvslovers/ufsd": {
-    "sha256": "09860edcafb7215838b9086420c051686b6c0f4519609f4a9b8b2119074a1a6b",
+    "sha256": "c2eb5f98317769e07c39363f29e4884fec1fd22f803582cfb36de5f7e67ea548",
     "version": "1.4.0-dev"
+  },
+  "plugin:mvslovers/mbt-ufs": {
+    "sha256": "4e0a4cbf4dfcdfc54b8713ad3e45beade9b769bdd07e16996960256aafa51561",
+    "version": "0.1.0"
+  },
+  "tool:ufsd-utils": {
+    "sha256": "d1b1a1ea60ec98f1b233cabdd9bca3c7b2b737da304f2ddb9c0b654782c72a9e",
+    "version": "1.0.1"
   }
 }
