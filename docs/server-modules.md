@@ -161,7 +161,35 @@ running that kind of load test.
 
 ## Building a Server Module
 
-Create a `project.toml` with dependencies on `crent370` and `httpd`:
+A server module is an ordinary load module that depends on httpd's library.
+That library is `cgistart` (the module's `__start`, which picks up the HTTPD
+and HTTPC pointers and calls `main()`) plus the public headers (`httpcgi.h`
+and friends). `dep_startup = true` links the module with that startup instead
+of the C runtime's own.
+
+With mbt 3, in `mbt.toml`:
+
+```toml
+schema = 3
+
+[project]
+name = "mymodule"
+version = "1.0.0"
+kind = "application"
+
+[dependencies]
+"mvslovers/httpd" = ">=4.2.0-dev"
+
+[module.MYMODULE]
+dep_startup = true
+rent = true
+reus = true
+sources = ["src/*.c"]
+```
+
+Then `mbt deps` and `mbt build`.
+
+With mbt 2, the same in `project.toml`, followed by `make deps` and `make`:
 
 ```toml
 [project]
@@ -169,18 +197,20 @@ name = "mymodule"
 version = "1.0.0"
 type = "application"
 
-[build.sources]
-c_dirs = ["src/"]
+[dependencies]
+"mvslovers/httpd" = ">=4.2.0-dev"
 
-[[link.module]]
+[[module]]
 name = "MYMODULE"
-entry = "@@CRT0"
-options = ["LIST", "MAP", "XREF", "RENT"]
-include = ["@@CRT1", "MYMODULE"]
-
-[link.module.dep_includes]
-"mvslovers/crent370" = "*"
+dep_startup = true
+rent = true
+reus = true
+sources = ["src/*.c"]
 ```
+
+The C runtime is libc370, installed with the cc370 toolchain; it is not a
+dependency of its own. Register the module in HTTPD's Parmlib with a `MOD=`
+line and an `AUTH=` (see [configuration.md](configuration.md)).
 
 ## Examples
 

@@ -1,14 +1,18 @@
+schema = 3
+
 [project]
 name = "httpd"
 version = "4.2.0-dev"
-type = "application"
+kind = "application"
 
 [toolchain]
-# Pins the refs release.yml builds the published artifacts against; build.yml
-# deliberately keeps floating on main so a cc370/libc370 regression surfaces
-# in a PR build (mbt#68).  Locally only libc370 is checked, as a floor against
-# the sysroot; the cc370 pin applies to release CI alone, since there is no
-# version to read out of an installed compiler.
+# mbt: the mbt 3 release line this project is built with; a newer installed
+# mbt switches to a matching 3.0.x by itself.
+#
+# cc370 and libc370 pin what release.yml (mbt's release3.yml) builds the
+# published artifacts against; build.yml deliberately keeps floating on main so
+# a cc370/libc370 regression surfaces in a PR build (mbt#68).  Locally both are
+# checked as a floor against what is installed (`mbt doctor` reports them).
 #
 # Without this the release CI builds against libc370 main, which is how ftpd's
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
@@ -26,36 +30,31 @@ type = "application"
 # 2.5.0 stdio skips the stream's ENQ until cthread_create() has made a thread
 # (mvslovers/libc370#453); HTTPD's socket thread and worker pool are created
 # that way, so the server's streams lock as before.
+mbt = "3.0"
 cc370 = "1.4.0"
 libc370 = "2.6.0"
 
 [build]
-# The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
+# include/ is on the include path by convention; this adds the credentials
+# package's headers.
+#
+# -Wall -Wextra -Werror are mbt's own defaults.  The root CLAUDE.md always
+# documented them as enforced, but under mbt 1 nothing passed them, so 598
+# warnings accumulated unseen -- among them a printf with two %s and one
+# argument.  Issue #138 cleared the tree and the -Wextra round cleared the rest;
+# a new warning now fails the build, which is the point.  Do not add -Wno-*
+# here: the trigraph warnings that would have needed one were removed at the
+# source instead (#139).
+#
+# The build stamp behind HTTPD000I/001I/006W is not injected here either: mbt
 # generates .mbt/buildstamp.h and puts it on the include path, so httpd.c gets
 # MBT_VERSION / MBT_COMMIT / MBT_COMMIT_DIRTY from `#include <buildstamp.h>`
-# (mbt#59). As a header it is a real prerequisite via -MMD, so a new commit
-# recompiles the banner TU instead of leaving it stamped with the previous
-# hash. The -DVERSION that used to be here fed a `#ifndef VERSION` block in
-# httpd.c that no longer exists.
-#
-# -Wall -Werror: the root CLAUDE.md has always documented these as enforced,
-# but nothing passed them, so 598 warnings accumulated unseen -- among them a
-# printf with two %s and one argument. Issue #138 cleared the tree; this line
-# is what keeps it clear. Adding a warning now fails the build, which is the
-# point. Do not add -Wno-* here: the trigraph warnings that would have needed
-# one were removed at the source instead (#139).
-cflags = [
-	"-I",
-	"include",
-	"-I",
-	"credentials/include",
-	"-Wall",
-	"-Werror",
-]
+# (mbt#59).
+include = ["credentials/include"]
 
-[host]
-# `make test-host` reuses build.cflags (mbt/scripts/mbttesthost.py) but compiles
-# with the developer machine's cc, whose -Wall is a different and far larger set
+[build.host]
+# `mbt test` reuses the build's flags but compiles with the developer
+# machine's cc, whose -Wall is a different and far larger set
 # than cc370's -- the pointer-sign warnings alone run into the hundreds, and
 # none of them say anything about the MVS build. -Werror exists here to keep the
 # shipped target build clean; gating the fast host loop on another compiler's
@@ -66,9 +65,26 @@ cflags = ["-Wno-error"]
 "mvslovers/ufsd" = ">=1.4.0-dev"
 "mvslovers/crypto370" = ">=1.0.1"
 
+# -- The webroot disk (issue #252) --------------------------------
+# mbt/init.lua turns static/ into build/webroot/httpd-webroot.img through the
+# mbt-ufs plugin, before `mbt package` and `mbt dist`; docs/installation.md
+# carries the operator's side.  The image is built under build/ and NOT under
+# dist/: the release workflow publishes dist/* as Release assets, so an image
+# there would appear beside the versioned artifacts under a name carrying no
+# version at all.  It ships inside the archive instead ([distribution] extra).
+#
+# ufsd-utils is pinned rather than taken from PATH: `create` stamps an owner
+# and a timestamp into the image, so the version that builds a release
+# artifact is part of what is shipped.
+[tools]
+ufsd-utils = { repo = "mvslovers/ufsd-utils", version = "1.0.1" }
+
+[plugins]
+"mvslovers/mbt-ufs" = "^0.1"
+
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
-# autocalls it: each [[module]] below lists only its own root source(s)
+# autocalls it: each [module.*] below lists only its own root source(s)
 # (each root defines its own main(), so they cannot be globbed into one
 # module), and the linker pulls the shared rest from this archive by
 # autocall (referenced members only -> minimal load modules).  Mirrors the
@@ -81,8 +97,8 @@ sources = ["src/*.c", "credentials/src/*.c"]
 #   - httpstrt: HTTPD's __premain() hook (rejects SYSPRINT, opens
 #     HTTPDOUT/ERR/IN).  libc370's startup refers to it weakly, and a weak
 #     reference does not pull a member out of an archive, so it has to be
-#     named: the HTTPD module lists httpstrt.c in its own [[module]] sources;
-#     everything else (CGI modules, [[test]] modules) runs without the hook.
+#     named: the HTTPD module lists httpstrt.c in its own module sources;
+#     everything else (CGI modules, test modules) runs without the hook.
 exclude = ["src/cgistart.c", "src/httpstrt.c"]
 
 # -- Load Modules -------------------------------------------------
@@ -91,28 +107,24 @@ exclude = ["src/cgistart.c", "src/httpstrt.c"]
 # [internal] by autocall.
 
 # Main HTTPD server (APF-authorized)
-[[module]]
-name = "HTTPD"
+[module.HTTPD]
 rent = true
 reus = true
 sources = ["src/httpstrt.c", "src/httpd.c", "src/httpprm.c"]
 ac = 1
 
 # SSI handler modules (CGI programs sharing the cgistart launcher)
-[[module]]
-name = "HTTPDM"
+[module.HTTPDM]
 rent = true
 reus = true
 sources = ["src/cgistart.c", "src/httpdm.c"]
 
-[[module]]
-name = "HTTPDMTT"
+[module.HTTPDMTT]
 rent = true
 reus = true
 sources = ["src/cgistart.c", "src/httpdmtt.c"]
 
-[[module]]
-name = "HTTPDSRV"
+[module.HTTPDSRV]
 rent = true
 reus = true
 sources = ["src/cgistart.c", "src/httpdsrv.c"]
@@ -121,8 +133,7 @@ sources = ["src/cgistart.c", "src/httpdsrv.c"]
 # without freeing.  Drive it a few hundred times and every other CGI must
 # still load at its original speed -- measurable with httpd's own code.
 # Like every module since 4.0.0 it is inert unless a Parmlib route names it.
-[[module]]
-name = "ABEND0C1"
+[module.ABEND0C1]
 rent = true
 reus = true
 sources = ["src/cgistart.c", "src/abend0c1.c"]
@@ -135,15 +146,24 @@ sources = ["src/cgistart.c", "src/abend0c1.c"]
 # separate step.
 
 # -- Tests --------------------------------------------------------
+# Defaults for every test; test/**/*.c and *.asm are tests unless excluded.
+# tstcgip.c is the probe for #275, built by hand as three programs from one
+# source: a cgistart module run on its own ends RC 12 before main(), so as a
+# test its standalone steps would fail the suite (its header has the rest,
+# mvslovers/mbt#163).
+[tests]
+rent = false
+reus = false
+exclude = [
+  "test/mvs/tstcgip.c",
+]
+
 # http_cgictx_get() registrar.  Uses lock()/__getm() (MVS SVCs), so it is
-# MVS-only (make test-mvs); the host build is skipped (it pulls httpd.h's
+# MVS-only (mbt test --mvs); the host build is skipped (it pulls httpd.h's
 # crent370 internals).  http_cgictx_get resolves from the [internal] autocall
 # archive, so only the test root is listed here.
-[[test]]
-name = "TSTGCTX"
+[test.TSTGCTX]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstgctx.c"]
 host = false                     # uses lock()/__getm() SVCs -> MVS-only (test-mvs)
 
 # http_decode() / httpdeco() URI percent+plus decoder.  MVS-target like
@@ -151,119 +171,89 @@ host = false                     # uses lock()/__getm() SVCs -> MVS-only (test-m
 # runtime headers, not host-portable), so the host build cannot compile it.
 # httpdeco (HTTPDECO) and asc2ebc resolve from the [internal] autocall archive,
 # so only the test root is listed here.
-[[test]]
-name = "TSTDECO"
+[test.TSTDECO]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/tstdeco.c"]
 host = false                 # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
 # so the host build (no autocall) can link them.
-[[test]]
-name = "TSTSAFE"
+[test.TSTSAFE]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 
 # httpbody() request-body length classifier (S7 Content-Length enforcement).
 # Free of httpd.h -> DUAL (host + MVS); helper source listed for the host link.
-[[test]]
-name = "TSTBODY"
+[test.TSTBODY]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tstbody.c", "src/httpbody.c"]
 
 # credexp() credential-reaper expiry decision (M2 session timeout).  Free of
 # project headers -> DUAL (host + MVS); helper source listed for the host link.
-[[test]]
-name = "TSTEXPIR"
+[test.TSTEXPIR]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 
 # httpracf() SAF authorization decision table (issue #135): rc 0 and 4 both
 # allow, -1 must not.  Free of httpd.h -> DUAL (host + MVS); helper source
 # listed for the host link.
-[[test]]
-name = "TSTRACF"
+[test.TSTRACF]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tstracf.c", "src/httpracf.c"]
 
 # httpstat() status code -> status line table (issue #181).  A code the table
 # does not know is answered with 500, so a gap is silent on the wire -- the
 # test pins every code httpd itself emits.  Free of httpd.h -> DUAL (host +
 # MVS); helper source listed for the host link.
-[[test]]
-name = "TSTSTAT"
+[test.TSTSTAT]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tststat.c", "src/httpstat.c"]
 
 # httprlm() Basic realm from the SMF ID (issue #191).  __smfid() hands over a
 # 4-byte, blank-padded, unterminated field, and an empty realm would collapse
 # every protection space on the origin (RFC 7617 makes it required) -- so the
 # degenerate inputs are what this pins.  Free of httpd.h -> DUAL (host + MVS).
-[[test]]
-name = "TSTREALM"
+[test.TSTREALM]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 sources = ["test/tstrealm.c", "src/httprlm.c"]
 
 # credid_enc()/credid_dec() round-trip + flag survival across a repeat read of a
 # stored CRED (issue #109: http_get_userid() garbage on a cache-hit read).
 # blowfish_encrypt/decrypt are crent370 (MVS) -> MVS-only test (test-mvs); the
 # credid_*/cred_* bodies resolve from the [internal] autocall archive.
-[[test]]
-name = "TSTCRED"
+[test.TSTCRED]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstcred.c"]
 host = false                     # blowfish_* are MVS-only (crent370) -> test-mvs
 
 # http_get_userid() end-to-end on a live HTTPC (issue #109): real cred_login()
 # + cache hit + the real HTTPGUID export.  MVS-only (blowfish + RACF SVCs);
 # http_get_userid/credid_/cred_ resolve from the [internal] autocall archive.
-[[test]]
-name = "TSTGUID"
+[test.TSTGUID]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstguid.c"]
 host = false                     # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
 # http_get_password() end-to-end on a live HTTPC (issue #111): decrypts the
 # caller's password from httpc->cred->id via the key pointer cached in the HTTPD
 # block, for the JES2 INTRDR job-card use case.  MVS-only (blowfish + RACF SVCs);
 # http_get_password/credid_/cred_ resolve from the [internal] autocall archive.
-[[test]]
-name = "TSTGPWD"
+[test.TSTGPWD]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstgpwd.c"]
 host = false                     # blowfish_* + RACF SVCs are MVS-only -> test-mvs
 
 # credtok_logout_arr() + wrapper (issue #113): logout must find, unlink and free
 # the CRED in the supplied array so the token stops resolving.  Guards the split
 # that lets http_logout() reach httpd's store from a CGI's GRT.  MVS-only (SHA256
 # token + array/lock SVCs); cred_/credtok_ resolve from the [internal] archive.
-[[test]]
-name = "TSTLOUT"
+[test.TSTLOUT]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstlout.c"]
 host = false                     # crent370 SVCs are MVS-only -> test-mvs
 
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
 # (HTTPNENV) resolves from the [internal] autocall archive.
-[[test]]
-name = "TSTNENV"
+[test.TSTNENV]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/tstnenv.c"]
 host = false                 # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
 # Where the CGI heap subpool (libc370#89) can be set at all -- the measurement
@@ -273,18 +263,13 @@ host = false                 # httpd.h -> crent370 internals -> MVS-only (test-m
 # run standalone it returns 0, and it reports its measurement through the
 # return code __linkds() hands back.  The runner's STEPLIB is TESTLIB+LINKLIB,
 # so TSTSP finds TSTSPM in the TESTLIB it was just deployed to.
-[[test]]
-name = "TSTSP"
+[test.TSTSP]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstsp.c"]
 host = false                   # cthreads + LINK + GETMAIN are SVCs -> test-mvs
 
-[[test]]
-name = "TSTSPM"
+[test.TSTSPM]
 rent = true
 reus = true
-sources = ["test/mvs/tstspm.c"]
 host = false                    # LINK target for TSTSP -> test-mvs
 
 # http_prm_read() Parmlib read-error guard.  Since libc370 1.0.4 an
@@ -296,12 +281,9 @@ host = false                    # LINK target for TSTSP -> test-mvs
 # MVS-only: a wrong-length record is a real BSAM condition with no host
 # equivalent.  http_prm_read (HTTPPRMR) resolves from the [internal] autocall
 # archive, so only the test root is listed here.
-[[test]]
-name = "TSTPRM"
+[test.TSTPRM]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
 parm = "IBMUSER.HTTPD.TPRM"
-sources = ["test/mvs/tstprm.c"]
 host = false                    # BSAM I/O error + DD: names -> test-mvs
 
 # http_link() failure reporting (issue #131): a module that cannot be loaded
@@ -309,11 +291,8 @@ host = false                    # BSAM I/O error + DD: names -> test-mvs
 # on a missing module returns 0 with prc == -1 -- which the test pins first, so
 # a change there fails here instead of resurfacing as "U0001 ABEND" in a 503.
 # MVS-only (LINK SVC); httplink resolves from the [internal] autocall archive.
-[[test]]
-name = "TSTLINK"
+[test.TSTLINK]
 rent = false          # mbtcheck.h keeps file-static counters
-reus = false
-sources = ["test/mvs/tstlink.c"]
 host = false                    # LINK SVC + httpd.h internals -> test-mvs
 
 # TSTLNKM is the LINK target for TSTLINK's T5, not a test of its own: it runs
@@ -321,11 +300,9 @@ host = false                    # LINK SVC + httpd.h internals -> test-mvs
 # as an abend.  No cgistart on purpose -- it clamps a negative main() rc to
 # 0, so a module with its own __start is the only thing that can still
 # produce one.  Run standalone by the runner (no parm) it returns 0.
-[[test]]
-name = "TSTLNKM"
+[test.TSTLNKM]
 rent = true
 reus = true
-sources = ["test/mvs/tstlnkm.c"]
 host = false                    # LINK target for TSTLINK -> test-mvs
 
 # There is deliberately no counterpart built with cgistart.  A cgistart module
@@ -354,16 +331,17 @@ headers = [
 ]
 
 # -- Deploy (development, does not touch the SMP installation) -----
-# Without this, mbtdeploy derives the target from the version --
-# HTTPD.V4R0M2D.LINKLIB and so on -- so the name moved with every release and
-# a stale one was left behind each time.  A fixed name keeps the development
-# library in one place.
+# HTTPD.DEV.LINKLIB is also mbt 3's default for a project called httpd.  It is
+# written out anyway, because a started task's STEPLIB names it and the name
+# must not move if the default ever does.  (mbt 2 derived the target from the
+# version -- HTTPD.V4R0M2D.LINKLIB and so on -- and left a stale one behind
+# with every release.)
 #
-# THE POINT OF NAMING IT IS TO KEEP IT AWAY FROM HTTPD.LINKLIB.  `make deploy`
+# THE POINT OF NAMING IT IS TO KEEP IT AWAY FROM HTTPD.LINKLIB.  `mbt deploy`
 # DELETES its target before receiving into it (RECEIVE refuses to merge), so a
 # started task whose STEPLIB names the deploy target loses its load library
 # mid-deploy.  HTTPD.LINKLIB is what SMP installs into and what the shipped
-# procedure points at; this one is for `make deploy` alone, and the two must
+# procedure points at; this one is for `mbt deploy` alone, and the two must
 # never be the same string.
 #
 # Deploying does not activate anything.  To run a development build, point a
@@ -374,7 +352,7 @@ headers = [
 target = "HTTPD.DEV.LINKLIB"
 
 # -- Distribution (SMP4 install package) --------------------------
-# Turns `make package` into an installable product, on the two transports ufsd
+# Turns `mbt package` into an installable product, on the two transports ufsd
 # and ftpd ship with, plus a third one they have no need for:
 #
 #   load modules -> XMIT -> staging HTTPLOAD -> SMP ++MOD -> HTTPD.LINKLIB
@@ -387,8 +365,8 @@ target = "HTTPD.DEV.LINKLIB"
 # and refuses to merge into an existing one -- a first-install-only transport
 # for something an operator updates.  So it travels as a plain file in the
 # archive (`extra` below) and goes up over IND$FILE, which needs nothing on the
-# target beyond a 3270 session.  `make webroot` builds it; the Makefile carries
-# the why, docs/installation.md the operator's side.
+# target beyond a 3270 session.  The mbt-ufs plugin builds it (mbt/init.lua,
+# which carries the why); docs/installation.md has the operator's side.
 #
 # SMP *copies* the host-bound modules rather than re-binding them (a COPY-style
 # ++JCLIN is what says so), which is what keeps HTTPD's ac = 1 and every custom
@@ -402,7 +380,7 @@ target = "HTTPD.DEV.LINKLIB"
 # operator does not scratch those by hand; section 12 covers LINKLIB and
 # AHTTPLOD only.  There is still no in-place update for SMP to manage.
 #
-# samplib/httpd carries @LINKLIB@ in its STEPLIB, which mbtdist replaces with
+# samplib/httpd carries @LINKLIB@ in its STEPLIB, which mbt replaces with
 # the configured target while staging -- the same placeholder ufsd's and ftpd's
 # procs use, and the reason the shipped proc points at the library SMP actually
 # installed into rather than at a name fixed when the file was written.  Do not
@@ -448,7 +426,7 @@ target = "HTTPD.DEV.LINKLIB"
 # one-shot choice -- changing it later is a new functional level, which is
 # exactly why #259 waited for THTP410 rather than riding a 4.0.x patch.
 #
-# All five [[module]] entries ship, ABEND0C1 included: mbtdist packages every
+# All five [module.*] entries ship, ABEND0C1 included: mbt packages every
 # module and offers no exclude.  Deliberate rather than overlooked -- since
 # 4.0.0 a module is inert unless a Parmlib route names it, and the shipped
 # HTTPPRM0 leaves its /.abend line commented out.  It is the acceptance vehicle
@@ -461,12 +439,11 @@ target = "HTTPD.DEV.LINKLIB"
 readme = "docs/installation.md"
 
 # The webroot disk, put in the archive as `httpd-webroot.img` -- `extra` takes
-# the basename, so the path here is only where `make webroot` writes it and the
-# name an operator sees is the file's own.  Listed rather than generated by
-# mbtdist: the image is not a dataset the install job creates, and nothing in
-# the SYSMOD or the RECEIVE plan knows about it.  `make package` and `make dist`
-# both depend on the target that builds it, because a missing `extra` file is a
-# hard error here -- deliberately: an archive quietly missing the webroot would
+# the basename, so the path here is only where the webroot task writes it and
+# the name an operator sees is the file's own.  Listed rather than generated by
+# mbt: the image is not a dataset the install job creates, and nothing in the
+# SYSMOD or the RECEIVE plan knows about it.  The task runs before `mbt package`
+# and `mbt dist`, because a missing `extra` file is a hard error here -- deliberately: an archive quietly missing the webroot would
 # look complete and serve nothing on /.
 #
 # Under build/ rather than dist/ on purpose.  The release workflow publishes
@@ -475,14 +452,14 @@ readme = "docs/installation.md"
 # already carries.
 extra = ["build/webroot/httpd-webroot.img"]
 
-[distribution.smp]
+[smp]
 # ONE FMID PER RELEASE, spent exactly once: T + three product letters + the
 # three version digits.  httpd 4.1.0 is THTP410, 4.1.1 would be THTP411.  There
 # is no room in a 7-character id for a second digit, so NO VERSION COMPONENT MAY
 # EVER EXCEED 9 -- at patch 9 cut the next minor, at minor 9 the next major;
 # 4.1.10 cannot be expressed and must not be released.  Service SYSMODs (U...)
-# stay reserved and unused: mbt emits ++FUNCTION only and there is no `make
-# ptf`, so a patch is a new function level rather than a PTF on an old one.
+# stay reserved and unused: mbt emits ++FUNCTION only and builds no PTF, so a
+# patch is a new function level rather than a PTF on an old one.
 # The T stays clear of the E??nnnn namespace MVS 3.8j's own function SYSMODs
 # occupy (EBB1102 is 3.8j itself, alongside EAS1102, EBT1102, EDE1102, ...).
 #
@@ -497,7 +474,8 @@ extra = ["build/webroot/httpd-webroot.img"]
 # it still lost to the owner of the module name.  So versioning the datasets
 # never bought a clean cut -- the collision was never on the dataset.
 #
-# `delete` below puts DELETE(THTP400) on the ++VER.  SMP then deletes the
+# The derived delete puts DELETE(<the previous minor>) on the ++VER --
+# DELETE(THTP410) for 4.2.0.  SMP then deletes the
 # predecessor's LMODs from the target (HMA2240) and copies the new ones in
 # (HMA2380), and MOD(HTTPD) comes back carrying the new FMID and RMID --
 # ownership transfers.  Each zone is deleted by its own pass: APPLY the CDS,
@@ -566,20 +544,15 @@ extra = ["build/webroot/httpd-webroot.img"]
 # the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and a spent
 # id is never reused.  TTST001-TTST004 went to the ++VER DELETE measurement.
 # Pick a fresh one, the way ftpd used TTMP110 and TTMP111 for its 1.1.0 runs.
-# AFTER A RELEASE, MOVE BOTH OF THESE BEFORE ANYTHING IS BUILT FROM THE TREE.
-# `make release` bumps VERSION and the project version and stops -- it does NOT
-# move the id -- so the tree comes out of a release carrying the id that was
-# just spent.  4.1.0 ships under THTP410; the commit that follows the bump to
-# 4.1.1-dev has to set fmid = "THTP411" and delete = ["THTP410"].  Miss it and
-# 4.1.1 packages under an id that is already REC APP ACC somewhere, which SMP
-# refuses to receive -- or worse, receives on a stand that never saw 4.1.0.
-# Measured elsewhere rather than here: mvslovers/ftpd sat in exactly this state
-# after releasing 1.1.0 on 2026-09-14, VERSION at 1.1.1-dev and fmid still
-# TFTP110.  ufsd does the move in the commit right after the bump (3db6866 ->
-# 20988c3); copy that habit.
-fmid = "THTP420"
-delete = ["THTP410"]            # the level this one replaces -- see above
-system = "Z038"
+# THE ID FOLLOWS THE VERSION.  With a prefix, mbt derives fmid and delete from
+# [project] version -- 4.2.0 is THTP420, deleting THTP410 -- so a release no
+# longer leaves the tree carrying the id it just spent, the trap mbt 2's
+# explicit fmid set (ftpd sat in it after 1.1.0, fmid still TFTP110 at
+# 1.1.1-dev).  What remains is the patch release: 4.2.1 has no id of its own
+# in the derivation, and mbt refuses to spend THTP420 a second time.  A patch
+# needs an explicit fmid = "THTP421" with delete = ["THTP420"], and that id
+# LISTed free on the stands first like any other.
+prefix = "THTP"  # FMID and delete follow from the version
 
 # Empty despite the [dependencies] entry on ufsd, which is a *build* time one:
 # libufs is linked statically, so nothing of ufsd has to be installed for the
@@ -595,12 +568,6 @@ prereq = []
 accept_fmid = true              # accept the FMID once so a PTF can be RESTOREd
 lklib = "HTTPD.HTTPLOAD"        # staging: what the load XMIT is received into
 target = "HTTPD.LINKLIB"        # where the load modules end up
-distlib = "HTTPD.AHTTPLOD"
 
-[[distribution.library]]
-dir = "samplib"
+[distribution.library.samplib]
 target = "HTTPD.SAMPLIB"
-
-# -- Release ------------------------------------------------------
-[release]
-version_files = ["VERSION"]

@@ -5,9 +5,9 @@
 //* modules into it.
 //*
 //* WHY THIS EXISTS
-//*   `make deploy` RECEIVEs into the deploy library built from
-//*   MBT_MVS_HLQ in .env -- by default
-//*   <hlq>.HTTPD.V4R0M0D.LINKLIB -- and stops there. The started
+//*   `mbt deploy` RECEIVEs into the deploy library -- [deploy]
+//*   target in mbt.toml, HTTPD.DEV.LINKLIB -- and stops
+//*   there. The started
 //*   task runs from a different data set (its STEPLIB DD), so a
 //*   deploy on its own changes nothing that is running.
 //*
@@ -42,7 +42,7 @@
 //*
 //*     SYS2.PROCLIB(HTTPD)  ->  //STEPLIB DD DSN=...
 //*
-//*   The deploy library is the one `make deploy` prints as its
+//*   The deploy library is the one `mbt deploy` prints as its
 //*   target.
 //*
 //* AFTERWARDS

@@ -3,8 +3,8 @@
 The published GitHub Release body for each tag, kept here as the source of
 record. GitHub is not one, for two separate reasons.
 
-**The workflow overwrites the body.** `make release` pushes a tag, which runs
-mbt's shared `release.yml`. That job **deletes every existing release for the
+**The workflow overwrites the body.** `mbt release` pushes a tag, which runs
+mbt's shared `release3.yml`. That job **deletes every existing release for the
 tag** and recreates it with `gh release create --generate-notes` — a body built
 from commit subjects. A hand-written body is not an input to that process and
 does not survive a re-push of the same tag.

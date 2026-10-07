@@ -3,12 +3,10 @@
 *.o
 *.d
 
-# Build artifacts
+# Hand-written jobs kept beside the tree; the operational ones under
+# tests/jcl/ are source, the same exception mvsmf carries.
 *.jcl
-# ...except the operational jobs under tests/jcl/, which are source rather
-# than build output. Same exception mvsmf carries, for the same reason.
 !tests/jcl/*.jcl
-.build-warnings
 
 # IDE
 *.geany
@@ -21,7 +19,6 @@ compile_commands.json
 # Build system (mbt)
 .mbt/
 build/
-contrib/
 dist/
 *.xmit
 

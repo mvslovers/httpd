@@ -55,15 +55,23 @@ order, and which ones wait on a decision rather than on code — none of which
 GitHub stores. It names issues but never owns their state. Reconcile it after
 every merge, and if it ever disagrees with `gh issue list`, the tracker wins.
 
-## Dependencies (from project.toml)
+## Dependencies (from mbt.toml)
 
 ```toml
 [dependencies]
-"mvslovers/ufsd" = ">=1.1.0"
+"mvslovers/ufsd" = ">=1.4.0-dev"
+"mvslovers/crypto370" = ">=1.0.1"
+
+[tools]
+ufsd-utils = { repo = "mvslovers/ufsd-utils", version = "1.0.1" }
+
+[plugins]
+"mvslovers/mbt-ufs" = "^0.1"
 ```
 
-That is the whole list. `libc370` is the cc370 sysroot (`-lc`), not a declared
-dependency. crent370 was superseded by libc370; ufs370 by ufsd; the lua370 and
+That is the whole list: the two libraries the load modules link, the host tool
+that writes the webroot image, and the plugin that drives it. `libc370` is the
+cc370 sysroot (`-lc`), not a declared dependency. crent370 was superseded by libc370; ufs370 by ufsd; the lua370 and
 mqtt370 entries went with the Lua engine and the MQTT telemetry. Resolved
 versions are pinned in `mbt.lock` (committed).
 
@@ -85,7 +93,7 @@ Autonomous workflow for resolving a GitHub issue end-to-end:
 2. **Create a feature branch** — `git checkout -b issue-<number>-<short-description>`
 3. **Analyze** — Identify affected files, understand the existing patterns in nearby code
 4. **Implement** — Write code following the conventions in this CLAUDE.md
-5. **Verify syntax** — Run `make compiledb` and check clangd diagnostics (no errors)
+5. **Verify syntax** — Run `mbt compiledb` and check clangd diagnostics (no errors)
 6. **Commit** — Descriptive message, no AI references. Reference the issue: `Fixes #<number>`
 7. **Push and create PR** — `gh pr create --title "..." --body "Fixes #<number>"`
 8. **Summary** — Report what was done, what to verify on the live MVS system
@@ -94,37 +102,48 @@ If any step fails, stop and report the issue rather than guessing.
 
 ## Build System (mbt)
 
-HTTPD uses [mbt](https://github.com/mvslovers/mbt) as its build tool (Git submodule in `mbt/`). Clone with `--recursive` or run `git submodule update --init`.
+HTTPD is built with [mbt](https://github.com/mvslovers/mbt) 3, a program
+installed on the machine (`[toolchain] mbt = "3.0"` in `mbt.toml` pins the
+line; a newer installed mbt switches to it). The project file is `mbt.toml`;
+there is no submodule, no Makefile, no `project.toml` and no `VERSION` any more
+-- the version lives in `[project] version` alone. `mbt/` is the project's own
+Lua: `mbt/init.lua` builds the webroot image through the mbt-ufs plugin.
 
 ### Build Commands
 
-mbt **v2**: the whole build runs on the host with the cc370 toolchain, and only
-`make deploy` touches MVS. `make help` lists every target; the root CLAUDE.md
-documents the full set. The ones used most here:
+The whole build runs on the host with the cc370 toolchain, and only
+`mbt deploy` and `mbt test --mvs` touch MVS. `mbt` alone lists every command;
+the ones used most here:
 
 ```bash
-make               # build the load modules
-make modules       # production modules only
-make test          # cross-compile the [[test]] modules
-make test-host     # build + run the dual tests natively — the fast inner loop
-make test-mvs      # deploy to TESTLIB + run the suite on MVS
-make doctor        # verify environment (MVS connectivity, tools)
-make compiledb     # generate compile_commands.json for clangd
-make clean         # remove build/ and dist/ (keeps staged deps)
-make distclean     # clean + remove all of .mbt/ (incl. deps)
+mbt deps              # stage ufsd, crypto370, ufsd-utils and mbt-ufs (pinned in mbt.lock)
+mbt build             # build the load modules
+mbt build --all       # load modules + the CGI library (build/httpd.a)
+mbt build --tests     # cross-compile the test modules
+mbt test              # build + run the dual tests natively — the fast inner loop
+mbt test --mvs        # deploy to TESTLIB + run the suite on MVS
+mbt package           # dist/: SMP package, load XMIT, lib archive, webroot image
+mbt run webroot       # build only the webroot image
+mbt doctor --offline  # verify the toolchain without contacting MVS
+mbt compiledb         # generate compile_commands.json for clangd
+mbt clean             # remove build/ and dist/ (keeps staged deps)
+mbt distclean         # clean + remove all of .mbt/ (incl. deps)
 ```
 
-`make bootstrap` / `build` / `link` / `install` were mbt v1 and no longer exist.
+`mbt deps` never moves a pin on its own: a prerelease that was published again
+(ufsd's `-dev` levels are) is refused until `mbt deps --update` re-pins it.
 
-**`make test-host` cannot catch a `-Werror` regression.** `[host] cflags =
-["-Wno-error"]` in project.toml, deliberately — the host compiler's `-Wall` is a
-different and much larger set. The target build is the gate, so run `make` or
-`make modules` before calling a change clean. CI only *compiles* `make test`, it
-never runs an assertion.
+**`mbt test` cannot catch a `-Werror` regression.** `[build.host] cflags =
+["-Wno-error"]` in mbt.toml, deliberately — the host compiler's `-Wall` is a
+different and much larger set. The target build is the gate, so run
+`mbt build --all` before calling a change clean. CI builds the modules and the
+test modules and runs the host tests; it never runs an MVS assertion.
 
 ### Configuration
 
-Local settings go in `.env` (gitignored). See `.env.example` for the template. Key variables: `MBT_MVS_HOST`, `MBT_MVS_PORT`, `MBT_MVS_USER`, `MBT_MVS_PASS`, `MBT_MVS_HLQ`.
+The MVS systems mbt deploys to and tests on live in `~/.mbt/targets.toml`, one
+file per machine, not in the project (`mbt target import .env --name <name>`
+turns an old `.env` into a target; `mbt target list` shows them).
 
 ## Architecture
 
@@ -267,7 +286,7 @@ Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no routes).
 - **cgistart.c**: Custom `__start` for CGI modules.
 - **httpx.c**: HTTPX vector table initialization.
 
-**Built-in CGI modules** — the four `[[module]]` entries besides HTTPD itself:
+**Built-in CGI modules** — the four `[module.*]` entries besides HTTPD itself:
 - **httpdsrv.c**: Server + control-block display (`/.dsrv`)
 - **httpdm.c / httpdmtt.c**: Storage display (`/.dm`) and Master Trace Table (`/.dmtt`)
 - **abend0c1.c**: Deliberate-abend test CGI
@@ -337,18 +356,19 @@ The mvsMF CGI module has its own additional ESTAE layer in `router.c` (via `try(
 
 ### Testing
 
-The suite is a set of mbt `[[test]]` modules in `test/`, declared in
-project.toml and written against `<mbtcheck.h>` (`CHECK` / `CHECK_EQ` /
-`mbt_test_summary`, RC 0 = all passed). `make test-host` runs the DUAL ones
-natively in seconds; `make test-mvs` runs every one on MVS as a batch **and** a
+The suite is a set of mbt test modules in `test/` -- every `test/**/*.c` is a
+test named after its file, with a `[test.NAME]` entry in mbt.toml only where it
+needs more sources or `host = false` -- written against `<mbtcheck.h>` (`CHECK`
+/ `CHECK_EQ` / `mbt_test_summary`, RC 0 = all passed). `mbt test` runs the DUAL
+ones natively in seconds; `mbt test --mvs` runs every one on MVS as a batch **and** a
 TSO step and prints a per-test matrix.
 
 A test is DUAL only if the code under test is free of httpd.h. That is worth
 arranging: pull the pure decision out into its own small source with its own
 header — `httpbody.c`, `httpracf.c`, `httpesc.c`, `httpstat.c` all exist for
-this reason — and list that source in the `[[test]]` alongside the test for the
-host link. Everything reaching a control block, an SVC or a socket stays
-`host = false` and runs only under `make test-mvs`.
+this reason — and list that source in the `[test.NAME]` entry alongside the test
+for the host link. Everything reaching a control block, an SVC or a socket stays
+`host = false` and runs only under `mbt test --mvs`.
 
 Test names are MVS member names: **8 characters, uppercase**. A 9-character name
 builds fine and then kills the entire runner job with a JCL error (#180).
