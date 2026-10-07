@@ -6,20 +6,28 @@ type = "application"
 [toolchain]
 # Pins the refs release.yml builds the published artifacts against; build.yml
 # deliberately keeps floating on main so a cc370/libc370 regression surfaces
-# in a PR build (mbt#68). cc370 is omitted -- it defaults to main and has no
-# releases to pin to yet.
+# in a PR build (mbt#68).  Locally only libc370 is checked, as a floor against
+# the sysroot; the cc370 pin applies to release CI alone, since there is no
+# version to read out of an installed compiler.
 #
 # Without this the release CI builds against libc370 main, which is how ftpd's
 # first 1.0.0 attempt shipped reporting an unreleased runtime nobody could
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
-# 2.4.0: the current release; it needs cc370 >= 1.4.0 (its headers #error
-# otherwise).  It is also the floor: HTTPD's startup step is libc370's
-# __premain() hook (#281, mvslovers/libc370#440), and an older libc.a would
-# never call it -- HTTPD would open SYSPRINT/SYSTERM/SYSIN as its streams
-# instead of refusing them.  The C runtime startup is a member of libc.a since
-# 2.3.0, so no module names a startup object (mvslovers/mbt#158).
-libc370 = "2.4.0"
+#
+# cc370 1.4.0: libc370 2.4.0 and later need cc370 >= 1.4.0 (their headers
+# #error otherwise).
+#
+# libc370 2.6.0: the current release.  The floor is 2.4.0: HTTPD's startup step
+# is libc370's __premain() hook (#281, mvslovers/libc370#440), and an older
+# libc.a would never call it -- HTTPD would open SYSPRINT/SYSTERM/SYSIN as its
+# streams instead of refusing them.  The C runtime startup is a member of libc.a
+# since 2.3.0, so no module names a startup object (mvslovers/mbt#158).  Since
+# 2.5.0 stdio skips the stream's ENQ until cthread_create() has made a thread
+# (mvslovers/libc370#453); HTTPD's socket thread and worker pool are created
+# that way, so the server's streams lock as before.
+cc370 = "1.4.0"
+libc370 = "2.6.0"
 
 [build]
 # The build stamp behind HTTPD000I/001I/006W is not injected here: mbt
