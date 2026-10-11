@@ -67,10 +67,12 @@ ufsd-utils = { repo = "mvslovers/ufsd-utils", version = "1.0.1" }
 
 [plugins]
 "mvslovers/mbt-ufs" = "^0.1"
+"mvslovers/mbt-stc" = "^0.1"
 ```
 
 That is the whole list: the two libraries the load modules link, the host tool
-that writes the webroot image, and the plugin that drives it. `libc370` is the
+that writes the webroot image, the plugin that drives it, and the plugin that
+restarts the server and compresses its development library. `libc370` is the
 cc370 sysroot (`-lc`), not a declared dependency. crent370 was superseded by libc370; ufs370 by ufsd; the lua370 and
 mqtt370 entries went with the Lua engine and the MQTT telemetry. Resolved
 versions are pinned in `mbt.lock` (committed).
@@ -124,6 +126,7 @@ mbt test              # build + run the dual tests natively — the fast inner l
 mbt test --mvs        # deploy to TESTLIB + run the suite on MVS
 mbt package           # dist/: SMP package, load XMIT, lib archive, webroot image
 mbt run webroot       # build only the webroot image
+mbt run restart -- HTTPD   # compress HTTPD.DEV.LINKLIB + restart HTTPD (mbt-stc)
 mbt doctor --offline  # verify the toolchain without contacting MVS
 mbt compiledb         # generate compile_commands.json for clangd
 mbt clean             # remove build/ and dist/ (keeps staged deps)
