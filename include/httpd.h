@@ -589,6 +589,8 @@ struct httpx {
                                     /* 13C client password into buf */
     const char *(*http_realm)(HTTPD *);
                                     /* 140 settled Basic realm (#193) */
+    int         (*http_new_session)(HTTPC *);
+                                    /* 144 private login session (#288) */
 };
 
 extern int http_in(HTTPC*)                                              asm("HTTPIN");
@@ -671,6 +673,7 @@ extern int http_check_auth(HTTPC *, const char *classname,
 extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");
 extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("HTTPGPWD");
 extern const char *http_realm(HTTPD *)                                     asm("HTTPGRLM");
+extern int http_new_session(HTTPC *)                                       asm("HTTPNSES");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
@@ -922,6 +925,9 @@ extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTT
 
 #define http_realm(httpd) \
     ((httpx->http_realm)((httpd)))
+
+#define http_new_session(httpc) \
+    ((httpx->http_new_session)((httpc)))
 
 #endif  /* ifndef HTTPX_H */
 
