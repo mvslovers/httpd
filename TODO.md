@@ -11,7 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-07 after PR #287 merged (#286,
+*Last reconciled against the tracker: 2026-10-11 after PR #289 (#288, a
+private session per explicit login, vector entry `0x144`) and PR #291 (#290,
+mbt-stc as a plugin, so `mbt run restart -- HTTPD` compresses
+`HTTPD.DEV.LINKLIB`) merged and v4.2.0-dev was re-cut on `c81e38e`; ten issues
+open, none of the ranked items moved. Before that, 2026-10-07 after PR #287 merged (#286,
 the move to mbt 3: mbt.toml, the webroot image through the mbt-ufs plugin,
 objects and load modules byte-identical to mbt 2), ten issues open, none of
 the ranked items moved. Before that, the same day after PR #285 merged (#284,
@@ -67,7 +71,8 @@ never cut and `THTP411` stays unassigned -- and carries `THTP420` /
 mvsdev and drnmig3a before 4.2.0 is tagged.
 
 **The libc370 2.0 port landed on 2026-10-01** (#272, PR #273) and ships as the
-prerelease **v4.2.0-dev** (tag on `e628477`). It stays a prerelease until
+prerelease **v4.2.0-dev** (re-cut on `c81e38e` on 2026-10-11, so it carries
+#288; first tagged on `e628477`). It stays a prerelease until
 mvsMF, httplua and httprexx are on libc370 2.0: `httpcgi.h` in `libhttpd` now
 includes 2.0 headers, and their `>=` ranges would pick up a stable release. Its
 SMP package already carries `THTP420`, so an SMP install of it spends that id
@@ -447,6 +452,20 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#288** — every explicit login gets a credential of its own (PR #289):
+  `cred_session()` and the export `http_new_session()` at vector `0x144`, used
+  by the form login and by mvsMF's authenticate POST (mvslovers/mvsmf#399).
+  Before it, two clients logging on with the same userid and password from one
+  address shared one token, and one logout ended both. At most 16 sessions per
+  client; the oldest is ended only after a minute idle, else the login is
+  refused. TSTSESS 90/0 on mvsdev. Not covered: the Basic cache CRED is still
+  shared, and its token still goes out as a cookie on Basic responses
+  (mvslovers/mvsmf#324).
+- **#290** — nothing compressed `HTTPD.DEV.LINKLIB` (PR #291): every deploy
+  leaves the replaced member's space dead. httpd now takes the mbt-stc plugin,
+  so `mbt run restart -- HTTPD` compresses before the restart. Not yet run on
+  MVS: the first restart through it is the measurement (library usage before
+  and after; it stood at 85% on 2026-10-11).
 - **#256** — the STC procedure stopped allocating what its modules open
   (PR #257, shipped in v4.0.1). `HASPCKPT`/`HASPACE1` went out with `HTTPJES2`
   because nothing in `httpd/src/` opened them. True, and the wrong question: a
