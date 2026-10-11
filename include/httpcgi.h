@@ -317,6 +317,10 @@ struct httpx {
                                     /* 140 settled Basic realm: REALM   */
                                     /* keyword or the SMF ID, never     */
                                     /* NULL (httpd#191, #193)           */
+    int         (*http_new_session)(HTTPC *);
+                                    /* 144 private login session: own   */
+                                    /* CRED + token, so a logout ends   */
+                                    /* only this one (httpd#288)        */
 };
 
 /* Eye-catcher for HTTPD pointer identification (ABI constant) */
@@ -645,5 +649,21 @@ struct httpx {
 
 #define http_realm(httpd) \
     ((httpx->http_realm)((httpd)))
+
+/* http_new_session() - turn this request's login into a session of its own
+** (httpd#288): a new credential with its own token, which http_get_token()
+** returns from then on.  For an explicit login endpoint only -- each call costs
+** a RACF logon and a slot in the credential store.
+**
+**    0  the session exists; http_get_token() now returns its token
+**   -1  no session: the request is not authenticated, carries no password,
+**       RACF refused, or the store is full
+**
+** A client holds at most 16 such sessions (same userid, password and address);
+** the next one ends its least recently used.  A module built against this
+** entry needs an httpd whose vector carries it -- there is no way to test for
+** it at run time. */
+#define http_new_session(httpc) \
+    ((httpx->http_new_session)((httpc)))
 
 #endif /* HTTPCGI_H */

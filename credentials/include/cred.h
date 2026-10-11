@@ -63,6 +63,9 @@ struct cred {
 	unsigned char   flags;			/* 4F flags						*/
 #define CRED_FLAG_NO_DELETE 0x80	/* ,,, do not delete cred		*/
 #define CRED_FLAG_KEEP_ACEE	0x40	/* ... do not delete cred->acee	*/
+#define CRED_FLAG_SESSION	0x20	/* ... private login session	*/
+									/*     (#288): never found by	*/
+									/*     CREDID, only by token	*/
 	time64_t		created;		/* 50 creation time stamp (#118)*/
 };									/* 58 (88 bytes)				*/
 
@@ -164,6 +167,48 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 
 /* overflow cap on the credential array (login flood protection, M2) */
 #define CRED_MAX 256
+
+/* cred_session() - mint a PRIVATE session for the client behind an existing
+ * credential (#288): a CRED of its own, with its own random token and its own
+ * ACEE, flagged CRED_FLAG_SESSION.  For an explicit login -- the z/OSMF
+ * authenticate POST and the form login -- never for a plain Basic request.
+ *
+ * Why a session of its own: cred_login() finds the credential by CREDID
+ * (address, userid, password), so every login with the same credentials from
+ * the same address used to get the SAME token, and a logout by one of them
+ * ended all of them.  A session CRED is never returned by cred_find_by_id(), so
+ * only its own token reaches it and a logout ends only that session.
+ *
+ * It copies the source's encrypted CREDID unchanged, so http_get_password()
+ * still works on a session (the job card needs it, #164).  The ACEE is a fresh
+ * racf_login(), never shared: a CRED frees its ACEE when it goes, and the
+ * source and the session go at different times.
+ *
+ * array and key are passed in, never taken from cred_array()/credkey(): a CGI
+ * calls this through the HTTPX vector, in a GRT where both are empty (#109,
+ * #111, #113).  Returns the new CRED, already in the array, or NULL (no
+ * password on the source, RACF refused, no storage, array full). */
+extern CRED *
+cred_session(CRED ***array, CREDKEY *key, CRED *from)										asm("CREDSESS");
+
+/* sessions one client may hold at a time (#288): same CREDID, so the same
+ * userid, password and address.  A login without a logout costs a slot until
+ * SESSION_TIMEOUT reaps it, so a client that never logs out -- a script in a
+ * loop, an editor re-authenticating -- would otherwise fill CRED_MAX within the
+ * idle timeout and lock EVERY user out of logging in, Basic included.  At the
+ * limit the client's own least recently used session is ended to make room
+ * (if it has been idle for CRED_SESSION_IDLE, else the login is refused);
+ * nobody else's is ever touched.  16 is far above what one client needs.  It
+ * bounds one client, not a deliberate flood: sixteen clients at the limit
+ * together fill CRED_MAX. */
+#define CRED_SESSION_MAX 16
+
+/* seconds a session must have been idle before CRED_SESSION_MAX may end it.  A
+ * request holds its CRED by a plain pointer, so ending a session one of its
+ * requests is still using would leave that request on freed storage.  A client
+ * with all its sessions busy gets its login refused instead -- 16 logins inside
+ * a minute without a logout is a loop, not a user. */
+#define CRED_SESSION_IDLE 60
 
 /* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs, or
  * older than maxage_secs counted from cred->created regardless of activity

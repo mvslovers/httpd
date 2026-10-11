@@ -103,6 +103,33 @@ rather than work around it; the table is covered by `TSTSTAT`.
 **Cross-request context:**
 - `http_cgictx_get(httpd, eye, size)` — find or create one context block per 8-byte eyecatcher. A module that needs a single, address-space-lifetime block (shared across requests and workers) registers it here. The block begins with the 8-byte eyecatcher (`char eye[8]`, stamped on create); `size` is used only on create and ignored on a hit, so always pass the same size for the same eyecatcher. The block is zeroed on create, lives until the address space ends, and is never freed individually. Returns the block, or `NULL` if the context array is full or storage is exhausted. Example: `http_cgictx_get(httpd, "MVSMFCTX", sizeof(MVSMF_CTX))`.
 
+**Authentication** (the credential httpd resolved before dispatching the module):
+- `http_get_userid(httpc, out, len)` / `http_get_acee(httpc)` — who the client is
+- `http_check_auth(httpc, class, resource, attr)` — RACF check under the client's ACEE; `0` is permitted
+- `http_get_password(httpc, out, len)` — the client's password, for a JOB card
+- `http_get_token(httpc, out, len)` — the session token of the resolved credential
+- `http_new_session(httpc)` — make this request's login a **session of its own**:
+  a new credential with its own token and ACEE, which `http_get_token()` returns
+  from then on. `0` on success, `-1` without one (no credential or password,
+  RACF refused, store full).
+- `http_logout(httpc)` — end the credential the request resolved to
+
+A module with a login endpoint calls `http_new_session()` before
+`http_get_token()`. Without it the token is the one the request resolved to,
+and plain Basic requests resolve by address, userid and password — so every
+client logging on with the same credentials from the same address would get
+the same token, and a logout by one would end all of them (#288).
+
+Only the login endpoint should call it: each call costs a RACF logon and a slot
+in the credential store. A client (same userid, password and address) holds at
+most 16 sessions; the next login ends its least recently used one. A token
+handed out without it — for instance on every Basic response, as mvsMF does —
+remains the shared credential's, and a logout with it ends that credential for
+everyone holding it; clients sending Basic simply log on again.
+
+The entry is at `0x144` in the vector. There is no run-time test for an entry,
+so a module calling it needs an httpd that has it.
+
 ## Direct Accessors (not HTTPX entries)
 
 `HTTPD` is opaque to a module — you hold the pointer and never dereference it.

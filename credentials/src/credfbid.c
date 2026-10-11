@@ -21,6 +21,12 @@ CRED *cred_find_by_id(CREDID *id)
 
 		if (!c) continue;
 
+		/* A private login session carries the same CREDID as the credential
+		   it was minted from, but it belongs to its token alone (#288).  Found
+		   here, a plain Basic request would hand its token out, and cred_login()'s
+		   max-age branch could end it under its owner. */
+		if (c->flags & CRED_FLAG_SESSION) continue;
+
 		if (memcmp(&c->id, id, sizeof(CREDID))==0) {
 			found = c;
 			break;

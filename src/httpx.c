@@ -118,6 +118,7 @@ static HTTPX vect = {
     http_logout,                /* 138 http_logout()                */
     http_get_password,          /* 13C http_get_password()          */
     http_realm,                 /* 140 http_realm()                 */
+    http_new_session,           /* 144 http_new_session()           */
 };
 
 HTTPX *httpx = &vect;

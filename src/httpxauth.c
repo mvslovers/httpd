@@ -6,7 +6,7 @@
 ** All accessors are NULL-credential safe (an unauthenticated request has
 ** httpc->cred == NULL).  Exported through the HTTPX vector (append-only):
 **   http_get_userid  http_get_acee  http_get_token  http_check_auth
-**   http_logout  http_get_password  http_realm
+**   http_logout  http_get_password  http_realm  http_new_session
 **
 ** Each function carries a >8-char C name, so it needs an explicit &FUNC CSECT
 ** name (matching its asm() alias) and an #undef to shed the httpx macro layer
@@ -265,4 +265,38 @@ http_realm(HTTPD *httpd)
 {
     if (!httpd) return NULL;
     return httpd->cfg_realm;
+}
+
+/* http_new_session() - give this request's login a session of its own
+** (#288): a new CRED with its own random token and its own ACEE, which
+** httpc->cred then points at, so http_get_token() returns its token and a
+** later http_logout() with that token ends this session and no other.
+** Returns 0 on success, -1 when there is no session to make (see
+** cred_session() for the reasons).
+**
+** Without it, a login hands out the token of whichever CRED the request
+** resolved to -- and httppc.c resolves Basic through cred_login(), which finds
+** the CRED by address, userid and password.  So every client logging on with
+** the same credentials from the same address got the same token, and a logout
+** by one of them logged out all of them.
+**
+** The array and the key come from the HTTPD block, never cred_array()/
+** credkey(): this runs in a CGI's GRT (#113, #111).  The CRED the request
+** resolved to stays in the store for the Basic path; only this one is
+** private. */
+__asm__("\n&FUNC SETC 'HTTPNSES'");
+#undef http_new_session
+int
+http_new_session(HTTPC *httpc)
+{
+    CRED *cred;
+
+    if (!httpc || !httpc->cred || !httpc->httpd) return -1;
+
+    cred = cred_session(httpc->httpd->credarr, httpc->httpd->credkey,
+                        httpc->cred);
+    if (!cred) return -1;
+
+    httpc->cred = cred;
+    return 0;
 }

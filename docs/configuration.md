@@ -176,6 +176,13 @@ What reaching the limit *does* depends on how the client authenticates:
   interval: the cached credential is dropped and the password is checked
   against RACF again.
 
+Each explicit login — the `/login` form, and a module's login endpoint such
+as mvsMF's `POST /zosmf/services/authenticate` — gets a **session of its own**
+with its own token, so a logout ends only that one (#288). Both limits apply
+to each session separately. One client (same userid, password and address)
+holds at most 16; the next login ends its least recently used session, so a
+client that never logs out cannot fill the credential store for everyone else.
+
 Both limits are enforced when a request looks a credential up, not only by the
 background sweep, so an expired session is rejected immediately rather than up
 to a minute later.

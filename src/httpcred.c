@@ -416,6 +416,18 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 	wtof("httpcred.c:process_post() cred=0x%08X", cred);
 #endif
 	if (cred) {
+		/* the Sec-Token must be this login's own (#288).  cred_login() finds
+		   the credential by address, userid and password, so a second browser
+		   or tab logging on the same way would otherwise get the same token --
+		   and /logout would end both. */
+		CRED *session = cred_session(httpd->credarr, httpd->credkey, cred);
+
+		if (!session) {
+			rc = print_login(httpd, httpc, "Login failed, no session available");
+			goto quit;
+		}
+		cred = session;
+
 		/* success */
 		httpc->cred = cred;
 
