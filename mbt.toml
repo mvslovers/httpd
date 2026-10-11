@@ -79,8 +79,14 @@ cflags = ["-Wno-error"]
 [tools]
 ufsd-utils = { repo = "mvslovers/ufsd-utils", version = "1.0.1" }
 
+# mbt-stc: `mbt run restart -- HTTPD` compresses HTTPD.DEV.LINKLIB and restarts
+# HTTPD. A deploy replaces members in place (IEBCOPY, DISP=SHR) and every
+# replaced member leaves its old space dead until a compress, which needs the
+# library free -- so it runs while the server is stopped. Without it nothing
+# compresses this library, and deploys fill it up.
 [plugins]
 "mvslovers/mbt-ufs" = "^0.1"
+"mvslovers/mbt-stc" = "^0.1"
 
 # -- Internal autocall archive ------------------------------------
 # All of httpd's objects, archived into build/httpdint.a.  Every module
