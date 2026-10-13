@@ -29,7 +29,7 @@ One placeholder is used throughout:
 
 | | |
 |---|---|
-| `<version>` | the release, e.g. `4.1.0` — it appears in every shipped file name |
+| `<version>` | the release, e.g. `4.2.0` — it appears in every shipped file name |
 
 It is already filled in inside the shipped jobs; you only need it to recognise
 which file is which.
@@ -40,20 +40,19 @@ which release a name belongs to. Up to and including 4.0.2 they were versioned
 — `HTTPD.V4R0M2.LINKLIB` — and two releases could sit side by side; 4.1.0 ends
 that.
 
-**From 4.1.1 onward an upgrade needs nothing uninstalled first.** Each release's
-SYSMOD carries `DELETE(<the previous FMID>)`, so SMP deletes the old modules
-from `HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
+**Upgrading from 4.1.0 needs nothing uninstalled first.** This release's
+SYSMOD carries `DELETE(THTP410)`, so SMP deletes the 4.1.0 modules from
+`HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
 ownership of each module moves with them. You stop the server (step 5), skip
 step 4 because the libraries are already there, and submit the install job.
 
-**Coming from 4.0.x is different, and every installation that exists today is
-4.0.x.** `HTTPD.LINKLIB` does not exist on those systems — they have
-`HTTPD.V4R0M2.*` — so nothing of this release lands on top of anything, and
-`DELETE(THTP400)` has no modules to find in the library it is pointed at. That
-first upgrade is a **move, not a replacement**: it runs step 4 and it re-points
-`STEPLIB` once. Nothing has to be uninstalled first there either.
-[Section 12a](#12a-upgrading-from-40x) has the order; follow it instead of this
-list.
+**Coming from 4.0.x, install 4.1.0 first.** This release deletes `THTP410`
+and nothing else. On a 4.0.x system the modules still belong to `THTP400`, and
+a SYSMOD that does not own a module cannot replace it: SMP selects none of
+them, copies nothing, and every step still ends `RC 00`. 4.1.0 is the release
+that crosses from `THTP400`, and it is also the one move to the unversioned
+dataset names — [section 12a](#12a-upgrading-from-40x) has that order, done
+with the **4.1.0** package. After it, upgrade to this release as above.
 
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
@@ -418,8 +417,9 @@ Expect `COND CODE 0000`.
 > what the APPLY expects to find and replace. A failure here saying the dataset
 > exists is that situation, not an error to work around.
 >
-> **Coming from 4.0.x, do run it**: those names are new on that system. See
-> [section 12a](#12a-upgrading-from-40x) for the full order.
+> **Coming from 4.0.x**, install 4.1.0 first, following
+> [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
+> come back and upgrade to this release, skipping it.
 
 ---
 
@@ -481,7 +481,7 @@ The SYSMOD travels inline in the job — there is no third file to upload.
 output:
 
 ```
-HMA3930    SYSMOD THTP410 SUCCESSFULLY RECEIVED
+HMA3930    SYSMOD THTP420 SUCCESSFULLY RECEIVED
 HMA2240    SUCCESSFULLY DELETED LMOD=HTTPD
 HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB
            - RETURN CODE=00
@@ -882,7 +882,7 @@ A healthy start ends in `HTTPD001I … READY`:
 
 ```
 HTTPD000I HTTPD <version> (A69A370) STARTING
-HTTPD005I LIBC370 1.0.3 (58767B3)
+HTTPD005I LIBC370 2.10.3 (A790DC4)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
@@ -986,7 +986,7 @@ What this release put on the system:
 
 | | |
 |---|---|
-| FMID | `THTP410` |
+| FMID | `THTP420` |
 | Load modules | `HTTPD`, `HTTPDSRV`, `HTTPDM`, `HTTPDMTT`, `ABEND0C1` |
 | Target library | `HTTPD.LINKLIB` |
 | Distribution library | `HTTPD.AHTTPLOD` |
@@ -1018,11 +1018,11 @@ the ACDS and touches no library:
 //UCLIN   EXEC SMPAPP
 //SMPCNTL  DD  *
  UCLIN CDS .
-  DEL SYSMOD(THTP410) MOD(HTTPD) .
-  DEL SYSMOD(THTP410) MOD(HTTPDSRV) .
-  DEL SYSMOD(THTP410) MOD(HTTPDM) .
-  DEL SYSMOD(THTP410) MOD(HTTPDMTT) .
-  DEL SYSMOD(THTP410) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP420) MOD(HTTPD) .
+  DEL SYSMOD(THTP420) MOD(HTTPDSRV) .
+  DEL SYSMOD(THTP420) MOD(HTTPDM) .
+  DEL SYSMOD(THTP420) MOD(HTTPDMTT) .
+  DEL SYSMOD(THTP420) MOD(ABEND0C1) .
   DEL MOD(HTTPD) .
   DEL MOD(HTTPDSRV) .
   DEL MOD(HTTPDM) .
@@ -1033,41 +1033,52 @@ the ACDS and touches no library:
   DEL LMOD(HTTPDM) .
   DEL LMOD(HTTPDMTT) .
   DEL LMOD(ABEND0C1) .
+  DEL SYSMOD(THTP420) .
   DEL SYSMOD(THTP410) .
+  DEL SYSMOD(THTP400) .
  ENDUCL .
  UCLIN ACDS .
-  DEL SYSMOD(THTP410) MOD(HTTPD) .
-  DEL SYSMOD(THTP410) MOD(HTTPDSRV) .
-  DEL SYSMOD(THTP410) MOD(HTTPDM) .
-  DEL SYSMOD(THTP410) MOD(HTTPDMTT) .
-  DEL SYSMOD(THTP410) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP420) MOD(HTTPD) .
+  DEL SYSMOD(THTP420) MOD(HTTPDSRV) .
+  DEL SYSMOD(THTP420) MOD(HTTPDM) .
+  DEL SYSMOD(THTP420) MOD(HTTPDMTT) .
+  DEL SYSMOD(THTP420) MOD(ABEND0C1) .
   DEL MOD(HTTPD) .
   DEL MOD(HTTPDSRV) .
   DEL MOD(HTTPDM) .
   DEL MOD(HTTPDMTT) .
   DEL MOD(ABEND0C1) .
+  DEL SYSMOD(THTP420) .
   DEL SYSMOD(THTP410) .
+  DEL SYSMOD(THTP400) .
  ENDUCL .
 /*
 //LIST    EXEC SMPAPP
 //SMPCNTL  DD  *
  RESETRC .
+ LIST CDS  SYSMOD(THTP420) .
  LIST CDS  SYSMOD(THTP410) .
+ LIST CDS  SYSMOD(THTP400) .
+ LIST ACDS SYSMOD(THTP420) .
  LIST ACDS SYSMOD(THTP410) .
+ LIST ACDS SYSMOD(THTP400) .
 /*
 //
 ```
 
-Every `DEL` reports `HMA2550 UPDATE COMPLETE`, and each `UCLIN` block ends
-`RC 00`.
+Every `DEL` that finds its entry reports `HMA2550 UPDATE COMPLETE`. What a
+line naming an id this system never had reports has not been measured, so do
+not judge the job by the `UCLIN` return codes: the `LIST` below is the
+result.
 
-**3. Read the LIST — this is the actual result.** Both zones must answer:
+**3. Read the LIST — this is the actual result.** Every id must answer, in
+both zones:
 
 ```
 THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND OR WERE NOT ELIGIBLE
 FOR PROCESSING
  TYPE        NAME
- SYSMOD      THTP410
+ SYSMOD      THTP420
 ```
 
 with `HIGHEST RETURN CODE IS 04`. **RC 04 and an empty list means the FMID is
@@ -1075,31 +1086,33 @@ free.** Both zones matter: the CDS records what is applied, the ACDS what is
 accepted, and they are separate inventories — an id gone from one and present in
 the other is not free.
 
+**Read the stanzas, not the step's return code.** A surviving tombstone (below)
+answers RC 00 while the cleared ids answer RC 04, so it does not raise the
+step's highest return code above the 04 you were expecting. A stanza naming
+`TYPE = FUNCTION` and `DELBY` is an id that is still there.
+
 ### The tombstones — one `DEL SYSMOD` each, and there may be several
 
 A system that was upgraded also carries the **tombstone** of every level it
-came through: `THTP400` listed as `TYPE = FUNCTION` with `DELBY = THTP410` and
+came through: `THTP410` listed as `TYPE = FUNCTION` with `DELBY = THTP420` and
 nothing else. `LIST` answers **RC 00** for those, not RC 04, so the
 "RC 04 + empty list = free" rule above reads them as occupied — which is
 correct, the ids are spent and can never be reused.
 
-They own no elements, so leaving them harms nothing. To clear them, add one
-line per tombstone to the `UCLIN` above, in **both** zones:
-
-```
-  DEL SYSMOD(THTP400) .
-```
-
-**Do not write that list from memory.** A system that went 4.0.x → 4.1.0 →
-4.1.1 carries *two* — `THTP400 DELBY=THTP410` and `THTP410 DELBY=THTP411` — and
-a job that names only the release you are removing and its immediate
-predecessor leaves the older one standing for good. `LIST CDS SYSMOD(THTP4??)`
-before you write the job and delete what it actually reports.
+**Tombstones accumulate, one per upgrade.** A system that went 4.0.x → 4.1.0 →
+4.2.0 carries two: `THTP400 DELBY=THTP410` and `THTP410 DELBY=THTP420`. A job
+that names only the release you are removing and its immediate predecessor
+leaves the older one standing for good. That is why the job above names
+**every id HTTPD has ever spent** — `THTP420`, `THTP410`, `THTP400` — rather
+than the ones this system happens to have seen.
 
 `DEL SYSMOD` does work on a tombstone — measured on drnmig3a 2026-09-14,
 `TSTHCLN JOB00043`: 29 × `HMA2550 UPDATE COMPLETE`, `COND CODE 0000`, and both
 ids gone from both zones afterwards. On a system that was never upgraded the
-line simply finds nothing, which is why it can stand unconditionally.
+line simply finds nothing, which is why every line can stand unconditionally:
+the list needs no judgement about which releases this system has seen, and
+getting that judgement wrong is exactly the failure it prevents. Each release
+adds its own id here.
 
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
@@ -1131,7 +1144,7 @@ Those are yours to delete — unmount the disk before you scratch it.
 > accepted FMID from a package built by this same generator, on an MVS/CE system
 > running SMP 4 level 04.48. It is a property of SMP 4 and of accepting a
 > function SYSMOD, not of any one product — but the `UCLIN` job above has not
-> itself been run against `THTP400` or `THTP410`. The same job *shape* was run
+> itself been run against `THTP400`, `THTP410` or `THTP420`. The same job *shape* was run
 > end to end on FTPD on 2026-09-13 (jobs `JOB00269` and `JOB00281`), which is
 > where the `NOT SEL` behaviour in the upgrade note above was measured. Read the
 > `LIST` output rather than trusting the `DEL` cards.
@@ -1140,19 +1153,26 @@ Those are yours to delete — unmount the disk before you scratch it.
 
 ## 12a. Upgrading from 4.0.x
 
+> **Do this with the 4.1.0 package, not this release's.** This release deletes
+> `THTP410` only, so on a 4.0.x system — where the modules belong to `THTP400` —
+> its install selects nothing and copies nothing while every step ends `RC 00`.
+> Download 4.1.0 from the releases page, follow the steps below with it, and
+> confirm the 4.1.0 banner. Then upgrade to this release the ordinary way:
+> stop, install, start, with no allocation step.
+
 Those releases put their datasets in `HTTPD.V4R0M0.*`, `HTTPD.V4R0M1.*` or
-`HTTPD.V4R0M2.*`, so nothing of this release lands on top of them. That makes
+`HTTPD.V4R0M2.*`, so nothing of 4.1.0 lands on top of them. That makes
 this upgrade a **move** rather than a replacement — but it is still just the
 ordinary install, in order, with three extra things to remember.
 
 **There is nothing to uninstall first.** `DELETE(THTP400)` does the inventory
-work even though the old modules are in a library this release never names.
+work even though the old modules are in a library 4.1.0 never names.
 
 The reason is that **SMP does not record which data set an element lives in —
 it records the ddname the install job used.** Both generations' libraries end
 in `LINKLIB`, and the ddname comes from that last qualifier, so both installs
 use ddname `LINKLIB`: pointing at `HTTPD.V4R0M2.LINKLIB` in the one case and
-`HTTPD.LINKLIB` in the other. When this release's `APPLY` deletes the
+`HTTPD.LINKLIB` in the other. When 4.1.0's `APPLY` deletes the
 predecessor's load modules it resolves `LINKLIB` **in its own job**, which
 points at the new library. It deletes from there, reports success, and copies
 the new modules in. `HTTPD.V4R0M2.LINKLIB` is never opened, and nothing in the
@@ -1177,7 +1197,8 @@ it is simply the old build.
 2. **Run step 4.** This is the one upgrade that allocates: `HTTPD.LINKLIB` and
    `HTTPD.AHTTPLOD` are new names on this system. They are created beside the
    old libraries, not over them.
-3. **Steps 3 and 6, unchanged** — upload and install. Expect the `APPLY` to end
+3. **Steps 3 and 6, with the 4.1.0 files** — upload and install; the SMP
+   output names `THTP410`, not the id step 6 shows. Expect the `APPLY` to end
    `COND CODE 0004` on `HMA2461`; that is the deleted level having no `SMPSCDS`
    backup entry, and the `ACCEPT` still runs.
 4. **Re-point `STEPLIB`** in your `HTTPD` procedure to `HTTPD.LINKLIB`.

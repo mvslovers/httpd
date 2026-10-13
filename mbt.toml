@@ -526,8 +526,9 @@ extra = ["build/webroot/httpd-webroot.img"]
 # THTP411: mvsdev (MVS/CE) FMIDCHK JOB00343, RC 04 NOT FOUND in CDS and ACDS,
 # 2026-09-14.  Never spent: 4.1.1 was not cut -- the libc370 2.0 port made the
 # next release 4.2.0 -- and it stays unassigned.
-# THTP420: NOT YET CHECKED ON ANY STAND.  LIST it in CDS and ACDS on mvsdev and
-# drnmig3a before 4.2.0 is tagged.
+# THTP420: free on the maintainer's word (2026-10-13), as TFTP120 was for ftpd
+# 1.2.0 -- NO LIST was run on any stand before 4.2.0 was tagged.  The SMP
+# installs that follow the release are the first check.
 # THTP410 (spent by 4.1.0) was checked on BOTH: mvsdev FMIDCHK JOB00288 and
 # drnmig3a FMIDCHK JOB00034, each RC 04 NOT FOUND in CDS and ACDS.
 # Name the stands every time.
