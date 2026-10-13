@@ -448,10 +448,17 @@ delete = ["THTP410"]
 a second digit. At patch 9 cut the next minor, at minor 9 the next major;
 httpd 4.1.10 cannot be expressed and must not be released.
 
-Current: **`THTP420`** for 4.2.0, deleting `THTP410`, not yet checked on any
-stand. 4.1.0 shipped under `THTP410` and 4.0.x under `THTP400`; both are
-burned. 4.1.1 was never cut -- the libc370 2.0 port (#272) made the next
-release a minor -- so `THTP411` stays unassigned.
+Under mbt 3 the id is derived: `[smp] prefix = "THTP"` in mbt.toml plus the
+version gives the FMID and the predecessor it deletes; the block above is the
+mbt 2 form, and an explicit `fmid`/`delete` would still win.
+
+Current: **`THTP430`** for 4.3.0-dev, deleting `THTP420` (derived), not yet
+checked on any stand. 4.2.0 was released 2026-10-13 under `THTP420` -- free on
+the maintainer's word, no `LIST` run on any stand. 4.1.0 shipped under
+`THTP410` and 4.0.x under `THTP400`; all three are burned. 4.1.1 was never cut
+-- the libc370 2.0 port (#272) made the next release a minor -- so `THTP411`
+stays unassigned. Each release adds its id to the removal job in
+`docs/installation.md` section 12, which names every id ever spent.
 
 Never re-spend an id, and never install a test package under the real one: a
 test needs a throwaway id **and** throwaway module names, because SMP keys

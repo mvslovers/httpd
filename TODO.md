@@ -11,10 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-13 after PR #293 (#292,
+*Last reconciled against the tracker: 2026-10-13 after v4.2.0 (PR #294,
+the 4.2.0 notes and guide; FMID THTP420; main now 4.3.0-dev, THTP430); ten
+issues open, none of the ranked items moved. Before that, the same day after PR #293 (#292,
 the `[toolchain]` pin: cc370 1.6.1, libc370 2.10.3, and ufsd moved to the
-released `>=1.4.0`); ten issues open, none of the ranked items moved. Next for
-4.2.0: an MVS test run on dev1 with the new toolchain, then the release.
+released `>=1.4.0`); ten issues open, none of the ranked items moved.
 Before that, 2026-10-11 after PR #289 (#288, a
 private session per explicit login, vector entry `0x144`) and PR #291 (#290,
 mbt-stc as a plugin, so `mbt run restart -- HTTPD` compresses
