@@ -205,7 +205,7 @@ version = "1.0.0"
 kind = "application"
 
 [dependencies]
-"mvslovers/httpd" = ">=4.2.0-dev"
+"mvslovers/httpd" = ">=4.2.0"
 
 [module.MYMODULE]
 dep_startup = true
@@ -225,7 +225,7 @@ version = "1.0.0"
 type = "application"
 
 [dependencies]
-"mvslovers/httpd" = ">=4.2.0-dev"
+"mvslovers/httpd" = ">=4.2.0"
 
 [[module]]
 name = "MYMODULE"
