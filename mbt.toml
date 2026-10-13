@@ -2,7 +2,7 @@ schema = 3
 
 [project]
 name = "httpd"
-version = "4.2.0-dev"
+version = "4.2.0"
 kind = "application"
 
 [toolchain]
