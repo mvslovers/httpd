@@ -19,10 +19,14 @@ kind = "application"
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
 #
-# cc370 1.4.0: libc370 2.4.0 and later need cc370 >= 1.4.0 (their headers
-# #error otherwise).
+# cc370 1.6.1: libc370 2.8.0 and later need cc370 >= 1.6.0 (their headers
+# #error otherwise); from 1.6.0 on as370 finds the IBM macros in maclib370
+# by itself.  HTTPD has no assembler source of its own, so the move of those
+# macros out of libc370 (2.8.0, mvslovers/libc370#494) changes nothing here.
 #
-# libc370 2.6.0: the current release.  The floor is 2.4.0: HTTPD's startup step
+# libc370 2.10.3: the current release.  It keeps a PDS member whose write
+# failed out of the directory on close (mvslovers/libc370#524), so a failed
+# overwrite no longer destroys the old member.  The floor is 2.4.0: HTTPD's startup step
 # is libc370's __premain() hook (#281, mvslovers/libc370#440), and an older
 # libc.a would never call it -- HTTPD would open SYSPRINT/SYSTERM/SYSIN as its
 # streams instead of refusing them.  The C runtime startup is a member of libc.a
@@ -31,8 +35,8 @@ kind = "application"
 # (mvslovers/libc370#453); HTTPD's socket thread and worker pool are created
 # that way, so the server's streams lock as before.
 mbt = "3.0"
-cc370 = "1.4.0"
-libc370 = "2.6.0"
+cc370 = "1.6.1"
+libc370 = "2.10.3"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
