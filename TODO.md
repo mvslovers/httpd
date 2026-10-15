@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-15 after v4.3.0 (PR #299, the
+*Last reconciled against the tracker: 2026-10-15 after the m38b soak (#297 /
+mvsmf#430: about 28,750 module requests at 0 bytes per request); #300 filed
+out of it and ranked low, beside its libc370 half, libc370#553; thirteen issues
+open, none of the ranked items moved. Before that, the same day after v4.3.0 (PR #299, the
 4.3.0 notes and guide; FMID THTP430; main now 4.4.0-dev, THTP440); twelve
 issues open, none of the ranked items moved. Before that, the same day while
 preparing 4.3.0: PR
@@ -76,6 +79,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
+| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **#250(b)** (does LINK fetch every time?), and libc370#553 to name the code in HTTPD908E. Low: seen only on a stand with fetch I/O errors |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
@@ -351,6 +355,11 @@ brings in stays in the JPA to the next request, or is fetched from the library
 again each time, is unsettled: the project's own sources said both, which is
 what made #250 worth filing. Two `/.dm` calls against a running server decide
 it — compare free storage between them.
+
+#300 adds a data point, not the answer. On m38b, fetch of MVSMF failed at about
+request 19,900 of a soak, so a fetch did run then, long after start. Whether it
+runs on *every* request is still the open question. #300's remedy (keep the
+module resident) depends on it.
 
 **(c)** re-scopes #198's second step on that answer: placement hygiene if the
 copy persists, a per-request disk fetch worth eliminating if it does not.
