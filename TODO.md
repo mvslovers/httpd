@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-15 while preparing 4.3.0: PR
+*Last reconciled against the tracker: 2026-10-15 after v4.3.0 (PR #299, the
+4.3.0 notes and guide; FMID THTP430; main now 4.4.0-dev, THTP440); twelve
+issues open, none of the ranked items moved. Before that, the same day while
+preparing 4.3.0: PR
 #298 merged and #297 closed (confirmed in a running server: 900 requests to
 a module relinked against libc370 2.12.1 lost nothing); twelve issues open,
 the ranked order otherwise unchanged. 4.3.0 is the libc370 2.12.1 relink and

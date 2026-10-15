@@ -452,10 +452,11 @@ Under mbt 3 the id is derived: `[smp] prefix = "THTP"` in mbt.toml plus the
 version gives the FMID and the predecessor it deletes; the block above is the
 mbt 2 form, and an explicit `fmid`/`delete` would still win.
 
-Current: **`THTP430`** for 4.3.0-dev, deleting `THTP420` (derived), not yet
-checked on any stand. 4.2.0 was released 2026-10-13 under `THTP420` -- free on
-the maintainer's word, no `LIST` run on any stand. 4.1.0 shipped under
-`THTP410` and 4.0.x under `THTP400`; all three are burned. 4.1.1 was never cut
+Current: **`THTP440`** for 4.4.0-dev, deleting `THTP430` (derived), not yet
+checked on any stand. 4.3.0 was released 2026-10-15 under `THTP430` (the
+libc370 2.12.1 relink, #297) -- free on the maintainer's word, no `LIST` run on
+any stand. 4.2.0 was released 2026-10-13 under `THTP420`, likewise unchecked.
+4.1.0 shipped under `THTP410` and 4.0.x under `THTP400`; all four are burned. 4.1.1 was never cut
 -- the libc370 2.0 port (#272) made the next release a minor -- so `THTP411`
 stays unassigned. Each release adds its id to the removal job in
 `docs/installation.md` section 12, which names every id ever spent.
