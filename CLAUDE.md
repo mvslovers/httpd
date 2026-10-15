@@ -454,8 +454,10 @@ mbt 2 form, and an explicit `fmid`/`delete` would still win.
 
 Current: **`THTP440`** for 4.4.0-dev, deleting `THTP430` (derived), not yet
 checked on any stand. 4.3.0 was released 2026-10-15 under `THTP430` (the
-libc370 2.12.1 relink, #297) -- free on the maintainer's word, no `LIST` run on
-any stand. 4.2.0 was released 2026-10-13 under `THTP420`, likewise unchecked.
+libc370 2.12.1 relink, #297) -- free on the maintainer's word, no `LIST` run
+before the release; installed 2026-10-15 on m38r (JOB00891), m38l (JOB01708),
+m38x (JOB00629) and m38b (JOB01517), each checked by member list and `LIST`.
+4.2.0 was released 2026-10-13 under `THTP420`, likewise unchecked.
 4.1.0 shipped under `THTP410` and 4.0.x under `THTP400`; all four are burned. 4.1.1 was never cut
 -- the libc370 2.0 port (#272) made the next release a minor -- so `THTP411`
 stays unassigned. Each release adds its id to the removal job in
