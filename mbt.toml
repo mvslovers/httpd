@@ -534,9 +534,10 @@ extra = ["build/webroot/httpd-webroot.img"]
 # THTP420: free on the maintainer's word (2026-10-13), as TFTP120 was for ftpd
 # 1.2.0 -- NO LIST was run on any stand before 4.2.0 was tagged.  The SMP
 # installs that follow the release are the first check.
-# THTP430 (4.3.0, deleting THTP420): no LIST run on any stand when the release
-# was prepared (2026-10-15).  The SMP installs on m38r, m38b, m38l and m38x
-# that follow it are the first check -- read their LIST and member lists.
+# THTP430 (4.3.0, deleting THTP420): free on the maintainer's word
+# (2026-10-15) -- NO LIST was run on any stand before 4.3.0 was tagged.  The
+# SMP installs on m38r, m38b, m38l and m38x that follow it are the first check
+# -- read their LIST and member lists.
 # THTP410 (spent by 4.1.0) was checked on BOTH: mvsdev FMIDCHK JOB00288 and
 # drnmig3a FMIDCHK JOB00034, each RC 04 NOT FOUND in CDS and ACDS.
 # Name the stands every time.
