@@ -11,7 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-15 after #297 was filed (handed
+*Last reconciled against the tracker: 2026-10-15 while preparing 4.3.0: PR
+#298 merged and #297 closed (confirmed in a running server: 900 requests to
+a module relinked against libc370 2.12.1 lost nothing); twelve issues open,
+the ranked order otherwise unchanged. 4.3.0 is the libc370 2.12.1 relink and
+nothing else. Before that, the same day after #297 was filed (handed
 over from mvsmf#430; the cause is libc370#546, fixed in libc370 2.12.1) and PR
 #298 opened with the pin; thirteen issues open, #297 ranked first because it
 ends every CGI after some 50,000 requests. #295 and #296 were filed after
@@ -59,13 +63,12 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #297 | `type:bug` — every CGI request leaks ~128 B of subpool 0 in the module's C runtime (libc370#546) | **the confirmation run** on m38r: PR #298 pins libc370 2.12.1, then 300 × `/.dm` with an expected delta of 0 |
-| 2 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
-| 3 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
-| 4 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
-| 5 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
-| 6 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
-| 7 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
+| 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
+| 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
+| 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
+| 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
+| 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
+| 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
