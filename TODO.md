@@ -11,9 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 after the libc370 pin moved to
-2.22.0 (direct commit, no code change): twelve issues open, the ranked order
-unchanged. Before that, the same day after PR #308 (libc370 pin
+*Last reconciled against the tracker: 2026-10-19 after PR #310 (#309: wtof()
+arguments match their formats, ahead of libc370#654): #309 filed and closed
+with it; twelve issues open, the ranked order unchanged. Before that, the same
+day after the libc370 pin moved to 2.22.0 (direct commit, no code change).
+Before that, the same day after PR #308 (libc370 pin
 2.21.0, the release with libc370#388; no code change): twelve issues open, the
 ranked order unchanged. Before that, the same day after PR #306 (#303: the MIME
 lookup works with both `bsearch()` argument orders; libc370 pin 2.20.0): #303
@@ -476,6 +478,10 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#309** — every `wtof()`/`wtodumpf()` argument matches its format (PR #310):
+  libc370#654 declares `format(printf)` on them, and the build would have
+  failed under `-Werror`. Pointers cast `(unsigned)`, `__64` passed as `.u64`
+  (identical code, no output change), one missing `%` in `credtest.c`.
 - **#303** — the MIME lookup holds against either `bsearch()` order (PR #306):
   the key is an `HTTPM`, so libc370#388's C99 order no longer reads the
   extension as a table entry (S0C4 in `HTTPCMP` before). TSTMIME red/green on an
