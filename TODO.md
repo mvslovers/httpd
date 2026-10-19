@@ -11,7 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 with the #250 docs PR: (b) and
+*Last reconciled against the tracker: 2026-10-19 after PR #305 (resident modules,
+#198 step 2): #300 closed, rank 4 done; twelve issues open. Before that, the same
+day with the #250 docs PR: (b) and
 the reuse of a held copy measured, #250 closes; its rank 4 goes to #198's step 2
 (with #300), decided the same day. Before that, 2026-10-19 after PR #301 (the program
 fetch probe of #300, `internals/fetchprobe/`); #300 stays open and its row is
@@ -77,15 +79,13 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
 | 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
-| 4 | #198 step 2, with #300 | hold every `MOD=` module with `__load()` from startup to shutdown, so a request no longer fetches it | **review and merge** of the implementing PR (`RESIDENT=YES` default; verified in a TK5 container). Then: not on m38r while mvsmf#425 is watched there, or with `RESIDENT=NO` |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **rank 4** (no fetch per request any more), and libc370#553 to name the code in HTTPD908E (its completion code only: LINK's error exit carries no reason code, #250). Low, but not rare: met on m38b by HTTPD and by PL/I compiles, and by the probe (`internals/fetchprobe/`, PR #301) on m38r and m38l and under both Hercules 4.10.0 levels tried, roughly 1 to 28 per million fetches; the measurements are in #300 |
-| — | #198 | hygiene, explicitly not a bug | step 2 is rank 4; step 1 (`PREALLOC`) stays deferred |
+| — | #198 | hygiene, explicitly not a bug | step 2 landed (PR #305); step 1 (`PREALLOC`) stays deferred to 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -346,37 +346,15 @@ undetermined: the sysroot was already 1.0.4 before the relink work began, so
 1.0.3 was never measured. That test needs a sysroot rebuilt from a libc370 v1.0.3
 checkout, which is why it has not been run.
 
-### 4 · #198 step 2, with #300 — hold the modules resident
+### ~~4 · #198 step 2, with #300 — hold the modules resident~~
 
-*decided 2026-10-19; implemented on `issue-198-resident-modules`*
-
-#250 answered both questions this needed. (b): a LINKed copy does not survive
-in the Job Pack Area, so every request is a full program fetch (MVSMF: about
-335 KB), unless requests overlap — measured on MVS/CE 2026-10-14, confirmed on
-TK5 and MVS/CE 2026-10-19. And the follow-up: a copy held by `__load()` in the
-main task is found by the LINK every worker issues, on both systems, by the
-`BLDL` + `LOAD DE=` path libc370 takes as well. Both are written down once, in
-`docs/server-modules.md`, and #250 closes with that.
-
-So #198's step 2 is no longer placement hygiene: it removes a disk fetch per
-request, and with it the `106-0F` exposure of #300 (1 to 28 per million fetches,
-82 pages each for MVSMF). The shape: `__load(NULL, module, …)` once per
-registered `MOD=` at startup, kept for the server's life, `__delete()` at
-shutdown; dispatch stays a LINK. Implemented as `RESIDENT=YES|NO` (default
-`YES`), modules linked neither RENT nor REUS left on the fetch per request
-(`HTTPD441W`). Verified in a TK5 container: with the MVSMF member deleted under
-a running server, 31 of 31 requests answered (30 in parallel), against 31 × 503
-with `806-4` under `RESIDENT=NO`. What was open before writing it, and where it
-went:
-
-- **Concurrency:** 30 parallel requests on the held RENT MVSMF, no fetch. A
-  REUS-only module is not measured. Every ecosystem module (MVSMF, HTTPDSRV/
-  DM/DMTT, ABEND0C1, HTTPLUA, HTTPREXX) is `rent` and `reus`.
-- **A held copy outlives a deploy:** documented; `RESIDENT=NO` keeps the old
-  behaviour.
-- **Not on m38r while mvsmf#425 is watched there** (#250, 2026-10-14): a held
-  MVSMF changes exactly the placement and lifetime that hit depends on, and a
-  copy that is overwritten stays overwritten until the restart.
+Landed as PR #305 on 2026-10-19 and closed #300: `RESIDENT=YES` (the default)
+LOADs each `MOD=` module at startup and holds it, so no request fetches it any
+more. Verified in TK5 containers at key 8 and key 0 (#198). What stays open
+from it: **m38r gets `RESIDENT=NO`** in its member while mvsmf#425 is watched
+there, and libc370#553 for naming the code in HTTPD908E (completion code only:
+LINK's error exit has no reason code, #250). Ranks 5 and 6 keep their numbers
+until the next re-rank.
 
 ### 5 · #258 — thirteen console lines that tell the operator nothing
 
@@ -433,8 +411,8 @@ Two things the scoping turned up that the issue text does not have:
   a server that never does.
 - Step 2 as written cannot use the existing path: `__linkds()` would *run* the
   module with no request. `__load()` (libc370 `clibos.h:202`) is the primitive
-  that loads without executing. #250 has answered what it was gated on, and
-  step 2 is now rank 4 above, out of this deferral.
+  that loads without executing. #250 answered what it was gated on, and step 2
+  landed as PR #305 (2026-10-19); only step 1 is left here.
 
 ---
 
