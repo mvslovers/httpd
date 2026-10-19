@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-15 after the m38b soak (#297 /
+*Last reconciled against the tracker: 2026-10-19 after PR #301 (the program
+fetch probe of #300, `internals/fetchprobe/`); #300 stays open and its row is
+corrected: the `106-0F` is not a property of one stand. Thirteen issues open,
+none of the ranked items moved. Before that, 2026-10-15 after the m38b soak (#297 /
 mvsmf#430: about 28,750 module requests at 0 bytes per request); #300 filed
 out of it and ranked low, beside its libc370 half, libc370#553; thirteen issues
 open, none of the ranked items moved. Before that, the same day after v4.3.0 (PR #299, the
@@ -79,7 +82,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **#250(b)** (does LINK fetch every time?), and libc370#553 to name the code in HTTPD908E. Low: seen only on a stand with fetch I/O errors |
+| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **#250(b)** (does LINK fetch every time?), and libc370#553 to name the code in HTTPD908E. Low, but not rare: the probe (`internals/fetchprobe/`, PR #301) sees `106-0F` on m38b, m38r and m38l and under both Hercules 4.10.0 levels tried, roughly 1 to 28 per million fetches; the measurements are in #300 |
 | — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
