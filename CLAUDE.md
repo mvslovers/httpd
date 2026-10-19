@@ -1,6 +1,8 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+It extends the ecosystem root `CLAUDE.md`, which covers the platform constraints,
+mbt basics, SMP/FMID rules, the deploy libraries and the git rules.
 
 ## Project Overview
 
@@ -8,35 +10,19 @@ HTTPD is an HTTP web server for MVS 3.8j, originally by Mike Rayborn (v3.3.x). V
 
 The server's primary role is hosting CGI modules (especially mvsMF) that provide REST APIs for MVS. It also serves static files from the UFS filesystem via UFSD.
 
-**Current version:** 4.0.0-dev (on `main`)
+**Current version:** 4.4.0-dev (on `main`; `[project] version` in `mbt.toml`)
 **Maintenance branch:** `v3.3.x` (from commit dd07c1b, for fixes to Mike Rayborn's version)
 
-## C Standard Override
+## Read when relevant
 
-**This project uses `-std=gnu99`**, overriding the root CLAUDE.md's strict C89 rule.
+| Before you … | read |
+|---|---|
+| change response framing, keep-alive, or look for where something lives | `internals/architecture.md` (4.0.0 decisions, HTTP/1.1 design, source file map) |
+| inspect a live server with `/.dsrv`, `/.dm`, `/.dmtt` | `internals/display-modules.md`, and `~/repos/mvs/.workspace/context/httpd-debug.md` |
+| write or change a server module | `docs/server-modules.md`, `internals/development.md` |
+| cut a release or touch `[smp]` | `~/repos/mvs/.workspace/context/smp.md` (the httpd FMID row and burned ids) |
 
-Implications:
-- `//` line comments are allowed
-- Mixed declarations and statements are allowed
-- `snprintf`, `stdbool.h`, designated initializers are available
-- VLAs are still forbidden (stack constraints)
-- All variable declarations should still prefer top-of-block for readability
-
-Cross-compiled for MVS/370 with the `cc370` toolchain (GCC 3.4.6 fork; c2asm370 is its unmaintained predecessor and is not used here). All other platform constraints from the root CLAUDE.md still apply (24-bit addressing, EBCDIC, no POSIX, memory efficiency, etc.).
-
-## HTTPD 4.0.0 — Confirmed Changes
-
-These decisions are final:
-
-- **HTTP/1.1 support** — Chunked Transfer Encoding, Content-Length, Persistent Connections (Keep-Alive)
-- **Parmlib configuration** — Replace Lua config engine with line-based Parmlib parser (DD:HTTPPRM, FB-80)
-- **UFSD-only docroot** — Remove DD-based file serving (`/DD:HTML(...)` paths), static files only from UFS
-- **Remove embedded FTPD** — FTP functionality available separately
-- **Remove MQTT telemetry** — HTTPT struct, telemetry_thread, mqtt370 dependency
-- **Extract HTTPLUA/HTTPREXX** — Lua and REXX CGI handlers moved to separate projects (mvslovers/httplua, mvslovers/httprexx), lua370 dependency removed
-- **CGIs disabled by default** — No CGIs are registered unless explicitly configured in Parmlib.
-
-## HTTPD 4.0.0 — Open Items
+## Open Items
 
 Not tracked here. The four Notion tasks this section used to list (TSK-112,
 TSK-110, TSK-108, TSK-10) are all **Done**, and the list sat stale for months
@@ -79,28 +65,12 @@ versions are pinned in `mbt.lock` (committed).
 
 ## Development Workflow
 
-1. Every bug fix or feature requires a **GitHub Issue**. If none exists, create one first.
-2. **Plan and analyze first** using the Opus 4.6 model. Implementation follows using Sonnet 4.6.
-3. Develop each fix/feature on a **feature branch**.
-4. When done, merge via **Pull Request** and close the issue with a short comment.
-5. **Never reference AI or Claude** in commit messages, comments, PR descriptions, or anywhere else in the project.
+When a fix or feature is done, merge via Pull Request and close the issue with a short comment.
+**Plan and analyze first** using the Opus 4.6 model. Implementation follows using Sonnet 4.6.
 
-## Custom Commands
-
-### /fix-issue \<number\>
-
-Autonomous workflow for resolving a GitHub issue end-to-end:
-
-1. **Read the issue** — `gh issue view <number> --repo mvslovers/httpd`
-2. **Create a feature branch** — `git checkout -b issue-<number>-<short-description>`
-3. **Analyze** — Identify affected files, understand the existing patterns in nearby code
-4. **Implement** — Write code following the conventions in this CLAUDE.md
-5. **Verify syntax** — Run `mbt compiledb` and check clangd diagnostics (no errors)
-6. **Commit** — Descriptive message, no AI references. Reference the issue: `Fixes #<number>`
-7. **Push and create PR** — `gh pr create --title "..." --body "Fixes #<number>"`
-8. **Summary** — Report what was done, what to verify on the live MVS system
-
-If any step fails, stop and report the issue rather than guessing.
+`/fix-issue <number>` is the workspace command (`~/repos/mvs/.workspace/commands/fix-issue.md`).
+Here its verify step is `mbt compiledb` plus clangd diagnostics, and `mbt build --all`
+(see below: `mbt test` cannot catch a `-Werror` regression).
 
 ## Build System (mbt)
 
@@ -144,9 +114,8 @@ test modules and runs the host tests; it never runs an MVS assertion.
 
 ### Configuration
 
-The MVS systems mbt deploys to and tests on live in `~/.mbt/targets.toml`, one
-file per machine, not in the project (`mbt target import .env --name <name>`
-turns an old `.env` into a target; `mbt target list` shows them).
+MVS targets come from `~/.mbt/targets.toml` (see root). `mbt target import .env --name <name>`
+turns an old `.env` into a target; `mbt target list` shows them.
 
 ## Architecture
 
@@ -189,7 +158,7 @@ httpclos.c   → Release HTTPC, close socket
 
 ### CGI Subsystem
 
-CGI modules are loaded via MVS LINK SVC (`__linkds`). The HTTPD/HTTPC pointers are passed through the GRT (Global Register Table) and discovered by the CGI's custom `__start` (cgistart.c / cgxstart.c).
+CGI modules are loaded via MVS LINK SVC (`__linkds`). The HTTPD/HTTPC pointers are passed through the GRT (Global Register Table) and discovered by the CGI's custom `__start` (cgistart.c).
 
 CGI modules call server functions through the HTTPX vector table:
 ```c
@@ -213,27 +182,6 @@ which was measured against `httpd/src/` alone and missed the three repos whose
 modules run in this address space; issue #256. **Before removing anything from the PROC, grep `../mvsmf`,
 `../httplua` and `../httprexx` too** — a `grep` that stops at this repo's edge
 cannot answer the question.
-
-### HTTP/1.1 Design (implemented)
-
-**Response body framing — decision logic:**
-0. If the status is body-less (`1xx`, `204`, `304`) → never set Content-Length or
-   Transfer-Encoding and never emit a body (RFC 7230 §3.3.1). The chunked fallback in
-   `httpprtv.c` skips these; otherwise the `0\r\n\r\n` trailer from `httpdone.c` is an
-   illegal body that strict parsers (llhttp/Node) reject.
-1. If handler/CGI set Content-Length (e.g. mvsMF's `sendDefaultHeaders()`) → use as-is
-2. If static file with known size (UFS `filesize`) → send Content-Length
-3. Otherwise → send `Transfer-Encoding: chunked`
-
-**Chunked encoding — transparent in httpsend.c:**
-When `httpc->chunked == 1`, every `http_send()` call is automatically wrapped in chunk framing. The terminating `0\r\n\r\n` is sent in `httpdone.c`.
-
-**Keep-Alive:**
-- HTTP/1.1: default keep-alive, `Connection: close` to opt out
-- HTTP/1.0: default close, `Connection: keep-alive` to opt in
-- Configurable idle timeout and max requests per connection
-
-**Impact on CGI modules (mvsMF):** Zero changes needed. mvsMF already sets Content-Length via `sendDefaultHeaders()` for JSON responses. Streaming responses get chunked encoding transparently.
 
 ### Parmlib Configuration
 
@@ -264,52 +212,12 @@ with its own `AUTH=`; there is no `CGI` keyword. **Write the `AUTH=`** — since
 
 Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no routes).
 
-### Key Source Files
-
-**Core HTTP engine:**
-- **httpd.c**: Main entry, initialization, socket_thread, worker_thread, operator commands.
-- **httpin.c**: Read HTTP request line and headers from socket.
-- **httppars.c**: Parse method, URI, query parameters, POST body.
-- **httppc.c**: Request dispatch — CGI match → http_link, or static file → http_get.
-- **httpget.c**: Static file serving. MIME detection via httpmime.c.
-- **httpresp.c**: HTTP response line + standard headers.
-- **httpsend.c**: Low-level socket send.
-- **httprese.c**: Reset for the next request on a kept-alive connection, or close.
-- **httpclos.c**: Release client handle, close socket, free UFS handles.
-- **httpopen.c**: File open — UFS only; the DD path is gone (4.0.0).
-- **httpmime.c**: MIME type detection from file extension.
-- **httpauth.c / httpcred.c**: RACF authentication and credential management.
-- **httplink.c**: CGI module loading via MVS LINK SVC.
-
-**Configuration:**
-- **httpprm.c**: Parmlib parser — reads `DD:HTTPPRM` (`HTTPD_PARMLIB_DD` in httpd.h). Replaced the Lua-based httpconf.c, which is gone. Startup does not echo the settled configuration; `F HTTPD,D CONFIG` reports it on demand.
-- **httpdmsg.h**: the operator message catalog. Every WTO literal, once. See *Conventions*.
-
-**CGI infrastructure:**
-- **cgistart.c**: Custom `__start` for CGI modules.
-- **httpx.c**: HTTPX vector table initialization.
-
-**Built-in CGI modules** — the four `[module.*]` entries besides HTTPD itself:
-- **httpdsrv.c**: Server + control-block display (`/.dsrv`)
-- **httpdm.c / httpdmtt.c**: Storage display (`/.dm`) and Master Trace Table (`/.dmtt`)
-- **abend0c1.c**: Deliberate-abend test CGI
-
-None is registered unless the Parmlib says so.
-
-**Subsystems:**
-- **httprepo.c**: SMF recording + simple counters (format in `docs/smf-records.md`)
-
-**Gone, do not look for them:** httpconf.c and the Lua runtime (→
-mvslovers/httplua), httprexx.c (→ mvslovers/httprexx), the FTP daemon (`ftp*.c`
-→ mvslovers/ftpd), the MQTT telemetry (HTTPT, telemetry_thread), and the
-hello.c / test.c demos. httpjes2.c and httpdsl.c live in `tbd/`, outside the
-build — mvsMF's jobs and dataset APIs replaced them.
-
 ### Conventions
 
 - Headers use `asm("SYMBOL")` annotations for MVS external symbol naming.
 - ASM entry points use `__asm__("\n&FUNC SETC '...'")` for 8-char MVS CSECT names.
 - Manual memory management — watch for malloc/free pairing on ALL error paths.
+- C is gnu99 (see root); variable declarations should still prefer top-of-block for readability.
 - Tab indentation, 4-space width. Line endings are **whatever the file already
   has** — most of `src/` is CRLF, newer files are LF. Do not convert a file as a
   side effect of editing it: a whole-file line-ending flip buries the real diff
@@ -345,7 +253,7 @@ The mvsMF CGI module has its own additional ESTAE layer in `router.c` (via `try(
   load module lands in key-0 storage while the code runs problem state key 8,
   so the first such store is an S0C4 (issue #197). It is the **library the
   module is fetched from** that decides this, not `AC(1)` and not the RENT
-  attribute — measured, see libc370's `doc/consumer-notes.md`. A `__super()`
+  attribute — measured, see libc370's `docs/consumer-notes.md`. A `__super()`
   window is not a way out: a module can be key-0 without holding the
   authorization to switch keys. Put the state in the HTTPD control block (a
   `main()` local, hence key 8), on the heap, or in `__wsaget()`. Read-only
@@ -379,91 +287,11 @@ builds fine and then kills the entire runner job with a JCL error (#180).
 End-to-end checks against a live HTTPD + mvsMF are `curl` scripts in the mvsMF
 repo (`tests/test.sh` and friends) — integration, not a substitute for the above.
 
-### Display Modules (live storage inspection)
+## SMP FMID
 
-The root `CLAUDE.md` covers when to reach for these; this is the detail. All are
-read-only, all need Basic auth, none is registered unless `DD:HTTPPRM` says so.
-
-**`/.dsrv` — HTTPDSRV, server control blocks.** `?target=` selects the block and
-each one is shown as hex plus a named field table:
-
-| target | block | needs `&m=` |
-|--------|-------|-------------|
-| `HTTPD` | the server singleton (392 bytes, `0x188`) | no |
-| `MGR` | `CTHDMGR`, the worker pool manager | no |
-| `FS` | `UFSSYS` handle (8 bytes with the libufs stub) | no |
-| `MOD` | the route array — every `MOD=` / `LOC=` entry | **yes** |
-| `TASK` | a `CTHDTASK` | **yes** |
-| `FILE` | a `FILE` handle | **yes** |
-
-The addresses the `&m=` targets want come out of the `HTTPD` block:
-`httpcgi` at `+44`, `mgr` at `+34`, `socket_thread` at `+30`, `ufssys` at `+54`.
-
-**`/.dm` — HTTPDM, arbitrary storage.** `?m=<hex>&l=<bytes>&c=<chunk>&t=<title>`
-— only `m` is required; `c` is capped at 64; `t` labels the dump header. Every
-parameter has short and long aliases (`m`/`mem`/`memory`, `l`/`len`/`length`,
-`c`/`s`/`chunk`/`size`, `t`/`title`).
-
-Pointer chasing is the point: read a pointer, feed it back as `m`. `CVTPTR` is
-at `0x10`, so `/.dm?m=10&l=16` yields the CVT, and CVT+`0x130` is `CVTTZ`.
-
-**`/.dmtt` — HTTPDMTT, Master Trace Table.** No parameters needed (`?d=1`
-toggles a raw-data variant). This is the console log, so it is where RAKF
-messages, `HTTPDnnn` WTOs and abends actually show up — check it before
-theorising about why a request failed.
-
-**Gone in 4.0.0:** `/dsl/*` (HTTPDSL, dataset lister) and `/jes/*` (HTTPJES2,
-JES spool) are no longer built — mvsMF's dataset and jobs APIs replace them.
-Their sources sit in `tbd/`, outside the build; see `tbd/README.md`. So the
-three display modules above are the whole set now, and `/jes/status` is not a
-JES2 cross-check any more — use mvsMF's jobs API.
-
-**Reading the route table:** `?target=MOD` decodes the whole 32-byte `HTTPROUTE`,
-so `auth` (`+14`) is named and spelled out — that is the field the request is
-gated on, and since #105 the only one: the global `LOGIN` bitmask is retired,
-`+09` is a reserved byte, and there is no `AUTH=DEFAULT` any more. A route
-showing `AUTH=NONE` is public, whether the line said `AUTH=NONE` or said
-nothing. The one line that reads as public but is not is `RES=` without
-`AUTH=`: the parser resolves that to `BASIC` before the route is built, so what
-`?target=MOD` shows is still what gates the request. And
-`AUTH=` never selected a credential *source* — the resolver runs before the
-route is matched, so every route accepts every source. It selects whether a
-login is needed and how a missing one is challenged: `NONE`, `FORM`, `BASIC`,
-and since #121 `TOKEN` (a bare 401, never a challenge, for API routes whose
-clients handle the 401 themselves).
-
-## SMP4 FMID — one per release
-
-The id is the release: `T` + three product letters + the three version digits.
-One id per release, **spent exactly once**, and each release's SYSMOD deletes
-its predecessor:
-
-```toml
-[distribution.smp]
-fmid   = "THTP420"
-delete = ["THTP410"]
-```
-
-**No version component may ever exceed 9** — a 7-character id has no room for
-a second digit. At patch 9 cut the next minor, at minor 9 the next major;
-httpd 4.1.10 cannot be expressed and must not be released.
-
-Under mbt 3 the id is derived: `[smp] prefix = "THTP"` in mbt.toml plus the
-version gives the FMID and the predecessor it deletes; the block above is the
-mbt 2 form, and an explicit `fmid`/`delete` would still win.
-
-Current: **`THTP440`** for 4.4.0-dev, deleting `THTP430` (derived), not yet
-checked on any stand. 4.3.0 was released 2026-10-15 under `THTP430` (the
-libc370 2.12.1 relink, #297) -- free on the maintainer's word, no `LIST` run
-before the release; installed 2026-10-15 on m38r (JOB00891), m38l (JOB01708),
-m38x (JOB00629) and m38b (JOB01517), each checked by member list and `LIST`.
-4.2.0 was released 2026-10-13 under `THTP420`, likewise unchecked.
-4.1.0 shipped under `THTP410` and 4.0.x under `THTP400`; all four are burned. 4.1.1 was never cut
--- the libc370 2.0 port (#272) made the next release a minor -- so `THTP411`
-stays unassigned. Each release adds its id to the removal job in
-`docs/installation.md` section 12, which names every id ever spent.
-
-Never re-spend an id, and never install a test package under the real one: a
-test needs a throwaway id **and** throwaway module names, because SMP keys
-element ownership on `MOD(name)`, not on the target library. See the root
-`CLAUDE.md` for the full rule and the measurements behind it.
+`[smp] prefix = "THTP"` in mbt.toml: mbt 3 derives the FMID and the predecessor
+it deletes from the version (4.4.0-dev → `THTP440`, deleting `THTP430`). Rules,
+the burned list and the per-release install record are in the root's `smp.md`.
+Each release adds its id to the removal job in `docs/installation.md` section 12,
+which names every id ever spent. A test package needs a throwaway id **and**
+throwaway module names.
