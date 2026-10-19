@@ -56,6 +56,27 @@ Helpers, same conventions:
 | `peek.py TARGET JOBNAME JOBID` | job status and LDLP lines of a running job |
 | `subjcl.py TARGET FILE.jcl` | submit any job, wait, print the whole spool |
 | `xfer.py get\|put TARGET DSN FILE [VOLUME]` | binary download/upload of an XMIT file, for moving a test library between stands |
+| `resp.py HLQ` | writes the LINK reuse probe job (below) to stdout |
+
+## Does LINK reuse a loaded copy? (`resp.asm`)
+
+A second probe, written for #250: whether a module held by LOAD is found by
+the LINK that HTTPD issues per request. `RESP` LOADs a test module, deletes
+its member from the library (`STOW … D`, checked with BLDL), and LINKs to it:
+a LINK that still works used the copy in storage, one that fails `806-4` went
+to the library. Five cases, each with its own module (`RPRBA`–`RPRBE`): no
+LOAD; `LOAD EP=`; the same with a module linked without REUS; LINK from a
+subtask (`rprbs.asm`); and the `BLDL` + `LOAD DE=` path of libc370's
+`__load()`.
+
+```
+python3 -I resp.py HLQ > resp.jcl
+python3 -I subjcl.py TARGET resp.jcl
+```
+
+The job allocates `HLQ.RESPPRB.XLIB` and deletes it again in its last step.
+Every result is a `RESP` or `RPRBS` line in the job log. The results are in
+#250.
 
 ## Reading the DASD images
 

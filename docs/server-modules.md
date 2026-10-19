@@ -31,10 +31,16 @@ at ~50 ms per dispatch and proposes an in-process router for hot endpoints.
 Treat that figure as an estimate: it has not been measured, and no measured
 number for either side of this exists in the repo.
 
-> Whether the copy LINK brings in survives in the Job Pack Area to the next
-> request, or is fetched from the library again each time, is **not settled** —
-> see [#250](https://github.com/mvslovers/httpd/issues/250). Do not write either
-> answer down anywhere until it has been measured.
+**Every request fetches the module from the library again**, unless another
+request is using it at that moment. MVS deletes a LINKed module as soon as
+nobody uses it, so the copy does not survive in the Job Pack Area, and the
+next LINK is a full program fetch: for MVSMF, about 335 KB read from disk per
+request. Measured twice ([#250](https://github.com/mvslovers/httpd/issues/250)):
+by walking HTTPD's job pack queue between requests on MVS/CE, and with a probe
+on TK5 and MVS/CE that deletes the member between two LINKs
+(`internals/fetchprobe/`). A fetch can fail with `IEA703I 106-0F`, and each
+failed fetch costs the module's storage until the server stops
+([#300](https://github.com/mvslovers/httpd/issues/300)).
 
 > **Note on naming:** The route type was renamed `HTTPCGI` → `HTTPROUTE` in #105, and `http_find_cgi` / `http_add_cgi` / `http_process_cgi` became `http_find_route` / `http_add_route` / `http_process_route`. What did **not** change, and must not: the httpx vector offsets `0x100`/`0x104`/`0x108`, the external symbols `HTTPFCGI`/`HTTPACGI`/`HTTPPCGI`, and the field layout. `httpcgi.h` keeps the old macro spellings as aliases for out-of-tree modules. The header filename, the `cgimain` entry point and `http_cgi_subpool()` still say CGI — those really are about CGI programs. The Parmlib keyword changed from `CGI=` to `MOD=` earlier.
 
