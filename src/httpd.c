@@ -1157,9 +1157,18 @@ worker_thread(void *udata, CTHDWORK *work)
                    cleanup still runs.  On an abend the pipeline never reached
                    http_reset_busy() (httppc.c:149), so drop the stale busy
                    entry here -- while httpc is still valid, before close frees
-                   it.  The normal path already cleared busy, so gate on rc. */
+                   it.  The normal path already cleared busy, so gate on rc.
+                   A negative rc is not an abend: try() could not set up its
+                   ESTAE and serve_client() never ran (libc370#476; up to
+                   libc370 2.22.0 that case returned +1 and read as user
+                   abend 1), #311.  Nothing set busy then, so there is none
+                   to drop. */
                 rc = try(serve_client, httpc, work);
-                if (rc) {
+                if (rc < 0) {
+                    wtof(MSG_WORKER_NO_ESTAE,
+                        (unsigned)work, (unsigned)httpc, httpc->socket);
+                }
+                else if (rc) {
                     wtof(MSG_WORKER_ABEND,
                         rc, (unsigned)work, (unsigned)httpc, httpc->socket);
                     http_reset_busy(httpc);
