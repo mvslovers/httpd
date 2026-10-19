@@ -74,6 +74,13 @@
 # DEBUG=0
 #
 # --- Modules ---
+# RESIDENT=YES (the default) loads every MOD= module once at startup and
+# holds it until shutdown, so no request fetches it from disk.  A module
+# that is neither RENT nor REUS is not held (HTTPD441W).  A new module
+# level then takes effect at the next restart; RESIDENT=NO fetches per
+# request instead.
+# RESIDENT=YES
+#
 # Format: MOD=PROGRAM /url/pattern   (URL prefix match)
 #         MOD=PROGRAM *.ext          (explicit extension - uses DOCROOT)
 #         MOD=PROGRAM                (extension derived from module name,

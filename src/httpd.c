@@ -16,6 +16,9 @@
 #include <mvs/socket.h>
 #include <ext/version.h>            /* libc370_version()                */
 #include <mvs/apf.h>                /* __autask/__austep/__uatask/__uastep */
+#include <mvs/link.h>               /* __load/__delete (resident_*)      */
+#include <mvs/pds.h>                /* __bldl (resident_hold)            */
+#include <mvs/dslist.h>             /* struct loaddata: RENT/REUS bits   */
 
 static int socket_thread(void *arg1, void *arg2);
 static int worker_thread(void *udata, CTHDWORK *work);
@@ -215,6 +218,113 @@ res_probe(HTTPD *httpd)
 	}
 }
 
+/* Resident modules (#198 step 2, #300).
+**
+** A LINKed module does not survive its LINK: MVS deletes it as soon as nobody
+** uses it, so every request used to fetch its module from the library again
+** -- for MVSMF some 335 KB -- and every fetch that failed (IEA703I 106-0F,
+** 1 to 28 per million fetches across the stands) cost the module's storage
+** until the server stopped.  A copy held by LOAD in this task is found by the
+** LINK every worker issues, from its own subtask (both measured in #250).  So
+** startup LOADs each MOD= module once, and terminate() DELETEs it again.
+**
+** Only a module linked RENT or REUS is held.  One that is neither may not run
+** twice from the same copy, and a held copy would be reused (measured, #250),
+** so it keeps the fetch per request it always had.  The same holds for a
+** module that is not there at startup or fails to load: each route still
+** works, the old way, and a WTO says which.
+**
+** Both run in the job step task: initialize() and terminate() are called on
+** main()'s TCB, and a LOAD belongs to the task that issued it. */
+static int
+same_module(const char *a, const char *b)
+{
+	return http_cmp((const UCHAR *)a, (const UCHAR *)b) == 0;
+}
+
+/* the route before n that names the same module, or n when there is none */
+static unsigned
+first_route_for(HTTPD *httpd, unsigned n)
+{
+	unsigned	m;
+
+	for (m = 0; m < n; m++) {
+		if (httpd->route[m]->pgm
+		 && same_module(httpd->route[m]->pgm, httpd->route[n]->pgm))
+			return m;
+	}
+	return n;
+}
+
+static void
+resident_hold(HTTPD *httpd)
+{
+	unsigned	count;
+	unsigned	n;
+	int			i;
+
+	httpd->resident_held = 0;
+	if (!httpd->cfg_resident || !httpd->route) return;
+
+	count = array_count(&httpd->route);
+	for (n = 0; n < count; n++) {
+		HTTPROUTE		*route	= httpd->route[n];
+		BLDL			bldl;
+		struct loaddata	*ld;
+		char			name[9];
+
+		if (!route->pgm || !route->pgm[0]) continue;
+		if (first_route_for(httpd, n) != n) continue;	/* held already */
+
+		for (i = 0; i < 8 && route->pgm[i]; i++)
+			name[i] = (char)toupper((unsigned char)route->pgm[i]);
+		name[i] = '\0';
+		memset(&bldl, 0, sizeof(bldl));
+		memset(bldl.de76[0].name, ' ', sizeof(bldl.de76[0].name));
+		memcpy(bldl.de76[0].name, name, i);
+
+		if (__bldl(&bldl, NULL)) {
+			wtof(MSG_RES_NOT_FOUND, name);
+			continue;
+		}
+
+		ld = (struct loaddata *)bldl.de76[0].udata;
+		if (!(ld->loadatr1 & (LOADRENT | LOADREUS))) {
+			wtof(MSG_RES_NOT_REUS, name);
+			continue;
+		}
+
+		if (!__load(NULL, name, NULL, NULL)) {
+			wtof(MSG_RES_LOAD_FAILED, name);
+			continue;
+		}
+
+		if (httpd->resident_held < 255) httpd->resident_held++;
+	}
+}
+
+/* Give the held copies back.  A DELETE for a module this task never loaded
+** (not found, not reusable, or RESIDENT=NO) answers 4 and changes nothing,
+** so there is no list of what was held to keep in step. */
+static void
+resident_release(HTTPD *httpd)
+{
+	unsigned	count;
+	unsigned	n;
+
+	if (!httpd->cfg_resident || !httpd->route) return;
+
+	count = array_count(&httpd->route);
+	for (n = 0; n < count; n++) {
+		HTTPROUTE	*route = httpd->route[n];
+
+		if (!route->pgm || !route->pgm[0]) continue;
+		if (first_route_for(httpd, n) != n) continue;
+		__delete(route->pgm);
+	}
+	httpd->resident_held = 0;
+}
+
 /* initialize() - returns the step return code: 0 when the server came up, 8
 ** when it refused to.  It used to be void, which is how a Parmlib error the
 ** server explicitly refuses to start on still ended the step CC 0000 (#226):
@@ -351,6 +461,9 @@ initialize(int argc, char **argv)
 	** only once http_config() has parsed them, and there is no way to reload
 	** the Parmlib, so this is the one point that needs it (#137). */
 	res_probe(httpd);
+
+	/* Hold the MOD= modules while the region is still empty (#198). */
+	resident_hold(httpd);
 
     /* create socket thread */
     httpd->socket_thread = cthread_create_ex(socket_thread,
@@ -574,6 +687,9 @@ terminate(void)
 
     /* terminate the worker threads */
     cthread_manager_term(&httpd->mgr);
+
+    /* no worker LINKs any more: give the held modules back (#198) */
+    resident_release(httpd);
 
     if (httpd->httpc) {
         for(httpc=httpd->httpc[0]; httpc; httpc=httpd->httpc[0]) {

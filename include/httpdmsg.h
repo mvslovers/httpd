@@ -341,6 +341,10 @@
 /** HTTPD135I DISPLAY CONFIG, credential hard max-age; 0 disables it (#118) */
 #define MSG_D_CFG_MAXAGE	"HTTPD135I SESSION_MAXAGE %d MIN%s"
 
+/** HTTPD137I DISPLAY CONFIG, the RESIDENT keyword and how many of the
+ *  MOD= modules startup could hold (#198) */
+#define MSG_D_CFG_RESIDENT	"HTTPD137I RESIDENT %s  MODULES HELD %d"
+
 /** HTTPD136I DISPLAY CONFIG, Basic realm / server name (#193): the REALM
  *  keyword's value, or the system's SMF ID when the Parmlib names none */
 #define MSG_D_CFG_REALM		"HTTPD136I REALM %s"
@@ -578,6 +582,27 @@
 
 /** HTTPD432W SMF record type outside the user range */
 #define MSG_SMF_BAD_TYPE	"HTTPD432W INVALID SMF TYPE=%d (128-255)"
+
+/*
+ * HTTPD44x -- resident modules (#198 step 2, #300).  With RESIDENT=YES, the
+ * default, startup LOADs every MOD= module once and holds it until shutdown,
+ * so the LINK of each request finds it in storage instead of fetching it
+ * from the library.  A module that cannot be held keeps working the way
+ * every module did before: fetched afresh for each request.  These lines
+ * say which ones, at startup only.
+ */
+
+/** HTTPD440W BLDL does not find the module in STEPLIB or the link list */
+#define MSG_RES_NOT_FOUND	"HTTPD440W MODULE %s NOT FOUND AT STARTUP, NOT HELD"
+
+/** HTTPD441W linked neither RENT nor REUS: a held copy must not run twice */
+#define MSG_RES_NOT_REUS	"HTTPD441W MODULE %s NOT REUSABLE, FETCHED PER REQUEST"
+
+/** HTTPD442W found, but the LOAD failed (IEA703I names the code) */
+#define MSG_RES_LOAD_FAILED	"HTTPD442W MODULE %s LOAD FAILED, FETCHED PER REQUEST"
+
+/** HTTPD443W RESIDENT= is neither YES nor NO; the default stays */
+#define MSG_RES_BAD_VALUE	"HTTPD443W INVALID RESIDENT VALUE \"%s\" (YES|NO)"
 
 /* =====================================================================
 ** HTTPD9xx -- diagnostics, abend recovery, storage

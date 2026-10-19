@@ -77,7 +77,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
 | 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
-| 4 | #198 step 2, with #300 | hold every `MOD=` module with `__load()` from startup to shutdown, so a request no longer fetches it | **nothing**: decided 2026-10-19, reuse measured in #250; per-module RENT/REUS check, and not on m38r while mvsmf#425 is watched there |
+| 4 | #198 step 2, with #300 | hold every `MOD=` module with `__load()` from startup to shutdown, so a request no longer fetches it | **review and merge** of the implementing PR (`RESIDENT=YES` default; verified in a TK5 container). Then: not on m38r while mvsmf#425 is watched there, or with `RESIDENT=NO` |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
@@ -348,7 +348,7 @@ checkout, which is why it has not been run.
 
 ### 4 · #198 step 2, with #300 — hold the modules resident
 
-*decided 2026-10-19; nothing to wait for*
+*decided 2026-10-19; implemented on `issue-198-resident-modules`*
 
 #250 answered both questions this needed. (b): a LINKed copy does not survive
 in the Job Pack Area, so every request is a full program fetch (MVSMF: about
@@ -362,13 +362,18 @@ So #198's step 2 is no longer placement hygiene: it removes a disk fetch per
 request, and with it the `106-0F` exposure of #300 (1 to 28 per million fetches,
 82 pages each for MVSMF). The shape: `__load(NULL, module, …)` once per
 registered `MOD=` at startup, kept for the server's life, `__delete()` at
-shutdown; dispatch stays a LINK. Before writing it:
+shutdown; dispatch stays a LINK. Implemented as `RESIDENT=YES|NO` (default
+`YES`), modules linked neither RENT nor REUS left on the fetch per request
+(`HTTPD441W`). Verified in a TK5 container: with the MVSMF member deleted under
+a running server, 31 of 31 requests answered (30 in parallel), against 31 × 503
+with `806-4` under `RESIDENT=NO`. What was open before writing it, and where it
+went:
 
-- **Concurrency is not measured.** RENT modules are shared; a REUS-only module
-  serialises the workers; a module that is neither gets a copy per concurrent
-  caller. MVSMF is `rent = true, reus = true`; check every other `MOD=` module.
-- **A held copy outlives a deploy.** A new module level then needs a restart,
-  where today the next request picks it up.
+- **Concurrency:** 30 parallel requests on the held RENT MVSMF, no fetch. A
+  REUS-only module is not measured. Every ecosystem module (MVSMF, HTTPDSRV/
+  DM/DMTT, ABEND0C1, HTTPLUA, HTTPREXX) is `rent` and `reus`.
+- **A held copy outlives a deploy:** documented; `RESIDENT=NO` keeps the old
+  behaviour.
 - **Not on m38r while mvsmf#425 is watched there** (#250, 2026-10-14): a held
   MVSMF changes exactly the placement and lifetime that hit depends on, and a
   copy that is overwritten stays overwritten until the restart.
