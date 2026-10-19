@@ -24,8 +24,14 @@ kind = "application"
 # by itself.  HTTPD has no assembler source of its own, so the move of those
 # macros out of libc370 (2.8.0, mvslovers/libc370#494) changes nothing here.
 #
-# libc370 2.22.0 brings nothing HTTPD needs; the pin follows the current
-# release.  __uastep() now clears the STEPLIB authorization only when
+# libc370 2.23.0: try() gives back the ~500 bytes of SDWA of every abend it
+# recovers (mvslovers/libc370#640).  __linkds() LINKs every module under
+# try() and a worker runs each request under it, so every module abend the
+# server survived cost that much until it was restarted.  try() returns -1, not +1, when it cannot set up its ESTAE
+# (mvslovers/libc370#476), which HTTPD063E reports since #311.  wtof() and
+# its relatives carry format(printf) (#309 matched the arguments).
+#
+# Since 2.22.0 __uastep() clears the STEPLIB authorization only when
 # __austep() set it (mvslovers/libc370#125); HTTPD already tests
 # CRTAUTH_STEPLIB before it calls __uastep(), so it never hit that.  HTTPD
 # has no scanf(), no fseek() and no fwrite() of size 0, and its only %a is
@@ -65,7 +71,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.1"
-libc370 = "2.22.0"
+libc370 = "2.23.0"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
