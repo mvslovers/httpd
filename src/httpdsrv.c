@@ -476,10 +476,17 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_69</td>"
-        "<td>(reserved)</td>"
-        "<td>%02X %02X</td></tr>\n",
-        O(unused_69), httpd->unused_69[0], httpd->unused_69[1]);
+        "<td>httpd->cfg_resident</td>"
+        "<td>Config Hold MOD= Modules</td>"
+        "<td>%s</td></tr>\n",
+        O(cfg_resident), httpd->cfg_resident ? "YES" : "NO");
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->resident_held</td>"
+        "<td>Modules Held Resident</td>"
+        "<td>%u</td></tr>\n",
+        O(resident_held), httpd->resident_held);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"

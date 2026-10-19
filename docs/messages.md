@@ -188,7 +188,7 @@ Everything in this range is written because an operator asked for it, so the
 | `HTTPD121I`, `HTTPD122I` | `D LOGIN` | Logged-in users and their ACEE addresses. |
 | `HTTPD123I`, `HTTPD124I` | `D STATS` | SMF level and the request/error/byte/active counters. |
 | `HTTPD125I`, `HTTPD126I`, `HTTPD126E`, `HTTPD127W` | `S STATS` | Counter reset, level change, and the two operand errors. |
-| `HTTPD128I`–`HTTPD136I` | `D CONFIG` | Port, task limits, timeouts, session lifetime (idle and max-age), document root, codepage, realm/server name, SMF, and which Parmlib member was read. |
+| `HTTPD128I`–`HTTPD137I` | `D CONFIG` | Port, task limits, timeouts, session lifetime (idle and max-age), document root, codepage, realm/server name, SMF, which Parmlib member was read, and `RESIDENT` with the number of modules held. |
 | `HTTPD140I` | `D VERSION` | Version and build commit. |
 | `HTTPD142I`, `HTTPD143I` | `D TIME` | GMT and local time with the offset in minutes. |
 | `HTTPD144E`–`HTTPD148I` | `D MEMORY` | Address out of range, end of dump, ESTAE failure, an abend while reading, and the usage line. Reading storage is done under recovery, so a bad address is caught rather than fatal. |
@@ -250,6 +250,10 @@ are simply absent (`HTTPD038E`).
 | `HTTPD430W` | `SMF TYPE n CONFIGURED BUT SMF INACTIVE` | Written at start: records are being produced for a writer that is not there. Either start SMF or set `SMF NONE`. |
 | `HTTPD431W` | `INVALID SMF LEVEL "l"` | Not `NONE`/`ERROR`/`AUTH`/`ALL`. |
 | `HTTPD432W` | `INVALID SMF TYPE=n (128-255)` | Outside the user record range. |
+| `HTTPD440W` | `MODULE m NOT FOUND AT STARTUP, NOT HELD` | Written at start with `RESIDENT=YES`: a `MOD=` module is in neither `STEPLIB` nor the link list. Its route stays registered; each request tries the library again. Usually a typo in the member, or a module not installed yet. |
+| `HTTPD441W` | `MODULE m NOT REUSABLE, FETCHED PER REQUEST` | Written at start: the module is linked neither RENT nor REUS, so one held copy must not run twice. It works, fetched from the library for every request. Relink it RENT (or at least REUS) to have it held. |
+| `HTTPD442W` | `MODULE m LOAD FAILED, FETCHED PER REQUEST` | Written at start: the module was found, but the LOAD failed; the `IEA703I` line before it names the code. The route works the way it did before 4.4.0. |
+| `HTTPD443W` | `INVALID RESIDENT VALUE "v" (YES\|NO)` | The default, `YES`, stays. |
 
 ## HTTPD9xx — diagnostics
 

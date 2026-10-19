@@ -268,6 +268,8 @@ d_config(char *buf)
     wtof(MSG_D_CFG_REALM, httpd->cfg_realm);
     wtof(MSG_D_CFG_SMF, (int)httpd->smf_type, levels[httpd->smf_level]);
     wtof(MSG_D_CFG_SOURCE, parmlib_name(name, sizeof(name)));
+    wtof(MSG_D_CFG_RESIDENT, httpd->cfg_resident ? "YES" : "NO",
+        (int)httpd->resident_held);
 
     unlock(httpd, LOCK_SHR);
 

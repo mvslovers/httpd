@@ -34,6 +34,7 @@ HTTPD134I CODEPAGE CP037
 HTTPD136I REALM MVSC
 HTTPD132I SMF TYPE 128 LEVEL ALL
 HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
+HTTPD137I RESIDENT YES  MODULES HELD 1
 ```
 
 That answers "which member is this server running, and did my change take
@@ -463,7 +464,7 @@ MOD=PROGRAM                     Extension match (derives *.program from name)
 MOD=PROGRAM /url/pattern AUTH=BASIC RES=class:resource   with auth policy
 ```
 
-Server modules are MVS load modules that run inside the server's address space, on the worker thread's own TCB — unlike traditional CGI programs, which fork a new process per request. HTTPD enters one through the MVS **LINK SVC on every dispatch** (`http_link()` → `__linkds()`); there is no load at startup and no cached entry point. What *is* a direct call is the other direction: the module reaching back into the server through the HTTPX function vector. See [Writing Server Modules](server-modules.md) for the dispatch path in detail.
+Server modules are MVS load modules that run inside the server's address space, on the worker thread's own TCB — unlike traditional CGI programs, which fork a new process per request. HTTPD enters one through the MVS **LINK SVC on every dispatch** (`http_link()` → `__linkds()`), and holds every module in storage from startup on, so that LINK finds it there instead of fetching it from the library (`RESIDENT`, below). What *is* a direct call is the other direction: the module reaching back into the server through the HTTPX function vector. See [Writing Server Modules](server-modules.md) for the dispatch path in detail.
 
 Any `MOD=` route may add the per-route `AUTH=` / `RES=` options described under
 [Security](#security).
@@ -488,8 +489,30 @@ URL prefix matching is checked first. If no prefix matches, extension matching i
 
 `HTTPDSL` (`/dsl/*`, dataset list) and `HTTPJES2` (`/jes/*`, JES2 job browser)
 were removed in 4.0.0 — mvsMF's dataset and jobs APIs replace them. They are no
-longer built, so a `MOD=` line naming either one parses fine but fails to load
-the program when a request first matches the route.
+longer built, so a `MOD=` line naming either one parses fine, startup reports
+`HTTPD440W MODULE … NOT FOUND AT STARTUP, NOT HELD`, and each request that
+matches the route fails to load the program.
+
+### Resident modules (`RESIDENT`)
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `RESIDENT` | `YES` | `YES` loads every `MOD=` module once at startup and holds it until shutdown. `NO` fetches the module from the library for every request, as releases before 4.4.0 did. |
+
+On its own, a LINK fetches the module from disk every time it is not already
+running: for mvsMF about 335 KB per request, and a fetch that fails
+(`IEA703I 106-0F`) costs the module's storage until the server stops. With
+`RESIDENT=YES` no request fetches anything.
+
+A module is held only if it is linked RENT or REUS; one that is neither keeps
+the fetch per request (`HTTPD441W`). A module that is not there at startup
+(`HTTPD440W`) or does not load (`HTTPD442W`) is not held either; its route
+works as it always did. `F HTTPD,D CONFIG` shows how many modules are held
+(`HTTPD137I`).
+
+**A deployed module takes effect at the next restart**, because the held copy
+stays in storage. Set `RESIDENT=NO` where a new module level must take effect
+without a restart, at the price of one fetch per request.
 
 ### Example
 

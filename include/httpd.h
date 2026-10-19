@@ -135,7 +135,8 @@ struct httpd {
 #define SMF_LEVEL_AUTH   2			/* ... auth events + errors		*/
 #define SMF_LEVEL_ALL    3			/* ... every request + sessions	*/
     UCHAR		smf_type;			/* 68 SMF record type (def 243)	*/
-    UCHAR		unused_69[2];		/* 69-6A available				*/
+    UCHAR		cfg_resident;		/* 69 hold MOD= modules (#198)	*/
+    UCHAR		resident_held;		/* 6A modules held resident		*/
     UCHAR       cfg_cgictx;         /* 6B # CGI context pointers    */
     UCHAR       ufs_enabled;        /* 6C UFS filesystem enabled    */
     UCHAR       dbg_enabled;        /* 6D debug output enabled      */

@@ -280,6 +280,7 @@ set_defaults(HTTPD *httpd)
     httpd->smf_level        = SMF_LEVEL_NONE;
     httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
+    httpd->cfg_resident     = 1;    /* hold every MOD= module (#198) */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
                             | HTTPD_CLIENT_STATS;
     httpd->ufs_enabled      = 1;
@@ -565,6 +566,20 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         if (i < 1) i = 1;
         if (i > 255) i = 255;
         httpd->cfg_keepalive_max = (UCHAR)i;
+    }
+    else if (strcmp(key, "RESIDENT") == 0) {
+        /* YES (the default) holds every MOD= module from startup to
+           shutdown, so a request no longer fetches it (#198, #300).  NO
+           keeps the fetch per request -- a new module level then takes
+           effect without a restart. */
+        int vlen = 0;
+        while (value[vlen] && value[vlen] != ' ') vlen++;
+        if (vlen == 3 && http_cmpn((const UCHAR *)value, (const UCHAR *)"YES", 3) == 0)
+            httpd->cfg_resident = 1;
+        else if (vlen == 2 && http_cmpn((const UCHAR *)value, (const UCHAR *)"NO", 2) == 0)
+            httpd->cfg_resident = 0;
+        else
+            wtof(MSG_RES_BAD_VALUE, value);
     }
     else if (strcmp(key, "CGI_CONTEXT_POINTERS") == 0) {
         i = atoi(value);

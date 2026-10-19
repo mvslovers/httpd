@@ -61,6 +61,7 @@ static const char * const parmlines[] = {
     "# TSTPRM -- Parmlib read-error probe",
     "PORT=2280",
     "MAXTASK=17",
+    "RESIDENT=NO",          /* the default is YES (#198) */
     NULL
 };
 
@@ -160,6 +161,8 @@ main(int argc, char **argv)
         CHECK_EQ((int)httpd.port, TSTPRM_PORT, "healthy HTTPPRM: PORT parsed");
         CHECK_EQ((int)httpd.cfg_maxtask, TSTPRM_MAXTASK,
                  "healthy HTTPPRM: MAXTASK parsed");
+        CHECK_EQ((int)httpd.cfg_resident, 0,
+                 "healthy HTTPPRM: RESIDENT=NO parsed");
 
         __dsfree(HTTPD_PARMLIB_DD);
     } else {
