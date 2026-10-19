@@ -190,6 +190,15 @@ host = false                     # uses lock()/__getm() SVCs -> MVS-only (test-m
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h -> crent370 internals -> MVS-only (test-mvs)
 
+# http_mime() / httpmime() extension -> MIME type lookup (issue #303): the
+# bsearch() comparator must find every entry whichever argument order the
+# linked libc.a uses (libc370#388 moved it to C99's key-first order).  The
+# table is sorted in EBCDIC, so the host's ASCII order could not run it;
+# httpmime (HTTPMIME) resolves from the [internal] autocall archive.
+[test.TSTMIME]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false                 # httpd.h + EBCDIC-sorted table -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly

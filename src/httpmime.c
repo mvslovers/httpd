@@ -99,16 +99,17 @@ static HTTPM mimes[] = {
 
 static HTTPM default_mime = { "txt", "text/plain", 0};
 
+/* Both arguments are HTTPM entries: the key is one too (see httpmime()).
+   C99 calls compar(key, element), libc370 up to 2.20.0 called
+   compar(element, key) (libc370#388).  With two arguments of one type the
+   order does not matter, so the lookup holds against either libc (#303). */
 static int
 mime_cmp(const void *pv1, const void *pv2)
 {
     const HTTPM *p1 = pv1;
-    const UCHAR *p2 = pv2;
-    int   rc;
+    const HTTPM *p2 = pv2;
 
-    rc = http_cmp(p1->ext, p2);
-
-    return rc;
+    return http_cmp(p1->ext, p2->ext);
 }
 
 const HTTPM *
@@ -116,6 +117,7 @@ httpmime(const UCHAR *path)
 {
     UCHAR   *ext    = NULL;
     HTTPM   *mime   = NULL;
+    HTTPM   key;
     UCHAR   *sep;
     int     len;
     UCHAR   *p;
@@ -150,7 +152,10 @@ httpmime(const UCHAR *path)
         if (p) *p = 0;
 
         /* Look for the mime for this file extension */
-        mime = bsearch(buf, mimes, MAX_MIME, sizeof(mimes[0]), mime_cmp);
+        key.ext    = buf;
+        key.type   = NULL;
+        key.binary = 0;
+        mime = bsearch(&key, mimes, MAX_MIME, sizeof(mimes[0]), mime_cmp);
     }
 
     if (!mime) {
