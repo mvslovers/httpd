@@ -1292,14 +1292,6 @@ identify_cthread(void)
     return rc;
 }
 
-static int auth_setup(const char *name)
-{
-    int     rc = 0;
-    (void)name;
-
-    return rc;
-}
-
 static int unauth_setup(const char *name)
 {
     int         rc      = 0;
@@ -1354,7 +1346,7 @@ main(int argc, char **argv)
     CIB         *cib;
     int         i;
     int         rc;
-    int         apf_at_entry;   /* authorized before auth_setup()? (#197) */
+    int         apf_at_entry;   /* authorized before the APF setup? (#197) */
     unsigned    count;
     unsigned    *ecblist[10];
     HTTPD       server;
@@ -1375,10 +1367,10 @@ main(int argc, char **argv)
     /* Which route authorizes the STC decides whether its own module storage is
     ** writable, and the log did not say until #197 sent someone looking.
     **
-    ** MEASURE it with TESTAUTH -- do not infer it from crtopts below.
-    ** `crtopts` is declared in libc370's clibcrt.h and read in @@apfset.c, but
-    ** NOTHING IN LIBC370 EVER ASSIGNS IT: the CRT is zeroed, so CRTOPTS_AUTH
-    ** is permanently clear.  A message built on it reports "BY SVC" on a
+    ** MEASURE it with TESTAUTH.  libc370's CRT used to declare a `crtopts`
+    ** field with a CRTOPTS_AUTH bit, but nothing ever assigned it: the CRT is
+    ** zeroed, so the bit was permanently clear (libc370#113 removed the
+    ** field).  A message built on it reported "BY SVC" on a
     ** module that was demonstrably fetched key 0, which is exactly what the
     ** first HTTPD002I said on mvsdev.  __isauth() is one TESTAUTH, no
     ** supervisor state, and it is what UFSD007I / FTPD008I already use.
@@ -1387,24 +1379,18 @@ main(int argc, char **argv)
     ** authorized and the distinction is gone. */
     apf_at_entry = __isauth();
 
-    /* Deliberately still on crtopts, dead field and all.  Because it is
-    ** permanently clear this always takes unauth_setup(), the path that calls
-    ** __autask() AND identify_cthread() -- and CTHREAD must be IDENTIFYed or
-    ** `ATTACH EP=CTHREAD` (libc370 @@ctcrtx.c) finds nothing, since CTHREAD is
-    ** an ENTRY inside this load module and not a library member.  auth_setup()
-    ** is an empty stub, so "correcting" this test to __isauth() would, on a
-    ** system that authorizes by library, skip the IDENTIFY and leave the
-    ** server unable to create a single thread.  The dead field is what has
-    ** been protecting httpd, ufsd and ftpd all along; see libc370#122 before
-    ** touching either half. */
-    if (crt->crtopts & CRTOPTS_AUTH) {
-        /* this task was previously authorized */
-        rc = auth_setup(argv[0]);
-    }
-    else {
-        /* this task has not been authorized yet */
-        rc = unauth_setup(argv[0]);
-    }
+    /* APF setup, whether or not the step was authorized at entry.
+    ** unauth_setup() is the path that calls __autask() AND
+    ** identify_cthread(), and CTHREAD must be IDENTIFYed or `ATTACH
+    ** EP=CTHREAD` (libc370 @@ctcrtx.c) finds nothing, since CTHREAD is an
+    ** ENTRY inside this load module and not a library member.  This used to
+    ** test crt->crtopts & CRTOPTS_AUTH and call an empty auth_setup() when it
+    ** was set; libc370 never set it, so unauth_setup() is what always ran,
+    ** and it is what runs now (libc370#113 removes the field).  Never skip it
+    ** for an authorized step: on a system that authorizes by library that
+    ** skips the IDENTIFY and leaves the server unable to create a single
+    ** thread (libc370#122). */
+    rc = unauth_setup(argv[0]);
     /* Startup banner, AFTER the APF setup above and deliberately so: an
     ** unauthorized WTO is prefixed '+' by the system, and the first two lines
     ** an operator reads should not be decorated with a diagnostic about a
@@ -1417,14 +1403,6 @@ main(int argc, char **argv)
     ** hide, and a build carrying uncommitted changes says so instead of
     ** passing itself off as the commit it was branched from.  The buffers are
     ** scoped: they are dead the moment the banner is out. */
-    /* Startup banner.  Which HTTPD, built from which source, against which C
-    ** runtime.  A deploy/relink mismatch (sysroot says X, the STC runs Y) then
-    ** cannot hide, and a build carrying uncommitted changes says so instead of
-    ** passing itself off as the commit it was branched from.
-    **
-    ** If these lines have a leading '+' then we are not APF authorized yet --
-    ** which is why the banner comes before auth_setup() and not after.  The
-    ** buffers are scoped: they are dead the moment the banner is out. */
     http_upcase(vers, sizeof(vers), MBT_VERSION);
     {
         char commit[24];
