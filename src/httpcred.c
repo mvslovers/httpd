@@ -439,7 +439,7 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 			id.addr >> 16 & 0xFF,
 			id.addr >>  8 & 0xFF,
 			id.addr       & 0xFF,
-			cred->acee );
+			(unsigned)cred->acee );
 
 		memset(&id, 0, sizeof(CREDID));
 

@@ -29,7 +29,7 @@ parse_cookies(HTTPC *httpc, const UCHAR *in)
 	UCHAR	*value;
 	
 	if (!buf) {
-		wtof(MSG_ENV_NO_STORAGE, "HTTP_Cookie", httpc);
+		wtof(MSG_ENV_NO_STORAGE, "HTTP_Cookie", (unsigned)httpc);
 		return -1;      /* -1, like every other setter in this path */
 	}
 
