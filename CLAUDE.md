@@ -66,7 +66,6 @@ versions are pinned in `mbt.lock` (committed).
 ## Development Workflow
 
 When a fix or feature is done, merge via Pull Request and close the issue with a short comment.
-**Plan and analyze first** using the Opus 4.6 model. Implementation follows using Sonnet 4.6.
 
 `/fix-issue <number>` is the workspace command (`~/repos/mvs/.workspace/commands/fix-issue.md`).
 Here its verify step is `mbt compiledb` plus clangd diagnostics, and `mbt build --all`
