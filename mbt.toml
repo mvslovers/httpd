@@ -24,7 +24,14 @@ kind = "application"
 # by itself.  HTTPD has no assembler source of its own, so the move of those
 # macros out of libc370 (2.8.0, mvslovers/libc370#494) changes nothing here.
 #
-# libc370 2.21.0: bsearch() calls the comparison function as C99 does, key
+# libc370 2.22.0 brings nothing HTTPD needs; the pin follows the current
+# release.  __uastep() now clears the STEPLIB authorization only when
+# __austep() set it (mvslovers/libc370#125); HTTPD already tests
+# CRTAUTH_STEPLIB before it calls __uastep(), so it never hit that.  HTTPD
+# has no scanf(), no fseek() and no fwrite() of size 0, and its only %a is
+# a strftime() weekday, not the new printf() conversion.
+#
+# Since 2.21.0 bsearch() calls the comparison function as C99 does, key
 # first (mvslovers/libc370#388).  httpmime() compares two HTTPM entries, so
 # the order does not matter to it (#303); a comparator written for the old
 # order would read the extension as a table entry and end S0C4.  The other
@@ -58,7 +65,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.1"
-libc370 = "2.21.0"
+libc370 = "2.22.0"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials

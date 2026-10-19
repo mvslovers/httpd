@@ -11,7 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 after PR #308 (libc370 pin
+*Last reconciled against the tracker: 2026-10-19 after the libc370 pin moved to
+2.22.0 (direct commit, no code change): twelve issues open, the ranked order
+unchanged. Before that, the same day after PR #308 (libc370 pin
 2.21.0, the release with libc370#388; no code change): twelve issues open, the
 ranked order unchanged. Before that, the same day after PR #306 (#303: the MIME
 lookup works with both `bsearch()` argument orders; libc370 pin 2.20.0): #303
@@ -479,7 +481,7 @@ project already writes it down properly.
   extension as a table entry (S0C4 in `HTTPCMP` before). TSTMIME red/green on an
   MVS/CE container. Same PR: release builds pin libc370 2.20.0, whose #601 gives
   a cancelled server's port back at once. PR #308 then pinned 2.21.0, the
-  release with libc370#388.
+  release with libc370#388, and the pin then followed to 2.22.0.
 - **#288** — every explicit login gets a credential of its own (PR #289):
   `cred_session()` and the export `http_new_session()` at vector `0x144`, used
   by the form login and by mvsMF's authenticate POST (mvslovers/mvsmf#399).
