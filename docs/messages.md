@@ -168,6 +168,7 @@ code is the test and the sequence is not.
 | `HTTPD060I` | `SHUTDOWN name TCB(x) TASK(x) STACKSIZE(n)` | One server thread ended. Expect one per worker plus the socket thread. |
 | `HTTPD061I` | `STARTING name TCB(x) TASK(x) STACKSIZE(n)` | One server thread started. At start you should see the socket thread plus `MINTASK` workers. |
 | `HTTPD062E` | `ABEND xxxxxxxx IN WORKER(w) CLIENT(c) SOCKET(s)` | A worker's ESTAE caught an abend. Only that request dies; the worker is recycled and the server continues. Always worth a bug report — include the abend code and the request. |
+| `HTTPD063E` | `NO RECOVERY IN WORKER(w), CLIENT(c) SOCKET(s) DROPPED` | The worker could not set up the recovery routine it runs each request under, so it did not touch this request: nothing was read or answered, and the connection was closed. Nothing abended. Rare (no task anchor, or ten recovery routines already in use); worth reporting if it repeats. |
 | `HTTPD070E` | `UNKNOWN CODEPAGE "name", USING CP037` | The `CODEPAGE` value is not one this build knows. Check the spelling. |
 | `HTTPD071I` | *(retired)* | The codepage in effect is a `D CONFIG` value (`HTTPD134I`), not a startup line. |
 | `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. The step ends `CC 0008` (#245). This message is the whole report — it is written before anything was initialized, so no stop sequence follows it. |

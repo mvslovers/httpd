@@ -213,6 +213,10 @@
 /** HTTPD062E the worker's ESTAE caught an abend; the worker is recycled */
 #define MSG_WORKER_ABEND	"HTTPD062E ABEND %08X IN WORKER(%06X) CLIENT(%08X) SOCKET(%d)"
 
+/** HTTPD063E try() could not set up the worker's recovery routine, so the
+ *  request was neither read nor answered; the connection is closed (#311) */
+#define MSG_WORKER_NO_ESTAE	"HTTPD063E NO RECOVERY IN WORKER(%06X), CLIENT(%08X) SOCKET(%d) DROPPED"
+
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
 
