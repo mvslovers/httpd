@@ -11,7 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 after PR #301 (the program
+*Last reconciled against the tracker: 2026-10-19 with the #250 docs PR: (b) and
+the reuse of a held copy measured, #250 closes; its rank 4 goes to #198's step 2
+(with #300), decided the same day. Before that, 2026-10-19 after PR #301 (the program
 fetch probe of #300, `internals/fetchprobe/`); #300 stays open and its row is
 corrected: the `106-0F` is not a property of one stand. Thirteen issues open,
 none of the ranked items moved. Before that, 2026-10-15 after the m38b soak (#297 /
@@ -75,15 +77,15 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
 | 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
-| 4 | #250 | `type:research` — the `type:docs` half landed | **MVS time**, two `/.dm` calls |
+| 4 | #198 step 2, with #300 | hold every `MOD=` module with `__load()` from startup to shutdown, so a request no longer fetches it | **nothing**: decided 2026-10-19, reuse measured in #250; per-module RENT/REUS check, and not on m38r while mvsmf#425 is watched there |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **#250(b)** (does LINK fetch every time?), and libc370#553 to name the code in HTTPD908E. Low, but not rare: met on m38b by HTTPD and by PL/I compiles, and by the probe (`internals/fetchprobe/`, PR #301) on m38r and m38l and under both Hercules 4.10.0 levels tried, roughly 1 to 28 per million fetches; the measurements are in #300 |
-| — | #198 | hygiene, explicitly not a bug | **#250(b)**, then milestone 4.1.0 |
+| — | #300 | robustness — a failed module fetch (`106-0F`) orphans the module's storage, 82 pages for MVSMF | **rank 4** (no fetch per request any more), and libc370#553 to name the code in HTTPD908E (its completion code only: LINK's error exit carries no reason code, #250). Low, but not rare: met on m38b by HTTPD and by PL/I compiles, and by the probe (`internals/fetchprobe/`, PR #301) on m38r and m38l and under both Hercules 4.10.0 levels tried, roughly 1 to 28 per million fetches; the measurements are in #300 |
+| — | #198 | hygiene, explicitly not a bug | step 2 is rank 4; step 1 (`PREALLOC`) stays deferred |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -344,32 +346,32 @@ undetermined: the sysroot was already 1.0.4 before the relink work began, so
 1.0.3 was never measured. That test needs a sysroot rebuilt from a libc370 v1.0.3
 checkout, which is why it has not been run.
 
-### 4 · #250 — does a LINKed module survive in the Job Pack Area?
+### 4 · #198 step 2, with #300 — hold the modules resident
 
-*what is left of it needs a live server and nothing else*
+*decided 2026-10-19; nothing to wait for*
 
-~~**(a)** Five statements across `docs/configuration.md` and
-`docs/development.md` described module dispatch as a startup `__load()` and a
-direct HTTPX call at ~10µs, where `httppcgi.c:47` LINKs on every dispatch.~~
-Landed as PR #251 before 4.0.0 — they were the user-facing documents.
+#250 answered both questions this needed. (b): a LINKed copy does not survive
+in the Job Pack Area, so every request is a full program fetch (MVSMF: about
+335 KB), unless requests overlap — measured on MVS/CE 2026-10-14, confirmed on
+TK5 and MVS/CE 2026-10-19. And the follow-up: a copy held by `__load()` in the
+main task is found by the LINK every worker issues, on both systems, by the
+`BLDL` + `LOAD DE=` path libc370 takes as well. Both are written down once, in
+`docs/server-modules.md`, and #250 closes with that.
 
-**(b) is the open half, and it is the one worth having.** Whether the copy LINK
-brings in stays in the JPA to the next request, or is fetched from the library
-again each time, is unsettled: the project's own sources said both, which is
-what made #250 worth filing. Two `/.dm` calls against a running server decide
-it — compare free storage between them.
+So #198's step 2 is no longer placement hygiene: it removes a disk fetch per
+request, and with it the `106-0F` exposure of #300 (1 to 28 per million fetches,
+82 pages each for MVSMF). The shape: `__load(NULL, module, …)` once per
+registered `MOD=` at startup, kept for the server's life, `__delete()` at
+shutdown; dispatch stays a LINK. Before writing it:
 
-#300 adds a data point, not the answer. On m38b, fetch of MVSMF failed at about
-request 19,900 of a soak, so a fetch did run then, long after start. Whether it
-runs on *every* request is still the open question. #300's remedy (keep the
-module resident) depends on it.
-
-**(c)** re-scopes #198's second step on that answer: placement hygiene if the
-copy persists, a per-request disk fetch worth eliminating if it does not.
-
-The docs now record (b) as an open question and say not to write either answer
-down until it is measured. Honour that — a plausible guess written into
-`docs/server-modules.md` is exactly how the five wrong statements got there.
+- **Concurrency is not measured.** RENT modules are shared; a REUS-only module
+  serialises the workers; a module that is neither gets a copy per concurrent
+  caller. MVSMF is `rent = true, reus = true`; check every other `MOD=` module.
+- **A held copy outlives a deploy.** A new module level then needs a restart,
+  where today the next request picks it up.
+- **Not on m38r while mvsmf#425 is watched there** (#250, 2026-10-14): a held
+  MVSMF changes exactly the placement and lifetime that hit depends on, and a
+  copy that is overwritten stays overwritten until the restart.
 
 ### 5 · #258 — thirteen console lines that tell the operator nothing
 
@@ -426,7 +428,8 @@ Two things the scoping turned up that the issue text does not have:
   a server that never does.
 - Step 2 as written cannot use the existing path: `__linkds()` would *run* the
   module with no request. `__load()` (libc370 `clibos.h:202`) is the primitive
-  that loads without executing. And it is gated on #250(b).
+  that loads without executing. #250 has answered what it was gated on, and
+  step 2 is now rank 4 above, out of this deferral.
 
 ---
 
