@@ -30,6 +30,10 @@ httprese(HTTPC *httpc)
     httpc->len = 0;
     httpc->pos = 0;
     httpc->sent = 0;
+    /* httppcgi() reads resp == 0 as "no status line sent yet"; left at the
+       previous request's status, a module abend on the next request of
+       this connection sent its 503 text with no status line (#307). */
+    httpc->resp = 0;
     httpc->subtype = 0;
     httpc->substate = 0;
     httpc->chunked = 0;
