@@ -229,6 +229,14 @@ host = false                 # httpd.h -> crent370 internals -> MVS-only (test-m
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h + EBCDIC-sorted table -> MVS-only (test-mvs)
 
+# http_reset() / httprese() between two requests of a keep-alive connection
+# (issue #307): no response state of the previous request may survive it,
+# or a module abend on the next request loses its status line.  httprese
+# (HTTPRESE) resolves from the [internal] autocall archive.
+[test.TSTRESE]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false                 # httpd.h -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
