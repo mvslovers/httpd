@@ -21,9 +21,9 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
            caller passes through, and it still knows which variable failed,
            which the reset sites no longer do. */
         if (errno == E2BIG)
-            wtof(MSG_ENV_TOO_LARGE, name, httpc);
+            wtof(MSG_ENV_TOO_LARGE, name, (unsigned)httpc);
         else
-            wtof(MSG_ENV_NO_STORAGE, name, httpc);
+            wtof(MSG_ENV_NO_STORAGE, name, (unsigned)httpc);
         rc = -1;
         goto quit;
     }
@@ -48,7 +48,7 @@ httpsenv(HTTPC *httpc, const UCHAR *name, const UCHAR *value)
     }
     if (rc) {
         free(v);
-        wtof(MSG_ENV_NO_STORAGE, name, httpc);
+        wtof(MSG_ENV_NO_STORAGE, name, (unsigned)httpc);
         rc = -1;
     }
 

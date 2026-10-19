@@ -290,7 +290,7 @@ d_login_cred(CRED *cred)
 		id.addr >> 16 & 0xFF,
 		id.addr >> 8  & 0xFF,
 		id.addr       & 0xFF,
-		cred->acee);
+		(unsigned)cred->acee);
 
 	return rc;
 }
@@ -397,7 +397,7 @@ d_memory(char *buf)
 	
 	/* sanity check memory address */
 	if (mem > (char*)0x00FFFFFF){
-		wtof(MSG_D_MEM_INVALID, mem);
+		wtof(MSG_D_MEM_INVALID, (unsigned)mem);
 		goto quit;
 	}
 
@@ -405,7 +405,7 @@ d_memory(char *buf)
 	try(wtodumpf, mem, len, "DISPLAY MEMORY");
 	rc = tryrc();
 	if (rc==0) {
-		wtof(MSG_D_MEM_END, mem);
+		wtof(MSG_D_MEM_END, (unsigned)mem);
 		goto quit;
 	}
 	
@@ -417,11 +417,11 @@ d_memory(char *buf)
 	
 	if (rc > 0xFFF) {
 		/* system ABEND occured */
-		wtof(MSG_D_MEM_ABEND_S, (rc >> 12) & 0xFFF, mem);
+		wtof(MSG_D_MEM_ABEND_S, (rc >> 12) & 0xFFF, (unsigned)mem);
 	}
 	else {
 		/* user ABEND occured */
-		wtof(MSG_D_MEM_ABEND_U, rc & 0xFFF, mem);
+		wtof(MSG_D_MEM_ABEND_U, rc & 0xFFF, (unsigned)mem);
 	}
 	
 quit:
@@ -498,7 +498,7 @@ d_cthdtask(CTHDTASK *task)
     wtof(MSG_D_TASK2,
         task->termecb, task->rc, task->stacksize);
     wtof(MSG_D_TASK3,
-        task->func, task->arg1, task->arg2);
+        (unsigned)task->func, (unsigned)task->arg1, (unsigned)task->arg2);
 
 quit:
     return 0;
@@ -519,15 +519,15 @@ d_cthdmgr(CTHDMGR *mgr)
     }
 
     wtof(MSG_D_MGR1,
-        mgr->eye, mgr->task, mgr->wait);
+        mgr->eye, (unsigned)mgr->task, mgr->wait);
     wtof(MSG_D_MGR2,
-        mgr->func, mgr->udata, mgr->stacksize);
+        (unsigned)mgr->func, (unsigned)mgr->udata, mgr->stacksize);
     wtof(MSG_D_MGR3,
-        mgr->worker, mgr->queue, mgr->state, state);
+        (unsigned)mgr->worker, (unsigned)mgr->queue, mgr->state, state);
     wtof(MSG_D_MGR4,
         mgr->mintask, mgr->maxtask);
     wtof(MSG_D_MGR5,
-        array_count(&mgr->worker), mgr->dispatched);
+        array_count(&mgr->worker), mgr->dispatched.u64);
 
 quit:
     return 0;
@@ -597,19 +597,19 @@ d_cthdwork(CTHDWORK *work)
     }
 
     wtof(MSG_D_WORK1,
-        work, work->eye, work->wait);
+        (unsigned)work, work->eye, work->wait);
     wtof(MSG_D_WORK2,
-        work->mgr, work->task, work->queue);
+        (unsigned)work->mgr, (unsigned)work->task, (unsigned)work->queue);
     wtof(MSG_D_WORK3,
         work->state, state);
     wtof(MSG_D_WORK4,
-        work->start_time, work->start_time.u64 ? ctime64(&work->start_time) : "");
+        work->start_time.u64, work->start_time.u64 ? ctime64(&work->start_time) : "");
     wtof(MSG_D_WORK5,
-        work->wait_time, work->wait_time.u64 ? ctime64(&work->wait_time) : "");
+        work->wait_time.u64, work->wait_time.u64 ? ctime64(&work->wait_time) : "");
     wtof(MSG_D_WORK6,
-        work->disp_time, work->disp_time.u64 ? ctime64(&work->disp_time) : "");
+        work->disp_time.u64, work->disp_time.u64 ? ctime64(&work->disp_time) : "");
     wtof(MSG_D_DISPCNT,
-        work->dispatched);
+        work->dispatched.u64);
 
     if (work->state==CTHDWORK_STATE_RUNNING && work->queue) {
         /* since we're not holding any lock, we want to use try() to handle unexpected failures */
@@ -636,13 +636,13 @@ d_thread(char *buf)
     lock(httpd,1);
 
     if (task) {
-        wtof(MSG_D_THREAD, task, "MAIN SERVER THREAD");
+        wtof(MSG_D_THREAD, (unsigned)task, "MAIN SERVER THREAD");
         d_cthdtask(task);
         wtof(MSG_D_RNAME, httpd->rname);
         wtof(MSG_SEPARATOR);
     }
 
-    wtof(MSG_D_THREAD, httpd->socket_thread, "SOCKET THREAD");
+    wtof(MSG_D_THREAD, (unsigned)httpd->socket_thread, "SOCKET THREAD");
     if (httpd->socket_thread) {
         d_cthdtask(httpd->socket_thread);
         wtof(MSG_D_LISTENER, httpd->listen, httpd->port);
@@ -656,7 +656,7 @@ d_thread(char *buf)
 
         task = mgr->task;
         if (task) {
-            wtof(MSG_D_THREAD, task, "DISPATCHER THREAD");
+            wtof(MSG_D_THREAD, (unsigned)task, "DISPATCHER THREAD");
             d_cthdtask(task);
         }
         d_cthdmgr(mgr);
@@ -671,7 +671,7 @@ d_thread(char *buf)
             task = work->task;
             if (!task) continue;
 
-            wtof(MSG_D_THREAD, task, "WORKER THREAD");
+            wtof(MSG_D_THREAD, (unsigned)task, "WORKER THREAD");
             d_cthdtask(task);
             d_cthdwork(work);
             wtof(MSG_SEPARATOR);

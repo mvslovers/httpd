@@ -35,13 +35,13 @@ int main(int argc, char **argv)
     before = utime64(NULL);
 	after = utime64(NULL);
 	__64_sub(&after, &before, &usec);
-	wtof("before=%llu, after=%llu, usec=%llu", before, after, usec);
+	wtof("before=%llu, after=%llu, usec=%llu", before.u64, after.u64, usec.u64);
 	
     before = utime64(NULL);
 	rc = cred_init(salt, saltlen);
 	after = utime64(NULL);
 	__64_sub(&after, &before, &usec);
-	wtof("cred_init(\"%s\",%u) rc=%d usec=%llu", salt, saltlen, rc, usec);
+	wtof("cred_init(\"%s\",%u) rc=%d usec=%llu", salt, saltlen, rc, usec.u64);
 	if (rc==0) {
 		key = credkey();
 		// wtodumpf(key, sizeof(CREDKEY), "CREDKEY");
@@ -71,10 +71,10 @@ int main(int argc, char **argv)
 				size_t len = 0;
 				enc = base64_encode((unsigned char*)&cred->token, sizeof(CREDTOK), &len);
 				if (enc) {
-					wtof("base64 TOKEN=\"%s\" (%u)", enc, len);
+					wtof("base64 TOKEN=\"%s\" (%u)", enc, (unsigned)len);
 					dec = base64_decode(enc, len, &len);
 					if (dec) {
-						wtodumpf(dec, len, "CRED#u TOKEN", n);
+						wtodumpf(dec, len, "CRED#%u TOKEN", n);
 						free(dec);
 					}
 					free(enc);

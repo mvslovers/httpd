@@ -898,7 +898,7 @@ socket_thread(void *arg1, void *arg2)
 
     http_enter("socket_thread()\n");
 
-    wtof(MSG_THREAD_START, "SOCKET THREAD", tcb, task, task->stacksize);
+    wtof(MSG_THREAD_START, "SOCKET THREAD", (unsigned)tcb, (unsigned)task, task->stacksize);
 
     /* if something goes all wrong, capture it! */
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
@@ -1054,7 +1054,7 @@ socket_thread(void *arg1, void *arg2)
     } /* while(task) */
 
 quit:
-	wtof(MSG_THREAD_STOP, "SOCKET THREAD", tcb, task, task->stacksize);
+	wtof(MSG_THREAD_STOP, "SOCKET THREAD", (unsigned)tcb, (unsigned)task, task->stacksize);
 
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
     http_exit("socket_thread()\n");
@@ -1095,14 +1095,14 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
                it.  The guard stays as the last resort either way. */
             if (spin == 0 && http_is_busy(httpc)) {
                 wtof(MSG_STALE_BUSY,
-                    httpc, (int)httpc->state, httpc->socket,
+                    (unsigned)httpc, (int)httpc->state, httpc->socket,
                     httpc->request_count);
                 http_reset_busy(httpc);
             }
             if (++spin >= 1000) {
                 wtof(MSG_SPIN,
-                    httpc, (int)httpc->state, httpc->socket,
-                    httpc->request_count, work);
+                    (unsigned)httpc, (int)httpc->state, httpc->socket,
+                    httpc->request_count, (unsigned)work);
                 /* The spin means httppc() kept taking its busy-exit without
                    ever reaching http_reset_busy(), so this client is still in
                    httpd->busy -- and http_close() does not clear that array.
@@ -1139,7 +1139,7 @@ worker_thread(void *udata, CTHDWORK *work)
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
 
     sprintf(name, "WORKER(%06X)", (unsigned)work);
-    wtof(MSG_THREAD_START, name, tcb, task, task->stacksize);
+    wtof(MSG_THREAD_START, name, (unsigned)tcb, (unsigned)task, task->stacksize);
 
     while(task) {
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
@@ -1161,7 +1161,7 @@ worker_thread(void *udata, CTHDWORK *work)
                 rc = try(serve_client, httpc, work);
                 if (rc) {
                     wtof(MSG_WORKER_ABEND,
-                        rc, work, httpc, httpc->socket);
+                        rc, (unsigned)work, (unsigned)httpc, httpc->socket);
                     http_reset_busy(httpc);
                 }
                 http_dbgf("closing client(%08X) socket(%d)\n",
@@ -1177,7 +1177,7 @@ worker_thread(void *udata, CTHDWORK *work)
         }
     }
 
-	wtof(MSG_THREAD_STOP, name, tcb, task, task->stacksize);
+	wtof(MSG_THREAD_STOP, name, (unsigned)tcb, (unsigned)task, task->stacksize);
 
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
 
