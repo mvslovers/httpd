@@ -11,7 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 after PR #310 (#309: wtof()
+*Last reconciled against the tracker: 2026-10-20 after PRs #313, #314 and #316
+(#311 HTTPD063E for a worker without recovery, #312 SonarCloud analyses a
+32-bit target, #315 crtopts no longer read, ahead of libc370#113): all three
+filed and closed the same day; twelve issues open, the ranked order
+unchanged. Before that, 2026-10-19 after PR #310 (#309: wtof()
 arguments match their formats, ahead of libc370#654): #309 filed and closed
 with it; twelve issues open, the ranked order unchanged. Before that, the same
 day after the libc370 pin moved to 2.22.0 (direct commit, no code change).
@@ -478,6 +482,15 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#315** — `main()` no longer reads `crt->crtopts` (PR #316): libc370#113
+  removes the field, which was never assigned, so `unauth_setup()` always
+  ran; it now runs unconditionally. Not `__isauth()` (libc370#122).
+- **#312** — `.sonarcloud.properties` (PR #314): SonarCloud analyses for
+  `powerpc-unknown-eabi` like brexx370, so `(unsigned)ptr` is no longer
+  c:S1767. Takes effect from the first analysis of `main`.
+- **#311** — `HTTPD063E` (PR #313): a worker whose `try()` cannot set up
+  its ESTAE no longer reports `HTTPD062E ABEND`; -1 from libc370 2.23.0 on
+  (libc370#476).
 - **#309** — every `wtof()`/`wtodumpf()` argument matches its format (PR #310):
   libc370#654 declares `format(printf)` on them, and the build would have
   failed under `-Werror`. Pointers cast `(unsigned)`, `__64` passed as `.u64`
