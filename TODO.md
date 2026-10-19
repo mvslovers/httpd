@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-19 after PR #305 (resident modules,
+*Last reconciled against the tracker: 2026-10-19 after PR #306 (#303: the MIME
+lookup works with both `bsearch()` argument orders; libc370 pin 2.20.0): #303
+closed, #307 filed out of that PR's server test and not yet ranked; twelve issues
+open. Before that, the same day after PR #305 (resident modules,
 #198 step 2): #300 closed, rank 4 done; twelve issues open. Before that, the same
 day with the #250 docs PR: (b) and
 the reuse of a held copy measured, #250 closes; its rank 4 goes to #198's step 2
@@ -81,6 +84,7 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
+| — | #307 | a module abend on a reused keep-alive connection gets no response; as old as 4.3.0, not the pin | not yet ranked |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
@@ -468,6 +472,11 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#303** — the MIME lookup holds against either `bsearch()` order (PR #306):
+  the key is an `HTTPM`, so libc370#388's C99 order no longer reads the
+  extension as a table entry (S0C4 in `HTTPCMP` before). TSTMIME red/green on an
+  MVS/CE container. Same PR: release builds pin libc370 2.20.0, whose #601 gives
+  a cancelled server's port back at once. 2.21.0 (#388) needs only the pin.
 - **#288** — every explicit login gets a credential of its own (PR #289):
   `cred_session()` and the export `http_new_session()` at vector `0x144`, used
   by the form login and by mvsMF's authenticate POST (mvslovers/mvsmf#399).
