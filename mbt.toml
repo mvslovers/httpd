@@ -24,7 +24,18 @@ kind = "application"
 # by itself.  HTTPD has no assembler source of its own, so the move of those
 # macros out of libc370 (2.8.0, mvslovers/libc370#494) changes nothing here.
 #
-# libc370 2.12.1: a C module entered by LINK no longer leaves 128 bytes of
+# libc370 2.20.0: a program's sockets are closed when it ends, also on an
+# abend nothing recovers (mvslovers/libc370#601), so an HTTPD that abends gives
+# its listening port back instead of holding it until Hercules restarts
+# (measured: after a CANCEL the port refuses at once; with 2.12.1 it hung).  A
+# socket belongs to the program whose socket() or accept() made it; the socket
+# thread and the workers share HTTPD's, and a LINKed module that opens none
+# closes none of the server's.  Since 2.19.0 select() waits the time it is
+# given (mvslovers/libc370#396).  httpmime() compares two HTTPM entries, so its
+# bsearch() works with the argument order of 2.20.0 and with C99's, which the
+# next libc370 adopts (mvslovers/libc370#388, #303).
+#
+# Since 2.12.1 a C module entered by LINK no longer leaves 128 bytes of
 # subpool 0 behind at every normal run (mvslovers/libc370#546).  Every CGI
 # request LINKs its module, so HTTPDM, HTTPDSRV and HTTPDMTT lost that much per
 # request until the next restart (#297).  The fix is in the module's own C
@@ -41,7 +52,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.1"
-libc370 = "2.12.1"
+libc370 = "2.20.0"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
