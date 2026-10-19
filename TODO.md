@@ -11,7 +11,10 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-20 after PRs #313, #314 and #316
+*Last reconciled against the tracker: 2026-10-20 after PR #317 (#307: the
+keep-alive reset clears the response status; libc370 pin 2.23.0 pushed just
+before it): #307 closed, its unranked row gone; eleven issues open, the
+ranked order unchanged. Before that, the same day after PRs #313, #314 and #316
 (#311 HTTPD063E for a worker without recovery, #312 SonarCloud analyses a
 32-bit target, #315 crtopts no longer read, ahead of libc370#113): all three
 filed and closed the same day; twelve issues open, the ranked order
@@ -94,7 +97,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
-| — | #307 | a module abend on a reused keep-alive connection gets no response; as old as 4.3.0, not the pin | not yet ranked |
 | — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | **nothing** since the 2.0 pin; not yet ranked. In 2.0 `sleep()` is in `<unistd.h>`, not `<time.h>` as the issue says |
@@ -482,6 +484,12 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#307** — a module abend on the 2nd+ request of a keep-alive connection
+  gets its 503 again (PR #317): `httprese()` never cleared `httpc->resp`, so
+  `httppcgi()` skipped the status line and sent a bare body (curl 000).
+  TSTRESE red/green and a side-by-side server run on an MVS/CE container.
+  Same day: libc370 pin 2.23.0 (libc370#640, `try()` frees the SDWA of
+  every abend it recovers).
 - **#315** — `main()` no longer reads `crt->crtopts` (PR #316): libc370#113
   removes the field, which was never assigned, so `unauth_setup()` always
   ran; it now runs unconditionally. Not `__isauth()` (libc370#122).
