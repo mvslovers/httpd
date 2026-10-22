@@ -11,18 +11,11 @@
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
 #include "httpxlat.h"
+#include <unistd.h>          /* sleep()                                      */
 #include <mvs/enq.h>        /* ENQ()       -- port single-instance (#223)   */
 #include <mvs/dd.h>         /* get_dsab()  -- DD -> DSAB                    */
 #include <ibm/mvs/ieftiot1.h> /* TIOTDD      -- DSAB -> TIOT entry            */
 #include <ibm/mvs/iefjfcbn.h> /* JFCB        -- TIOT entry -> dsname(member)  */
-
-/* libc370 ships sleep() (src/clib/sleep.c) and __tzget() (src/clib/@@tzget.c)
-** but declares neither in any header, so both were implicit declarations here.
-** Declared locally until libc370 exports them (libc370 #70); the signatures are
-** copied from those definitions, so a later header will agree rather than
-** conflict. */
-extern int sleep(unsigned seconds);
-extern int __tzget(void);       /* src/clib/@@tzget.c -- returns crt->crttzoff */
 
 /* Seconds to let the stack settle after close_stale_port() closed something,
 ** before the immediate rebind (#224).  Deliberately NOT httpd->bind_sleep,

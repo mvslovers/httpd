@@ -19,10 +19,31 @@ kind = "application"
 # reproduce from a tag. HTTPD005I names the runtime it linked against, so an
 # unpinned release build makes that line unreproducible in exactly the same way.
 #
-# cc370 1.6.1: libc370 2.8.0 and later need cc370 >= 1.6.0 (their headers
+# cc370 1.6.3: libc370 2.8.0 and later need cc370 >= 1.6.0 (their headers
 # #error otherwise); from 1.6.0 on as370 finds the IBM macros in maclib370
 # by itself.  HTTPD has no assembler source of its own, so the move of those
 # macros out of libc370 (2.8.0, mvslovers/libc370#494) changes nothing here.
+# 1.6.2 makes ld370 keep a CSECT's data when a COM of the same name follows it
+# (1.6.1 turned it into an empty common area and still ended rc 0); 1.6.3 only
+# changes how MVCK/MVCP/MVCS assemble.  Both are drop-ins, and 1.6.3 is what
+# the release is built and tested with.
+#
+# libc370 2.25.1: send() passes at most 256 bytes to the emulator and returns
+# that short count (mvslovers/libc370#160, 2.24.0); send_raw() and send_all()
+# already loop until the whole buffer is out, so nothing changes but the number
+# of calls per body.  select() sets ENOTSOCK when it fails and socket() only
+# reports errors it can have (#161, 2.24.1); the socket thread selects on the
+# listener alone while the workers hold the clients, so no socket is closed
+# under a select().  The first-use storage the library creates (open-file
+# list, standard streams, SYSENV) is created in the task's own key, also
+# inside a key-0 window (#693, 2.24.1), which stc_identity()'s __super()
+# window does not touch.  A pool of 1 to 3 workers now processes its queue
+# (#700, 2.25.1); HTTPD sets mintask itself after cthread_manager_init() and
+# never runs below 1.  <unistd.h> declares sleep() and usleep() and <time.h>
+# __tzget(), so the local declarations are gone (#270).  The other changes of
+# 2.24.0 to 2.25.1 do not reach HTTPD: no VSAM, no BSAM/BDAM, no dynamic
+# allocation by structure, no fseek(), no timegm(), no math functions, and
+# __linkds() keeps its signature.
 #
 # libc370 2.23.0: try() gives back the ~500 bytes of SDWA of every abend it
 # recovers (mvslovers/libc370#640).  __linkds() LINKs every module under
@@ -70,8 +91,8 @@ kind = "application"
 # (mvslovers/libc370#453); HTTPD's socket thread and worker pool are created
 # that way, so the server's streams lock as before.
 mbt = "3.0"
-cc370 = "1.6.1"
-libc370 = "2.23.0"
+cc370 = "1.6.3"
+libc370 = "2.25.1"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
