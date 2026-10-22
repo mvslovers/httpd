@@ -4,10 +4,7 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
-
-/* libc370 ships usleep() (src/clib/usleep.c) but its headers carry
-   no prototype for it */
-extern int usleep(unsigned usec);
+#include <unistd.h>    /* usleep() */
 
 /* send_raw() - send raw bytes to socket without chunk framing */
 static int

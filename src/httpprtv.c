@@ -2,10 +2,7 @@
 ** HTTP printv
 */
 #include "httpd.h"
-
-/* libc370 ships usleep() (src/clib/usleep.c) but its headers carry
-   no prototype for it */
-extern int usleep(unsigned usec);
+#include <unistd.h>    /* usleep() */
 
 /* A zero-progress send (0 from http_send(), socket send buffer full)
 ** is retried after a pause instead of busy-spinning the worker at
