@@ -731,7 +731,7 @@ client can log in.
    and falls back to the target's Hercules console if it has one, and fails
    with "not delivered" if it has not.
 
-3. Reload: `/F RAKF,RELOAD`
+3. Reload the profiles: `S RAKFPROF` (RAKF 2)
 
 ---
 
