@@ -167,7 +167,7 @@ code is the test and the sequence is not.
 | `HTTPD040I` | `WAITING FOR SOCKET THREAD TO TERMINATE (n)` | Normal during shutdown, up to ten times, one per second. |
 | `HTTPD041I` | `FORCE DETACHING SOCKET THREAD` | The socket thread did not end within ten seconds and was detached. Worth reporting with the surrounding log. |
 | `HTTPD044W` | `UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not up, or `libufs` could not reach it. CGI routes still work; static files do not. |
-| `HTTPD045E` | `UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD failed a read while a file was being sent. `n` is the UFSD return code (`52` is an I/O error); `path` is the request path, cut at 40 characters. Not a client fault and not a server bug: look at UFSD and the volume behind the file system. The status line and headers had already been sent, so the client could not be given a 500; the connection is closed without the final chunk of a chunked body (or short of its `Content-Length`), which is how a client tells truncation from completion. Before 4.4.0 the same fault showed as `HTTPD901E` after a thousand passes. |
+| `HTTPD045E` | `UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD failed a read while a file was being sent. `n` is the return code UFSD gave (`52` is an I/O error). `path` is the path of the request as the client asked for it, cut at 40 characters; for a file pulled in by a server-side include it is still the path of the page that was requested. Not a client fault and not a server bug: look at UFSD and the volume behind the file system. The response is abandoned and the connection is closed; what the client sees is under *A UFS read error on the wire* below. Before 4.4.0 the same fault ended as `HTTPD901E` after a thousand passes, with the worker spinning until then. |
 | `HTTPD047E` | `UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC=n` | No credential can be sealed, so form login and session cookies are dead. Basic auth still works. |
 | `HTTPD050E` | `MAXSOCK IS ZERO, THE LISTENER IS IN AN INVALID STATE` | Internal: `select()` was handed an empty descriptor set. The socket thread ends. |
 | `HTTPD051E` | `SELECTEX() FAILED, RC=n ERRNO=e` | The accept loop cannot continue and the socket thread ends. The server must be restarted. |
@@ -184,6 +184,27 @@ code is the test and the sequence is not.
 | `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. The step ends `CC 0008` (#245). This message is the whole report — it is written before anything was initialized, so no stop sequence follows it. |
 | `HTTPD098I` | `HTTPD SHUTTING DOWN` | `P HTTPD` was accepted and the quiesce has begun. |
 | `HTTPD099I` | `HTTPD SHUTDOWN COMPLETE` | Everything was released. If the address space ends without this line, shutdown did not finish cleanly. |
+
+### A UFS read error on the wire
+
+The status line (`200`) and the headers are sent before the first byte of the
+file is read. When UFSD fails a read after that, nothing is left to correct and
+no `500` can follow. HTTPD writes `HTTPD045E`, stops sending, drops what it had
+not yet sent, and closes the connection when the request ends. It does not keep
+the connection for another request, although the response headers may have said
+`Connection: keep-alive`. The worker is free at once.
+
+What the client can tell depends on how the body was framed:
+
+| Response | What the client sees |
+|---|---|
+| A file of known, non-zero size that is not parsed for includes, any HTTP version. These carry `Content-Length`. | Fewer body bytes than `Content-Length`, then the close. A client that compares the two reports an incomplete body. |
+| A file that is parsed for includes (every `text/html` file, and `text/x-server-parsed-html`), requested with HTTP/1.1. These are sent chunked. | The chunks that were sent, then the close, without the final zero-length chunk. A client that reads chunked bodies reports an incomplete message. |
+| A file that is parsed for includes, requested with HTTP/1.0. No `Content-Length` and no chunking. | The body ends at the close, which is also how a complete one ends. The client cannot tell the failure from the end of the file. Only the console line shows it. |
+
+The request is not counted as an error: where SMF writes a record for it, the
+record carries `resp_code` 200, and the server's error total does not change.
+`HTTPD045E` is the only sign on the server side that the response failed.
 
 ## HTTPD1xx — operator console
 
@@ -275,7 +296,7 @@ surrounding log and what the client was doing.
 | Id | Text | Meaning |
 |---|---|---|
 | `HTTPD900D` `HTTPD902D` `HTTPD903D` | *(retired)* | Probes for #159, removed with it (#186). `HTTPD903D` wrote a census line every 60 seconds on an idle server. The ids are reserved, not reused. |
-| `HTTPD901E` | `SPIN IN SERVE_CLIENT: … -- FORCING CLOSE` | A client sat in one state past every deadline. The connection is closed so the worker is not lost. |
+| `HTTPD901E` | `SPIN IN SERVE_CLIENT: … -- FORCING CLOSE` | A client sat in one state past every deadline. The connection is closed so the worker is not lost. Before 4.4.0 a UFS read error ended here; it is now `HTTPD045E`. |
 | `HTTPD904E` | `NO STORAGE FOR ENVIRONMENT VARIABLE v CLIENT(c)` | The request cannot be completed. Region too small, or a leak. |
 | `HTTPD905E` | `ENVIRONMENT VARIABLE v TOO LARGE CLIENT(c)` | The value exceeds what an `HTTPV` holds. |
 | `HTTPD906W` | `STORAGE RECLAIM FOR pgm FAILED, RC=n` | A CGI's subpool survived it. Storage leaks until restart. |
