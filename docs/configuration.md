@@ -648,6 +648,20 @@ LOC=/*                 AUTH=NONE
 LOC=/admin/*          AUTH=BASIC RES=FACILITY:HTTPD.ADMIN
 ```
 
+The shipped configuration uses the same mechanism to put one part of an API
+behind a profile of its own: mvsMF's console service issues operator commands
+and checks nobody's authority, so it has a route ahead of the catch-all:
+
+```
+MOD=MVSMF /zosmf/restconsoles/*   AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE
+MOD=MVSMF /zosmf/*                AUTH=TOKEN
+```
+
+A user without READ on the resource gets `403`; everything else under
+`/zosmf/` is untouched. Swapped, the catch-all matches first and the console
+is open to every login — with no message.
+The profile is defined in [Installation](installation.md), step 8.
+
 ## SMF Recording
 
 ```
