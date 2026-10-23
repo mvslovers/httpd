@@ -60,9 +60,10 @@ The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
 
 **Does `HTTPD.LINKLIB` already exist on a system that has no HTTPD from SMP?**
-Then the allocation job in step 4 fails, and the library has to be moved out of
-the way first. That is the case on TK5, which ships HTTPD 3.3 in its own
-`HTTPD.LINKLIB`, and on a system where somebody filled one by hand. Read
+Then the allocation job in step 4 does not do what you want, and it can even end
+with RC 0. The library has to be moved out of the way first. That is the case
+on TK5, which ships HTTPD 3.3 in its own `HTTPD.LINKLIB`, and on a system where
+somebody filled one by hand. Read
 [step 4](#a-library-that-smp-does-not-own) before you submit anything.
 
 > **SECURITY — before you start the new server, check every route in your
@@ -511,7 +512,7 @@ no catalog entry) before you continue.
 1. **Stop the server that uses the library**, whatever its procedure is
    called (`/P HTTPD33` on TK5). A library in use cannot be renamed: the rename
    job starts and then waits, without ending, until the server is gone.
-2. **List the members** (ISPF 3.4, or `IEHLIST LISTPDS` as in step 6) and write
+2. **List the members** (ISPF 3.4) and write
    down everything that is not one of HTTPD's own modules. You deal with it in
    the last point.
 3. **Rename the library** with IDCAMS. It changes the catalog entry and the
