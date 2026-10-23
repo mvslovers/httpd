@@ -217,6 +217,12 @@
  *  request was neither read nor answered; the connection is closed (#311) */
 #define MSG_WORKER_NO_ESTAE	"HTTPD063E NO RECOVERY IN WORKER(%06X), CLIENT(%08X) SOCKET(%d) DROPPED"
 
+/** HTTPD064E the socket thread was created but is not in its accept loop when
+ * the server is about to say READY, or ended before it got there.  Nothing
+ * would ever be accepted, so the start is abandoned with CC 0008 (#296).
+ * Distinct from HTTPD033E, where the thread was never created. */
+#define MSG_SOCKET_THREAD_DOWN	"HTTPD064E SOCKET THREAD IS NOT RUNNING, START ABANDONED"
+
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
 

@@ -12,6 +12,8 @@
 #include "httpd.h"
 #include "httpdmsg.h"               /* operator message catalog         */
 #include "httpracf.h"               /* HTTP_RACF_NOTPROT (res_probe)    */
+#include "httpthrd.h"               /* httpself/httpthup (#296)         */
+#include <unistd.h>                 /* usleep()                         */
 #include <mvs/crt.h>
 #include <mvs/socket.h>
 #include <ext/version.h>            /* libc370_version()                */
@@ -22,6 +24,37 @@
 
 static int socket_thread(void *arg1, void *arg2);
 static int worker_thread(void *udata, CTHDWORK *work);
+
+/* A new thread asks cthread_self() for its own handle while its creator may
+** not yet have stored the TCB address in it, and is told NULL (#296; the
+** mechanism is in httpthrd.h).  The window is microseconds: 50 probes 20 ms
+** apart are a second, far more than it ever needs. */
+#define SELF_TRIES      50
+#define SELF_PAUSE_US   20000
+
+/* main() waits for the socket thread to reach its accept loop before it
+** writes READY: 50 looks 100 ms apart, five seconds.  A healthy start does
+** not wait at all -- the workers were created after the socket thread. */
+#define SOCK_UP_TRIES   50
+#define SOCK_UP_PAUSE_US 100000
+
+static void *
+self_probe(void)
+{
+    return cthread_self();
+}
+
+static void
+self_pause(void)
+{
+    usleep(SELF_PAUSE_US);
+}
+
+static void
+sock_up_pause(void)
+{
+    usleep(SOCK_UP_PAUSE_US);
+}
 
 unsigned __stklen = 64*1024;
 
@@ -882,7 +915,7 @@ socket_thread(void *arg1, void *arg2)
     HTTPD       *httpd  = grt->grtapp1;
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    CTHDTASK    *task   = cthread_self();
+    CTHDTASK    *task   = httpself(self_probe, SELF_TRIES, self_pause);
     CTHDMGR     *mgr    = httpd->mgr;
     int         rc;
     int         sock;
@@ -900,10 +933,16 @@ socket_thread(void *arg1, void *arg2)
 
     http_enter("socket_thread()\n");
 
-    wtof(MSG_THREAD_START, "SOCKET THREAD", (unsigned)tcb, (unsigned)task, task->stacksize);
+    /* task is NULL only if the handle is still missing after the wait in the
+    ** initializer; then there is nothing to read from it, the loop below is
+    ** not entered and the state stays GONE for main() to find (#296). */
+    wtof(MSG_THREAD_START, "SOCKET THREAD", (unsigned)tcb, (unsigned)task,
+         task ? task->stacksize : 0);
 
     /* if something goes all wrong, capture it! */
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+
+    if (task) httpd->sockstate = HTTP_THRD_RUNNING;
 
     /* we loop until we're shut down */
     while(task) {
@@ -1056,7 +1095,9 @@ socket_thread(void *arg1, void *arg2)
     } /* while(task) */
 
 quit:
-	wtof(MSG_THREAD_STOP, "SOCKET THREAD", (unsigned)tcb, (unsigned)task, task->stacksize);
+	httpd->sockstate = HTTP_THRD_GONE;
+	wtof(MSG_THREAD_STOP, "SOCKET THREAD", (unsigned)tcb, (unsigned)task,
+	     task ? task->stacksize : 0);
 
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
     http_exit("socket_thread()\n");
@@ -1128,7 +1169,7 @@ worker_thread(void *udata, CTHDWORK *work)
 {
     unsigned    *psa    = (unsigned *)0;
     unsigned    *tcb    = (unsigned *)psa[0x21C/4]; /* A(TCB) from PSATOLD  */
-    CTHDTASK    *task   = cthread_self();
+    CTHDTASK    *task   = httpself(self_probe, SELF_TRIES, self_pause);
     int         rc      = 0;
     char        *data   = NULL;
     HTTPC       *httpc  = NULL;
@@ -1141,7 +1182,7 @@ worker_thread(void *udata, CTHDWORK *work)
     abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
 
     sprintf(name, "WORKER(%06X)", (unsigned)work);
-    wtof(MSG_THREAD_START, name, (unsigned)tcb, (unsigned)task, task->stacksize);
+    wtof(MSG_THREAD_START, name, (unsigned)tcb, (unsigned)task, task ? task->stacksize : 0);
 
     while(task) {
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
@@ -1188,7 +1229,7 @@ worker_thread(void *udata, CTHDWORK *work)
         }
     }
 
-	wtof(MSG_THREAD_STOP, name, (unsigned)tcb, (unsigned)task, task->stacksize);
+	wtof(MSG_THREAD_STOP, name, (unsigned)tcb, (unsigned)task, task ? task->stacksize : 0);
 
     abendrpt(ESTAE_DELETE, DUMP_DEFAULT);
 
@@ -1495,6 +1536,15 @@ main(int argc, char **argv)
     httpcmd("maxrates", buf, sizeof(buf));
     wtof("%s", buf);
 #endif
+
+    /* A server whose socket thread is not running accepts nothing; READY would
+    ** be a lie and the operator would learn it from a curl that times out.
+    ** A healthy start passes without waiting (#296). */
+    if (!httpthup(&httpd->sockstate, SOCK_UP_TRIES, sock_up_pause)) {
+        wtof(MSG_SOCKET_THREAD_DOWN);
+        rc = 8;                         /* refused start, like HTTPD033E */
+        goto cleanup;
+    }
 
     /* set number of modify commands we'll queue */
     __cibset(5);

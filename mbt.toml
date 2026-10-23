@@ -300,6 +300,14 @@ sources = ["test/tstracf.c", "src/httpracf.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tststat.c", "src/httpstat.c"]
 
+# httpself()/httpthup() thread start-up hand-shake (issue #296): the socket
+# thread must not take a NULL cthread_self() as fact, and main() must not write
+# READY over a socket thread that is not running.  Free of httpd.h -> DUAL
+# (host + MVS); helper source listed for the host link.
+[test.TSTTHRD]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstthrd.c", "src/httpthrd.c"]
+
 # httprlm() Basic realm from the SMF ID (issue #191).  __smfid() hands over a
 # 4-byte, blank-padded, unterminated field, and an empty realm would collapse
 # every protection space on the origin (RFC 7617 makes it required) -- so the

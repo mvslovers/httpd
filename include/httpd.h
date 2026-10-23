@@ -114,7 +114,9 @@ struct httpd {
 #define HTTPD_CLIENT_INDUMP	0x40	/* ... client timeout buf dump 	*/
 #define HTTPD_CLIENT_STATS	0x20	/* ... client statistics desired*/
 
-    UCHAR       unused;   			/* 2F unused                    */
+    volatile UCHAR sockstate;       /* 2F socket thread state, only */
+                                    /* ... the thread writes it:    */
+                                    /* ... HTTP_THRD_* (#296)       */
 
     CTHDTASK    *socket_thread;     /* 30 socket_thread subtask     */
     CTHDMGR     *mgr;               /* 34 worker_thread manager     */
