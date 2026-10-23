@@ -659,8 +659,9 @@ MOD=MVSMF /zosmf/*                AUTH=TOKEN
 
 A user without READ on the resource gets `403`; everything else under
 `/zosmf/` is untouched. Swapped, the catch-all matches first and the console
-is open to every login — with no message. Percent-encoding in the request path
-does not get round the gate: the server decodes the path before it matches.
+is open to every login — with no message. Only single-encoded forms of the
+path were measured (the server decodes the path once before it matches); the
+double-encoded case is under review (mvsMF #347).
 The profile is defined in [Installation](installation.md), step 8.
 
 ## SMF Recording

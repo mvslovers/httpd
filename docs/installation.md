@@ -722,7 +722,10 @@ client can log in.
    FACILITYMVSMF.CONSOLE                               ADMIN   READ
    ```
 
-   Access is READ or nothing. The second line grants the operators' group; to
+   Access is READ or nothing, and READ means every operator command, from
+   console 0 and without a `UCMAUTH` filter: `ADMIN` is only an example, so
+   grant it to a group of its own that holds just the people who may do that.
+   The second line grants that group; to
    grant one more person without a group of their own, add a line with the user
    id in the group column (`FACILITYMVSMF.CONSOLE … TESTER  READ`, measured on
    RAKF 2). **The development user needs the profile too:**
