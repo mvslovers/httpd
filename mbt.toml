@@ -403,6 +403,12 @@ rent = false          # mbtcheck.h keeps file-static counters
 parm = "IBMUSER.HTTPD.TPRM"
 host = false                    # BSAM I/O error + DD: names -> test-mvs
 
+# __loadx() reports the completion and reason code HTTPD442W prints
+# (issue #320).  MVS-only (LOAD SVC).
+[test.TSTLOADX]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false                    # LOAD SVC -> test-mvs
+
 # http_link() failure reporting (issue #131): a module that cannot be loaded
 # must not come out as an abend code.  Rests on a libc370 contract -- __linkds()
 # on a missing module returns 0 with prc == -1 -- which the test pins first, so
