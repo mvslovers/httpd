@@ -4,6 +4,8 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "httpgive.h"
+#include <time.h>      /* time() */
 #include <unistd.h>    /* usleep() */
 
 /* send_raw() - send raw bytes to socket without chunk framing */
@@ -38,6 +40,42 @@ send_raw(HTTPC *httpc, const UCHAR *buf, int len)
     }
 
     return pos;
+}
+
+/* send_giveup() - tell the operator that a client was abandoned because it
+** took no data for the whole no-progress budget (issue #347).
+**
+** Many stalled clients at once must not flood the console, which is also
+** what mvsMF's console API reads back, so httpgive() lets one message
+** through per SEND_GIVEUP_INTERVAL and the rest are counted into the next.
+** Several workers arrive here at the same time; the two counters sit in the
+** HTTPD block (not in a static: the module may be RENT) and are guarded by
+** an exclusive lock on the address of the first.  The WTO itself is written
+** after the lock is released.
+**
+** Only the connection's address is printed: nothing of the request is.
+*/
+static void
+send_giveup(HTTPC *httpc)
+{
+    HTTPD       *httpd  = httpc->httpd;
+    unsigned    held    = 0;
+    int         report;
+    int         lockrc;
+
+    lockrc = lock(&httpd->giveup_last, LOCK_EXC);
+    report = httpgive(&httpd->giveup_last, &httpd->giveup_held,
+                      (unsigned)time(NULL), SEND_GIVEUP_INTERVAL, &held);
+    if (lockrc == 0) unlock(&httpd->giveup_last, LOCK_EXC);
+
+    if (report)
+        wtof(MSG_SEND_GIVEUP,
+             httpc->addr >> 24 & 0xFF,
+             httpc->addr >> 16 & 0xFF,
+             httpc->addr >>  8 & 0xFF,
+             httpc->addr       & 0xFF,
+             SEND_STALL_MAX * SEND_STALL_PAUSE / 1000000,
+             httpc->sent, held);
 }
 
 /* send_raw_all() - send the whole buffer or fail.
@@ -82,6 +120,7 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
             }
             if (++stall > SEND_STALL_MAX) {
                 httpc->state = CSTATE_DONE;
+                send_giveup(httpc);
                 return -1;
             }
             usleep(SEND_STALL_PAUSE);

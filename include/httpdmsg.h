@@ -228,6 +228,15 @@
  * Distinct from HTTPD033E, where the thread was never created. */
 #define MSG_SOCKET_THREAD_DOWN	"HTTPD064E SOCKET THREAD IS NOT RUNNING, START ABANDONED"
 
+/** HTTPD065W a worker gave up on a client that took no data for the whole
+ *  no-progress budget (SEND_STALL_MAX x SEND_STALL_PAUSE, 10 seconds): its
+ *  receive window stayed closed and the response was cut off.  The client
+ *  sees the connection close.  Nothing the client sent is printed, only the
+ *  address of the connection, as HTTPD007I does.  Written at most once per
+ *  SEND_GIVEUP_INTERVAL; the last argument is how many give-ups the interval
+ *  held back (#347). */
+#define MSG_SEND_GIVEUP		"HTTPD065W CLIENT %u.%u.%u.%u ABANDONED, NO SEND PROGRESS FOR %d SEC, %u BYTES SENT, %u SUPPRESSED"
+
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
 

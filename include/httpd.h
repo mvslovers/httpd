@@ -150,11 +150,16 @@ struct httpd {
     unsigned	active_connections;	/* 7C active client connections	*/
     const HTTPCP *xlate;            /* 80 codepage pair in effect   */
                                     /* ... (was: st_dataset) (#197) */
-    void        *unused_84;         /* 84 (was: cgilua_dataset)     */
+    unsigned    giveup_last;        /* 84 time() of the last HTTPD065W,*/
+                                    /* ... 0 = none yet (#347); was */
+                                    /* ... cgilua_dataset.  Locked  */
+                                    /* ... as lock(&giveup_last)    */
     ACEE        *stc_prev_acee;     /* 88 STC ACEE to put back at   */
                                     /* ... shutdown, NULL until the */
                                     /* ... switch took (#197)       */
-    void        *unused_8C;         /* 8C (was: cgilua_cpath)       */
+    unsigned    giveup_held;        /* 8C give-ups counted since    */
+                                    /* ... that message (#347); was */
+                                    /* ... cgilua_cpath             */
     UFS			*ufs;				/* 90 Unix "like" File System   */
     USHRT       cfg_session_maxage; /* 94 credential hard max-age   */
                                     /* ... (min), 0=off (#118)      */
@@ -209,6 +214,10 @@ enum cstate {
    at 100% CPU, and give up once the budget below is exhausted */
 #define SEND_STALL_MAX      100     /* consecutive no-progress sends*/
 #define SEND_STALL_PAUSE    100000  /* microseconds between retries */
+
+/* the give-up of a stalled client is reported to the operator at most once
+   per interval (issue #347); the rest are counted in the next message */
+#define SEND_GIVEUP_INTERVAL 60     /* seconds between HTTPD065W    */
 
 enum rdw {
     RDW_NONE=0,                     /* no RDW (default)             */
