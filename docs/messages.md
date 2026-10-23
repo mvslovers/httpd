@@ -95,8 +95,8 @@ HTTPD099I HTTPD SHUTDOWN COMPLETE
 ```
 
 **The first line is the cause**, and it is the only one that varies:
-`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E`, `HTTPD420E`, `HTTPD038E` or
-`HTTPD033E`, each naming what actually failed. There is no summary line under it: `HTTPD400E`
+`HTTPD037E`, `HTTPD028E`, `HTTPD030E`, `HTTPD031E`, `HTTPD420E`, `HTTPD038E`,
+`HTTPD033E` or `HTTPD064E`, each naming what actually failed. There is no summary line under it: `HTTPD400E`
 used to follow every one of these and named the *configuration* on four of the
 five it could reach, sending the operator into the Parmlib after a mistake that
 was not there (#233).
@@ -108,10 +108,18 @@ nothing was served. Those absences are a hint, not a test: a server stopped
 right after a start it survived writes almost the same thing.
 
 **The step return code is the test.** A start refused by `initialize()` — the
-seven ids above — ends `CC 0008` (#226); a clean `P HTTPD` ends `CC 0000`.
+first seven ids above, all but `HTTPD064E` — ends `CC 0008` (#226); a clean `P HTTPD` ends `CC 0000`.
 Automation that has to recognize a failed start — `$DJ`, a COND CODE check, an
 IEFACTRT exit, a rule that restarts a dead STC — keys on that, never on a
 console string.
+
+`HTTPD064E` ends `CC 0008` too (#296), and it is the one refusal that comes
+after the server looked well on its way. `initialize()` has succeeded, the
+listener and the threads exist, and only then does `main()` find the socket
+thread not running. The `HTTPD061I` lines are therefore on the console above it,
+`HTTPD060I` lines follow for the threads that were started, and `HTTPD001I` is
+never written. The note above about absent `HTTPD060I` lines does not apply to
+it.
 
 `HTTPD090E` ends `CC 0008` as well (#245), but it is the one refusal with a
 different **shape**: the console interface is checked before `initialize()`
@@ -169,7 +177,7 @@ code is the test and the sequence is not.
 | `HTTPD061I` | `STARTING name TCB(x) TASK(x) STACKSIZE(n)` | One server thread started. At start you should see the socket thread plus `MINTASK` workers. |
 | `HTTPD062E` | `ABEND xxxxxxxx IN WORKER(w) CLIENT(c) SOCKET(s)` | A worker's ESTAE caught an abend. Only that request dies; the worker is recycled and the server continues. Always worth a bug report — include the abend code and the request. |
 | `HTTPD063E` | `NO RECOVERY IN WORKER(w), CLIENT(c) SOCKET(s) DROPPED` | The worker could not set up the recovery routine it runs each request under, so it did not touch this request: nothing was read or answered, and the connection was closed. Nothing abended. Rare (no task anchor, or ten recovery routines already in use); worth reporting if it repeats. |
-| `HTTPD064E` | `SOCKET THREAD IS NOT RUNNING, START ABANDONED` | The socket thread was created but had ended, or had not reached its accept loop within five seconds, when the server was about to say `HTTPD001I ... READY`. Nothing would ever be accepted, so there is no `READY`: the server stops (`HTTPD099I`) and the step ends CC 0008. Start it again; if it repeats, report it with the surrounding log. Not `HTTPD033E`, which is for a thread that could not be created at all. |
+| `HTTPD064E` | `SOCKET THREAD IS NOT RUNNING, START ABANDONED` | The socket thread, which takes in new connections, was created but is not working: it ended on its own, or it was not yet accepting connections after five seconds. A server in that state would answer nothing, so `HTTPD001I ... READY` is not written. The server stops instead (`HTTPD098I` to `HTTPD099I`) and the step ends `CC 0008`. Start it again; if it repeats, report it with the console log from `HTTPD000I` on. Not `HTTPD033E`, which is for a thread that could not be created at all. |
 | `HTTPD070E` | `UNKNOWN CODEPAGE "name", USING CP037` | The `CODEPAGE` value is not one this build knows. Check the spelling. |
 | `HTTPD071I` | *(retired)* | The codepage in effect is a `D CONFIG` value (`HTTPD134I`), not a startup line. |
 | `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. The step ends `CC 0008` (#245). This message is the whole report — it is written before anything was initialized, so no stop sequence follows it. |

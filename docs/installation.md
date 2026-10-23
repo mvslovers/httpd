@@ -895,6 +895,10 @@ HTTPD061I STARTING WORKER(11ED48)   TCB(9CD420) TASK(120FC8) STACKSIZE(65536)
 HTTPD001I HTTPD <version> READY - SERVING /www
 ```
 
+`READY` is written only once the socket thread, which takes in the connections,
+is running. If it is not, `HTTPD064E` takes the place of `READY` and the server
+stops (see below).
+
 That transcript is a system with UFSD running. Without it, `HTTPD044W` appears
 between `HTTPD004I` and `HTTPD054I` — and the last line still reads
 `SERVING /www`, because it names the configured document root rather than a
@@ -912,10 +916,13 @@ and that one look after the first start is worth taking: it prints what HTTPD
 visible there and nowhere else.
 
 **A refused start is recognised by the step return code, never by a console
-string.** A start refused by initialisation ends `CC 0008`; a clean `/P HTTPD`
+string.** A refused start ends `CC 0008`; a clean `/P HTTPD`
 ends `CC 0000`. The first console line is the cause (`HTTPD037E`, `HTTPD028E`,
-`HTTPD030E`, `HTTPD031E`, `HTTPD420E`, `HTTPD033E` or `HTTPD090E`); everything
-under it is the ordinary stop sequence and says nothing about what went wrong.
+`HTTPD030E`, `HTTPD031E`, `HTTPD420E`, `HTTPD033E`, `HTTPD064E` or `HTTPD090E`);
+everything under it is the ordinary stop sequence and says nothing about what
+went wrong. `HTTPD064E` is the one that comes late: the listener and the threads
+were already started, and the socket thread turned out not to be running. Start
+the server again; if it repeats, report it with the console log.
 The full contract is in
 [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md).
 
@@ -1277,6 +1284,7 @@ nothing above touches it.
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
 | `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it, and `106-0F` means storage, not a missing member |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
+| `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
 | `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8 |
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
