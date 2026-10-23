@@ -77,13 +77,89 @@ DOCROOT=/www
 
 HTTP/1.1 clients get persistent connections by default. HTTP/1.0 clients always get `Connection: close`.
 
+### Client timeout diagnostics
+
+The server waits `CLIENT_TIMEOUT` seconds for the rest of a request line or a
+header line (`KEEPALIVE_TIMEOUT` seconds on the second and later requests of a
+persistent connection) and then closes the connection. Three keywords control
+what it reports about that.
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `CLIENT_TIMEOUT_MSG` | 1 | `1` writes one console line when such a client times out: `client xxxxxxxx on socket n timed out after s seconds` — the address of the client block in hex, the socket number and the timeout that expired. `0` writes none. The line carries no message ID. |
+| `CLIENT_TIMEOUT_DUMP` | 1 | `1` also writes a dump of the bytes received so far to the console, titled `Receive Buffer`. `0` writes none. |
+| `CLIENT_STATS` | 1 | `1` or `0`. Only the server-status display (`/.dsrv`, module `HTTPDSRV`) reads it: it shows as `STATS` in the *Client Options* row. No other code in the server tests the flag, so it changes nothing the server does or writes. |
+
+Each of the three reads its value as a number. A value above zero switches the
+option on and **anything else switches it off** — `0`, but also `NO`, `OFF` or
+`YES`. Write `1` to switch one on.
+
+The console line and the dump are written only when at least one byte of the
+line had arrived. A connection that opens and sends nothing is closed without
+either, whatever these keywords say. The timeout itself is the same in every
+case: the connection is closed. With `DEBUG=1` the line also goes to the
+`HTTPDBG` DD, independent of `CLIENT_TIMEOUT_MSG`.
+
+On a server that scanners reach, these console lines can be frequent.
+`CLIENT_TIMEOUT_MSG=0` and `CLIENT_TIMEOUT_DUMP=0` quiet them and change
+nothing else.
+
 ## Document Root
 
 | Keyword | Default | Description |
 |---------|---------|-------------|
 | `DOCROOT` | `/www` | UFS path for static file serving. UFSD must be running and the path must exist. |
+| `UFS` | 1 | `1` initializes the UFS client at startup, which static file serving needs. `0` skips the initialization entirely: UFSD is not contacted and `HTTPD044W` is not written. |
 
 All static content (HTML, CSS, JS, images) is served from this directory. Server-Side Includes (SSI) are processed for `.html` files.
+
+`UFS=0` is for a server that only hosts `MOD=` routes, on a system that will
+never run UFSD. The routes work as before and static file requests cannot be
+served. The *UFS Filesystem Enabled* row of the `/.dsrv` display shows `0`.
+`HTTPD001I` still names the configured document root: it says nothing about
+whether a filesystem is there. With `UFS=1` and no UFSD the server starts the
+same way, but writes `HTTPD044W` to tell you so.
+
+`UFS` reads its value as a number, like the keywords above: `UFS=0` switches it
+off, and so does any value that is not a number above zero, `UFS=NO` and
+`UFS=YES` included.
+
+## Codepage
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `CODEPAGE` | `CP037` | The translation table between the server's EBCDIC text and the ASCII on the wire: `CP037`, `IBM1047` or `LEGACY`, in any letter case. |
+
+`F HTTPD,D CONFIG` reports the value as `HTTPD134I CODEPAGE name`.
+
+**Leave it at `CP037`.** The keyword is narrower than its name suggests, and
+the default is not a preference.
+
+- **What it governs.** The table of the codepage in effect translates
+  everything the server and its modules write to a client — status line,
+  headers, `http_printf()` output, the MVS data sets and members they send —
+  and everything read from a client: the request line, the headers, and the
+  body of a POST. The compiler stores a string literal as a fixed byte, so the
+  table has to be the one that byte was written for. cc370 writes literals in
+  CP037: the string `"[]{}~"` compiles to `BA BB C0 D0 A1`.
+- **Why changing it is not free.** Under `IBM1047` the same bytes translate
+  differently. `[` (`BA`) leaves the server as `DD` and `]` (`BB`) as `A8`,
+  where `CP037` gives `5B` and `5D`. Every mvsMF response that carries a JSON
+  array stops being JSON, and a `[` in a request translates to a different
+  byte than the one a compiled literal has. `{`, `}` and `~` are the same in
+  both tables. `LEGACY` reproduces the tables of HTTPD 3.3.x, which moved the
+  brackets to the IBM-1047 positions (`AD`, `BD`) for input and differ from
+  `CP037` on output as well. It is kept for backward compatibility with 3.x.
+- **What it does not govern.** The content of static files from UFS. The
+  server reads those, and the files an SSI directive includes, with the
+  IBM-1047 table whatever this keyword says (`src/httpfile.c`). A webroot image
+  therefore needs no codepage decision, and `CODEPAGE=IBM1047` does not make it
+  more correct.
+
+An unknown value writes `HTTPD070E` and the server runs on `CP037`. The value
+is stored as typed, up to 15 characters, and `HTTPD134I` and the `/.dsrv`
+display show it as typed — so after `HTTPD070E` they name a codepage that is
+not in effect. The setting is read once, at startup.
 
 ## Security
 
@@ -513,6 +589,23 @@ works as it always did. `F HTTPD,D CONFIG` shows how many modules are held
 **A deployed module takes effect at the next restart**, because the held copy
 stays in storage. Set `RESIDENT=NO` where a new module level must take effect
 without a restart, at the price of one fetch per request.
+
+### Module context blocks (`CGI_CONTEXT_POINTERS`)
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `CGI_CONTEXT_POINTERS` | 255 | Highest index of the table in which modules register their context blocks. The table has this value plus one entries (256 by default, 4 bytes each). Range 0 to 255: a larger value is read as 255, a negative one is ignored. |
+
+A module that needs one block of storage for the life of the address space asks
+the server for it with `http_cgictx_get()` and an 8-byte eyecatcher (see
+[Writing Server Modules](server-modules.md)). Each distinct eyecatcher takes one
+slot. When every slot is taken the call returns `NULL` and the module has to
+cope. With a handful of modules the default is far more than is used, so there
+is rarely a reason to change it.
+
+The value is read as a number, like the keywords above: text that is not a
+number reads as `0` and leaves a single slot. The table is allocated once, at
+startup. The `/.dsrv` display shows the value in effect.
 
 ### Example
 
