@@ -85,6 +85,9 @@ httppcgi(HTTPC *httpc, HTTPROUTE *route)
         ** only a real abend leaves a dump worth looking for -- everything else
         ** here means the module never ran (#131). */
         switch (rc) {
+        case HTTP_LINK_ENOMOD:
+            reason = "was not found";
+            break;
         case HTTP_LINK_ENOLOAD:
             reason = "could not be loaded";
             break;

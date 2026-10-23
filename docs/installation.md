@@ -194,7 +194,7 @@ program is not looked for until a request first matches. The failure then shows
 up per request as
 
 ```
-HTTPD908E EXTERNAL PROGRAM MVSMF could not be loaded (not found in STEPLIB?)
+HTTPD908E EXTERNAL PROGRAM MVSMF was not found
 ```
 
 Comment the three lines out, or install mvsMF:
@@ -1275,7 +1275,7 @@ nothing above touches it.
 | `HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT n` | An older instance still holds the port. `/P HTTPD` first — step 5 |
 | `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal; the server runs on the inherited STC identity |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
-| `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. The parenthetical "(not found in STEPLIB?)" is a guess; the real abend code is in the `IEA703I` line beside it, and `106-0F` means storage, not a missing member |
+| `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it, and `106-0F` means storage, not a missing member |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
 | `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8 |

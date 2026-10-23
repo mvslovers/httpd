@@ -550,9 +550,10 @@ struct httpx {
    is NOT one of these is a negated abend code, formatted 0x00sssuuu; these sit
    above that range so they can never be mistaken for one.  Anything here means
    the module never ran, so there is no dump to go looking for. */
-#define HTTP_LINK_ENOLOAD (-0x01000001) /* module not found, LINK failed    */
+#define HTTP_LINK_ENOLOAD (-0x01000001) /* LINK failed, not S806 (ENOMOD)   */
 #define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
 #define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
+#define HTTP_LINK_ENOMOD  (-0x01000004) /* module not found (S806)          */
 
 /* A module that ran and returned a negative rc of its own, folded into its own
    range so it cannot be read as a negated abend code.  cgistart clamps a

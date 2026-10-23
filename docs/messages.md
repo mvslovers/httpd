@@ -253,7 +253,7 @@ are simply absent (`HTTPD038E`).
 | `HTTPD432W` | `INVALID SMF TYPE=n (128-255)` | Outside the user record range. |
 | `HTTPD440W` | `MODULE m NOT FOUND AT STARTUP, NOT HELD` | Written at start with `RESIDENT=YES`: a `MOD=` module is in neither `STEPLIB` nor the link list. Its route stays registered; each request tries the library again. Usually a typo in the member, or a module not installed yet. |
 | `HTTPD441W` | `MODULE m NOT REUSABLE, FETCHED PER REQUEST` | Written at start: the module is linked neither RENT nor REUS, so one held copy must not run twice. It works, fetched from the library for every request. Relink it RENT (or at least REUS) to have it held. |
-| `HTTPD442W` | `MODULE m LOAD FAILED, FETCHED PER REQUEST` | Written at start: the module was found, but the LOAD failed; the `IEA703I` line before it names the code. The route works the way it did before 4.4.0. |
+| `HTTPD442W` | `MODULE m LOAD FAILED, ABEND CODE Sccc REASON rr, FETCHED PER REQUEST` | Written at start: the module was found, but the LOAD failed. `ccc` is the completion code the LOAD ended with (`806` module not found, `106` fetch error, `80A` no storage) and `rr` its reason code, both hexadecimal; `000` and `00` mean LOAD gave none. The route works the way it did before 4.4.0. |
 | `HTTPD443W` | `INVALID RESIDENT VALUE "v" (YES\|NO)` | The default, `YES`, stays. |
 
 ## HTTPD9xx — diagnostics
@@ -270,7 +270,7 @@ surrounding log and what the client was doing.
 | `HTTPD905E` | `ENVIRONMENT VARIABLE v TOO LARGE CLIENT(c)` | The value exceeds what an `HTTPV` holds. |
 | `HTTPD906W` | `STORAGE RECLAIM FOR pgm FAILED, RC=n` | A CGI's subpool survived it. Storage leaks until restart. |
 | `HTTPD907W` | `STALE BUSY ENTRY FOR CLIENT(c) … -- CLEARED` | A busy-list entry outlived its request; cleared and processing resumed. |
-| `HTTPD908E` | `EXTERNAL PROGRAM pgm reason` | The CGI could not be linked — `reason` says why. An abend after loading is reported with its code; a load failure carries none — the console log has the cause (e.g. `IEA703I` for a storage failure). |
+| `HTTPD908E` | `EXTERNAL PROGRAM pgm reason` | The CGI could not be linked — `reason` says why. `was not found`: the module is in neither `STEPLIB` nor the link list (completion code `S806`), also the text in the 503 response. `could not be loaded`: the LINK failed for another reason (for instance a fetch error or no storage) — the console log has the cause (e.g. `IEA703I`). An abend after loading is reported with its code. |
 | `HTTPD909E` | `UNSUPPORTED HTTP STATUS n REQUESTED, SENT 500` | A handler asked for a status code this build has no reason phrase for. See `httpstat.c`. |
 | `HTTPD910E` | `ABEND Sxxx DETECTED` / `ABEND Unnnn DETECTED` | The main task's recovery caught an abend. |
 | `HTTPD911E` | `func LOCK FAILURE` | A lock could not be taken. |

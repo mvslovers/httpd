@@ -16,7 +16,7 @@
 #include <mvs/socket.h>
 #include <ext/version.h>            /* libc370_version()                */
 #include <mvs/apf.h>                /* __autask/__austep/__uatask/__uastep */
-#include <mvs/link.h>               /* __load/__delete (resident_*)      */
+#include <mvs/link.h>               /* __loadx/__delete (resident_*)     */
 #include <mvs/pds.h>                /* __bldl (resident_hold)            */
 #include <mvs/dslist.h>             /* struct loaddata: RENT/REUS bits   */
 
@@ -271,6 +271,8 @@ resident_hold(HTTPD *httpd)
 		HTTPROUTE		*route	= httpd->route[n];
 		BLDL			bldl;
 		struct loaddata	*ld;
+		unsigned	abcode;
+		unsigned	reason;
 		char			name[9];
 
 		if (!route->pgm || !route->pgm[0]) continue;
@@ -294,8 +296,8 @@ resident_hold(HTTPD *httpd)
 			continue;
 		}
 
-		if (!__load(NULL, name, NULL, NULL)) {
-			wtof(MSG_RES_LOAD_FAILED, name);
+		if (!__loadx(NULL, name, NULL, NULL, &abcode, &reason)) {
+			wtof(MSG_RES_LOAD_FAILED, name, abcode, reason);
 			continue;
 		}
 

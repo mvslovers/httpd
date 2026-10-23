@@ -360,29 +360,9 @@ struct httproute {
 ** An abend code from ___try() is formatted 0x00sssuuu (clibtry.h), so it can
 ** never exceed 0x00FFFFFF.  Anything of greater magnitude is therefore free
 ** as a sentinel and cannot collide with a real abend, however the module
-** failed.  httppcgi() maps these to their own text.
-**
-** Residual ambiguity, by design: a module that deliberately returns -1 is
-** indistinguishable from one that could not be loaded, because __link()
-** collapses both into *prc = -1.  Server modules return 0. */
-#define HTTP_LINK_ENOLOAD (-0x01000001) /* module not found, LINK failed    */
-#define HTTP_LINK_ENOPGM  (-0x01000002) /* route carries no program name    */
-#define HTTP_LINK_EESTAE  (-0x01000003) /* __linkds could not set the ESTAE */
-
-/* A module that ran to completion and returned a NEGATIVE rc of its own.
-** It cannot be passed through raw: -5 from the module and the negated abend
-** code of a U0005 are the same integer, and reporting the one as the other is
-** the whole of #131.  The rc is folded into a reserved range instead, so
-** httppcgi() can report what happened without claiming an abend.
-**
-** Only a module with its own __start can get here -- cgistart clamps a
-** negative main() rc to 0, because a CGI reports failures through the HTTP
-** response and R15 is not that channel.  The fold is bounded to the abend
-** range on the way in, so it cannot overflow. */
-#define HTTP_LINK_EPGMRC_BASE (-0x02000000)
-#define HTTP_LINK_EPGMRC(rc)  (HTTP_LINK_EPGMRC_BASE + (rc))
-#define HTTP_LINK_IS_PGMRC(v) ((v) <= HTTP_LINK_EPGMRC_BASE)
-#define HTTP_LINK_PGMRC(v)    ((v) - HTTP_LINK_EPGMRC_BASE)
+** failed.  httppcgi() maps these to their own text.  The codes are defined
+** in httplkrc.h, which holds the decision that picks one. */
+#include "httplkrc.h"
 
 /* The configuration DD.  The STC PROC allocates it as &D(&M), so the member is
    a startup choice (S HTTPD,M=HTTPPRM1) -- see parmlib_name() in httpprm.c. */
