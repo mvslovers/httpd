@@ -11,7 +11,11 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-23 with the fix for #263 (`http_send_file()` asks `ufs_ferror()` at both read sites and ends the response on the first pass; `HTTPD045E` replaces the `HTTPD901E` spin): #263 closes with its PR and its row is gone, the ranked order of the rest unchanged. Before that, 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
+*Last reconciled against the tracker: 2026-10-26 for the 4.4.0 release candidate (#324),
+against `origin/main` 638fbc3: twenty issues open besides this one. #322 (`PREALLOC`,
+deferred beyond 4.4.0), #323, #325, #326, #327, #333, #335, #336, #343, #346, #350,
+#351, #352 and #353 are filed and not yet ranked. #254, #262, #263, #295, #296, #300,
+#307, #320 and #328 and PR #305 are closed or merged and have no row; #319 stays open. Before that, 2026-10-23 with the fix for #263 (`http_send_file()` asks `ufs_ferror()` at both read sites and ends the response on the first pass; `HTTPD045E` replaces the `HTTPD901E` spin): #263 closes with its PR and its row is gone, the ranked order of the rest unchanged. Before that, 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
 2.25.1, cc370 1.6.3; the changes since 2.23.0 reviewed, only the local
 `sleep()`/`usleep()`/`__tzget()` declarations needed code, the `src/` half of
 #270): #318 closes with its PR, #319 and #320 filed out of the review and not
@@ -97,15 +101,25 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
-| 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
-| — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
-| — | #320 | `__linkdsx()`/`__loadx()` tell a missing module from other LINK failures | nothing; not yet ranked |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #198 | hygiene, explicitly not a bug | step 2 landed (PR #305); step 1 (`PREALLOC`) stays deferred to 4.1.0 |
+| — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | deferred beyond 4.4.0; not yet ranked |
+| — | #327 | engineering questions from the install guide review (#295): the 50-second `EADDRINUSE` after a restart, the RAKF entries the HTTPD user needs | answers go into #295; not yet ranked |
+| — | #325 | acceptance of `RESIDENT=YES` on TK5 Update 5 and MVS/CE (TK5 Update 6 when available) | **MVS time** on each platform; not yet ranked |
+| — | #326 | build and test the HTTPD modules against the 4.4.0 candidate | the candidate; not yet ranked |
+| — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; not part of 4.4.0 |
+| — | #333 | `type:docs` — the installation guide's troubleshooting row says 106-0F means storage | not yet ranked |
+| — | #335 | sample configuration — gate mvsMF's console service with a `FACILITY` profile | not yet ranked |
+| — | #336 | install guide step 6 — the IEHLIST snippet fails on TK5; the HTTPWEBR job card uses `NOTIFY=&SYSUID` | not yet ranked |
+| — | #343 | docs — installation step 8 should name the RAKF commands for `RES=` profiles | not yet ranked |
+| — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
+| — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
+| — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
+| — | #352 | installation guide step 9c — operator `MOUNT` with `PATH=/www` mounts `/WWW`, the server finds no pages | not yet ranked |
+| — | #353 | installation guide section 12 — the UCLIN job aborts on ids the system never had and skips the ACDS pass | not yet ranked |
+| — | #324 | release preparation 4.4.0 | the scope merged, then the board |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
