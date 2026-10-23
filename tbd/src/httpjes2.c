@@ -3,10 +3,7 @@
 #include "clibjes2.h"   /* JES prototypes */
 #include "jestime.h"   /* ISO 8601 UTC job timestamps */
 #include "clibcp.h"     /* JES checkpoint struct */
-
-/* libc370 ships __tzget() (src/clib/@@tzget.c) but declares it in no header
-   -- see libc370 #70.  Returns crt->crttzoff for the calling task. */
-extern int __tzget(void);
+#include <time.h>       /* __tzget() */
 
 #define httpx   (httpd->httpx)
 
