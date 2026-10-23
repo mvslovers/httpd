@@ -175,19 +175,27 @@ HTTPD talks to across address spaces.
 
 ### mvsMF is what the shipped configuration expects
 
-`HTTPPRM0` ships with three active routes, all of them to **mvsMF** — the
+`HTTPPRM0` ships with four active routes, all of them to **mvsMF** — the
 z/OSMF-compatible REST API, which is a separate product:
 
 ```
 MOD=MVSMF /zosmf/info                    AUTH=NONE
 MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
+MOD=MVSMF /zosmf/restconsoles/*          AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE
 MOD=MVSMF /zosmf/*                       AUTH=TOKEN
 ```
 
 The first two are public on purpose — the anonymous reachability probe and the
 token login endpoint do their own auth, so the gate must not challenge them.
-The catch-all behind them is where the datasets, jobs and files live, and it is
+The catch-all at the end is where the datasets, jobs and files live, and it is
 gated. First match wins, so the order matters.
+
+The third line is the **console service**. It issues operator commands, and
+mvsMF itself checks no authority: any user who can log in could stop a started
+task or vary a device. So the console gets a route of its own that also needs
+READ on the RAKF resource `FACILITY MVSMF.CONSOLE` — define it in step 8. It has
+to stand **before** `/zosmf/*`: listed after the catch-all it is never reached,
+and nothing warns you.
 
 If mvsMF is not installed, HTTPD starts and those routes register normally — the
 program is not looked for until a request first matches. The failure then shows
@@ -197,7 +205,7 @@ up per request as
 HTTPD908E EXTERNAL PROGRAM MVSMF was not found
 ```
 
-Comment the three lines out, or install mvsMF:
+Comment the four lines out, or install mvsMF:
 <https://github.com/mvslovers/mvsmf/releases>. Its load library has to be in the
 STC's STEPLIB concatenation — HTTPD dispatches a module through the MVS LINK
 SVC, which searches the task's own libraries.
@@ -610,7 +618,7 @@ why you are changing it.
 
 Every keyword in the shipped member is commented out, so a member copied
 unchanged runs on the built-in defaults — **port 8080, document root `/www`** —
-plus the three active `MOD=MVSMF` route lines. Four things are worth a look
+plus the four active `MOD=MVSMF` route lines. Four things are worth a look
 before the first start:
 
 ```
@@ -691,7 +699,7 @@ client can log in.
    started under immediately before the release — so both SVC 244 calls are made
    by the same account, rather than requiring the profile on every system.
 
-2. Optionally define profiles for any route that carries `RES=class:resource`.
+2. Define the profile for every route that carries `RES=class:resource`.
    A `RES=` naming a resource **no profile covers** is not an error and does not
    deny: SAF calls an unprotected resource allowed, so the authorisation stage
    does nothing and only the `AUTH=` stage is left. HTTPD says so at startup:
@@ -699,6 +707,29 @@ client can log in.
    ```
    HTTPD425W NO PROFILE FOR FACILITY:HTTPD.ADMIN -- /admin/* NOT GATED
    ```
+
+   The shipped `HTTPPRM0` has one such route, the mvsMF console service, so
+   `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
+   NOT GATED` is what an installation without the profile prints — and until
+   the profile exists every user who can log in may issue operator commands.
+   Define it in `SYS1.SECURE.CNTL(PROFILES)`: the class in columns 1–8, the
+   resource in 9–52, a group or user id in 53–60 and the access from column 61,
+   with the universal entry (blank group) first and the lines in ascending
+   order:
+
+   ```
+   FACILITYMVSMF.CONSOLE                                       NONE
+   FACILITYMVSMF.CONSOLE                               ADMIN   READ
+   ```
+
+   Access is READ or nothing. The second line grants the operators' group; to
+   grant one more person without a group of their own, add a line with the user
+   id in the group column (`FACILITYMVSMF.CONSOLE … TESTER  READ`, measured on
+   RAKF 2). **The development user needs the profile too:**
+   `mbt run restart` and `mbt target console` issue `P`/`S` through
+   `/zosmf/restconsoles`. Without READ the request is refused (`403`); mbt warns
+   and falls back to the target's Hercules console if it has one, and fails
+   with "not delivered" if it has not.
 
 3. Reload: `/F RAKF,RELOAD`
 
@@ -888,6 +919,8 @@ HTTPD005I LIBC370 2.23.0 (B452CDB)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
+HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/services/authenticate
+HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/restconsoles/*
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/*
 HTTPD054I LISTENING ON ANY PORT 8080
 HTTPD061I STARTING SOCKET THREAD    TCB(9CD9D0) TASK(10CFC8) STACKSIZE(32768)
@@ -1278,7 +1311,9 @@ nothing above touches it.
 | `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it, and `106-0F` means storage, not a missing member |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
-| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8 |
+| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means every user who can log in may issue operator commands |
+| `403` on `/zosmf/restconsoles/…`, plain-text body | The user has no READ on `FACILITY MVSMF.CONSOLE` — step 8. A `403` is HTTPD's gate, not mvsMF's |
+| `/zosmf/restconsoles/…` answers `200` to a user the profile excludes | The route stands after `/zosmf/*` (check the order of the `HTTPD036I` lines at startup), or the profile is not loaded yet — reload it, step 8 |
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
 | `401` on a route showing `AUTH=NONE` | Not HTTPD's gate. mvsMF runs its own auth track on `/zosmf/*` — establish which layer answered before debugging HTTPD's |
 | `S106` at start on a freshly installed library | The XMIT was uploaded in text mode. Re-upload in **binary** and re-run the install job |

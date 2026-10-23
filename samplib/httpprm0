@@ -91,6 +91,12 @@
 # match wins): the anonymous reachability probe (/zosmf/info) and the token
 # login/logout endpoint (/zosmf/services/authenticate) do their own auth, so
 # the gate must not challenge them.
+# The console service (/zosmf/restconsoles/*) issues operator commands for any
+# caller that can log in, and mvsMF itself checks nothing, so it gets a route
+# of its own with a profile check.  It MUST precede /zosmf/*: listed after it,
+# the catch-all matches first and the profile is never consulted -- silently.
+# Define FACILITY MVSMF.CONSOLE in RAKF (docs/installation.md, step 8); with no
+# profile the check permits everyone and HTTPD425W says so at startup.
 # TOKEN on the catch-all, not a blank: a route without AUTH= is PUBLIC, and
 # leaving the whole API ungated would hand every dataset and job endpoint to
 # anyone who can reach the port.  TOKEN answers a bare 401 without a
@@ -98,6 +104,7 @@
 # wants -- see the AUTH= notes above.
 MOD=MVSMF /zosmf/info                    AUTH=NONE
 MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
+MOD=MVSMF /zosmf/restconsoles/*          AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE
 MOD=MVSMF /zosmf/*                       AUTH=TOKEN
 # Add a RACF/RAKF profile check on top of the login:
 # MOD=MVSMF /zosmf/*  AUTH=TOKEN RES=FACILITY:MVSMF.ACCESS
