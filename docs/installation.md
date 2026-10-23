@@ -59,6 +59,39 @@ package — then 4.2.0, then this release.
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
 
+**Does `HTTPD.LINKLIB` already exist on a system that has no HTTPD from SMP?**
+Then the allocation job in step 4 does not do what you want, and it can even end
+with RC 0. The library has to be moved out of the way first. That is the case
+on TK5, which ships HTTPD 3.3 in its own `HTTPD.LINKLIB`, and on a system where
+somebody filled one by hand. Read
+[step 4](#a-library-that-smp-does-not-own) before you submit anything.
+
+> **SECURITY — before you start the new server, check every route in your
+> Parmlib member for an `AUTH=`.**
+>
+> SMP never touches your PARMLIB, so an upgrade starts the new server on the
+> member you wrote for the old one. **A route without `AUTH=` is public**, and
+> so is every path no route claims — there is no global login policy to fall
+> back on any more. A member written against a release that had one can carry
+> routes that were protected by it and are now open to anyone who can reach the
+> port:
+>
+> ```
+> MOD=MVSMF /zosmf/*                   <- public: no AUTH=
+> MOD=MVSMF /zosmf/*  AUTH=TOKEN       <- gated
+> ```
+>
+> Open the member and read it line by line: every `MOD=` and `LOC=` line has an
+> `AUTH=`, and `AUTH=NONE` stands only where the route is public on purpose.
+> Then ask for a gated route without a credential — it must answer `401`
+> (`AUTH=BASIC` and `AUTH=TOKEN`) or the HTML login page (`AUTH=FORM`), never
+> the content. [Step 7](#editing-httpprm0) has the modes.
+>
+> Do not take a `401` from `/zosmf/*` as proof that the HTTPD gate is closed.
+> mvsMF refuses a request that carries no credential on its own account, so
+> the route answers `401` with or without `AUTH=`. A display module and a
+> static `LOC=` prefix have no such second check.
+
 ---
 
 ## 1. What is in the archive
@@ -88,17 +121,18 @@ above are inert on a fresh install. That is deliberate: `/.dm` and `/.dmtt` hand
 out arbitrary storage and the console log, and `ABEND0C1` abends on purpose.
 See [step 7](#7-install-the-procedure-and-the-configuration).
 
-> **The four are diagnostic, debugging and development tools, and they are on
-> their way out.** They ship in 4.0.x so that a problem on a live system can be
-> looked at without a private build — reading a control block beats guessing at
-> one, and `/.dmtt` is often the fastest way to the console log. They are not
-> production endpoints, and **the next release will not deliver them**: a server
-> whose job is hosting an API has no business shipping an arbitrary-storage
-> reader alongside it. Build them from source when you need them.
+> **The four are diagnostic, debugging and development tools.** They ship so
+> that a problem on a live system can be looked at without a private build —
+> reading a control block beats guessing at one, and `/.dmtt` is often the
+> fastest way to the console log. They are not production endpoints: a server
+> whose job is hosting an API has no business offering an arbitrary-storage
+> reader alongside it, and each of them needs an `AUTH=` of its own the moment
+> you route to it. Every 4.x release up to and including this one delivers
+> them.
 >
 > Nothing depends on them. `HTTPD` is the only module the started task names,
-> and removing the other four changes no behaviour of a server that never
-> routed to them.
+> and a server that never routed to the other four behaves the same without
+> them.
 
 The sample library holds three members: `HTTPD` (the started task procedure),
 `HTTPPRM0` (the configuration pattern) and `HTTPWEBR` (a job that allocates the
@@ -185,10 +219,14 @@ MOD=MVSMF /zosmf/restconsoles/*          AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE
 MOD=MVSMF /zosmf/*                       AUTH=TOKEN
 ```
 
-The first two are public on purpose — the anonymous reachability probe and the
-token login endpoint do their own auth, so the gate must not challenge them.
-The catch-all at the end is where the datasets, jobs and files live, and it is
-gated. First match wins, so the order matters.
+The first two carry `AUTH=NONE` on purpose: they are not gated by HTTPD
+because mvsMF decides for them. **Neither is anonymous.** Without a credential
+`/zosmf/info` answers `401` like every other mvsMF path — there is no
+anonymous reachability probe — and the token login endpoint has to be reached
+even when the login fails, so that it can answer with the z/OSMF-shaped `401`.
+The catch-all behind them is where the datasets, jobs and files live, and it is
+gated by HTTPD as well. First match wins, so the order matters. mvsMF's own
+installation guide has its side of this.
 
 The third line is the **console service**. It issues operator commands, and
 mvsMF itself checks no authority: any user who can log in could stop a started
@@ -281,8 +319,9 @@ both unavailable.
 It obtains authorisation itself at startup, which goes through **SVC 244 — and
 that comes from RAKF**. The clean alternative is to add `HTTPD.LINKLIB` to
 the APF list in `SYS1.PARMLIB(IEAAPF00)`. On MVS 3.8j the APF list is only read
-at IPL, and the library name carries the version — so this is one IPL per
-release, not one IPL ever.
+at IPL, but the library name carries no version (since 4.1.0): the entry is
+added once, costs one IPL, and stays right for every later release. An entry
+is the data set name and the volume, so keep the library on that volume.
 
 **With neither, HTTPD does not start.** Unlike FTPD, which warns and keeps
 running, HTTPD treats this as fatal:
@@ -439,6 +478,80 @@ Expect `COND CODE 0000`.
 > [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
 > upgrade to 4.2.0 and to this release, skipping it both times.
 
+### A library that SMP does not own
+
+The job allocates `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` new, and it cannot do
+that over a name that is already catalogued. A system can have such a library
+without an SMP installation behind it:
+
+- TK5 ships HTTPD 3.3 in `HTTPD.LINKLIB`, started by the procedure `HTTPD33`.
+- On MVS/CE somebody may have filled `HTTPD.LINKLIB` by hand, with the `HTTPD`
+  module and whatever was copied in beside it (an mvsMF module, for one).
+
+SMP owns none of the members of such a library, and a SYSMOD cannot replace
+what it does not own. This guide installs only into a library the allocation
+job created, so the existing one is moved out of the way first and the install
+then runs as on a first installation. The old library stays on the disk until
+the new server has started, which is also your way back.
+
+**Do not read the allocation job's return code as the answer.** Measured on
+TK5, allocating a name that is already catalogued ends the step with
+`COND CODE 0000`, and the only sign is a line in the job log:
+
+```
+IEF287I   HTTPD.LINKLIB                           NOT CATLGD  2
+```
+
+The existing library is untouched, and the new one exists on a volume without a
+catalog entry. If you go on, the install job writes into the old library, SMP
+selects nothing, and every step ends `RC 00` (see the troubleshooting table). If
+you find that line in the output, scratch the stray copy on the volume the
+following `IEF287I` line names (ISPF 3.4 with that volume serial, since it has
+no catalog entry) before you continue.
+
+1. **Stop the server that uses the library**, whatever its procedure is
+   called (`/P HTTPD33` on TK5). A library in use cannot be renamed: the rename
+   job starts and then waits, without ending, until the server is gone.
+2. **List the members** (ISPF 3.4) and write
+   down everything that is not one of HTTPD's own modules. You deal with it in
+   the last point.
+3. **Rename the library** with IDCAMS. It changes the catalog entry and the
+   entry on the volume together:
+
+   ```jcl
+   //HTTPDREN JOB (SYS),'HTTPD RENAME',
+   //             CLASS=A,MSGCLASS=H,MSGLEVEL=(1,1),
+   //             REGION=4096K
+   //RENAME   EXEC PGM=IDCAMS
+   //SYSPRINT DD  SYSOUT=*
+   //SYSIN    DD  *
+     ALTER HTTPD.LINKLIB NEWNAME(HTTPD.OLD.LINKLIB)
+   /*
+   ```
+
+   Expect `IDC0531I ENTRY HTTPD.LINKLIB ALTERED` and `COND CODE 0000`, and
+   check it in ISPF 3.4: `HTTPD.OLD.LINKLIB` is listed and `HTTPD.LINKLIB` is
+   gone. The procedure of the old server still
+   names `HTTPD.LINKLIB` in its `STEPLIB`; point it at the new name if the old
+   server is to stay startable, and leave it alone if it is not.
+4. **Look at the APF list** (`SYS1.PARMLIB(IEAAPF00)`) for `HTTPD.LINKLIB`;
+   [Authorisation](#authorisation) says why it matters. An entry is a data set
+   name *and a volume*, and it authorises whichever data set carries that name
+   on that volume. If there is one, allocate the new library on the volume it
+   names: add `VOL=SER=volume` to the two DDs of the allocation job, beside
+   `UNIT=SYSDA`. Without that the new library may land on another volume, the
+   entry no longer matches it, and HTTPD falls back to SVC 244 (`HTTPD002I`
+   says which route it got). Moving the entry to the new volume instead costs an
+   IPL, because the list is read only then.
+5. **Install** as on a first installation: steps 3, 4 and 6. The `DELOLD` step
+   of the install job scratches `HTTPD.HTTPLOAD` and `HTTPD.SAMPLIB`; if you
+   keep something of your own under either name, rename it the same way first.
+6. **Start the new server and read its banner** (step 10), then deal with what
+   was not HTTPD's. A module of another product is best installed again by that
+   product's own guide; `IEBCOPY` from `HTTPD.OLD.LINKLIB` will do if all you
+   need is the server running. Scratch `HTTPD.OLD.LINKLIB` only when everything
+   runs from the new library.
+
 ---
 
 ## 5. Stop a running HTTPD
@@ -465,6 +578,13 @@ Two things worth knowing before you do:
   Have another way in (FTPD, TSO, the Hercules console) before you stop the
   server.
 
+**`/P HTTPD` returns at once; the server does not end at once.** With clients
+still connected, the workers are waited for one by one, and the address space
+needs about 45 to 50 seconds to end (measured with six keep-alive clients). Wait
+for `$HASP395 HTTPD ENDED` before you submit the install job, because the APPLY
+writes into the library the old server still has open, and before any `/S HTTPD`
+([restarting](#restarting), step 10).
+
 ---
 
 ## 6. Install
@@ -477,7 +597,20 @@ with what you uploaded in step 3:
   RECEIVE INDSN('CHANGE.ME.SAMPLIB') -      <- IBMUSER.HTTPD.SAMP.XMIT
 ```
 
-Those are the only lines you have to change. Submit it.
+On TK5 those are the only lines you have to change. **On MVS/CE, name the
+volume**: add a `VOLUME()` operand to both of these `RECEIVE` commands (steps
+`RECV1` and `RECV2`) — `PUB000` on a stock MVS/CE, or another volume of yours.
+TSO RECEIVE creates its target itself and has to find a volume to put it on;
+whether it finds one depends on the system, and an explicit volume costs
+nothing where it would have found one anyway. For the load library:
+
+```
+  RECEIVE INDSN('IBMUSER.HTTPD.LOAD.XMIT') -
+    DATASET('HTTPD.HTTPLOAD') -
+    VOLUME('PUB000')
+```
+
+Submit it.
 
 The job runs eight steps, each conditional on the one before, so it stops at
 the first failure rather than building on it:
@@ -672,9 +805,8 @@ LOC=/*                  AUTH=NONE     static prefix, public on purpose
 
 The display modules deserve their own warning. `MOD=HTTPDM /.dm` with no `AUTH=`
 hands anyone who can reach the port arbitrary storage reads, and `/.dmtt` hands
-them the console log. They are debugging tools that will not be shipped after
-4.0.x (step 1) — enable them while you are diagnosing something, and gate them
-whenever you do:
+them the console log. They are debugging tools (step 1) — enable them while you
+are diagnosing something, and gate them whenever you do:
 
 ```
 MOD=HTTPDSRV  /.dsrv    AUTH=FORM
@@ -692,15 +824,63 @@ is [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configur
 Without this, HTTPD cannot authorise itself and does not start (step 2), and no
 client can log in.
 
-1. Add the `HTTPD` user to `SYS1.SECURE.CNTL(USERS)`, default group `USER`:
+1. Add **one line** for the HTTPD user to `SYS1.SECURE.CNTL(USERS)`. The member
+   is a table with fixed columns, not RACF command syntax:
+
+   | Columns | Holds | For HTTPD |
+   |---|---|---|
+   | 1-8 | userid | the `STCUSER` of step 7 (`HTTPD`) |
+   | 10-17 | group | the `STCGRP` of step 7 (`USER`) |
+   | 19-26 | password | MVS/CE (RAKF 2.0.0): blank. TK5 (RAKF 1.2.x): **required** |
+   | 28 | Operations | `N` |
+   | 30 | Special | `N`, or blank |
+
+   MVS/CE:
 
    ```
-   HTTPD    USER  DEFAULT-GROUP(USER)
+   123456789012345678901234567890
+   HTTPD    USER              N
    ```
 
-   This is the identity from `STCUSER`/`STCGRP` in step 7. It needs **READ** on
-   whatever HTTPD itself opens before a client identity exists: the PARMLIB
-   member, the document root, the log DDs.
+   TK5 (`CHANGEME` is a placeholder: choose the password before you paste
+   this line):
+
+   ```
+   123456789012345678901234567890
+   HTTPD    USER     CHANGEME N
+   ```
+
+   (The first line of each block is a ruler for the columns, not part of the
+   member.) On TK5 a line without a password is refused when the table is
+   reloaded: `S RAKFUSER` ends with `RAKFUIDS2 INPUT DATA INVALID OR OUT OF
+   SEQ.`, `RAKFUIDSX ** PROGRAM TERMINATED **` and `ABEND U0200`. HTTPD never
+   uses the password — it logs on without one — but a userid with a password is
+   an account anyone can try to log in to, so choose one you would give an
+   account of that group, not `CHANGEME`.
+
+   **Why the line is needed.** RAKF has no table of started tasks: every
+   started task runs as `STC`/`STCGROUP`, and on the stock profiles that group
+   holds ALTER on data sets. At startup HTTPD replaces that identity by logging
+   on `STCUSER` in `STCGRP` through RACINIT, without a password, and writes
+   `HTTPD004I`. Without a `USERS` line the logon fails
+   (`RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM`, then `HTTPD004W RACINIT
+   ENVIR=CREATE FAILED … RC=28`). That is not fatal, and that is the danger:
+   HTTPD runs on as `STC`/`STCGROUP`, with far more access than intended.
+
+   **The group that counts is the one on the `USERS` line.** RACINIT accepts
+   the group passed from the procedure, but data set access follows the group
+   on the user's `USERS` line. Grant access to that group, and keep it equal to
+   `STCGRP` so that the two do not drift apart.
+
+   Leave Operations at `N`: with `Y` the account gets operations authority, that
+   is data set access without a profile.
+
+   The account needs **READ** on whatever HTTPD itself opens before a client
+   identity exists: the Parmlib data set (`DD HTTPPRM`), the document root and
+   any other data set it opens. The stock `DATASET *` rule already gives that;
+   if you have narrowed it, give the group on the `USERS` line READ on those
+   data sets. Without READ on the Parmlib data set HTTPD stops at startup
+   (`RAKF0005`, `IEC150I 913-38`, `ABEND S913`).
 
    It does **not** need `FACILITY SVC244`. HTTPD acquires APF authorisation at
    start and releases it at `/P HTTPD`, and it restores the STC account it
@@ -708,9 +888,11 @@ client can log in.
    by the same account, rather than requiring the profile on every system.
 
 2. Define the profile for every route that carries `RES=class:resource`.
-   A `RES=` naming a resource **no profile covers** is not an error and does not
-   deny: SAF calls an unprotected resource allowed, so the authorisation stage
-   does nothing and only the `AUTH=` stage is left. HTTPD says so at startup:
+   They are checked against the identity of the client on each request, so the
+   HTTPD user needs none of them. A `RES=` naming a resource **no profile
+   covers** is not an error and does not deny: SAF calls an unprotected
+   resource allowed, so the authorisation stage does nothing and only the
+   `AUTH=` stage is left. HTTPD says so at startup:
 
    ```
    HTTPD425W NO PROFILE FOR FACILITY:HTTPD.ADMIN -- /admin/* NOT GATED
@@ -743,7 +925,18 @@ client can log in.
    and falls back to the target's Hercules console if it has one, and fails
    with "not delivered" if it has not.
 
-3. Reload the profiles: `S RAKFPROF` (RAKF 2)
+3. Reload the tables with the RAKF started tasks:
+
+   ```
+   /S RAKFUSER                   the USERS table
+   /S RAKFPROF                   the profiles table
+   ```
+
+   On MVS/CE, also `/S RAKF`. There is no `/F RAKF,RELOAD`: on TK5 it answers
+   `IEE341I RAKF NOT ACTIVE`.
+
+   You will see whether the line took when HTTPD starts: `HTTPD004I STC IDENTITY
+   SET TO HTTPD/USER VIA RACINIT` (step 10).
 
 ---
 
@@ -760,7 +953,15 @@ to SMP.
 touch. TSO RECEIVE is no better: it allocates its own target and refuses to
 merge into an existing dataset, which makes it a first-install-only transport
 for something you will replace. So the disk ships as a plain file and goes up
-over **IND$FILE**, which needs nothing on the target beyond a 3270 session.
+over **IND$FILE**, which needs nothing on the target beyond a 3270 session. FTP
+and zowe work as well, into the dataset allocated in a); see
+[b)](#b-upload-it-with-indfile).
+
+**The dataset is called `HTTPD.WEBROOT.UFS` throughout this guide.** That is
+what `HTTPWEBR` allocates, what the upload names and what the `MOUNT` names. The
+UFSD guides use `HTTPD.WEBROOT` in their own examples; a command copied from
+there and a `MOUNT` copied from here name two different data sets, and the mount
+fails for want of the one that was never uploaded. Use one name for all three.
 
 This step needs **UFSD** (step 2). Without it there is nothing to mount and
 nothing static to serve; every `MOD=` route works regardless.
@@ -783,6 +984,14 @@ choosing and mount it, or copy the files in over UFSD.
 //             UNIT=SYSDA,SPACE=(4096,256),
 //             DCB=(DSORG=PS,RECFM=U,BLKSIZE=4096)
 ```
+
+**Submitting it from a workstation.** The job card of `HTTPWEBR` carries
+`NOTIFY=&SYSUID`. `&SYSUID` is a TSO symbol, replaced when you `SUBMIT` from a
+TSO session or ISPF. A job sent through mvsMF's jobs API has the symbol
+replaced by mvsMF with the submitting userid. A job sent by FTP passes the card
+exactly as written and ends with `IEF627I INCORRECT USE OF AMPERSAND IN THE
+NOTIFY FIELD` and `JOB NOT RUN - JCL ERROR`. Put your own userid there (or
+delete the operand) before you submit it by FTP.
 
 **Run it before the upload, not after.** IND$FILE allocates an *existing*
 dataset `DISP=SHR` and takes the DCB from its label; only when the dataset is
@@ -839,6 +1048,25 @@ purpose (see above).
 
 A megabyte over a 3270 session takes minutes rather than seconds. That is the
 transfer, not a hang.
+
+**Without a 3270 session**, FTP and zowe do the same job, again into the dataset
+allocated in a) — binary, and name the dataset this guide uses:
+
+```sh
+# FTP
+ftp mvs-host
+binary
+put httpd-webroot.img 'HTTPD.WEBROOT.UFS'
+
+# zowe CLI
+zowe files upload file-to-data-set httpd-webroot.img "HTTPD.WEBROOT.UFS" --binary
+```
+
+These commands are taken from the UFSD
+[disk setup guide](https://github.com/mvslovers/ufsd/blob/main/docs/disk-setup.md),
+which also has `ufsd-utils upload` for an image of your own. The same rule holds
+for all of them: the dataset exists before the transfer, with `RECFM=U` and
+`BLKSIZE=4096`, and the transfer is binary.
 
 ### c) Mount it
 
@@ -944,6 +1172,11 @@ HTTPD001I HTTPD <version> READY - SERVING /www
 is running. If it is not, `HTTPD064E` takes the place of `READY` and the server
 stops (see below).
 
+The build stamps in that transcript are an example, not what to match. The
+first shows the version of the release you installed and the commit it was built
+from; the second shows the libc370 it was linked against, and that changes from
+release to release. Compare them with the release page, not with this one.
+
 That transcript is a system with UFSD running. Without it, `HTTPD044W` appears
 between `HTTPD004I` and `HTTPD054I` — and the last line still reads
 `SERVING /www`, because it names the configured document root rather than a
@@ -974,9 +1207,13 @@ The full contract is in
 Then reach it from a client:
 
 ```
-curl -v http://your-mvs-host:8080/zosmf/info      mvsMF installed
-curl -v http://your-mvs-host:8080/                static, needs UFSD
+curl -v -u IBMUSER:password http://your-mvs-host:8080/zosmf/info    mvsMF installed
+curl -v http://your-mvs-host:8080/                                   static, needs UFSD
 ```
+
+`/zosmf/info` needs a login: without `-u` mvsMF answers `401`, which is a working
+server saying no, not a fault. (The route carries `AUTH=NONE`, so HTTPD lets the
+request through; the `401` is mvsMF's own.) Use an account known to RAKF.
 
 Operator commands:
 
@@ -998,6 +1235,30 @@ Operator commands:
 
 Commands abbreviate to the capitalised prefix, which is why `DISPLAY Threads`
 and `DISPLAY TIme` need one and two letters respectively.
+
+### Restarting
+
+After `/P HTTPD`, wait for `$HASP395 HTTPD ENDED` before `/S HTTPD`. With
+connected clients that takes about 50 seconds (44 to 49 seconds measured with
+six keep-alive clients): the listener is closed early, but the workers are waited
+for one by one before the address space ends.
+
+- **`S HTTPD` too early ends with `HTTPD037E`.** The old address space still
+  holds the port's ENQ, so the new instance refuses to start and ends with
+  `CC 0008`. Nothing is damaged; start it again once `ENDED` has appeared.
+- **`HTTPD030I` lines are a wait, not an error.** The old address space is gone
+  and the TCP/IP stack still reports the port as taken. The new instance tries
+  again every `BIND_SLEEP` seconds (default 10), at most `BIND_TRIES` times
+  (default 10), and starts by itself as soon as the stack lets the port go.
+  Both keywords are set in the Parmlib member and take 1 to 100. If the last
+  retry fails too, `HTTPD030E` is written again and the instance ends.
+- On the stock MVS/CE and TK5 images the new instance bound within a few seconds
+  of the old one ending. If `HTTPD030I` runs for tens of seconds on your system,
+  open an issue (see [Getting help](#getting-help)) and include the Hercules
+  version and host OS, the times of `HTTPD098I`/`HTTPD099I` and of
+  `$HASP395 HTTPD ENDED` against the first `HTTPD030I`, whether
+  `IEF450I … ABEND SA03` appeared at the `P`, and when `S HTTPD` was issued
+  relative to `ENDED`.
 
 ---
 
@@ -1277,8 +1538,9 @@ it is simply the old build.
    the new one. Its own installation is the right way to put it back; a plain
    `IEBCOPY` works if you only need the server up.
 7. **Copy what you want out of the old `SAMPLIB`.**
-8. **`/S HTTPD`, and read the banner before going further.** This is a gate,
-   not a formality:
+8. **Check every route for an `AUTH=`** (the security note at the top of this
+   guide), then **`/S HTTPD`, and read the banner before going further.** The
+   banner is a gate, not a formality:
 
    ```
    HTTPD000I HTTPD 4.1.0 (xxxxxxx) STARTING
@@ -1313,7 +1575,8 @@ nothing above touches it.
 
 | Symptom | Likely cause |
 |---------|--------------|
-| Allocation job fails, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it |
+| Allocation job fails, or ends `COND CODE 0000` with `IEF287I … NOT CATLGD 2`, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it. If this is a TK5 or hand-filled system and HTTPD was never installed from SMP, the library is one SMP does not own: [rename it first](#a-library-that-smp-does-not-own) |
+| `RECV1`/`RECV2` fails on MVS/CE, no volume to allocate on | Add `VOLUME('PUB000')` (or a volume of yours) to both `RECEIVE` commands — step 6 |
 | `RECV1`/`RECV2` fails, target exists | A previous release's `HTTPD.HTTPLOAD`/`HTTPD.SAMPLIB`, or something else allocated it. RECEIVE refuses to merge; scratch it and re-run |
 | `APPLY` RC 00, no `HMA2380` at all, library empty | The modules still belong to another FMID (`MOD … NOT SEL` in the element summary). The SYSMOD's `++VER` is missing the `DELETE` for whatever owns them — this is a packaging fault, not an operator one; report it |
 | `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The `ACCEPT` is gated `(4,LT,…)` and still runs |
@@ -1324,8 +1587,11 @@ nothing above touches it.
 | `/S HTTPD` rejected — procedure not found | Procedure not copied into a PROCLIB in the started-task concatenation |
 | `HTTPD012E … UNABLE TO DYNAMICALLY OBTAIN APF AUTHORIZATION`, no listener | No RAKF (so no SVC 244) and no APF entry — step 2. This one is fatal, not a warning |
 | `HTTPD014E`/`015E`/`016E` and the step ends before any banner | A `SYSPRINT`, `SYSTERM` or `SYSIN` DD in the procedure — step 7 |
-| `HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT n` | An older instance still holds the port. `/P HTTPD` first — step 5 |
+| `HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT n` | An older instance still holds the port: still running, or still ending (up to about 50 s after `/P HTTPD` with clients connected). Wait for `$HASP395 HTTPD ENDED` — steps 5 and 10 |
+| `HTTPD030I EADDRINUSE, WAITING …`, repeating | The old instance is gone and the TCP/IP stack has not released the port yet. The new one retries every `BIND_SLEEP` s, `BIND_TRIES` times, and comes up by itself — [Restarting](#restarting) |
+| `HTTPD030E BIND() FAILED …` and the step ends | Every retry failed. The port is held by something else, or by the stack for longer than `BIND_TRIES` × `BIND_SLEEP` seconds — [Restarting](#restarting) |
 | `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal; the server runs on the inherited STC identity |
+| `S RAKFUSER` ends `RAKFUIDS2 INPUT DATA INVALID OR OUT OF SEQ.`, `ABEND U0200` (TK5) | A `USERS` line has no password in columns 19-26, or a field sits in the wrong column — step 8 |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
 | `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD could not read a file it had opened; `RC=52` is an I/O error. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a chunked (HTTP/1.1) response, so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |

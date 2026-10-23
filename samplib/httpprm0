@@ -1,4 +1,4 @@
-# HTTPD 4.0.0 Configuration
+# HTTPD Configuration
 #
 # Copy to SYS2.PARMLIB(HTTPPRM0)
 # Referenced by HTTPPRM DD in the STC JCL procedure.
@@ -88,9 +88,10 @@
 #         any MOD= may add trailing  AUTH=mode  and/or  RES=class:resource
 #
 # Public z/OSMF endpoints must precede the gated /zosmf/* catch-all (first
-# match wins): the anonymous reachability probe (/zosmf/info) and the token
-# login/logout endpoint (/zosmf/services/authenticate) do their own auth, so
-# the gate must not challenge them.
+# match wins): the info endpoint (/zosmf/info) and the token login/logout
+# endpoint (/zosmf/services/authenticate) do their own auth in mvsMF, so
+# the gate must not challenge them.  Neither is anonymous: /zosmf/info
+# answers 401 to a request without a login.
 # The console service (/zosmf/restconsoles/*) issues operator commands for any
 # caller that can log in, and mvsMF itself checks nothing, so it gets a route
 # of its own with a profile check.  It MUST precede /zosmf/*: listed after it,
