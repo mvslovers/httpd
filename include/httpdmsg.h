@@ -602,8 +602,9 @@
 /** HTTPD441W linked neither RENT nor REUS: a held copy must not run twice */
 #define MSG_RES_NOT_REUS	"HTTPD441W MODULE %s NOT REUSABLE, FETCHED PER REQUEST"
 
-/** HTTPD442W found, but the LOAD failed (IEA703I names the code) */
-#define MSG_RES_LOAD_FAILED	"HTTPD442W MODULE %s LOAD FAILED, FETCHED PER REQUEST"
+/** HTTPD442W found, but the LOAD failed; names the completion code (%03X,
+ *  806 = not found, 106 = fetch error, 80A = no storage) and the reason code */
+#define MSG_RES_LOAD_FAILED	"HTTPD442W MODULE %s LOAD FAILED, ABEND CODE S%03X REASON %02X, FETCHED PER REQUEST"
 
 /** HTTPD443W RESIDENT= is neither YES nor NO; the default stays */
 #define MSG_RES_BAD_VALUE	"HTTPD443W INVALID RESIDENT VALUE \"%s\" (YES|NO)"

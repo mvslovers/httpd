@@ -272,6 +272,13 @@ sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstbody.c", "src/httpbody.c"]
 
+# httplkrc() turns a LINK's outcome into http_link()'s code; S806 (module not
+# found) is told apart from every other LINK failure (issue #320).  Free of
+# httpd.h -> DUAL (host + MVS); helper source listed for the host link.
+[test.TSTLKRC]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstlkrc.c", "src/httplkrc.c"]
+
 # credexp() credential-reaper expiry decision (M2 session timeout).  Free of
 # project headers -> DUAL (host + MVS); helper source listed for the host link.
 [test.TSTEXPIR]

@@ -16,7 +16,8 @@
 **
 **   T1  the libc370 contract this all rests on -- __linkds() on a module that
 **       does not exist returns 0 (no abend) with prc == -1
-**   T2  http_link() maps that to HTTP_LINK_ENOLOAD, and in particular NOT to
+**   T2  http_link() maps that to HTTP_LINK_ENOMOD (#320: __linkdsx() reports
+**       the completion code S806), and in particular NOT to
 **       -1, which is what used to surface as U0001
 **   T3  a route dispatched without a program name reports itself as such
 **   T4  no sentinel can collide with a real abend code
@@ -49,15 +50,18 @@ int main(void)
     HTTPC   *httpc;
     int     rc;
     int     prc;
+    unsigned abcode;
 
     printf("=== HTTPD http_link failure reporting (issue #131) tests ===\n");
 
     /* --- T1: the libc370 contract.  If this ever changes, T2's mapping is
        reading the wrong signal and the U0001 report comes back. */
     prc = 0;
-    rc = __linkds(NOSUCH, NULL, NULL, &prc);
-    CHECK_EQ(rc, 0, "__linkds on a missing module does not abend");
-    CHECK_EQ(prc, -1, "__linkds leaves __link()'s -1 in prc");
+    abcode = 0;
+    rc = __linkdsx(NOSUCH, NULL, NULL, &prc, &abcode);
+    CHECK_EQ(rc, 0, "__linkdsx on a missing module does not abend");
+    CHECK_EQ(prc, -1, "__linkdsx leaves __link()'s -1 in prc");
+    CHECK_EQ(abcode, HTTP_LINK_CC_NOTFOUND, "__linkdsx reports S806");
 
     /* --- T2: httplink() turns that into its own code, not into an abend.
        A zeroed HTTPC is enough: httplink() only reads httpc->httpd (NULL is
@@ -67,7 +71,7 @@ int main(void)
     if (!httpc) return mbt_test_summary("TSTLINK");
 
     rc = http_link(httpc, NOSUCH);
-    CHECK_EQ(rc, HTTP_LINK_ENOLOAD, "missing module reports ENOLOAD");
+    CHECK_EQ(rc, HTTP_LINK_ENOMOD, "missing module reports ENOMOD");
     CHECK(rc != -1, "missing module is not reported as abend code 1 (U0001)");
 
     /* --- T3: no program name is its own answer, not a load failure */
@@ -102,16 +106,19 @@ int main(void)
           "ENOPGM is outside the abend code range");
     CHECK((unsigned)(-HTTP_LINK_EESTAE) > 0x00FFFFFF,
           "EESTAE is outside the abend code range");
+    CHECK((unsigned)(-HTTP_LINK_ENOMOD) > 0x00FFFFFF,
+          "ENOMOD is outside the abend code range");
 
     /* the folded module-rc range must clear the abend range too, and must not
-       swallow the three sentinels */
+       swallow the four sentinels */
     CHECK(HTTP_LINK_IS_PGMRC(HTTP_LINK_EPGMRC(-1)),
           "the smallest folded module rc is recognized as one");
     CHECK(!HTTP_LINK_IS_PGMRC(-0x00FFFFFF),
           "the largest abend code is not read as a folded module rc");
     CHECK(!HTTP_LINK_IS_PGMRC(HTTP_LINK_ENOLOAD) &&
           !HTTP_LINK_IS_PGMRC(HTTP_LINK_ENOPGM) &&
-          !HTTP_LINK_IS_PGMRC(HTTP_LINK_EESTAE),
+          !HTTP_LINK_IS_PGMRC(HTTP_LINK_EESTAE) &&
+          !HTTP_LINK_IS_PGMRC(HTTP_LINK_ENOMOD),
           "no sentinel is read as a folded module rc");
     CHECK_EQ(HTTP_LINK_PGMRC(HTTP_LINK_EPGMRC(-0x00FFFFFF)), -0x00FFFFFF,
              "the clamp boundary round-trips through the fold");
