@@ -11,7 +11,7 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-22 with #318 (libc370 pin
+*Last reconciled against the tracker: 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
 2.25.1, cc370 1.6.3; the changes since 2.23.0 reviewed, only the local
 `sleep()`/`usleep()`/`__tzget()` declarations needed code, the `src/` half of
 #270): #318 closes with its PR, #319 and #320 filed out of the review and not
@@ -102,7 +102,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
-| — | #296 | startup — socket thread gets a garbage TASK/STACKSIZE; the server listens but never answers | not yet ranked |
 | — | #295 | install guide — gaps found installing 4.2.0 on four stands | not yet ranked |
 | — | #270 | hygiene — local `sleep()` / `__tzget()` declarations | `src/` is done (#318: `<unistd.h>` and `<time.h>`; `usleep()` went with it). Only `tbd/src/httpjes2.c`, which is not built, still declares `__tzget()` — close it with that file's revival |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
