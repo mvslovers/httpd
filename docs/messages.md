@@ -179,6 +179,7 @@ code is the test and the sequence is not.
 | `HTTPD062E` | `ABEND xxxxxxxx IN WORKER(w) CLIENT(c) SOCKET(s)` | A worker's ESTAE caught an abend. Only that request dies; the worker is recycled and the server continues. Always worth a bug report — include the abend code and the request. |
 | `HTTPD063E` | `NO RECOVERY IN WORKER(w), CLIENT(c) SOCKET(s) DROPPED` | The worker could not set up the recovery routine it runs each request under, so it did not touch this request: nothing was read or answered, and the connection was closed. Nothing abended. Rare (no task anchor, or ten recovery routines already in use); worth reporting if it repeats. |
 | `HTTPD064E` | `SOCKET THREAD IS NOT RUNNING, START ABANDONED` | The socket thread, which takes in new connections, was created but is not working: it ended on its own, or it was not yet accepting connections after five seconds. A server in that state would answer nothing, so `HTTPD001I ... READY` is not written. The server stops instead (`HTTPD098I` to `HTTPD099I`) and the step ends `CC 0008`. Start it again; if it repeats, report it with the console log from `HTTPD000I` on. Not `HTTPD033E`, which is for a thread that could not be created at all. |
+| `HTTPD065W` | `CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR n SEC, b BYTES SENT, s SUPPRESSED` | A worker gave up on a client that took no data at all for `n` seconds (10) while a **chunked** (HTTP/1.1) response was being sent: its receive window stayed closed, so the response was cut off and the connection closed. `a.b.c.d` is the address of the connection, `b` the bytes sent on it so far, `s` how many such give-ups were held back since the previous `HTTPD065W` (see *Abandoned clients and the flood guard* below). Nothing the client sent is printed. Usually a client that stopped reading, a dead peer behind a firewall, or a network that dropped; if many different addresses appear together, look at TCP/IP on the MVS side first. A client that is slow but still taking data is not abandoned. |
 | `HTTPD070E` | `UNKNOWN CODEPAGE "name", USING CP037` | The `CODEPAGE` value is not one this build knows. Check the spelling. |
 | `HTTPD071I` | *(retired)* | The codepage in effect is a `D CONFIG` value (`HTTPD134I`), not a startup line. |
 | `HTTPD090E` | `UNABLE TO INITIALIZE CONSOLE INTERFACE` | No MODIFY and no STOP would be possible, so the server does not start. The step ends `CC 0008` (#245). This message is the whole report — it is written before anything was initialized, so no stop sequence follows it. |
@@ -205,6 +206,24 @@ What the client can tell depends on how the body was framed:
 The request is not counted as an error: where SMF writes a record for it, the
 record carries `resp_code` 200, and the server's error total does not change.
 `HTTPD045E` is the only sign on the server side that the response failed.
+
+### Abandoned clients and the flood guard
+
+While HTTPD sends a chunked (HTTP/1.1) response it waits for a client whose
+receive window is closed, up to 10 seconds without a single byte accepted (100
+attempts, 100 ms apart). Responses that are not chunked are not covered by this
+message. A pause shorter than that costs nothing: the transfer carries on.
+When the 10 seconds are used up the response is abandoned and `HTTPD065W` is written. A server that is
+being stopped does not wait and writes nothing, and neither does a connection
+that is already dead.
+
+`HTTPD065W` is written **at most once every 60 seconds**. The first abandoned
+client after a quiet minute is reported at once; any others inside the next 60
+seconds are only counted. The next `HTTPD065W` after that carries the count in
+its `s SUPPRESSED` field (`0` when nothing was held back). So the line shows
+one client's address per minute, not every client's; the count tells you how
+many more there were. If a burst ends and no further client is abandoned, the
+count stays unreported until the next one.
 
 ## HTTPD1xx — operator console
 

@@ -560,10 +560,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_84</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_84), httpd->unused_84);
+        "<td>httpd->giveup_last</td>"
+        "<td>Time of Last Send Give-up Message (#347)</td>"
+        "<td>%u</td></tr>\n",
+        O(giveup_last), httpd->giveup_last);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -574,10 +574,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_8C</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_8C), httpd->unused_8C);
+        "<td>httpd->giveup_held</td>"
+        "<td>Send Give-ups Not Yet Reported (#347)</td>"
+        "<td>%u</td></tr>\n",
+        O(giveup_held), httpd->giveup_held);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
