@@ -321,7 +321,10 @@ that comes from RAKF**. The clean alternative is to add `HTTPD.LINKLIB` to
 the APF list in `SYS1.PARMLIB(IEAAPF00)`. On MVS 3.8j the APF list is only read
 at IPL, but the library name carries no version (since 4.1.0): the entry is
 added once, costs one IPL, and stays right for every later release. An entry
-is the data set name and the volume, so keep the library on that volume.
+is the data set name and the volume, so keep the library on that volume. An
+entry whose data set no longer exists on that volume stays valid for any data
+set created later under that name on that volume: remove a stale entry at the
+next IPL.
 
 **With neither, HTTPD does not start.** Unlike FTPD, which warns and keeps
 running, HTTPD treats this as fatal:
@@ -507,7 +510,10 @@ catalog entry. If you go on, the install job writes into the old library, SMP
 selects nothing, and every step ends `RC 00` (see the troubleshooting table). If
 you find that line in the output, scratch the stray copy on the volume the
 following `IEF287I` line names (ISPF 3.4 with that volume serial, since it has
-no catalog entry) before you continue.
+no catalog entry) before you continue. Both libraries carry the same name, so
+scratch only on that volume: the volume of the catalogued old library is left
+alone, and a delete through the catalog would remove the old library, not the
+stray one.
 
 1. **Stop the server that uses the library**, whatever its procedure is
    called (`/P HTTPD33` on TK5). A library in use cannot be renamed: the rename
@@ -542,7 +548,9 @@ no catalog entry) before you continue.
    `UNIT=SYSDA`. Without that the new library may land on another volume, the
    entry no longer matches it, and HTTPD falls back to SVC 244 (`HTTPD002I`
    says which route it got). Moving the entry to the new volume instead costs an
-   IPL, because the list is read only then.
+   IPL, because the list is read only then. An entry whose data set no longer
+   exists on its volume stays valid for any data set created later under that
+   name on that volume, so remove a stale entry at the next IPL.
 5. **Install** as on a first installation: steps 3, 4 and 6. The `DELOLD` step
    of the install job scratches `HTTPD.HTTPLOAD` and `HTTPD.SAMPLIB`; if you
    keep something of your own under either name, rename it the same way first.
@@ -858,6 +866,11 @@ client can log in.
    an account anyone can try to log in to, so choose one you would give an
    account of that group, not `CHANGEME`.
 
+   RAKF 1.2.x keeps the passwords in `SYS1.SECURE.CNTL(USERS)` as typed, in
+   clear text. That member holds the password of every user on the system, so
+   it must not be readable by ordinary users: give READ on
+   `SYS1.SECURE.CNTL` only to the people who administer RAKF.
+
    **Why the line is needed.** RAKF has no table of started tasks: every
    started task runs as `STC`/`STCGROUP`, and on the stock profiles that group
    holds ALTER on data sets. At startup HTTPD replaces that identity by logging
@@ -937,6 +950,31 @@ client can log in.
 
    You will see whether the line took when HTTPD starts: `HTTPD004I STC IDENTITY
    SET TO HTTPD/USER VIA RACINIT` (step 10).
+
+4. On TK5, once HTTPD is running (step 10), check that the placeholder is not
+   the password. With mvsMF installed, try to log in as `HTTPD` with the
+   password of the example above; the answer must be a refusal:
+
+   ```
+   $ curl -s -o /dev/null -w '%{http_code}\n' -u HTTPD:CHANGEME \
+       -X POST -H 'X-CSRF-ZOSMF-HEADER: x' \
+       http://host:8080/zosmf/services/authenticate
+   401
+   ```
+
+   `200` means the placeholder is still the password. The `200` is itself a
+   login: HTTPD caches the credential, and a cached login is not checked
+   against RACF again until it ends. It ends after `SESSION_TIMEOUT` minutes
+   without a request (30 by default) or `SESSION_MAXAGE` minutes after the
+   login (480 by default), whichever comes first; see
+   [Session lifetime](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#session-lifetime-session_timeout-session_maxage).
+   A client that keeps sending requests keeps the login alive until
+   `SESSION_MAXAGE`, and changing the password and reloading the table does
+   not end it, so the placeholder keeps working. After a `200`, change the
+   password, run `/S RAKFUSER`, then stop and start HTTPD, or wait out
+   `SESSION_MAXAGE`.
+   A login with the placeholder should never have been accepted; if it was,
+   restart HTTPD after the password change.
 
 ---
 
@@ -1590,7 +1628,7 @@ nothing above touches it.
 | `HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT n` | An older instance still holds the port: still running, or still ending (up to about 50 s after `/P HTTPD` with clients connected). Wait for `$HASP395 HTTPD ENDED` — steps 5 and 10 |
 | `HTTPD030I EADDRINUSE, WAITING …`, repeating | The old instance is gone and the TCP/IP stack has not released the port yet. The new one retries every `BIND_SLEEP` s, `BIND_TRIES` times, and comes up by itself — [Restarting](#restarting) |
 | `HTTPD030E BIND() FAILED …` and the step ends | Every retry failed. The port is held by something else, or by the stack for longer than `BIND_TRIES` × `BIND_SLEEP` seconds — [Restarting](#restarting) |
-| `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal; the server runs on the inherited STC identity |
+| `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal, and that is the danger: the identity switch runs before the listener opens, so the server still comes up (`HTTPD054I`, `HTTPD001I`) on the inherited `STC`/`STCGROUP` identity, which holds ALTER on data sets on the stock profiles. A module that sets no identity of its own runs with it. Keep clients away, or `/P HTTPD`, until a start prints `HTTPD004I` instead |
 | `S RAKFUSER` ends `RAKFUIDS2 INPUT DATA INVALID OR OUT OF SEQ.`, `ABEND U0200` (TK5) | A `USERS` line has no password in columns 19-26, or a field sits in the wrong column — step 8 |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
 | `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD could not read a file it had opened; `RC=52` is an I/O error. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
