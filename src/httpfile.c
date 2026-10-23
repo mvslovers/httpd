@@ -8,10 +8,12 @@ typedef enum sstate     SSTATE;
 enum sstate {
     SSTATE_SENDING=0,
     SSTATE_EOF,
-    SSTATE_DONE
+    SSTATE_DONE,
+    SSTATE_ERROR
 };
 
 /* forward reference static function prototypes */
+static int ufs_read_failed(HTTPC *httpc);
 static int ssi_file_read(HTTPC *httpc);
 static int ssi_process(HTTPC *httpc, char *ssi);
 static int ssi_echo(HTTPC *httpc, char *next);
@@ -44,6 +46,7 @@ http_send_file(HTTPC *httpc, int binary)
 
 	if (httpc->ssi) {
 		ssi_file_read(httpc);
+		if (httpc->substate == SSTATE_ERROR) return rc;
 		goto sendit;
 	}
 
@@ -60,6 +63,11 @@ http_send_file(HTTPC *httpc, int binary)
 				/* use UFS version of fread() */
 				len = ufs_fread(&httpc->buf[httpc->len], 1, avail, httpc->ufp);
 			}
+
+            /* ufs_fread() returns what it got before the error, or 0
+             * with neither EOF nor progress: either is a failed read,
+             * whatever len says */
+            if (httpc->ufp && ufs_read_failed(httpc)) return rc;
 
             if (len>0) {
                 /* we read some data */
@@ -132,6 +140,34 @@ sendit:
     }
 
     return rc;
+}
+
+/* A UFS read error ends the response here, deliberately.  The status
+ * line and headers are long gone by the time the first read happens, so
+ * nothing can be corrected on the wire: the one honest signal left is a
+ * body that does not end.  Unsent bytes are dropped, framing is switched
+ * off so httpdone() writes no "0" chunk, and the connection is closed
+ * (RFC 7230 3.3.3).  Without this the state never advanced and
+ * serve_client() reported the stall as HTTPD901E, a client fault, 1000
+ * passes later (#263).  Returns 1 when the file has failed. */
+static int
+ufs_read_failed(HTTPC *httpc)
+{
+    int     err     = ufs_ferror(httpc->ufp);
+    UCHAR   *path;
+
+    if (!err) return 0;
+
+    path = http_get_env(httpc, "REQUEST_PATH");
+    wtof(MSG_UFS_READ_ERROR, err, path ? (char *)path : "");
+
+    httpc->chunked   = 0;
+    httpc->keepalive = 0;
+    httpc->len       = 0;
+    httpc->pos       = 0;
+    httpc->substate  = SSTATE_ERROR;
+    httpc->state     = CSTATE_DONE;
+    return 1;
 }
 
 static int
@@ -252,6 +288,7 @@ checkeof:
 		}
 	}
 	else if (httpc->ufp) {
+		if (ufs_read_failed(httpc)) goto quit;
 		if (ufs_feof(httpc->ufp)) {
 			httpc->substate = SSTATE_EOF;
 		}
@@ -325,6 +362,10 @@ ssi_send_buffer(HTTPC *httpc)
 	int		avail;
 	
 	// wtof("%s: enter pos=%d len=%d", __func__, httpc->pos, httpc->len);
+
+	/* the response has been abandoned (ufs_read_failed()); framing is off,
+	 * so whatever is still buffered must not reach the client raw */
+	if (httpc->substate == SSTATE_ERROR) return 0;
 	
     if (httpc->pos < httpc->len) {
         /* we have unsent data in buffer */
@@ -478,6 +519,7 @@ ssi_include(HTTPC *httpc, char *next)
     UCHAR   	subtype		= httpc->subtype;
     UCHAR		substate	= httpc->substate;
     UCHAR		ssi			= httpc->ssi;
+    int			failed		= 0;
     char		uri[UFS_PATH_MAX];
 
 	// wtof("%s: enter next=\"%s\"", __func__, next);
@@ -541,6 +583,7 @@ ssi_include(HTTPC *httpc, char *next)
 	while(httpc->state != CSTATE_DONE) {
 		http_send_file(httpc, 0);
 	}
+	failed = (httpc->substate == SSTATE_ERROR);
 	
 	goto quit;
 
@@ -564,6 +607,13 @@ quit:
     httpc->substate		= substate;
     httpc->ssi			= ssi;
     if (httpc->ssilevel > 0) httpc->ssilevel--;
+
+	/* a read error in the included file ends this response too; the
+	 * restore above would otherwise resume the outer file */
+	if (failed) {
+		httpc->substate	= SSTATE_ERROR;
+		httpc->state	= CSTATE_DONE;
+	}
 
 	// wtof("%s: exit rc=0", __func__);
 	return 0;
