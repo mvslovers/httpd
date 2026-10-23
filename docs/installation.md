@@ -842,7 +842,8 @@ client can log in.
    HTTPD    USER              N
    ```
 
-   TK5:
+   TK5 (`CHANGEME` is a placeholder: choose the password before you paste
+   this line):
 
    ```
    123456789012345678901234567890
@@ -986,9 +987,11 @@ choosing and mount it, or copy the files in over UFSD.
 
 **Submitting it from a workstation.** The job card of `HTTPWEBR` carries
 `NOTIFY=&SYSUID`. `&SYSUID` is a TSO symbol, replaced when you `SUBMIT` from a
-TSO session or ISPF; a job sent through mvsMF's jobs API or by FTP passes the
-card exactly as written and nothing replaces it. Put your own userid there (or
-delete the operand) before you submit it that way.
+TSO session or ISPF. A job sent through mvsMF's jobs API has the symbol
+replaced by mvsMF with the submitting userid. A job sent by FTP passes the card
+exactly as written and ends with `IEF627I INCORRECT USE OF AMPERSAND IN THE
+NOTIFY FIELD` and `JOB NOT RUN - JCL ERROR`. Put your own userid there (or
+delete the operand) before you submit it by FTP.
 
 **Run it before the upload, not after.** IND$FILE allocates an *existing*
 dataset `DISP=SHR` and takes the DCB from its label; only when the dataset is
