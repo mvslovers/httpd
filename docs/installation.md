@@ -951,9 +951,9 @@ client can log in.
    You will see whether the line took when HTTPD starts: `HTTPD004I STC IDENTITY
    SET TO HTTPD/USER VIA RACINIT` (step 10).
 
-4. On TK5, check that the placeholder is not the password. With mvsMF
-   installed, try to log in as `HTTPD` with the password of the example above;
-   the answer must be a refusal:
+4. On TK5, once HTTPD is running (step 10), check that the placeholder is not
+   the password. With mvsMF installed, try to log in as `HTTPD` with the
+   password of the example above; the answer must be a refusal:
 
    ```
    $ curl -s -o /dev/null -w '%{http_code}\n' -u HTTPD:CHANGEME \
@@ -962,11 +962,15 @@ client can log in.
    401
    ```
 
-   `200` means the placeholder is still the password. Run the check before
-   anyone has logged in with the placeholder: an `HTTPD` login that was
-   accepted once can still be answered after the password was changed and the
-   table reloaded (measured: status `500` with a working `LtpaToken2`
-   cookie).
+   `200` means the placeholder is still the password. The `200` is itself a
+   login: HTTPD caches the credential, and a cached login is not checked
+   against RACF again until `SESSION_MAXAGE` has passed (480 minutes from the
+   login by default, see [Session lifetime](configuration.md#session-lifetime-session_timeout-session_maxage)).
+   Changing the password and reloading the table does not end it, so the
+   placeholder keeps working. After a `200`, change the password, run
+   `/S RAKFUSER`, then stop and start HTTPD, or wait out `SESSION_MAXAGE`.
+   A login with the placeholder should never have been accepted; if it was,
+   restart HTTPD after the password change.
 
 ---
 
