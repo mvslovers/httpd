@@ -202,7 +202,7 @@ Comment the three lines out, or install mvsMF:
 STC's STEPLIB concatenation — HTTPD dispatches a module through the MVS LINK
 SVC, which searches the task's own libraries.
 
-#### mvsMF's jobs API needs the JES2 DDs
+#### mvsMF's jobs API and the JES2 DDs
 
 The same mechanism decides more than where the module is found. A module runs
 **in HTTPD's task**, so every ddname it opens has to be allocated by the STC
@@ -220,7 +220,15 @@ the shipped procedure allocates them:
 start — they are site values, not constants, and the ones above are only what
 the pattern has always carried.
 
-Without the two DDs the server starts normally and everything else works. The
+The two DDs are needed up to mvsMF 1.3.0. With mvsMF 1.4.0 and later they can
+go: its jobs API allocates the JES2 checkpoint and spool data sets itself when
+the procedure has no DD for them. The exception is a JES2 whose `$DSNPRFX` is
+not `SYS1` — there the DDs stay mandatory, because the allocation only looks for
+the `SYS1` names. The procedure shipped with this release still carries both
+DDs, and leaving them in is always safe.
+
+Where the DDs are needed (mvsMF 1.3.0 or earlier, or a `$DSNPRFX` other than
+`SYS1`) and missing, the server starts normally and everything else works. The
 jobs API does not — and it does not fail uniformly:
 
 | request | answer |
