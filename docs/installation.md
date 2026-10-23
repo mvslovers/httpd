@@ -964,11 +964,15 @@ client can log in.
 
    `200` means the placeholder is still the password. The `200` is itself a
    login: HTTPD caches the credential, and a cached login is not checked
-   against RACF again until `SESSION_MAXAGE` has passed (480 minutes from the
-   login by default, see [Session lifetime](configuration.md#session-lifetime-session_timeout-session_maxage)).
-   Changing the password and reloading the table does not end it, so the
-   placeholder keeps working. After a `200`, change the password, run
-   `/S RAKFUSER`, then stop and start HTTPD, or wait out `SESSION_MAXAGE`.
+   against RACF again until it ends. It ends after `SESSION_TIMEOUT` minutes
+   without a request (30 by default) or `SESSION_MAXAGE` minutes after the
+   login (480 by default), whichever comes first; see
+   [Session lifetime](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#session-lifetime-session_timeout-session_maxage).
+   A client that keeps sending requests keeps the login alive until
+   `SESSION_MAXAGE`, and changing the password and reloading the table does
+   not end it, so the placeholder keeps working. After a `200`, change the
+   password, run `/S RAKFUSER`, then stop and start HTTPD, or wait out
+   `SESSION_MAXAGE`.
    A login with the placeholder should never have been accepted; if it was,
    restart HTTPD after the password change.
 
