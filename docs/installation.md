@@ -719,16 +719,17 @@ client can log in.
 
    ```
    FACILITYMVSMF.CONSOLE                                       NONE
-   FACILITYMVSMF.CONSOLE                               ADMIN   READ
+   FACILITYMVSMF.CONSOLE                               MVSCONS READ
    ```
 
    Access is READ or nothing, and READ means every operator command, from
-   console 0 and without a `UCMAUTH` filter: `ADMIN` is only an example, so
-   grant it to a group of its own that holds just the people who may do that.
-   The second line grants that group; to
-   grant one more person without a group of their own, add a line with the user
-   id in the group column (`FACILITYMVSMF.CONSOLE … TESTER  READ`, measured on
-   RAKF 2). **The development user needs the profile too:**
+   console 0 and without a `UCMAUTH` filter: nothing narrows it per command.
+   The second line grants the group `MVSCONS`, a name chosen for this example:
+   use a group of its own that holds just the people who may issue operator
+   commands, not a broad one such as `ADMIN` that exists for other reasons.
+   To grant one more person without a group of their own, add a line with the
+   user id in the group column (`FACILITYMVSMF.CONSOLE … TESTER  READ`,
+   measured on RAKF 2). **The development user needs the profile too:**
    `mbt run restart` and `mbt target console` issue `P`/`S` through
    `/zosmf/restconsoles`. Without READ the request is refused (`403`); mbt warns
    and falls back to the target's Hercules console if it has one, and fails
