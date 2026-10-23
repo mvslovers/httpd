@@ -11,7 +11,7 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
+*Last reconciled against the tracker: 2026-10-23 with the fix for #263 (`http_send_file()` asks `ufs_ferror()` at both read sites and ends the response on the first pass; `HTTPD045E` replaces the `HTTPD901E` spin): #263 closes with its PR and its row is gone, the ranked order of the rest unchanged. Before that, 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
 2.25.1, cc370 1.6.3; the changes since 2.23.0 reviewed, only the local
 `sleep()`/`usleep()`/`__tzget()` declarations needed code, the `src/` half of
 #270): #318 closes with its PR, #319 and #320 filed out of the review and not
@@ -97,7 +97,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 1 | #263 | `type:bug` — a UFS read error is served as a truncated body | **an error vector for UFS**, which does not exist yet |
 | 2 | #254 | `type:docs` — six Parmlib keywords undocumented | nothing |
 | 3 | #262 | `type:research` — TSTSP `SA03` keeps the whole suite red | **MVS time**, and possibly a libc370 1.0.3 sysroot |
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
@@ -169,16 +168,13 @@ it needs **no** UCLIN — which is the opposite of what section 12a said when it
 was written from ufsd's guide rather than from a run. The old library came
 through untouched, so the crossing is recoverable as well as automatic.
 
-**That sentence used to read "nothing open is a code bug." It no longer does.**
-#263 is one, and it is the first real one since 4.0.0 shipped: a UFS read error
-leaves `http_send_file()` with no state that notices, so the client gets a
-truncated body on a chunked stream that never receives its terminator, and the
-console blames `HTTPD901E SPIN` — a `9xx` id `docs/messages.md` tells the reader
-is worth a bug report about the state machine. It ranks first because it is the
-only item that changes what a client receives. It is not ranked first because it
-is quick: no error vector for UFS exists, #260's lying-`BLKSIZE` DD does not
-reach `ufs_fopen()`, and a guard shipped without one would be reviewed rather
-than measured.
+**That sentence used to read "nothing open is a code bug."** #263 was the one
+exception since 4.0.0, the only item that changed what a client receives: a UFS
+read error left `http_send_file()` with no state that noticed, so the client got
+a torn body and the console blamed `HTTPD901E SPIN`. It is fixed in its PR
+(`HTTPD045E`, below). No natural error vector for UFS was found: `TSTFILE`
+forces the failure with a `UFSFILE` whose error flag is set, so the guard is
+measured, the fault that sets the flag in production is not.
 
 #254 stays high for the reason it always did — it costs no MVS time. #262 is
 above the other research items because a suite whose top line is permanently red
@@ -313,27 +309,17 @@ The `v4.0.0` **tag** was kept; only the release was removed.
 
 ---
 
-### 1 · #263 — a UFS read error is served as a truncated body
+### ~~1 · #263 — a UFS read error is served as a truncated body~~
 
-*the only open item that changes what a client receives*
-
-`http_send_file()` asks `ufs_feof()` and never `ufs_ferror()`, though libufs
-exports it (`libufs.h:243`). On a read error `ufs_fread()` returns 0 with EOF
-unset, so `substate` stays `SSTATE_SENDING` and no pass of the function can ever
-notice. `serve_client()`'s spin guard ends it at 1000 fruitless passes, which
-bounds the damage and mislabels it: the client keeps a chunked body that never
-got its `0\r\n\r\n`, and the console says `HTTPD901E SPIN` — an id
-`docs/messages.md` tells the reader to file a bug about the state machine.
-
-**The work is the error vector, not the check.** #260's — one data set behind two
-DDs that disagree about `BLKSIZE` — cannot reach `ufs_fopen()`, which goes
-through UFSD rather than a DD. Without one, a guard is reviewed and not measured,
-and `CLAUDE.md` is explicit that "feels fixed" is not fixed. Finding it may be
-the larger half, and it may belong in ufsd rather than here.
-
-The second decision is what to tell a client once the status line has gone out.
-An unterminated chunked body is the only honest signal left on the wire; that is
-a deliberate choice to make, not a fallback to stumble into.
+Fixed in its PR. Both read sites in `httpfile.c` (the bulk reader and the SSI
+line reader, which is what every `.html` goes through) ask `ufs_ferror()`, and
+an error ends the response on that pass: unsent bytes dropped, chunk framing
+off so no `0\r\n\r\n` follows, keep-alive off, `HTTPD045E` on the console. What
+stays true: the status line is always out before the first read, so a client
+sees a torn 200, never a 500 — the only honest signal left is a body that stops
+short. An error in an `<!--#include -->`d file ends the including response too.
+`HTTPD045E` is one line per failed request; a file that is read again and again
+writes it again and again, and there is no rate limit.
 
 ### 2 · #254 — six Parmlib keywords the parser accepts are undocumented
 

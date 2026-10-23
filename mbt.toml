@@ -258,6 +258,17 @@ host = false                 # httpd.h + EBCDIC-sorted table -> MVS-only (test-m
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h -> MVS-only (test-mvs)
 
+# http_send_file() on a UFS read error (issue #263).  ufs_fread() sets the
+# error flag and returns 0 with EOF unset; the send loop asked only for EOF, so
+# it never ended and serve_client() reported the stall as HTTPD901E.  The test
+# forces the error with a UFSFILE whose error flag is set and checks that the
+# response ends at once, unframed, with the connection closed.  Reaches httpd.h
+# and httpfile.c's SSI code -> MVS-only; HTTPFILE resolves from the [internal]
+# autocall archive, so only the test root is listed here.
+[test.TSTFILE]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
