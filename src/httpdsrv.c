@@ -348,10 +348,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused</td>"
-        "<td>(reserved)</td>"
+        "<td>httpd->sockstate</td>"
+        "<td>socket thread: 0 starting, 1 running, 2 gone</td>"
         "<td>%02X</td></tr>\n",
-        O(unused), httpd->unused);
+        O(sockstate), httpd->sockstate);
 
     if (httpd->socket_thread) {
         http_printf(httpc,
