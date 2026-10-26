@@ -1114,16 +1114,27 @@ The mount belongs to **UFSD**, not to HTTPD. In its Parmlib member:
 MOUNT    DSN(HTTPD.WEBROOT.UFS)  PATH(/www)  MODE(RO)
 ```
 
-or, without a restart — note that the operator command spells its operands with
-`=` and commas where the Parmlib statement uses parentheses:
+Use the Parmlib statement for the default `DOCROOT=/www`. The path keeps the
+case you wrote.
+
+UFSD also accepts the mount as an operator command, without a restart. The
+operator form spells its operands with `=` and commas where the Parmlib
+statement uses parentheses:
 
 ```
-/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/www,MODE=RO
+/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/WWW,MODE=RO
 ```
 
-`/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount it
-there instead. `MODE(RO)` is the default and the right setting here — the
-shipped disk is product content and nothing in the server writes to it.
+**The operator command cannot produce a lower-case mount point.** UFSD
+upper-cases the whole command before it parses it, so `PATH=/www` mounts `/WWW`.
+Paths are case-sensitive, and HTTPD's default `DOCROOT=/www` finds nothing there:
+every request answers `404`. With the operator command, set `DOCROOT=/WWW` in
+`HTTPPRM0` as well and restart HTTPD. For `/www`, use the Parmlib statement.
+
+`/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount that
+path instead, with the same case. `MODE(RO)` is the default and the right
+setting here — the shipped disk is product content and nothing in the server
+writes to it.
 
 **UFSD first, then HTTPD.** The filesystem has to be up and mounted before the
 server that serves from it — a runtime dependency SMP cannot express, which is
@@ -1143,18 +1154,33 @@ directory.
 |---|---|
 | `UFSD062E SUPERBLOCK VALIDATION FAILED FOR …` | the dataset's `BLKSIZE` is not the image's 4096 — or the transfer was not binary |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running (step 2) |
-| `404` on `/` | mounted somewhere other than `DOCROOT` |
+| `404` on `/` | mounted somewhere other than `DOCROOT` — also `/WWW` against `DOCROOT=/www`: `MOUNT LIST` shows the mount point as UFSD holds it |
 | a page of mojibake | the transfer translated the bytes; upload again in binary |
 
 ### Replacing the content later
 
-**Unmount before you re-upload.** IND$FILE allocates `DISP=SHR`, so it will
-happily rewrite a dataset UFSD has open — under the server's own buffers:
+**Release the dataset before you re-upload.** IND$FILE allocates `DISP=SHR`, so it
+will happily rewrite a dataset UFSD has open — under the server's own buffers.
+
+For a disk mounted at `/www` by the Parmlib statement, stop both address spaces,
+upload, and start them again, UFSD first:
 
 ```
-/F UFSD,UNMOUNT PATH=/www
+/P HTTPD
+/P UFSD
     ... upload ...
-/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/www,MODE=RO
+/S UFSD
+/S HTTPD
+```
+
+The operator `UNMOUNT` cannot do this for `/www`: it upper-cases `PATH=/www` to
+`/WWW` and finds no such mount. It works for a mount point that is upper case,
+for example the `/WWW` of the operator mount in step 9c:
+
+```
+/F UFSD,UNMOUNT PATH=/WWW
+    ... upload ...
+/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/WWW,MODE=RO
 ```
 
 For pages of your own, build the image on your workstation with
