@@ -368,6 +368,17 @@ late to change either. Neither line is a warning: both routes end in an
 authorised started task, and which one you want is a site decision. Quote the
 line in a bug report — it decides the storage key HTTPD's own module runs in.
 
+### Authors of server modules: the HTTPD level
+
+A server module that calls `http_new_session()` learns **why** a call failed only
+from HTTPD 4.5.0: `-2` RACF refused the logon, `-3` no free session slot, `-4`
+out of storage or RACF could not be asked. An earlier HTTPD returns `-1` for every
+failure. A module that must also run on an earlier HTTPD treats `-1` as a generic
+error, not as "not authenticated". The function vector has no run-time test for
+the entry; see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) for the values and the
+duty to call `http_logout()`. The SYSMOD declares no requirement for this: it is
+a note for the module author, not a prerequisite.
+
 ---
 
 ## 3. Upload the two XMIT files
