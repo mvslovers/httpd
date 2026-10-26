@@ -145,6 +145,10 @@ rather than work around it; the table is covered by `TSTSTAT`.
   (-4, out of storage, or RACF could not be asked: not active, an exit, a
   terminal or time restriction; answer 500). Treat any other negative value as
   an unknown failure.
+  Test for success with `!= 0` (or for failure with `< 0`), **never `== -1`**.
+  A module that compares with `-1` reads `-2` to `-4` as success and goes on to
+  `http_get_token()`, which then returns the token of the shared cache
+  credential, the one this call exists to avoid.
 - `http_logout(httpc)` — end the credential the request resolved to
 
 A module with a login endpoint calls `http_new_session()` before

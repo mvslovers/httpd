@@ -673,6 +673,11 @@ struct httpx {
 **                             terminal or time restriction).  A fault of the
 **                             server, not of the client (500).
 **
+** Test for success with `!= 0` (or for failure with `< 0`), never with
+** `== -1`: -1 is one of four reasons, and a module that compares with -1 reads
+** -2..-4 as success and goes on to http_get_token(), which then hands out the
+** token of the shared cache credential this call exists to avoid.
+**
 ** Treat any other negative value as an unknown failure: new reasons are added
 ** by appending values, never by changing these.  The values -2..-4 exist only
 ** from the httpd release that introduced them; an older httpd returns -1 for
@@ -681,11 +686,11 @@ struct httpx {
 ** for the entry at run time.
 **
 ** After -2 the credential the request authenticated with is marked unusable:
-** httpd no longer answers a request from it (it asks RACF again) and frees it
-** ten minutes later.  The current request still runs on it and must answer the
-** refusal, not carry on as the user.  A request that is still running ten
-** minutes after the refusal can lose the credential under it -- the same bound
-** as SESSION_MAXAGE.
+** httpd no longer answers a request from it, by password (it asks RACF again)
+** or by token, and frees it ten minutes later.  The current request still runs
+** on it and must answer the refusal, not carry on as the user.  A request that
+** is still running ten minutes after the refusal can lose the credential under
+** it -- the same bound as SESSION_MAXAGE.
 **
 ** A module that got 0 but cannot deliver the token to the client (a failed
 ** send, a response it gave up on) must call http_logout() before it returns:
