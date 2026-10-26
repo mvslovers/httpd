@@ -264,6 +264,46 @@ Both limits are enforced when a request looks a credential up, not only by the
 background sweep, so an expired session is rejected immediately rather than up
 to a minute later.
 
+#### A changed RACF password
+
+A client sending `Authorization: Basic` is answered from the cached credential
+and RACF is not asked, so after the password changed in RACF the **old** password
+keeps working until the cached entry ends:
+
+- The entry is bound to the client address (it is looked up by address, userid
+  and password together). The old password is accepted only from an address
+  that already holds a cache entry for it; from any other address RACF is asked
+  and refuses it.
+- For a client that keeps sending requests, the bound is `SESSION_MAXAGE`:
+  480 minutes by default, and no bound at all with `SESSION_MAXAGE 0`. An idle
+  client's entry ends at `SESSION_TIMEOUT` already.
+- An operator who needs a shorter window lowers `SESSION_MAXAGE`. Each
+  expiry costs the client one RACF logon.
+
+When an explicit login (the `/login` form, or a module calling
+`http_new_session()`) asks RACF for the session's own logon and RACF refuses
+the cached password (user not defined, wrong or expired password, access
+revoked), httpd learns that the cached entry is out of date. The login is
+answered as a refusal (the form shows "Invalid userid or password"; a module
+gets `HTTP_SESSION_REFUSED`). The entry is marked, and from then on no request
+is answered from it: the next request with that userid and password asks RACF
+and is refused. Any other RACF failure (RACF not active, an installation exit,
+a terminal or time restriction) says nothing about the cached password; the
+entry is left alone and the login fails as a server error
+(`HTTP_SESSION_NOMEM`, the form shows "Login failed, no session available").
+
+A marked entry is not freed at once, because the request that met the refusal
+(and any request that looked the entry up earlier) still points at it. It is
+freed ten minutes after it was marked, by the next login with the same
+credentials or by the background sweep. Until then, if RACF accepts the
+password again (it was set back), the entry is cleared and used as before.
+A request that is still running ten minutes after the refusal can lose its
+credential — the same bound as for `SESSION_MAXAGE`, and the reason for the
+warning below.
+
+This does not change the bounds above: an old password that no client ever
+tries to log in with is still accepted from the cache until the entry ends.
+
 > **Raise both well above the longest request.** The sweep frees credentials, so
 > a limit shorter than a request's own runtime could free one still in use.
 > The server writes `HTTPD026E` / `HTTPD032E` at startup when either is at or

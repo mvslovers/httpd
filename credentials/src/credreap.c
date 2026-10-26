@@ -10,6 +10,14 @@
 ** stays valid forever -- and with it a RACF identity that may since have been
 ** REVOKEd, had its password changed, or had its group memberships altered
 ** (the ACEE is a snapshot taken at login).  The max-age bounds that lag.
+**
+** A third case (#367): an entry marked CRED_FLAG_STALE -- RACF refused its
+** password when a session was minted from it -- is freed CRED_STALE_GRACE
+** seconds after it was marked.  The grace period is the borrow window again:
+** the request that met the refusal still holds the entry, and cred_session()
+** could not free it.  Counted from the mark (cred->stale), not from cred->last,
+** which every lookup refreshes.  Whichever comes first, this or the next
+** cred_login() for the same credentials after the period, removes it.
 */
 #include "cred.h"
 
@@ -41,9 +49,11 @@ unsigned cred_reap(unsigned ttl_secs, unsigned maxage_secs)
 
         /* idle too long, OR past the hard max-age counted from creation.
            credexp() treats a 0 limit as "never", so either may be disabled
-           on its own. */
+           on its own.  A stale entry (#367) expires on its own clock. */
         if (!credexp((long) difftime64(now, c->last),    ttl_secs) &&
-            !credexp((long) difftime64(now, c->created), maxage_secs)) continue;
+            !credexp((long) difftime64(now, c->created), maxage_secs) &&
+            !((c->flags & CRED_FLAG_STALE) &&
+              difftime64(now, c->stale) >= CRED_STALE_GRACE)) continue;
 
         /* skip anything a concurrent path is already freeing */
         if (testlock(c, LOCK_EXC) == 4) continue;

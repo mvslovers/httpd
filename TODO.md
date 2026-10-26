@@ -492,6 +492,14 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#367** — `http_new_session()` says why it failed; a cached password RACF
+  refused is dropped (PR #368, open): `-1` none, `-2` refused, `-3` busy, `-4`
+  no storage; only RACINIT rc 4/8/12/28 count as a refusal (others
+  are `-4`); the refused source is marked stale, not freed, never served by
+  `cred_login()` (it asks RACF afresh) and freed after a 10 minute grace by
+  `cred_login()` or the reaper. An interface change for HTTPX consumers; needs
+  the Security Reviewer. Not covered: the stale entry's token still resolves.
+  Full suite 838/838 on an MVS/CE container.
 - **#307** — a module abend on the 2nd+ request of a keep-alive connection
   gets its 503 again (PR #317): `httprese()` never cleared `httpc->resp`, so
   `httppcgi()` skipped the status line and sent a bare body (curl 000).

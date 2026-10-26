@@ -420,10 +420,15 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 		   the credential by address, userid and password, so a second browser
 		   or tab logging on the same way would otherwise get the same token --
 		   and /logout would end both. */
-		CRED *session = cred_session(httpd->credarr, httpd->credkey, cred);
+		int   why     = CRED_SESS_NONE;
+		CRED *session = cred_session(httpd->credarr, httpd->credkey, cred, &why);
 
 		if (!session) {
-			rc = print_login(httpd, httpc, "Login failed, no session available");
+			/* RACF refused the cached password: the same answer as a wrong one */
+			if (why == CRED_SESS_REFUSED)
+				rc = print_login(httpd, httpc, "Invalid userid or password");
+			else
+				rc = print_login(httpd, httpc, "Login failed, no session available");
 			goto quit;
 		}
 		cred = session;

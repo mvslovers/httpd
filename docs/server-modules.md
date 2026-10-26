@@ -138,8 +138,13 @@ rather than work around it; the table is covered by `TSTSTAT`.
 - `http_get_token(httpc, out, len)` — the session token of the resolved credential
 - `http_new_session(httpc)` — make this request's login a **session of its own**:
   a new credential with its own token and ACEE, which `http_get_token()` returns
-  from then on. `0` on success, `-1` without one (no credential or password,
-  RACF refused, store full).
+  from then on. `0` on success, otherwise a negative reason:
+  `HTTP_SESSION_NONE` (-1, no credential or no password), `HTTP_SESSION_REFUSED`
+  (-2, RACF refused the userid or password), `HTTP_SESSION_BUSY` (-3, the
+  client's sessions are all in use, or the store is full), `HTTP_SESSION_NOMEM`
+  (-4, out of storage, or RACF could not be asked: not active, an exit, a
+  terminal or time restriction; answer 500). Treat any other negative value as
+  an unknown failure.
 - `http_logout(httpc)` — end the credential the request resolved to
 
 A module with a login endpoint calls `http_new_session()` before
@@ -155,8 +160,14 @@ handed out without it — for instance on every Basic response, as mvsMF does �
 remains the shared credential's, and a logout with it ends that credential for
 everyone holding it; clients sending Basic simply log on again.
 
+A module that got `0` but cannot deliver the token to the client must call
+`http_logout()` before it returns; otherwise the session keeps its slot and its
+ACEE until the idle timeout or the per-client limit ends it.
+
 The entry is at `0x144` in the vector. There is no run-time test for an entry,
-so a module calling it needs an httpd that has it.
+so a module calling it needs an httpd that has it. The reasons -2 to -4 exist
+only from the httpd release that introduced them; older releases return -1 for
+every failure.
 
 ## Direct Accessors (not HTTPX entries)
 
