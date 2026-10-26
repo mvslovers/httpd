@@ -11,9 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-26 with #361 (job numbers and private system
-names out of the installation guide and `mbt.toml`; docs only), against `origin/main` e2d94bc:
-fourteen issues open besides #361, which closes with its PR. #322 (`PREALLOC`, deferred beyond
+*Last reconciled against the tracker: 2026-10-26 with the libufs note in the installation
+guide (#324), against `origin/main` 36a9f38: fourteen issues open, and #361 is closed (PR #365:
+job numbers and private system names out of the installation guide and `mbt.toml`). #322 (`PREALLOC`, deferred beyond
 4.4.0), #323, #325, #326, #327, #343, #346, #350 and #351 are filed and not yet ranked.
 #333 and #336 are closed (PRs #357 and #359) and #324 is closed, so none of them has a row any
 more; #319 stays open. Before that, 2026-10-26 for the 4.4.0 release candidate (#324), against
