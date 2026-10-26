@@ -12,10 +12,10 @@ wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
 *Last reconciled against the tracker: 2026-10-26 for the 4.4.0 release candidate (#324),
-against `origin/main` f887d50: seventeen issues open besides this one. #322 (`PREALLOC`,
-deferred beyond 4.4.0), #323, #325, #326, #327, #333, #336, #343, #346, #350, #351
+against `origin/main` e2d94bc: fifteen issues open besides this one. #322 (`PREALLOC`,
+deferred beyond 4.4.0), #323, #325, #326, #327, #343, #346, #350, #351
 and #361 are filed and not yet ranked. #254, #262, #263, #295, #296, #300, #307, #320,
-#328, #335, #352 and #353 and PR #305 are closed or merged and have no row; #319 stays open.
+#328, #333, #335, #336, #352 and #353 and PR #305 are closed or merged and have no row; #319 stays open.
 Before that, 2026-10-26 with #328 again (ufsd range >=1.5.1, `mbt.lock` re-pinned to 1.5.1; the ranked order unchanged). Before that, 2026-10-23 with the fix for #263 (`http_send_file()` asks `ufs_ferror()` at both read sites and ends the response on the first pass; `HTTPD045E` replaces the `HTTPD901E` spin): #263 closes with its PR and its row is gone, the ranked order of the rest unchanged. Before that, 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
 2.25.1, cc370 1.6.3; the changes since 2.23.0 reviewed, only the local
 `sleep()`/`usleep()`/`__tzget()` declarations needed code, the `src/` half of
@@ -111,8 +111,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #325 | acceptance of `RESIDENT=YES` on TK5 Update 5 and MVS/CE (TK5 Update 6 when available) | **MVS time** on each platform; not yet ranked |
 | — | #326 | build and test the HTTPD modules against the 4.4.0 candidate | the candidate; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; not part of 4.4.0 |
-| — | #333 | `type:docs` — the installation guide's troubleshooting row says 106-0F means storage | not yet ranked |
-| — | #336 | install guide step 6 — the IEHLIST snippet fails on TK5; the HTTPWEBR job card uses `NOTIFY=&SYSUID` | not yet ranked |
 | — | #343 | docs — installation step 8 should name the RAKF commands for `RES=` profiles | not yet ranked |
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
