@@ -286,20 +286,23 @@ the cached password (user not defined, wrong or expired password, access
 revoked), httpd learns that the cached entry is out of date. The login is
 answered as a refusal (the form shows "Invalid userid or password"; a module
 gets `HTTP_SESSION_REFUSED`). The entry is marked, and from then on no request
-is answered from it: the next request with that userid and password asks RACF
-and is refused. Any other RACF failure (RACF not active, an installation exit,
-a terminal or time restriction) says nothing about the cached password; the
-entry is left alone and the login fails as a server error
-(`HTTP_SESSION_NOMEM`, the form shows "Login failed, no session available").
+is answered from it. A request with that userid and password asks RACF and is
+refused. A request that carries the entry's token (a `Sec-Token` or
+`LtpaToken2` cookie, or a `Bearer` header) does not resolve to a credential at
+all. That token is the one a module hands out when it did not call
+`http_new_session()`, for instance on a Basic response. Any other RACF failure
+(RACF not active, an installation exit, a terminal or time restriction) says
+nothing about the cached password; the entry is left alone and the login fails
+as a server error (`HTTP_SESSION_NOMEM`, the form shows "Login failed, no
+session available"). HTTPD writes `HTTPD009W` for it.
 
-The mark covers the cache entry and nothing else. Private sessions
-(`http_new_session()`, the `/login` form) minted earlier from the same userid
-and password are not touched: each is found by its own token only, is a bearer
-token (#288), and stays valid until `SESSION_TIMEOUT` (idle) or `SESSION_MAXAGE`
-ends it. A refusal because the user was removed or the password changed
-therefore does not end the sessions that user already holds. The entry itself
-is also refused when it is reached by its token (a cookie or a Bearer header
-carrying the token of the marked entry), not only by Basic.
+The mark covers the cache entry and nothing else. A private session minted
+earlier from the same userid and password (by the `/login` form or by
+`http_new_session()`) is not touched. It is found by its own token only, and
+the token is all it needs (#288). It stays valid until `SESSION_TIMEOUT` (idle)
+or `SESSION_MAXAGE` ends it, or until the client's limit of 16 sessions pushes
+it out. A refusal because the user was removed or the password changed
+therefore does not end the sessions that user already holds.
 
 A marked entry is not freed at once, because the request that met the refusal
 (and any request that looked the entry up earlier) still points at it. It is
