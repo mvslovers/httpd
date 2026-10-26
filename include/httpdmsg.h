@@ -123,6 +123,13 @@
 /** HTTPD008W logout for a credential that was not found */
 #define MSG_LOGOUT_FAILED	"HTTPD008W USER %-8.8s IP %u.%u.%u.%u LOGOUT FAILED"
 
+/** HTTPD009W a login session could not be created because RACF failed with a
+ *  return code that says nothing about the password (RACF not active, an
+ *  installation exit, a terminal or time restriction).  A refusal of the
+ *  password itself (RACINIT 4, 8, 12, 28) is the client's doing and is not
+ *  written (#373). */
+#define MSG_SESSION_RACF_FAILED	"HTTPD009W LOGIN SESSION NOT CREATED, RACINIT FAILED RC=%d"
+
 /*
  * HTTPD010I/011I/013I are no longer written on the healthy path (#184
  * follow-up): that APF was obtained is only interesting when it FAILS, and

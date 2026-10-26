@@ -121,7 +121,6 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; milestone 4.5.0, not yet ranked |
-| — | #373 | follow-ups to #367 — refuse a stale credential by token, contract text for `http_new_session()`, a message id for the RACF failure | milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -498,7 +497,7 @@ project already writes it down properly.
   are `-4`); the refused source is marked stale, not freed, never served by
   `cred_login()` (it asks RACF afresh) and freed after a 10 minute grace by
   `cred_login()` or the reaper. An interface change for HTTPX consumers; needs
-  the Security Reviewer. Not covered: the stale entry's token still resolves (#373).
+  the Security Reviewer.
   Full suite 838/838 on an MVS/CE container.
 - **#307** — a module abend on the 2nd+ request of a keep-alive connection
   gets its 503 again (PR #317): `httprese()` never cleared `httpc->resp`, so

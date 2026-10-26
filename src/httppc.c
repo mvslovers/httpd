@@ -166,57 +166,13 @@ maxage_secs(HTTPD *httpd)
 }
 
 /*
-** cred_overage() - has this credential passed that limit?  The age is measured
-** from cred->created, which -- unlike cred->last -- is never refreshed, so
-** activity cannot extend a session past the maximum.  credexp() treats a 0
-** limit as "never", which is what switches the check off.
-*/
-static int
-cred_overage(HTTPD *httpd, CRED *cred)
-{
-	if (!cred) return 0;
-
-	return credexp((long) difftime64(time64(NULL), cred->created),
-	               maxage_secs(httpd));
-}
-
-/*
-** token_to_cred() - decode a base64 session-token string into a CREDTOK and
-** resolve the session (NULL on a miss).  Shared by the Sec-Token / LtpaToken2
-** cookies and the Bearer header; cred_find_by_token() refreshes cred->last (M2).
-**
-** An over-age credential is rejected HERE and not only by the reaper: the sweep
-** runs every ~60 s (httpd.c), so a reaper-only max-age would keep answering
-** with an expired session for up to a minute.  Enforcement is immediate;
-** reclamation is left to the sweep on purpose.  Freeing it on this path would
-** open a borrow window the idle design does not have -- a second worker holding
-** the same CRED for an in-flight request would be left with freed storage (the
-** M2 note in internals/refactoring-backlog.md: testlock catches a concurrent free,
-** not a borrow).  Leaving it linked costs one dead CRED for up to a minute and
-** resolves nothing in the meantime, because every lookup re-checks the age.
+** token_to_cred() - resolve a session-token string for this request (NULL on
+** a miss).  The decision is httptkcr()'s; this adds the configured max-age.
 */
 static CRED *
 token_to_cred(HTTPC *httpc, const char *b64)
 {
-	CREDTOK	tok;
-	CRED	*cred;
-	size_t	len;
-	char	*buf;
-
-	if (!b64 || !*b64) return NULL;
-
-	buf = base64_decode(b64, strlen(b64), &len);
-	if (!buf) return NULL;
-
-	memset(&tok, 0, sizeof(tok));
-	if (len > sizeof(tok)) len = sizeof(tok);
-	memcpy(&tok, buf, len);
-	free(buf);
-
-	cred = cred_find_by_token(&tok);
-	if (cred && cred_overage(httpc->httpd, cred)) cred = NULL;
-
-	return cred;
+	return httptkcr(b64, maxage_secs(httpc->httpd));
 }
 
 /*

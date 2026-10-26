@@ -673,6 +673,7 @@ extern const char *http_realm(HTTPD *)                                     asm("
 #define HTTP_SESSION_NOMEM   (-4)   /* out of storage, or RACF failed otherwise */
 extern int http_new_session(HTTPC *)                                       asm("HTTPNSES");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
+extern CRED *httptkcr(const char *b64, unsigned maxage)					asm("HTTPTKCR");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");

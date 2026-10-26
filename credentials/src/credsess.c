@@ -12,6 +12,7 @@
 */
 #include <mvs/storage.h>		/* __setsp()						*/
 #include "cred.h"
+#include "httpdmsg.h"		/* MSG_SESSION_RACF_FAILED		*/
 
 #undef array_count
 #undef array_add
@@ -106,7 +107,7 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)
 			reason = CRED_SESS_REFUSED;
 		}
 		else {
-			wtof("%s: RACF failed, rc=%d", __func__, rc);
+			wtof(MSG_SESSION_RACF_FAILED, rc);
 			reason = CRED_SESS_NOMEM;
 		}
 		goto quit;

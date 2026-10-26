@@ -74,6 +74,21 @@ login(HTTPC *httpc, unsigned addr, CREDTOK *tok)
            (int)sizeof(CREDTOK) ? 0 : LOGIN_NOTOKEN;
 }
 
+/* the credential a request would get from this token (cookie or Bearer), no
+   max-age: what httppc.c's token path decides, #373 */
+static CRED *
+by_token(CREDTOK *tok)
+{
+    size_t  len = 0;
+    char   *b64 = base64_encode((void *)tok, sizeof(CREDTOK), &len);
+    CRED   *cred;
+
+    if (!b64) return NULL;
+    cred = httptkcr(b64, 0);
+    free(b64);
+    return cred;
+}
+
 int main(void)
 {
     HTTPD    *httpd;
@@ -86,6 +101,7 @@ int main(void)
     CRED     *victim;
     CRED     *stale;
     CRED     *again;
+    CRED     *sess;
     CREDID    id;
     CREDTOK   tokn;
     time64_t  zero;
@@ -256,6 +272,9 @@ int main(void)
     CHECK(cred_login(addr, ibmuser, oldpw, 0) == stale,
           "the cache answers with it, RACF is not asked");
 
+    CHECK(by_token(&tokstale) == stale,
+          "before it is marked, the entry resolves by its token");
+
     a->addr = addr;
     a->cred = stale;
     CHECK(http_new_session(a) == HTTP_SESSION_REFUSED,
@@ -266,6 +285,11 @@ int main(void)
     CHECK((stale->flags & CRED_FLAG_STALE) != 0, "it is marked stale");
     CHECK(difftime64(stale->stale, zero) > 0, "with the time it was marked");
     CHECK(sessions_of(array, &stale->id) == 0, "and no session was made");
+
+    /* the token is refused too (#373), not only the password: a marked entry
+       stays linked for the requests that hold it, but nothing new reaches it */
+    CHECK(by_token(&tokstale) == NULL,
+          "a marked entry no longer resolves by its token");
 
     /* a marked entry is never served, and not freed within the grace period
        either: the lookup that finds it refreshes `last`, the floor is the
@@ -307,14 +331,27 @@ int main(void)
     shared = cred_login(addr, ibmuser, sys1, 0);
     CHECK(shared != NULL, "a fresh cache entry with a good password");
     if (!shared) return mbt_test_summary("TSTSESS");
+    CHECK(login(a, addr, &tokn) == 0, "a session is minted from it");
+    sess = cred_find_by_token(&tokn);
+    CHECK(sess != NULL && (sess->flags & CRED_FLAG_SESSION) != 0,
+          "and it is a private session");
+    CHECK(by_token(&shared->token) == shared,
+          "the unmarked cache entry resolves by its token");
     shared->flags |= CRED_FLAG_STALE;
     shared->stale  = time64(NULL);
+    CHECK(by_token(&shared->token) == NULL,
+          "marked, it does not resolve by its token (#373)");
+    CHECK(sess != NULL && by_token(&tokn) == sess,
+          "a session minted from it earlier is not touched by the mark");
     n = array_count(array);
     again = cred_login(addr, ibmuser, sys1, 0);
     CHECK(again == shared, "RACF accepts: the marked entry is taken back");
     CHECK((shared->flags & CRED_FLAG_STALE) == 0 && difftime64(shared->stale, zero) == 0,
           "mark and time are cleared");
     CHECK(array_count(array) == n, "no second CRED for the same credentials");
+    CHECK(by_token(&shared->token) == shared,
+          "taken back, the entry resolves by its token again");
+    credtok_logout_arr(array, &tokn);
     credtok_logout_arr(array, &shared->token);
 
     return mbt_test_summary("TSTSESS");

@@ -292,6 +292,15 @@ a terminal or time restriction) says nothing about the cached password; the
 entry is left alone and the login fails as a server error
 (`HTTP_SESSION_NOMEM`, the form shows "Login failed, no session available").
 
+The mark covers the cache entry and nothing else. Private sessions
+(`http_new_session()`, the `/login` form) minted earlier from the same userid
+and password are not touched: each is found by its own token only, is a bearer
+token (#288), and stays valid until `SESSION_TIMEOUT` (idle) or `SESSION_MAXAGE`
+ends it. A refusal because the user was removed or the password changed
+therefore does not end the sessions that user already holds. The entry itself
+is also refused when it is reached by its token (a cookie or a Bearer header
+carrying the token of the marked entry), not only by Basic.
+
 A marked entry is not freed at once, because the request that met the refusal
 (and any request that looked the entry up earlier) still points at it. It is
 freed ten minutes after it was marked, by the next login with the same
