@@ -264,6 +264,32 @@ Both limits are enforced when a request looks a credential up, not only by the
 background sweep, so an expired session is rejected immediately rather than up
 to a minute later.
 
+#### A changed RACF password
+
+A client sending `Authorization: Basic` is answered from the cached credential
+and RACF is not asked, so after the password changed in RACF the **old** password
+keeps working until the cached entry ends:
+
+- The entry is bound to the client address (it is looked up by address, userid
+  and password together). The old password is accepted only from an address
+  that already holds a cache entry for it; from any other address RACF is asked
+  and refuses it.
+- For a client that keeps sending requests, the bound is `SESSION_MAXAGE`:
+  480 minutes by default, and no bound at all with `SESSION_MAXAGE 0`. An idle
+  client's entry ends at `SESSION_TIMEOUT` already.
+- An operator who needs a shorter window lowers `SESSION_MAXAGE`. Each
+  expiry costs the client one RACF logon.
+
+When an explicit login (the `/login` form, or a module calling
+`http_new_session()`) asks RACF for the session's own logon and RACF refuses
+the cached password, httpd learns that the cached entry is out of date. The
+login is answered as a refusal (the form shows "Invalid userid or password"; a
+module gets `HTTP_SESSION_REFUSED`). The entry is marked, and the next request
+with that userid and password asks RACF and is refused; a marked entry is also
+removed by the background sweep once it has been idle for a minute. This does
+not change the bounds above: an old password that no client ever tries to log
+in with is still accepted from the cache until the entry ends.
+
 > **Raise both well above the longest request.** The sweep frees credentials, so
 > a limit shorter than a request's own runtime could free one still in use.
 > The server writes `HTTPD026E` / `HTTPD032E` at startup when either is at or

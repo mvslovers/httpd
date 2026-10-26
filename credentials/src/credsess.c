@@ -17,7 +17,7 @@
 #undef array_add
 
 CRED *
-cred_session(CRED ***array, CREDKEY *key, CRED *from)
+cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)
 {
 	CREDID		id;
 	CREDTOK		tok;
@@ -32,6 +32,7 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)
 	unsigned	n;
 	int			lockrc;
 	int			rc			= 0;
+	int			reason		= CRED_SESS_NONE;
 	unsigned char	user[9];
 	unsigned char	pass[9];
 
@@ -58,12 +59,22 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)
 	acee = racf_login((char *)user, (char *)pass, 0, &rc);
 	memset(user, 0, sizeof(user));
 	memset(pass, 0, sizeof(pass));
-	if (!acee) goto quit;
+	if (!acee) {
+		/* the password cached in `from` is no good any more (#367).  Mark it,
+		   never free it: the request calling us points at it, and its module
+		   may have set the task ACEE from it.  cred_login() drops a stale entry
+		   at its next lookup, before anyone borrows it again.  A session is not
+		   a cached password -- see cred.h. */
+		if (!(from->flags & CRED_FLAG_SESSION)) from->flags |= CRED_FLAG_STALE;
+		reason = CRED_SESS_REFUSED;
+		goto quit;
+	}
 
 	tok  = credtok_rand(key, &id);
 	cred = cred_new(&id, &tok, acee, CRED_FLAG_SESSION);
 	if (!cred) {
 		racf_logout(&acee);
+		reason = CRED_SESS_NOMEM;
 		goto quit;
 	}
 
@@ -103,6 +114,7 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)
 			   or pull a session out from under a request */
 			if (lockrc == 0) unlock(array, LOCK_EXC);
 			cred_free(&cred);
+			reason = CRED_SESS_BUSY;
 			goto quit;
 		}
 	}
@@ -111,6 +123,7 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)
 		if (lockrc == 0) unlock(array, LOCK_EXC);
 		wtof("%s: credential array full (%u); login rejected", __func__, CRED_MAX);
 		cred_free(&cred);
+		reason = CRED_SESS_BUSY;
 		goto free_evicted;
 	}
 
@@ -127,11 +140,13 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)
 	if (rc) {
 		wtof("%s: array_add() failed, rc=%d", __func__, rc);
 		cred_free(&cred);
+		reason = CRED_SESS_NOMEM;
 	}
 
 free_evicted:
 	if (evict) cred_free(&evict);
 
 quit:
+	if (!cred && why) *why = reason;
 	return cred;
 }

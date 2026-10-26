@@ -271,8 +271,11 @@ http_realm(HTTPD *httpd)
 ** (#288): a new CRED with its own random token and its own ACEE, which
 ** httpc->cred then points at, so http_get_token() returns its token and a
 ** later http_logout() with that token ends this session and no other.
-** Returns 0 on success, -1 when there is no session to make (see
-** cred_session() for the reasons).
+** Returns 0 on success, otherwise one of the negative HTTP_SESSION_* values:
+** NONE (no credential, or none with a password), REFUSED (RACF refused the
+** logon -- the credential the request holds is marked stale, see cred.h),
+** BUSY (per-client limit with every session in use, or the store full) and
+** NOMEM.  The contract for modules is in httpcgi.h.
 **
 ** Without it, a login hands out the token of whichever CRED the request
 ** resolved to -- and httppc.c resolves Basic through cred_login(), which finds
@@ -290,12 +293,20 @@ int
 http_new_session(HTTPC *httpc)
 {
     CRED *cred;
+    int  why = CRED_SESS_NONE;
 
-    if (!httpc || !httpc->cred || !httpc->httpd) return -1;
+    if (!httpc || !httpc->cred || !httpc->httpd) return HTTP_SESSION_NONE;
 
     cred = cred_session(httpc->httpd->credarr, httpc->httpd->credkey,
-                        httpc->cred);
-    if (!cred) return -1;
+                        httpc->cred, &why);
+    if (!cred) {
+        switch (why) {
+        case CRED_SESS_REFUSED: return HTTP_SESSION_REFUSED;
+        case CRED_SESS_BUSY:    return HTTP_SESSION_BUSY;
+        case CRED_SESS_NOMEM:   return HTTP_SESSION_NOMEM;
+        default:                return HTTP_SESSION_NONE;
+        }
+    }
 
     httpc->cred = cred;
     return 0;

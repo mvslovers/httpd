@@ -66,6 +66,9 @@ struct cred {
 #define CRED_FLAG_SESSION	0x20	/* ... private login session	*/
 									/*     (#288): never found by	*/
 									/*     CREDID, only by token	*/
+#define CRED_FLAG_STALE		0x10	/* ... RACF refused its password*/
+									/*     (#367): expired, dropped	*/
+									/*     by the next cred_login()	*/
 	time64_t		created;		/* 50 creation time stamp (#118)*/
 };									/* 58 (88 bytes)				*/
 
@@ -186,10 +189,26 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
  *
  * array and key are passed in, never taken from cred_array()/credkey(): a CGI
  * calls this through the HTTPX vector, in a GRT where both are empty (#109,
- * #111, #113).  Returns the new CRED, already in the array, or NULL (no
- * password on the source, RACF refused, no storage, array full). */
+ * #111, #113).  Returns the new CRED, already in the array, or NULL; on NULL
+ * *why (when why is not NULL) says which of the CRED_SESS_ reasons below it was.
+ *
+ * A refusal by RACF (CRED_SESS_REFUSED) proves the password cached in `from`
+ * is no longer good (changed, or the userid revoked).  `from` is then marked
+ * CRED_FLAG_STALE -- never freed: the request that called this still points at
+ * it, and its module may have set the task ACEE from it (#367).  A source that
+ * is itself a private session is not marked: a session is a bearer token, not
+ * a cached password, and find_by_id never returns it. */
 extern CRED *
-cred_session(CRED ***array, CREDKEY *key, CRED *from)										asm("CREDSESS");
+cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)								asm("CREDSESS");
+
+/* why cred_session() returned NULL (#367).  http_new_session() maps these onto
+ * the HTTP_SESSION_ values it returns to a module; the numbers match, but that
+ * mapping is spelled out there, not assumed. */
+#define CRED_SESS_NONE		(-1)	/* no source, or it has no password		*/
+#define CRED_SESS_REFUSED	(-2)	/* RACF refused the logon				*/
+#define CRED_SESS_BUSY		(-3)	/* client at CRED_SESSION_MAX, all in	*/
+									/* use; or the store is full			*/
+#define CRED_SESS_NOMEM		(-4)	/* no storage for the CRED or the array	*/
 
 /* sessions one client may hold at a time (#288): same CREDID, so the same
  * userid, password and address.  A login without a logout costs a slot until
@@ -209,6 +228,12 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from)										asm("CREDSESS");
  * with all its sessions busy gets its login refused instead -- 16 logins inside
  * a minute without a logout is a loop, not a user. */
 #define CRED_SESSION_IDLE 60
+
+/* seconds a CRED_FLAG_STALE entry must have been idle before cred_reap() frees
+ * it (#367).  The next cred_login() for it drops it anyway; the reaper only
+ * clears one nobody asks for again.  The floor is for the same reason as
+ * CRED_SESSION_IDLE: a request may still hold the entry by a plain pointer. */
+#define CRED_STALE_IDLE 60
 
 /* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs, or
  * older than maxage_secs counted from cred->created regardless of activity

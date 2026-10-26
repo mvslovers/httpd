@@ -92,8 +92,16 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 		   rejection until the next sweep.  credtok_logout_arr() re-locks the
 		   array, which is the same nesting cred_find_by_id() above already
 		   relies on -- and it is given the credential's OWN token, which since
-		   #188 is a random value we cannot re-derive from the CREDID. */
-		if (credexp((long) difftime64(time64(NULL), cred->created), maxage_secs)) {
+		   #188 is a random value we cannot re-derive from the CREDID.
+
+		   A stale entry (#367: RACF refused its password when a session was
+		   minted from it) is treated as expired, whatever its age: SESSION_MAXAGE
+		   may be 0, and a hit would otherwise keep accepting the old password.
+		   It was left in place by cred_session() because the request that found
+		   the refusal still holds it; by the time anyone is back here that
+		   request has long finished. */
+		if ((cred->flags & CRED_FLAG_STALE) ||
+		    credexp((long) difftime64(time64(NULL), cred->created), maxage_secs)) {
 			CREDTOK dead = cred->token;
 
 			credtok_logout_arr(array, &dead);
