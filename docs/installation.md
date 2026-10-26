@@ -190,6 +190,11 @@ The server starts, listens, and every `MOD=` route — mvsMF, the display module
 — works normally. Only static file requests fail. A CGI-only HTTPD is an
 ordinary deployment.
 
+HTTPD 4.4.0 is built against `libufs` 1.5.1 (UFSD 1.5.1). Running it against a
+UFSD older than 1.5.0 has not been tested; from 1.5.0 on, `ufs_ferror()` reports
+a read error reliably, which the response to a failed file read relies on. This
+is a note, not a prerequisite: the SYSMOD declares none.
+
 Note that `HTTPD001I` still reads `READY - SERVING /www` afterwards: it names
 the **configured** document root, not a working filesystem. `HTTPD044W` is the
 line that tells you the filesystem is not there, and it is written earlier in
