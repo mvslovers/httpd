@@ -668,14 +668,25 @@ reading success. ISPF 3.4 does, or:
 ```jcl
 //LIST    EXEC PGM=IEHLIST
 //SYSPRINT DD  SYSOUT=*
-//DD1      DD  UNIT=SYSALLDA,VOL=SER=your-volume,DISP=SHR
+//DD1      DD  UNIT=SYSDA,VOL=SER=your-volume,DISP=SHR
 //SYSIN    DD  *
- LISTPDS DSNAME=HTTPD.LINKLIB,VOL=SYSALLDA=your-volume
+ LISTPDS DSNAME=HTTPD.LINKLIB,VOL=SYSDA=your-volume
 /*
 ```
 
-Five members — `HTTPD`, `HTTPDSRV`, `HTTPDM`, `HTTPDMTT`, `ABEND0C1` — with
-`AUTH REQ = YES` on `HTTPD`.
+`your-volume` is the volume the library is on. The `DD1` statement is
+required: without it `IEHLIST` ends `IEH106I UNAVAILABLE DEVICE TYPE OR VOLUME
+I.D. SPECIFIED`, whatever the `VOL=` operand says. That message also comes
+back when the device type in `VOL=type=volser` does not match the volume.
+`SYSDA=` worked on TK5 and on MVS/CE; `SYSALLDA=` did not on TK5. If your
+system does not know `SYSDA`, write the volume's real device type instead
+(`3350`, `3380` or `3390`), for example `VOL=3390=your-volume`.
+
+The directory lists the five members `HTTPD`, `HTTPDSRV`, `HTTPDM`,
+`HTTPDMTT` and `ABEND0C1`, and any module that was copied in beside them
+(`MVSMF` is the usual one). `IEHLIST` prints each member's attributes only as
+hex, so it does not show the `AC(1)` authorisation code; `AMBLIST` below
+does.
 
 SMP **copies** these modules rather than re-binding them, which is why the
 `AC(1)` authorisation code on `HTTPD` and every module's custom entry point are
@@ -1024,13 +1035,13 @@ choosing and mount it, or copy the files in over UFSD.
 //             DCB=(DSORG=PS,RECFM=U,BLKSIZE=4096)
 ```
 
-**Submitting it from a workstation.** The job card of `HTTPWEBR` carries
-`NOTIFY=&SYSUID`. `&SYSUID` is a TSO symbol, replaced when you `SUBMIT` from a
-TSO session or ISPF. A job sent through mvsMF's jobs API has the symbol
-replaced by mvsMF with the submitting userid. A job sent by FTP passes the card
-exactly as written and ends with `IEF627I INCORRECT USE OF AMPERSAND IN THE
-NOTIFY FIELD` and `JOB NOT RUN - JCL ERROR`. Put your own userid there (or
-delete the operand) before you submit it by FTP.
+**Submitting it from a workstation.** The job card of `HTTPWEBR` has no
+`NOTIFY` operand, so nothing on it depends on how you submit it: it runs
+through mvsMF's jobs API and by FTP. The output stays in the held class
+(`MSGCLASS=H`) until you fetch it. If you add `NOTIFY=` to the card, name your
+own userid. `&SYSUID` is a TSO symbol: `SUBMIT` from TSO and mvsMF replace it,
+but FTP passes the card as written, and the job ends with `IEF627I INCORRECT
+USE OF AMPERSAND IN THE NOTIFY FIELD` and `JOB NOT RUN - JCL ERROR`.
 
 **Run it before the upload, not after.** IND$FILE allocates an *existing*
 dataset `DISP=SHR` and takes the DCB from its label; only when the dataset is
