@@ -11,7 +11,7 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-26 with #254 and #262, which were closed but still
+*Last reconciled against the tracker: 2026-10-26 against `origin/main` 8145027: #367 is closed (PR #368) and has no row any more; its follow-ups, #373, and #370 are filed and not yet ranked. Before that, 2026-10-26 with #254 and #262, which were closed but still
 had a section here, now struck through (the entry below that lists them as having no row was wrong
 about the sections); #367 and #370 are filed and not yet ranked. Before that, 2026-10-26 with the merge of #343 (PR #369), against
 `origin/main` 4622d81: #325, #327 and #343 are closed and have no row any more. #322 (`PREALLOC`,
@@ -120,8 +120,8 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
-| — | #367 | credential store — an old password still resolves after a RACF password change; `http_new_session()` return codes | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; milestone 4.5.0, not yet ranked |
+| — | #373 | follow-ups to #367 — refuse a stale credential by token, contract text for `http_new_session()`, a message id for the RACF failure | milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -493,12 +493,12 @@ Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
 - **#367** — `http_new_session()` says why it failed; a cached password RACF
-  refused is dropped (PR #368, open): `-1` none, `-2` refused, `-3` busy, `-4`
+  refused is dropped (PR #368, merged): `-1` none, `-2` refused, `-3` busy, `-4`
   no storage; only RACINIT rc 4/8/12/28 count as a refusal (others
   are `-4`); the refused source is marked stale, not freed, never served by
   `cred_login()` (it asks RACF afresh) and freed after a 10 minute grace by
   `cred_login()` or the reaper. An interface change for HTTPX consumers; needs
-  the Security Reviewer. Not covered: the stale entry's token still resolves.
+  the Security Reviewer. Not covered: the stale entry's token still resolves (#373).
   Full suite 838/838 on an MVS/CE container.
 - **#307** — a module abend on the 2nd+ request of a keep-alive connection
   gets its 503 again (PR #317): `httprese()` never cleared `httpc->resp`, so
