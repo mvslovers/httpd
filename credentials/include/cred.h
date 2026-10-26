@@ -59,7 +59,8 @@ struct cred {
 	ACEE			*acee;			/* 48 RACF ACEE					*/
 	unsigned short	len;			/* 4C length of CRED			*/
 	unsigned char	version;		/* 4E version number			*/
-#define CRED_VERSION	2			/* ... 2 added created (#118)	*/
+#define CRED_VERSION	3			/* ... 2 added created (#118)	*/
+									/*     3 added stale (#367)		*/
 	unsigned char   flags;			/* 4F flags						*/
 #define CRED_FLAG_NO_DELETE 0x80	/* ,,, do not delete cred		*/
 #define CRED_FLAG_KEEP_ACEE	0x40	/* ... do not delete cred->acee	*/
@@ -67,10 +68,13 @@ struct cred {
 									/*     (#288): never found by	*/
 									/*     CREDID, only by token	*/
 #define CRED_FLAG_STALE		0x10	/* ... RACF refused its password*/
-									/*     (#367): expired, dropped	*/
-									/*     by the next cred_login()	*/
+									/*     (#367): never served by	*/
+									/*     cred_login() again, freed	*/
+									/*     CRED_STALE_GRACE later	*/
 	time64_t		created;		/* 50 creation time stamp (#118)*/
-};									/* 58 (88 bytes)				*/
+	time64_t		stale;			/* 58 when CRED_FLAG_STALE was	*/
+									/*    set (#367), else 0		*/
+};									/* 60 (96 bytes)				*/
 
 /* cred_init() - initialize CRED environment, generates BLOWFISH_KEY for credkey() */
 extern int 
@@ -192,12 +196,17 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
  * #111, #113).  Returns the new CRED, already in the array, or NULL; on NULL
  * *why (when why is not NULL) says which of the CRED_SESS_ reasons below it was.
  *
- * A refusal by RACF (CRED_SESS_REFUSED) proves the password cached in `from`
- * is no longer good (changed, or the userid revoked).  `from` is then marked
+ * CRED_SESS_REFUSED means RACF said the userid or password is no good: RACINIT
+ * return codes 4 (user not defined), 8 (wrong password), 12 (password expired)
+ * and 28 (access revoked).  Those prove the password cached in `from` is no
+ * longer good (changed, or the userid revoked), and `from` is then marked
  * CRED_FLAG_STALE -- never freed: the request that called this still points at
- * it, and its module may have set the task ACEE from it (#367).  A source that
- * is itself a private session is not marked: a session is a bearer token, not
- * a cached password, and find_by_id never returns it. */
+ * it, and its module may have set the task ACEE from it (#367).  Any other
+ * RACINIT failure (RACF not active, an installation exit, a terminal or time
+ * restriction) says nothing about the cached password: `from` is left alone
+ * and the reason is CRED_SESS_NOMEM, a failure of the server, not of the
+ * client.  A source that is itself a private session is not marked: a session
+ * is a bearer token, not a cached password, and find_by_id never returns it. */
 extern CRED *
 cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)								asm("CREDSESS");
 
@@ -205,10 +214,11 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)								asm("CRED
  * the HTTP_SESSION_ values it returns to a module; the numbers match, but that
  * mapping is spelled out there, not assumed. */
 #define CRED_SESS_NONE		(-1)	/* no source, or it has no password		*/
-#define CRED_SESS_REFUSED	(-2)	/* RACF refused the logon				*/
+#define CRED_SESS_REFUSED	(-2)	/* RACF refused userid or password		*/
 #define CRED_SESS_BUSY		(-3)	/* client at CRED_SESSION_MAX, all in	*/
 									/* use; or the store is full			*/
-#define CRED_SESS_NOMEM		(-4)	/* no storage for the CRED or the array	*/
+#define CRED_SESS_NOMEM		(-4)	/* no storage for the CRED or the array,*/
+									/* or RACF failed for another reason	*/
 
 /* sessions one client may hold at a time (#288): same CREDID, so the same
  * userid, password and address.  A login without a logout costs a slot until
@@ -229,11 +239,16 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)								asm("CRED
  * a minute without a logout is a loop, not a user. */
 #define CRED_SESSION_IDLE 60
 
-/* seconds a CRED_FLAG_STALE entry must have been idle before cred_reap() frees
- * it (#367).  The next cred_login() for it drops it anyway; the reaper only
- * clears one nobody asks for again.  The floor is for the same reason as
- * CRED_SESSION_IDLE: a request may still hold the entry by a plain pointer. */
-#define CRED_STALE_IDLE 60
+/* seconds a CRED_FLAG_STALE entry is kept after it was marked, before
+ * cred_login() or cred_reap() frees it (#367).  The request that met the
+ * refusal, and any request that resolved the entry before it, still holds it by
+ * a plain pointer, possibly with the task ACEE set from it, so it cannot go at
+ * once.  It is counted from the mark, not from cred->last: a lookup refreshes
+ * that.  Within the grace period cred_login() does not serve the entry -- it
+ * asks RACF again.  A request that is still running when the period ends can
+ * lose its CRED, the same kind of bound as SESSION_MAXAGE >> longest request
+ * (HTTPD032E); 10 minutes is far above any request the server is built for. */
+#define CRED_STALE_GRACE 600
 
 /* cred_reap() - free CREDs (and their ACEEs) idle longer than ttl_secs, or
  * older than maxage_secs counted from cred->created regardless of activity

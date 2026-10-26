@@ -140,9 +140,11 @@ rather than work around it; the table is covered by `TSTSTAT`.
   a new credential with its own token and ACEE, which `http_get_token()` returns
   from then on. `0` on success, otherwise a negative reason:
   `HTTP_SESSION_NONE` (-1, no credential or no password), `HTTP_SESSION_REFUSED`
-  (-2, RACF refused the logon), `HTTP_SESSION_BUSY` (-3, the client's sessions
-  are all in use, or the store is full), `HTTP_SESSION_NOMEM` (-4). Treat any
-  other negative value as an unknown failure.
+  (-2, RACF refused the userid or password), `HTTP_SESSION_BUSY` (-3, the
+  client's sessions are all in use, or the store is full), `HTTP_SESSION_NOMEM`
+  (-4, out of storage, or RACF could not be asked: not active, an exit, a
+  terminal or time restriction; answer 500). Treat any other negative value as
+  an unknown failure.
 - `http_logout(httpc)` — end the credential the request resolved to
 
 A module with a login endpoint calls `http_new_session()` before

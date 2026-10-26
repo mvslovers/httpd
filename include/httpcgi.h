@@ -659,13 +659,19 @@ struct httpx {
 **    0  the session exists; http_get_token() now returns its token
 **   -1  HTTP_SESSION_NONE     the request is not authenticated, or carries no
 **                             password to log on again with
-**   -2  HTTP_SESSION_REFUSED  RACF refused the logon: the password the request
-**                             authenticated with is no longer valid (changed or
-**                             revoked since httpd cached it).  Answer 401.
+**   -2  HTTP_SESSION_REFUSED  RACF refused the logon -- userid not defined,
+**                             wrong or expired password, or access revoked: the
+**                             password the request authenticated with is no
+**                             longer valid (changed or revoked since httpd
+**                             cached it).  Answer 401.
 **   -3  HTTP_SESSION_BUSY     no slot: the client already holds 16 sessions and
 **                             all of them are in use, or the credential store
 **                             is full.  Retrying later may succeed (503).
-**   -4  HTTP_SESSION_NOMEM    out of storage (500)
+**   -4  HTTP_SESSION_NOMEM    out of storage, or RACF could not be asked for
+**                             a reason that says nothing about the password
+**                             (RACF not active, an installation exit, a
+**                             terminal or time restriction).  A fault of the
+**                             server, not of the client (500).
 **
 ** Treat any other negative value as an unknown failure: new reasons are added
 ** by appending values, never by changing these.  The values -2..-4 exist only
@@ -674,9 +680,12 @@ struct httpx {
 ** error and does not read it as "not authenticated".  There is no way to test
 ** for the entry at run time.
 **
-** After -2 the credential the request authenticated with is marked unusable
-** and httpd drops it at the next login; the current request still runs on it
-** and must answer the refusal, not carry on as the user.
+** After -2 the credential the request authenticated with is marked unusable:
+** httpd no longer answers a request from it (it asks RACF again) and frees it
+** ten minutes later.  The current request still runs on it and must answer the
+** refusal, not carry on as the user.  A request that is still running ten
+** minutes after the refusal can lose the credential under it -- the same bound
+** as SESSION_MAXAGE.
 **
 ** A module that got 0 but cannot deliver the token to the client (a failed
 ** send, a response it gave up on) must call http_logout() before it returns:

@@ -9,6 +9,7 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 	CRED	***array= cred_array();
 	CREDKEY	*key	= credkey();
 	CRED	*cred 	= NULL;
+	CRED	*held	= NULL;
 	CREDID	id 		= credid_init(NULL);
 	CREDTOK	tok;
 	ACEE	*acee	= NULL;
@@ -95,13 +96,31 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 		   #188 is a random value we cannot re-derive from the CREDID.
 
 		   A stale entry (#367: RACF refused its password when a session was
-		   minted from it) is treated as expired, whatever its age: SESSION_MAXAGE
-		   may be 0, and a hit would otherwise keep accepting the old password.
-		   It was left in place by cred_session() because the request that found
-		   the refusal still holds it; by the time anyone is back here that
-		   request has long finished. */
-		if ((cred->flags & CRED_FLAG_STALE) ||
-		    credexp((long) difftime64(time64(NULL), cred->created), maxage_secs)) {
+		   minted from it) is never served, whatever its age: SESSION_MAXAGE may
+		   be 0, and a hit would otherwise keep accepting the old password.  But
+		   it is not freed at once either.  The request that met the refusal
+		   still holds it, and so may any other request that resolved it
+		   earlier; cred_find_by_id() above refreshes cred->last, so a request
+		   that comes back here cannot tell from `last` whether those are done.
+		   The entry therefore gets its own floor, CRED_STALE_GRACE seconds from
+		   the mark (cred->stale), independent of `last`.  Within the grace
+		   period this call leaves it alone and asks RACF afresh: a refusal
+		   returns NULL (the client gets its 401 or the login form), an
+		   acceptance means the password works again -- it was set back, or the
+		   refusal was transient -- and the entry is cleared and returned as it
+		   is, so no second CRED for the same credentials appears.  Past the
+		   grace period the entry is dropped like an expired one.  What remains
+		   is the same bound as for SESSION_MAXAGE: a request that is still
+		   running CRED_STALE_GRACE seconds after the refusal can lose its CRED
+		   (see cred.h). */
+		int old = credexp((long) difftime64(time64(NULL), cred->created), maxage_secs);
+
+		if ((cred->flags & CRED_FLAG_STALE) && !old &&
+		    difftime64(time64(NULL), cred->stale) < CRED_STALE_GRACE) {
+			held = cred;
+			cred = NULL;
+		}
+		else if ((cred->flags & CRED_FLAG_STALE) || old) {
 			CREDTOK dead = cred->token;
 
 			credtok_logout_arr(array, &dead);
@@ -118,6 +137,15 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 	   leak a plaintext credential to the console/SYSLOG (issue #116). */
 	acee = racf_login(user, pass, 0, &rc);
 	if (!acee) {
+		goto cleanup;
+	}
+
+	/* RACF accepts what a stale entry refused: take the entry back */
+	if (held) {
+		racf_logout(&acee);
+		held->flags &= ~CRED_FLAG_STALE;
+		memset(&held->stale, 0, sizeof(held->stale));
+		cred = held;
 		goto cleanup;
 	}
 

@@ -16,6 +16,47 @@
 #undef array_count
 #undef array_add
 
+/* Clear a buffer in a way the optimiser cannot drop: memset() of a buffer that
+   is not read afterwards is dead code to it (Sonar S5798).  Writes through a
+   volatile pointer are observable, so they stay. */
+static void
+scrub(unsigned char *buf, unsigned len)
+{
+	volatile unsigned char *p = buf;
+
+	while (len--) *p++ = 0;
+}
+
+/* RACINIT return codes that say the userid or password is no good: 4 user not
+   defined, 8 wrong password, 12 password expired, 28 access revoked.  Any other
+   failure (32 RACF not active, 24 installation exit, 0x30 terminal or time
+   restriction, ...) says nothing about the cached password. */
+static int
+racf_refused(int rc)
+{
+	return rc == 4 || rc == 8 || rc == 12 || rc == 28;
+}
+
+/* the password cached in `from` is no good any more (#367).  Mark it, never
+   free it: the request calling us points at it, and its module may have set the
+   task ACEE from it.  Under the array lock, like every other reader of the
+   flag and the stamp (cred_login(), cred_reap()).  A session is not a cached
+   password -- see cred.h. */
+static void
+mark_stale(CRED ***array, CRED *from)
+{
+	int lockrc;
+
+	if (from->flags & CRED_FLAG_SESSION) return;
+
+	lockrc = lock(array, LOCK_EXC);
+	if (!(from->flags & CRED_FLAG_STALE)) {
+		from->stale  = time64(NULL);
+		from->flags |= CRED_FLAG_STALE;
+	}
+	if (lockrc == 0) unlock(array, LOCK_EXC);
+}
+
 CRED *
 cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)
 {
@@ -57,16 +98,17 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)
 	   RAKF writes its own RAKF0004, and the password must not reach a console
 	   (#116). */
 	acee = racf_login((char *)user, (char *)pass, 0, &rc);
-	memset(user, 0, sizeof(user));
-	memset(pass, 0, sizeof(pass));
+	scrub(user, sizeof(user));
+	scrub(pass, sizeof(pass));
 	if (!acee) {
-		/* the password cached in `from` is no good any more (#367).  Mark it,
-		   never free it: the request calling us points at it, and its module
-		   may have set the task ACEE from it.  cred_login() drops a stale entry
-		   at its next lookup, before anyone borrows it again.  A session is not
-		   a cached password -- see cred.h. */
-		if (!(from->flags & CRED_FLAG_SESSION)) from->flags |= CRED_FLAG_STALE;
-		reason = CRED_SESS_REFUSED;
+		if (racf_refused(rc)) {
+			mark_stale(array, from);
+			reason = CRED_SESS_REFUSED;
+		}
+		else {
+			wtof("%s: RACF failed, rc=%d", __func__, rc);
+			reason = CRED_SESS_NOMEM;
+		}
 		goto quit;
 	}
 

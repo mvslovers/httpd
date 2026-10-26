@@ -12,11 +12,12 @@
 ** (the ACEE is a snapshot taken at login).  The max-age bounds that lag.
 **
 ** A third case (#367): an entry marked CRED_FLAG_STALE -- RACF refused its
-** password when a session was minted from it -- is freed once it has been idle
-** CRED_STALE_IDLE seconds.  The idle floor is the borrow window again: the
-** request that met the refusal still holds the entry, and cred_session() could
-** not free it.  Whichever comes first, this or the next cred_login() for the
-** same credentials, removes it.
+** password when a session was minted from it -- is freed CRED_STALE_GRACE
+** seconds after it was marked.  The grace period is the borrow window again:
+** the request that met the refusal still holds the entry, and cred_session()
+** could not free it.  Counted from the mark (cred->stale), not from cred->last,
+** which every lookup refreshes.  Whichever comes first, this or the next
+** cred_login() for the same credentials after the period, removes it.
 */
 #include "cred.h"
 
@@ -52,7 +53,7 @@ unsigned cred_reap(unsigned ttl_secs, unsigned maxage_secs)
         if (!credexp((long) difftime64(now, c->last),    ttl_secs) &&
             !credexp((long) difftime64(now, c->created), maxage_secs) &&
             !((c->flags & CRED_FLAG_STALE) &&
-              difftime64(now, c->last) >= CRED_STALE_IDLE)) continue;
+              difftime64(now, c->stale) >= CRED_STALE_GRACE)) continue;
 
         /* skip anything a concurrent path is already freeing */
         if (testlock(c, LOCK_EXC) == 4) continue;
