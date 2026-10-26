@@ -11,7 +11,9 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-26 with the merge of #343 (PR #369), against
+*Last reconciled against the tracker: 2026-10-26 with #254 and #262, which were closed but still
+had a section here, now struck through (the entry below that lists them as having no row was wrong
+about the sections); #367 and #370 are filed and not yet ranked. Before that, 2026-10-26 with the merge of #343 (PR #369), against
 `origin/main` 4622d81: #325, #327 and #343 are closed and have no row any more. #322 (`PREALLOC`,
 deferred beyond 4.4.0), #323, #326, #346, #350 and #351 are filed and not yet ranked. Before that,
 2026-10-26 with the libufs note in the installation
@@ -118,6 +120,8 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
+| — | #367 | credential store — an old password still resolves after a RACF password change; `http_new_session()` return codes | not yet ranked |
+| — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -333,17 +337,18 @@ short. An error in an `<!--#include -->`d file ends the including response too.
 `HTTPD045E` is one line per failed request; a file that is read again and again
 writes it again and again, and there is no rate limit.
 
-### 2 · #254 — six Parmlib keywords the parser accepts are undocumented
+### ~~2 · #254 — six Parmlib keywords the parser accepts are undocumented~~
 
-*nothing blocks it; it is small and nobody has picked it up*
+Closed with PR #329: `docs/configuration.md` documents the six keywords.
 
 Ranked above #250 only because it costs no MVS time. `httpprm.c` is the
 authority for what the parser accepts; `docs/configuration.md` is what an
 operator reads, and the two disagree by six keywords.
 
-### 3 · #262 — TSTSP keeps the whole suite red
+### ~~3 · #262 — TSTSP keeps the whole suite red~~
 
-*it hides one test and devalues the other seventeen*
+Closed without a change in httpd: the cause was in libc370 (libc370#432), and
+`mbt test --mvs` runs green with libc370 2.25.1 in the sysroot.
 
 490 assertions pass and `mbt test --mvs` (then `make test-mvs`) still reports `2 step(s) FAILED`, because
 TSTSP's step ends `ABEND SA03` — the step task ending with a subtask still
