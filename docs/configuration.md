@@ -308,7 +308,7 @@ consults nothing. So HTTPD logs on to a dedicated identity instead and installs
 it as the address space's resting one (issue #177).
 
 > **This holds until the first client authenticates, and no further.** Measured
-> on mvsdev with `/.dm`: after startup `ASXBSENV` held the `HTTPD/USER` ACEE as
+> on a test system with `/.dm`: after startup `ASXBSENV` held the `HTTPD/USER` ACEE as
 > intended, and after one Basic-auth request it held the *client's*
 > `IBMUSER/ADMIN` ACEE instead. The `HTTPD/USER` ACEE was still allocated and
 > intact — it had simply been displaced.
