@@ -932,38 +932,95 @@ client can log in.
    `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
    NOT GATED` is what an installation without the profile prints — and until
    the profile exists every user who can log in may issue operator commands.
-   Define it in `SYS1.SECURE.CNTL(PROFILES)`: the class in columns 1–8, the
-   resource in 9–52, a group or user id in 53–60 and the access from column 61,
-   with the universal entry (blank group) first and the lines in ascending
-   order:
+   **Do not edit `PROFILES` by hand; RAKF's maintainer recommends the commands.**
+   On MVS/CE (RAKF 2.0.0) define the profile with `RDEFINE` and `PERMIT`.
+   `RDEFINE` writes the universal line of a profile, `PERMIT` adds a line for a
+   group or a user id. Run `RDEFINE` first. A hand-edited member that is wrong
+   aborts the reload, and on RAKF 2.0.0 it can keep JES2 from starting at the
+   next IPL.
+
+   Run the commands in a TSO batch step, each one starting in column 1:
+
+   ```
+   //RAKFCMD  JOB (1),'RAKF CMD',CLASS=A,MSGCLASS=H
+   //TSO      EXEC PGM=IKJEFT01,DYNAMNBR=20
+   //SYSPRINT DD SYSOUT=*
+   //SYSTSPRT DD SYSOUT=*
+   //SYSTSIN  DD *
+   RDEFINE MVSMF.CONSOLE CLASS(FACILITY) UACC(NONE)
+   PERMIT MVSMF.CONSOLE CLASS(FACILITY) ID(MVSCONS) ACCESS(READ)
+   RDEFINE HTTPD.ADMIN CLASS(FACILITY) UACC(NONE)
+   PERMIT HTTPD.ADMIN CLASS(FACILITY) ID(ADMIN) ACCESS(READ)
+   /*
+   ```
+
+   `SYSTSPRT` shows the answers:
+
+   ```
+   RDEFINE MVSMF.CONSOLE CLASS(FACILITY) UACC(NONE)
+   RDEFINE: FACILITY profile defined: MVSMF.CONSOLE
+   RDEFINE: Run RAKFPROF to activate the changes
+   PERMIT MVSMF.CONSOLE CLASS(FACILITY) ID(MVSCONS) ACCESS(READ)
+   PERMIT:  access READ    granted to FACILITY/MVSMF.CONSOLE
+   PERMIT: ID = MVSCONS
+   PERMIT: Run RAKFPROF to activate the changes
+   RDEFINE HTTPD.ADMIN CLASS(FACILITY) UACC(NONE)
+   RDEFINE: FACILITY profile defined: HTTPD.ADMIN
+   RDEFINE: Run RAKFPROF to activate the changes
+   PERMIT HTTPD.ADMIN CLASS(FACILITY) ID(ADMIN) ACCESS(READ)
+   PERMIT:  access READ    granted to FACILITY/HTTPD.ADMIN
+   PERMIT: ID = ADMIN
+   PERMIT: Run RAKFPROF to activate the changes
+   ```
+
+   The first pair is the console profile that the shipped `HTTPPRM0` needs; the
+   second is the `/admin/*` route of the `HTTPD425W` example above, shown for the
+   pattern. Both commands accept a group or a user id in `ID()`.
+   `PERMIT … ID(TESTER)` grants one more person without a group of their own.
+
+   **Who may run them.** The user must be connected to the group `RAKFADM` and
+   have the SPECIAL authority (column 30 of `USERS`, item 1). Without
+   SPECIAL `RDEFINE` answers `RDEFINE: Not authorized, no SPECIAL attribute`;
+   without the `RAKFADM` group it answers `RDEFINE: RAKFPROF access denied`.
+   Operations authority is not needed.
+
+   The commands change `SYS1.SECURE.CNTL(PROFILES)` only. Item 3 puts the
+   change in effect. Afterwards the member holds these lines for the console
+   profile (class in columns 1–8, resource from column 9, group or user id from
+   column 53, access from column 61); check them, do not type them:
 
    ```
    FACILITYMVSMF.CONSOLE                                       NONE
    FACILITYMVSMF.CONSOLE                               MVSCONS READ
    ```
 
+   On TK5 (RAKF 1.2.x) there are no such commands: a TSO step answers
+   `IKJ56500I COMMAND RDEFINE NOT FOUND`, and editing the member is the only
+   route. Put the same two lines into `SYS1.SECURE.CNTL(PROFILES)` by hand, with
+   the universal entry (blank group) first and the lines in ascending order.
+
    Access is READ or nothing, and READ means every operator command, from
    console 0 and without a `UCMAUTH` filter: nothing narrows it per command.
-   The second line grants the group `MVSCONS`, a name chosen for this example:
-   use a group of its own that holds just the people who may issue operator
-   commands, not a broad one such as `ADMIN` that exists for other reasons.
-   To grant one more person without a group of their own, add a line with the
-   user id in the group column (`FACILITYMVSMF.CONSOLE … TESTER  READ`,
-   measured on RAKF 2). **The development user needs the profile too:**
-   `mbt run restart` and `mbt target console` issue `P`/`S` through
-   `/zosmf/restconsoles`. Without READ the request is refused (`403`); mbt warns
-   and falls back to the target's Hercules console if it has one, and fails
-   with "not delivered" if it has not.
+   `MVSCONS` is a group name chosen for this example: use a group of its own
+   that holds just the people who may issue operator commands, not a broad one
+   such as `ADMIN` that exists for other reasons. **The development user needs
+   the profile too:** `mbt run restart` and `mbt target console` issue `P`/`S`
+   through `/zosmf/restconsoles`. Without READ the request is refused (`403`);
+   mbt warns and falls back to the target's Hercules console if it has one, and
+   fails with "not delivered" if it has not.
 
-3. Reload the tables with the RAKF started tasks:
+3. Reload the tables with the RAKF started tasks. After item 2 the profiles
+   table is the one that matters:
 
    ```
-   /S RAKFUSER                   the USERS table
    /S RAKFPROF                   the profiles table
+   /S RAKFUSER                   the USERS table
    ```
 
-   On MVS/CE, also `/S RAKF`. There is no `/F RAKF,RELOAD`: on TK5 it answers
-   `IEE341I RAKF NOT ACTIVE`.
+   The console answers `RAKFPROF7  RAKF PROFILES UPDATED` and `RAKFUIDS4  USER
+   TABLE UPDATED`. `/S RAKF` does both in one step (it adds `RAKF005I RAKF is
+   already active`) on MVS/CE and on TK5. There is no `/F RAKF,RELOAD`: it
+   answers `IEE341I RAKF NOT ACTIVE` on both.
 
    You will see whether the line took when HTTPD starts: `HTTPD004I STC IDENTITY
    SET TO HTTPD/USER VIA RACINIT` (step 10).
