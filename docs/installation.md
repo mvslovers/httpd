@@ -1362,7 +1362,8 @@ each name against ISPF 3.4 first, and do not confuse them with the unversioned
 **1. Stop the server:** `/P HTTPD`
 
 **2. Cut the FMID out of the SMP inventory.** Submit this — it edits the CDS and
-the ACDS and touches no library:
+the ACDS and touches no library. It is long on purpose, and on most systems its
+`UCLIN` step ends with RC 08; the explanation follows the job.
 
 ```
 //HTTPDUCL JOB (SYS),'HTTPD UNINSTALL',
@@ -1372,41 +1373,136 @@ the ACDS and touches no library:
 //SMPCNTL  DD  *
  UCLIN CDS .
   DEL SYSMOD(THTP430) MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP420) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP410) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP400) .
  ENDUCL .
+ RESETRC .
  UCLIN ACDS .
   DEL SYSMOD(THTP430) MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP420) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP410) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP400) .
  ENDUCL .
+ RESETRC .
 /*
 //LIST    EXEC SMPAPP
 //SMPCNTL  DD  *
@@ -1423,10 +1519,52 @@ the ACDS and touches no library:
 //
 ```
 
-Every `DEL` that finds its entry reports `HMA2550 UPDATE COMPLETE`. What a
-line naming an id this system never had reports has not been measured, so do
-not judge the job by the `UCLIN` return codes: the `LIST` below is the
-result.
+**Why every `DEL` has a block of its own.** The job holds 33 `DEL` statements,
+19 against the CDS and 14 against the ACDS. Each one stands in its own
+`UCLIN`/`ENDUCL` pair, and a `RESETRC .` follows every `ENDUCL .`. Three
+facts of SMP 4 make that necessary (measured on TK5 with SMP 4,
+`HMASMP LVL 04.48`):
+
+- **A `DEL` that names an entry the zone does not hold is an error.** It
+  reports `HMA2532 ** SYSMOD ENTRY THTP410 TO BE DELETED DOES NOT EXIST` and
+  `HMA2560 UPDATE PROCESSING TERMINATED - UPDATE NOT COMPLETE`, and its block
+  ends RC 08. A `DEL MOD` or `DEL LMOD` for a missing module reports the same
+  pair with `MODULE ENTRY` or `LMOD ENTRY` in the first message (each run in a
+  step of its own). `LIST` is different: an id it does not find is RC 04.
+- **After such an error SMP ignores every further `UCLIN` in the same step.**
+  Each one reports `HMA2293 ** CONTROL STATEMENT IGNORED DUE TO PREVIOUS ERROR`,
+  ends RC 12, and its `DEL` statements are discarded without a trace. Separate
+  blocks are not enough: with a `UCLIN`/`ENDUCL` pair around every `DEL` but no
+  `RESETRC`, the failure at `THTP410` silenced everything after it, and
+  `THTP430` and the tombstone `THTP420` were still in the ACDS afterwards.
+- **`RESETRC .` between the blocks lifts it.** With it, no `HMA2293` was
+  reported and every `DEL` that found its entry was carried out. A new
+  `EXEC SMPAPP` step lifts it as well, because each step is a separate SMP
+  run.
+
+**Read the return codes as expected, not as a verdict.** On a system that
+holds `THTP430` and the tombstone `THTP420` but never saw `THTP410` or
+`THTP400`, two blocks per zone fail, four of the 33, and the `UCLIN` step ends
+RC 08. The other 29 report `HMA2550 UPDATE COMPLETE`. The `LIST` step ends
+RC 04. Neither number says whether the removal worked; the stanzas of the
+`LIST` in step 3 do. Running the job a second time, when no id is left,
+gives RC 08 again with no `HMA2550` and no `HMA2293`, and the same `LIST`.
+
+**The modules go as well.** After the job, `LIST CDS MOD(...)`,
+`LIST CDS LMOD(...)` and `LIST ACDS MOD(...)` for the five module names answer
+RC 04, not found. Before it they list all five, and the CDS load module
+entries show `SYSTEM LIBRARY = LINKLIB`.
+
+**What was not measured.** A system where single `MOD` or `LMOD` entries are
+missing while `THTP430` is present was not run. Measured is only that such a
+line, alone in its step, reports `HMA2532` and `HMA2560` with RC 08. That
+`RESETRC .` lifts the `HMA2293` cascade after it, too, is concluded from the
+cases above, not measured.
+
+**A new release adds one block per zone.** When a later release is added to
+this job, its `DEL SYSMOD` goes into the CDS and the ACDS as one more
+four-line block each (`UCLIN`, `DEL`, `ENDUCL`, `RESETRC`), and two lines to the
+`LIST` step.
 
 **3. Read the LIST — this is the actual result.** Every id must answer, in
 both zones:
@@ -1464,13 +1602,14 @@ leaves the older one standing for good. That is why the job above names
 **every id HTTPD has ever spent** — `THTP430`, `THTP420`, `THTP410`, `THTP400` — rather
 than the ones this system happens to have seen.
 
-`DEL SYSMOD` does work on a tombstone — measured on drnmig3a 2026-09-14,
-`TSTHCLN JOB00043`: 29 × `HMA2550 UPDATE COMPLETE`, `COND CODE 0000`, and both
-ids gone from both zones afterwards. On a system that was never upgraded the
-line simply finds nothing, which is why every line can stand unconditionally:
-the list needs no judgement about which releases this system has seen, and
-getting that judgement wrong is exactly the failure it prevents. Each release
-adds its own id here.
+`DEL SYSMOD` does work on a tombstone: on a system holding `THTP430` and the
+tombstone `THTP420`, the job above removed both ids from both zones, measured on
+TK5 with SMP 4 (`HMASMP LVL 04.48`). On a system that never saw an id the line
+is not harmless: it fails with `HMA2532` and RC 08, as step 2 describes, and
+the block and the `RESETRC` around it absorb that. Naming every id
+unconditionally means the list needs no judgement about which releases this
+system has seen, and getting that judgement wrong is exactly the failure it
+prevents. Each release adds its own id here.
 
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
@@ -1501,11 +1640,11 @@ Those are yours to delete — unmount the disk before you scratch it.
 > The `RESTORE`/`REJECT` behaviour above was measured on 2026-08-14 against an
 > accepted FMID from a package built by this same generator, on an MVS/CE system
 > running SMP 4 level 04.48. It is a property of SMP 4 and of accepting a
-> function SYSMOD, not of any one product — but the `UCLIN` job above has not
-> itself been run against `THTP400`, `THTP410`, `THTP420` or `THTP430`. The same job *shape* was run
-> end to end on FTPD on 2026-09-13 (jobs `JOB00269` and `JOB00281`), which is
-> where the `NOT SEL` behaviour in the upgrade note above was measured. Read the
-> `LIST` output rather than trusting the `DEL` cards.
+> function SYSMOD, not of any one product. The `UCLIN` job above was run end to
+> end on TK5 with SMP 4 (`HMASMP LVL 04.48`) on a system holding `THTP430` and
+> the tombstone `THTP420`; it was not run on a system holding all four ids, or
+> on one with single `MOD` or `LMOD` entries missing. Read the `LIST` output,
+> not the `UCLIN` return codes.
 
 ---
 
