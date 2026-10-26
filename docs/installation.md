@@ -1739,14 +1739,14 @@ the new modules in. `HTTPD.V4R0M2.LINKLIB` is never opened, and nothing in the
 job log mentions it. (That explanation is `mvslovers/ftpd`'s, from the same
 crossing at `TFTP110`.)
 
-Measured on drnmig3a 2026-09-14 with throwaway ids (`T410INST JOB00040`): SMP
+Measured on 2026-09-14 on a test system with throwaway ids: SMP
 reported `HMA2240 SUCCESSFULLY DELETED LMOD …` for each module against the new,
 still-empty library without complaint, copied all five in
 (`HMA2380 … SYSMOD=<new>`), and `MOD(HTTPD)` came back reading
 `FMID = <new>  RMID = <new>`. The predecessor became a `DELBY` tombstone in both
 zones, and **its library was left untouched, every member still in place.** ftpd
-measured the identical shape on mvsdev (`JOB00323`/`325`/`326`) — two stands,
-two products, same result.
+measured the identical shape on a second system — two systems, two products,
+same result.
 
 **So the old library keeps a working, `AC(1)` copy of the previous release**,
 and that is what makes steps 4 and 5 below the ones that decide whether you are
