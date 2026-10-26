@@ -29,7 +29,7 @@ One placeholder is used throughout:
 
 | | |
 |---|---|
-| `<version>` | the release, e.g. `4.3.0` — it appears in every shipped file name |
+| `<version>` | the release, e.g. `4.4.0` — it appears in every shipped file name |
 
 It is already filled in inside the shipped jobs; you only need it to recognise
 which file is which.
@@ -40,21 +40,22 @@ which release a name belongs to. Up to and including 4.0.2 they were versioned
 — `HTTPD.V4R0M2.LINKLIB` — and two releases could sit side by side; 4.1.0 ends
 that.
 
-**Upgrading from 4.2.0 needs nothing uninstalled first.** This release's
-SYSMOD carries `DELETE(THTP420)`, so SMP deletes the 4.2.0 modules from
+**Upgrading from 4.3.0 needs nothing uninstalled first.** This release's
+SYSMOD carries `DELETE(THTP430)`, so SMP deletes the 4.3.0 modules from
 `HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
 ownership of each module moves with them. You stop the server (step 5), skip
 step 4 because the libraries are already there, and submit the install job.
 
 **Coming from an older release, go through each release in turn.** This
-release deletes `THTP420` and nothing else. On a 4.1.0 system the modules still
-belong to `THTP410`, and a SYSMOD that does not own a module cannot replace it:
+release deletes `THTP430` and nothing else. On a 4.2.0 system the modules still
+belong to `THTP420`, and a SYSMOD that does not own a module cannot replace it:
 SMP selects none of them, copies nothing, and every step still ends `RC 00`. So
-4.1.0 upgrades to 4.2.0 first, with the 4.2.0 package, and then to this
-release. A 4.0.x system starts with 4.1.0, the release that crosses from
-`THTP400` and the one move to the unversioned dataset names —
+4.2.0 upgrades to 4.3.0 first, with the 4.3.0 package, and then to this
+release; a 4.1.0 system goes through 4.2.0 and 4.3.0 in the same way. A 4.0.x
+system starts with 4.1.0, the release that crosses from `THTP400` and the one
+move to the unversioned dataset names —
 [section 12a](#12a-upgrading-from-40x) has that order, done with the **4.1.0**
-package — then 4.2.0, then this release.
+package — then 4.2.0, then 4.3.0, then this release.
 
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
@@ -479,7 +480,7 @@ Expect `COND CODE 0000`.
 >
 > **Coming from 4.0.x**, install 4.1.0 first, following
 > [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
-> upgrade to 4.2.0 and to this release, skipping it both times.
+> upgrade to 4.2.0, 4.3.0 and this release, skipping it each time.
 
 ### A library that SMP does not own
 
@@ -640,7 +641,7 @@ The SYSMOD travels inline in the job — there is no third file to upload.
 output:
 
 ```
-HMA3930    SYSMOD THTP430 SUCCESSFULLY RECEIVED
+HMA3930    SYSMOD THTP440 SUCCESSFULLY RECEIVED
 HMA2240    SUCCESSFULLY DELETED LMOD=HTTPD
 HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB
            - RETURN CODE=00
@@ -1114,16 +1115,27 @@ The mount belongs to **UFSD**, not to HTTPD. In its Parmlib member:
 MOUNT    DSN(HTTPD.WEBROOT.UFS)  PATH(/www)  MODE(RO)
 ```
 
-or, without a restart — note that the operator command spells its operands with
-`=` and commas where the Parmlib statement uses parentheses:
+Use the Parmlib statement for the default `DOCROOT=/www`. The path keeps the
+case you wrote.
+
+UFSD also accepts the mount as an operator command, without a restart. The
+operator form spells its operands with `=` and commas where the Parmlib
+statement uses parentheses:
 
 ```
-/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/www,MODE=RO
+/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/WWW,MODE=RO
 ```
 
-`/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount it
-there instead. `MODE(RO)` is the default and the right setting here — the
-shipped disk is product content and nothing in the server writes to it.
+**The operator command cannot produce a lower-case mount point.** UFSD
+upper-cases the whole command before it parses it, so `PATH=/www` mounts `/WWW`.
+Paths are case-sensitive, and HTTPD's default `DOCROOT=/www` finds nothing there:
+every request answers `404`. With the operator command, set `DOCROOT=/WWW` in
+`HTTPPRM0` as well and restart HTTPD. For `/www`, use the Parmlib statement.
+
+`/www` is HTTPD's default `DOCROOT`; if you changed it in `HTTPPRM0`, mount that
+path instead, with the same case. `MODE(RO)` is the default and the right
+setting here — the shipped disk is product content and nothing in the server
+writes to it.
 
 **UFSD first, then HTTPD.** The filesystem has to be up and mounted before the
 server that serves from it — a runtime dependency SMP cannot express, which is
@@ -1143,18 +1155,37 @@ directory.
 |---|---|
 | `UFSD062E SUPERBLOCK VALIDATION FAILED FOR …` | the dataset's `BLKSIZE` is not the image's 4096 — or the transfer was not binary |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running (step 2) |
-| `404` on `/` | mounted somewhere other than `DOCROOT` |
+| `404` on `/` | mounted somewhere other than `DOCROOT` — also `/WWW` against `DOCROOT=/www`: `MOUNT LIST` shows the mount point as UFSD holds it |
 | a page of mojibake | the transfer translated the bytes; upload again in binary |
 
 ### Replacing the content later
 
-**Unmount before you re-upload.** IND$FILE allocates `DISP=SHR`, so it will
-happily rewrite a dataset UFSD has open — under the server's own buffers:
+**Release the dataset before you re-upload.** IND$FILE allocates `DISP=SHR`, so it
+will happily rewrite a dataset UFSD has open — under the server's own buffers.
+
+For a disk mounted at `/www` by the Parmlib statement, stop both address spaces,
+upload, and start them again, UFSD first:
 
 ```
-/F UFSD,UNMOUNT PATH=/www
+/P HTTPD
+    ... wait for $HASP395 HTTPD ENDED ...
+/P UFSD
     ... upload ...
-/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/www,MODE=RO
+/S UFSD
+/S HTTPD
+```
+
+`/P HTTPD` returns at once, and the server needs up to about 50 seconds to end
+(step 5). Stop UFSD only after `$HASP395 HTTPD ENDED`.
+
+The operator `UNMOUNT` cannot do this for `/www`: it upper-cases `PATH=/www` to
+`/WWW` and finds no such mount. It works for a mount point that is upper case,
+for example the `/WWW` of the operator mount in step 9c:
+
+```
+/F UFSD,UNMOUNT PATH=/WWW
+    ... upload ...
+/F UFSD,MOUNT DSN=HTTPD.WEBROOT.UFS,PATH=/WWW,MODE=RO
 ```
 
 For pages of your own, build the image on your workstation with
@@ -1193,7 +1224,7 @@ A healthy start ends in `HTTPD001I … READY`:
 
 ```
 HTTPD000I HTTPD <version> (A69A370) STARTING
-HTTPD005I LIBC370 2.23.0 (B452CDB)
+HTTPD005I LIBC370 2.25.1 (FCDE4E8)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
@@ -1339,7 +1370,7 @@ What this release put on the system:
 
 | | |
 |---|---|
-| FMID | `THTP430` |
+| FMID | `THTP440` |
 | Load modules | `HTTPD`, `HTTPDSRV`, `HTTPDM`, `HTTPDMTT`, `ABEND0C1` |
 | Target library | `HTTPD.LINKLIB` |
 | Distribution library | `HTTPD.AHTTPLOD` |
@@ -1362,7 +1393,9 @@ each name against ISPF 3.4 first, and do not confuse them with the unversioned
 **1. Stop the server:** `/P HTTPD`
 
 **2. Cut the FMID out of the SMP inventory.** Submit this — it edits the CDS and
-the ACDS and touches no library:
+the ACDS and touches no library. It is long on purpose, and on a system that does
+not hold all of these ids its `UCLIN` step ends with RC 08; the explanation
+follows the job.
 
 ```
 //HTTPDUCL JOB (SYS),'HTTPD UNINSTALL',
@@ -1371,50 +1404,155 @@ the ACDS and touches no library:
 //UCLIN   EXEC SMPAPP
 //SMPCNTL  DD  *
  UCLIN CDS .
-  DEL SYSMOD(THTP430) MOD(HTTPD) .
-  DEL SYSMOD(THTP430) MOD(HTTPDSRV) .
-  DEL SYSMOD(THTP430) MOD(HTTPDM) .
-  DEL SYSMOD(THTP430) MOD(HTTPDMTT) .
-  DEL SYSMOD(THTP430) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP440) MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
+  DEL SYSMOD(THTP440) MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL LMOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
+  DEL SYSMOD(THTP440) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP430) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP420) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP410) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP400) .
  ENDUCL .
+ RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP430) MOD(HTTPD) .
-  DEL SYSMOD(THTP430) MOD(HTTPDSRV) .
-  DEL SYSMOD(THTP430) MOD(HTTPDM) .
-  DEL SYSMOD(THTP430) MOD(HTTPDMTT) .
-  DEL SYSMOD(THTP430) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP440) MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP440) MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP440) MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPD) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDSRV) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDM) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(HTTPDMTT) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP440) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP430) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP420) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP410) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
   DEL SYSMOD(THTP400) .
  ENDUCL .
+ RESETRC .
 /*
 //LIST    EXEC SMPAPP
 //SMPCNTL  DD  *
  RESETRC .
+ LIST CDS  SYSMOD(THTP440) .
  LIST CDS  SYSMOD(THTP430) .
  LIST CDS  SYSMOD(THTP420) .
  LIST CDS  SYSMOD(THTP410) .
  LIST CDS  SYSMOD(THTP400) .
+ LIST ACDS SYSMOD(THTP440) .
  LIST ACDS SYSMOD(THTP430) .
  LIST ACDS SYSMOD(THTP420) .
  LIST ACDS SYSMOD(THTP410) .
@@ -1423,10 +1561,61 @@ the ACDS and touches no library:
 //
 ```
 
-Every `DEL` that finds its entry reports `HMA2550 UPDATE COMPLETE`. What a
-line naming an id this system never had reports has not been measured, so do
-not judge the job by the `UCLIN` return codes: the `LIST` below is the
-result.
+**Why every `DEL` has a block of its own.** The job holds 35 `DEL` statements,
+20 against the CDS and 15 against the ACDS. Each one stands in its own
+`UCLIN`/`ENDUCL` pair, and a `RESETRC .` follows every `ENDUCL .`. Three
+facts of SMP 4 make that necessary (measured on TK5 with SMP 4,
+`HMASMP LVL 04.48`):
+
+- **A `DEL` that names an entry the zone does not hold is an error.** It
+  reports `HMA2532 ** SYSMOD ENTRY THTP410 TO BE DELETED DOES NOT EXIST` and
+  `HMA2560 UPDATE PROCESSING TERMINATED - UPDATE NOT COMPLETE`, and its block
+  ends RC 08. A `DEL MOD` or `DEL LMOD` for a missing module reports the same
+  pair with `MODULE ENTRY` or `LMOD ENTRY` in the first message (each run in a
+  step of its own). `LIST` is different: an id it does not find is RC 04.
+- **After such an error SMP ignores every further `UCLIN` in the same step.**
+  Each one reports `HMA2293 ** CONTROL STATEMENT IGNORED DUE TO PREVIOUS ERROR`,
+  ends RC 12, and its `DEL` statements are discarded without a trace. Separate
+  blocks are not enough: with a `UCLIN`/`ENDUCL` pair around every `DEL` but no
+  `RESETRC`, the failure at `THTP410` silenced everything after it, and
+  `THTP430` and the tombstone `THTP420` were still in the ACDS afterwards.
+- **`RESETRC .` between the blocks lifts it.** With it, no `HMA2293` was
+  reported and every `DEL` that found its entry was carried out. A new
+  `EXEC SMPAPP` step lifts it as well, because each step is a separate SMP
+  run.
+
+**Read the return codes as expected, not as a verdict.** The figures in this
+paragraph were measured with the 33-statement form of this job, which named
+`THTP430` as the newest id, on a system that held `THTP430` and the tombstone
+`THTP420` but never saw `THTP410` or `THTP400`. There two blocks per zone
+failed, four of the 33, and the `UCLIN` step ended RC 08. The other 29
+reported `HMA2550 UPDATE COMPLETE`. The `LIST` step ended RC 04. The job
+printed above has 35 statements: it adds the id `THTP440` to each zone and
+names it in the five `SYSMOD(...) MOD(...)` blocks. On a system that never held
+`THTP440` those blocks find no entry and each ends RC 08 with `HMA2532`, as
+every `DEL` for a missing entry does; that was not run. Neither number says
+whether the removal worked; the stanzas of the `LIST` in step 3 do. Running the
+33-statement job a second time, when no id was left, gave RC 08 again with no
+`HMA2550` and no `HMA2293`, and the same `LIST`.
+
+**The modules go as well.** After the job, `LIST CDS MOD(...)`,
+`LIST CDS LMOD(...)` and `LIST ACDS MOD(...)` for the five module names answer
+RC 04, not found. Before it they list all five, and the CDS load module
+entries show `SYSTEM LIBRARY = LINKLIB`.
+
+**What was not measured.** The 35-statement job as printed was not run. A
+system where single `MOD` or `LMOD` entries are missing while the newest id is
+present was not run either. Measured is only that such a
+line, alone in its step, reports `HMA2532` and `HMA2560` with RC 08. That
+`RESETRC .` lifts the `HMA2293` cascade after it, too, is concluded from the
+cases above, not measured.
+
+**A new release adds one block per zone and moves five.** When a later release
+is added to this job, its `DEL SYSMOD(<id>)` goes into the CDS and the ACDS as
+one more four-line block each (`UCLIN`, `DEL`, `ENDUCL`, `RESETRC`), the five
+`DEL SYSMOD(<id>) MOD(...)` blocks per zone are changed to name the new id
+instead of the old one (they are not added to), and two lines go into the
+`LIST` step.
 
 **3. Read the LIST — this is the actual result.** Every id must answer, in
 both zones:
@@ -1435,7 +1624,7 @@ both zones:
 THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND OR WERE NOT ELIGIBLE
 FOR PROCESSING
  TYPE        NAME
- SYSMOD      THTP430
+ SYSMOD      THTP440
 ```
 
 with `HIGHEST RETURN CODE IS 04`. **RC 04 and an empty list means the FMID is
@@ -1451,26 +1640,27 @@ step's highest return code above the 04 you were expecting. A stanza naming
 ### The tombstones — one `DEL SYSMOD` each, and there may be several
 
 A system that was upgraded also carries the **tombstone** of every level it
-came through: `THTP420` listed as `TYPE = FUNCTION` with `DELBY = THTP430` and
+came through: `THTP430` listed as `TYPE = FUNCTION` with `DELBY = THTP440` and
 nothing else. `LIST` answers **RC 00** for those, not RC 04, so the
 "RC 04 + empty list = free" rule above reads them as occupied — which is
 correct, the ids are spent and can never be reused.
 
 **Tombstones accumulate, one per upgrade.** A system that went 4.0.x → 4.1.0 →
-4.2.0 → 4.3.0 carries three: `THTP400 DELBY=THTP410`, `THTP410 DELBY=THTP420`
-and `THTP420 DELBY=THTP430`. A job
+4.2.0 → 4.3.0 → 4.4.0 carries four: `THTP400 DELBY=THTP410`,
+`THTP410 DELBY=THTP420`, `THTP420 DELBY=THTP430` and `THTP430 DELBY=THTP440`. A job
 that names only the release you are removing and its immediate predecessor
 leaves the older one standing for good. That is why the job above names
-**every id HTTPD has ever spent** — `THTP430`, `THTP420`, `THTP410`, `THTP400` — rather
+**every id HTTPD has ever spent** — `THTP440`, `THTP430`, `THTP420`, `THTP410`, `THTP400` — rather
 than the ones this system happens to have seen.
 
-`DEL SYSMOD` does work on a tombstone — measured on drnmig3a 2026-09-14,
-`TSTHCLN JOB00043`: 29 × `HMA2550 UPDATE COMPLETE`, `COND CODE 0000`, and both
-ids gone from both zones afterwards. On a system that was never upgraded the
-line simply finds nothing, which is why every line can stand unconditionally:
-the list needs no judgement about which releases this system has seen, and
-getting that judgement wrong is exactly the failure it prevents. Each release
-adds its own id here.
+`DEL SYSMOD` does work on a tombstone: on a system holding `THTP430` and the
+tombstone `THTP420`, the job above removed both ids from both zones, measured on
+TK5 with SMP 4 (`HMASMP LVL 04.48`). On a system that never saw an id the line
+is not harmless: it fails with `HMA2532` and RC 08, as step 2 describes, and
+the block and the `RESETRC` around it absorb that. Naming every id
+unconditionally means the list needs no judgement about which releases this
+system has seen, and getting that judgement wrong is exactly the failure it
+prevents. Each release adds its own id here.
 
 **4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
 still there, and a re-install's allocation job would fail on them:
@@ -1501,21 +1691,21 @@ Those are yours to delete — unmount the disk before you scratch it.
 > The `RESTORE`/`REJECT` behaviour above was measured on 2026-08-14 against an
 > accepted FMID from a package built by this same generator, on an MVS/CE system
 > running SMP 4 level 04.48. It is a property of SMP 4 and of accepting a
-> function SYSMOD, not of any one product — but the `UCLIN` job above has not
-> itself been run against `THTP400`, `THTP410`, `THTP420` or `THTP430`. The same job *shape* was run
-> end to end on FTPD on 2026-09-13 (jobs `JOB00269` and `JOB00281`), which is
-> where the `NOT SEL` behaviour in the upgrade note above was measured. Read the
-> `LIST` output rather than trusting the `DEL` cards.
+> function SYSMOD, not of any one product. The `UCLIN` job above was run end to
+> end on TK5 with SMP 4 (`HMASMP LVL 04.48`) on a system holding `THTP430` and
+> the tombstone `THTP420`; it was not run on a system holding all four ids, or
+> on one with single `MOD` or `LMOD` entries missing. Read the `LIST` output,
+> not the `UCLIN` return codes.
 
 ---
 
 ## 12a. Upgrading from 4.0.x
 
 > **Do this with the 4.1.0 package, not this release's.** This release deletes
-> `THTP420` only, so on a 4.0.x system — where the modules belong to `THTP400` —
+> `THTP430` only, so on a 4.0.x system — where the modules belong to `THTP400` —
 > its install selects nothing and copies nothing while every step ends `RC 00`.
 > Download 4.1.0 from the releases page, follow the steps below with it, and
-> confirm the 4.1.0 banner. Then upgrade to 4.2.0 and to this release the
+> confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0 and this release the
 > ordinary way, one after the other: stop, install, start, with no allocation
 > step.
 
@@ -1633,6 +1823,7 @@ nothing above touches it.
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
 | `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD could not read a file it had opened; `RC=52` is an I/O error. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a chunked (HTTP/1.1) response, so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
+| One request out of many takes 25 to 150 seconds under sustained load, the rest answer in about a second, and no console message appears | A known issue in this release, independent of `RESIDENT=`: single requests were seen to stall for 25 to 150 seconds in soak runs of 20,000 to 30,000 requests, with the median at 0.2 s and the 95th percentile near 1 s. The cause is not known and it has not been reproduced on demand. A request that a client abandoned at 60 s and sent again was answered the second time. Nothing to configure; use a client timeout and a retry. Tracked in [#350](https://github.com/mvslovers/httpd/issues/350) |
 | `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it. `106-0F` is not a storage shortage (that is `106-0C`): IBM describes it as an uncorrectable I/O error, or an error in the load module that made the channel program fail. Look at the library and the member, not at the region. A failed fetch costs the module's storage until the server stops; `RESIDENT=YES` (the default) avoids the per-request fetch, see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) and [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#resident-modules-resident) |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
