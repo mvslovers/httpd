@@ -1167,11 +1167,15 @@ upload, and start them again, UFSD first:
 
 ```
 /P HTTPD
+    ... wait for $HASP395 HTTPD ENDED ...
 /P UFSD
     ... upload ...
 /S UFSD
 /S HTTPD
 ```
+
+`/P HTTPD` returns at once, and the server needs up to about 50 seconds to end
+(step 5). Stop UFSD only after `$HASP395 HTTPD ENDED`.
 
 The operator `UNMOUNT` cannot do this for `/www`: it upper-cases `PATH=/www` to
 `/WWW` and finds no such mount. It works for a mount point that is upper case,
