@@ -1393,8 +1393,9 @@ each name against ISPF 3.4 first, and do not confuse them with the unversioned
 **1. Stop the server:** `/P HTTPD`
 
 **2. Cut the FMID out of the SMP inventory.** Submit this — it edits the CDS and
-the ACDS and touches no library. It is long on purpose, and on most systems its
-`UCLIN` step ends with RC 08; the explanation follows the job.
+the ACDS and touches no library. It is long on purpose, and on a system that does
+not hold all of these ids its `UCLIN` step ends with RC 08; the explanation
+follows the job.
 
 ```
 //HTTPDUCL JOB (SYS),'HTTPD UNINSTALL',
