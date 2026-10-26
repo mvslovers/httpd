@@ -11,10 +11,13 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-26 with the libufs note in the installation
+*Last reconciled against the tracker: 2026-10-26 with the merge of #343 (PR #369), against
+`origin/main` 4622d81: #325, #327 and #343 are closed and have no row any more. #322 (`PREALLOC`,
+deferred beyond 4.4.0), #323, #326, #346, #350 and #351 are filed and not yet ranked. Before that,
+2026-10-26 with the libufs note in the installation
 guide (#324), against `origin/main` 36a9f38: fourteen issues open, and #361 is closed (PR #365:
 job numbers and private system names out of the installation guide and `mbt.toml`). #322 (`PREALLOC`, deferred beyond
-4.4.0), #323, #325, #326, #327, #343, #346, #350 and #351 are filed and not yet ranked.
+4.4.0), #323, #326, #346, #350 and #351 are filed and not yet ranked.
 #333 and #336 are closed (PRs #357 and #359) and #324 is closed, so none of them has a row any
 more; #319 stays open. Before that, 2026-10-26 for the 4.4.0 release candidate (#324), against
 `origin/main` f887d50: seventeen issues open besides this one. #254, #262, #263, #295, #296,
@@ -110,11 +113,8 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | deferred beyond 4.4.0; not yet ranked |
-| — | #327 | engineering questions from the install guide review (#295): the 50-second `EADDRINUSE` after a restart, the RAKF entries the HTTPD user needs | answers go into #295; not yet ranked |
-| — | #325 | acceptance of `RESIDENT=YES` on TK5 Update 5 and MVS/CE (TK5 Update 6 when available) | **MVS time** on each platform; not yet ranked |
 | — | #326 | build and test the HTTPD modules against the 4.4.0 candidate | the candidate; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; not part of 4.4.0 |
-| — | #343 | docs — installation step 8 should name the RAKF commands for `RES=` profiles | not yet ranked |
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
