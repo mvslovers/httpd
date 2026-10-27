@@ -498,6 +498,18 @@ request is HTTP/1.1, the status is not 1xx, 204 or 304, and no
 every send is a chunk, and the server sends the final empty chunk when the
 request is done.
 
+*A HEAD request.* While a module runs for a HEAD, #cmd("httpc->state") is
+#cmd("CSTATE_HEAD"). A response to a HEAD ends at the empty line after the
+headers. Once the call that ends the headers has been made, #cmd("http_printf")
+and #cmd("http_printv") send nothing and return 0, so a body that the module
+writes with them does not reach the client. The server does not send
+#cmd("Transfer-Encoding: chunked") for a HEAD, whatever the module sent. The
+status line and the header lines before the empty line go out as for any
+method, a #cmd("Content-Length") among them. #cmd("http_send") is not changed:
+bytes that a module sends with it reach the client. A module that answers a
+HEAD therefore sends the status and the headers, and no body. Releases before
+HTTPD 4.5.0 chunk the response of a module to a HEAD and send its body.
+
 Two consequences follow.
 
 - Send the end of the headers as a call of its own. Do not write
@@ -823,7 +835,8 @@ says what each one does.
   [*Entry*], [*What it does*],
   [#cmd("http_in"), #cmd("http_parse")], [Read the request and parse it into variables.],
   [#cmd("http_get")], [Serves a static file for GET. See @ref-http.],
-  [#cmd("http_head"), #cmd("http_put"), #cmd("http_post")], [Stubs. Each answers 501 and sets the state to #cmd("CSTATE_DONE"). POST is routed to #cmd("http_put").],
+  [#cmd("http_head")], [Serves a static file for HEAD. It calls #cmd("http_get"), which sends the status and the headers of a GET and stops at the empty line when the state is #cmd("CSTATE_HEAD"). The state then becomes #cmd("CSTATE_DONE"). See @ref-http-methods. Before HTTPD 4.5.0 it was a stub that answered 501.],
+  [#cmd("http_put"), #cmd("http_post")], [Stubs. Each answers 501 and sets the state to #cmd("CSTATE_DONE"). POST is routed to #cmd("http_put").],
   [#cmd("http_done")], [Closes #cmd("fp") and #cmd("ufp"), sends the final chunk of a chunked response, sets the end time and the state #cmd("CSTATE_REPORT").],
   [#cmd("http_report")], [Adds to the counters and writes the SMF record (see @ref-smf). The state becomes #cmd("CSTATE_RESET").],
   [#cmd("http_reset")], [Frees the variables and clears the request fields. With keep-alive the state becomes #cmd("CSTATE_IN"), else #cmd("CSTATE_CLOSE").],

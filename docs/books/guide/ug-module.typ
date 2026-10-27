@@ -302,6 +302,12 @@ Three more rules go with the end of the headers.
   #cmd("http_send") is not examined.
 - Chunking is for HTTP/1.1. A client that sends HTTP/1.0 needs a
   #cmd("Content-Length"), and a module that serves such clients sets one.
+- A HEAD request has no body in the answer. While the module runs,
+  #cmd("httpc->state") is #cmd("CSTATE_HEAD"). After the call that ends the
+  headers, HTTPD drops what #cmd("http_printf") writes, and it does not chunk
+  the response. A module needs no special case to stay correct, but it can
+  skip the body for a HEAD. Bytes that a module sends with #cmd("http_send")
+  are not dropped. The _HTTPD Reference_ has the rule, in the chapter "The Server Module Interface", section "Output".
 
 == Storage <ug-module-storage>
 

@@ -1,0 +1,9 @@
+$ curl -I http://localhost:8080/docs/
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 17:11:59 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Content-Type: text/html
+X-Content-Type-Options: nosniff

@@ -261,11 +261,32 @@ chapter shows. Its text contains the decoded path:
 #idx("501 Not Implemented")
 #idx("405 Method Not Allowed")
 A static file is read-only for the client and always whole. HTTPD answers a
-GET. It does not answer anything else for a file.
+GET and a HEAD. It does not answer anything else for a file.
 
-*Methods.* HEAD, POST, PUT and DELETE for a static file get
-#cmd("501 Not Implemented"). The curl option #cmd("-I") sends a HEAD
-request, as @ug-first-client shows. The three other methods:
+*HEAD.* The curl option #cmd("-I") sends a HEAD request, as
+@ug-first-client shows. HTTPD answers with the status and the headers that a
+GET gets, and sends no body. A file that is not there gets the 404 of a GET,
+with no body:
+
+#screen(raw(read("../ex/ug-static/head-not-found.txt")))
+
+The connection stays open, as it does after a GET (@ug-first-keepalive). With
+#cmd("curl -v -I") and two URLs, the second HEAD uses the connection of the
+first:
+
+#screen(raw(read("../ex/ug-static/head-two-urls.txt")))
+
+A HEAD gets a #cmd("Content-Length") only where a GET gets one. An HTML file
+has none, because HTTPD looks for server-side includes in it
+(@ug-static-ssi). A HEAD for such a file has neither a length nor chunked
+transfer:
+
+#screen(raw(read("../ex/ug-static/head-html.txt")))
+
+The HEAD answer of HTTPD 4.4.0 and earlier is #cmd("501 Not Implemented").
+
+*Other methods.* POST, PUT and DELETE for a static file get
+#cmd("501 Not Implemented"). The three methods:
 
 #screen(raw(read("../ex/ug-static/post-to-file.txt")))
 

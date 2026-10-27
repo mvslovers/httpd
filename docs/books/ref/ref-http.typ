@@ -55,7 +55,8 @@ header, the connection closes, and the body is #cmd("405 Method Not Allowed").
   #table(columns: (1in, 1.5in, 1fr),
     [Method], [Route with a program], [Static file or #cmd("LOC=") route],
     [GET], [The module runs.], [The server sends the file.],
-    [HEAD], [The module runs.], [501 Not Implemented.],
+    [HEAD], [The module runs.], [The server sends the status and the headers
+      of a GET, and no body.],
     [POST], [The module runs.], [501 Not Implemented.],
     [PUT], [The module runs.], [501 Not Implemented.],
     [DELETE], [The module runs.], [501 Not Implemented.],
@@ -66,13 +67,45 @@ header, the connection closes, and the body is #cmd("405 Method Not Allowed").
 A route with a program has no restriction by method. The module decides which
 methods it accepts and sends its own response to the others.
 
-HEAD is not implemented for static files. The server answers with a 501. The
-response has no #cmd("Content-Length"), uses chunked transfer and carries the
-text #cmd("501 Not Implemented") as its body, which a HEAD response should not
-have. A client such as curl with #cmd("-I") reads only the headers and does not
-show the body.
+#idx("HEAD", "static file")
+A HEAD for a static file takes the path of a GET as far as the empty line that
+ends the headers, and stops there. The status and the headers are the ones that
+a GET sends. #cmd("Content-Length") is the length of the file, not 0. The
+response has no body. The client reads the headers and nothing else, so the
+connection stays usable for the next request.
 
 #screen(raw(read("../ex/ug-static/head-request.txt")))
+
+These rules hold for a HEAD.
+
+- The server opens the file as for a GET. A path with no file gets the 404 of a
+  GET, and a directory is resolved to #cmd("index.html") or
+  #cmd("default.html") as for a GET (@ref-http-path). The 404 has the headers of
+  the GET, and no body.
+
+  #screen(raw(read("../ex/ug-static/head-not-found.txt")))
+- On a route with #cmd("AUTH=BASIC") or #cmd("AUTH=TOKEN"), a HEAD without a
+  valid credential gets the 401 that a GET gets, and a HEAD that the resource
+  check refuses gets the 403. Both have the headers of the GET and no body. A
+  route with #cmd("AUTH=FORM") answers a HEAD in another way
+  (@ref-http-form-methods).
+- The server sends #cmd("Content-Length") only where a GET sends it
+  (@ref-http-hdr). For a file with a server-side include type, which
+  includes every #cmd("htm") and #cmd("html") file (@ref-http-ssi), and for a
+  file of 0 bytes there is no length. The HEAD then has neither
+  #cmd("Content-Length") nor #cmd("Transfer-Encoding"): a response to a HEAD is
+  never chunked (@ref-http-chunk).
+
+  #screen(raw(read("../ex/ug-static/head-html.txt")))
+- On a route with a program the module runs and decides. @ref-api-out says
+  what the server does with the output of a module for a HEAD.
+
+#note[HTTPD 4.4.0 and earlier do not answer a HEAD for a static file with the
+headers of a GET. They answer #cmd("501 Not Implemented") with no
+#cmd("Content-Length"), chunked transfer and the text
+#cmd("501 Not Implemented") as the body. A HEAD response must not have a body,
+so the connection could not be used for the next request. The behaviour in this
+section is that of HTTPD 4.5.0.]
 
 An unknown method gets a 405 and the connection closes.
 
@@ -293,7 +326,7 @@ one line of #cmd("text/plain").
       example because it cannot set the file name of a script, or a module asks
       for a status code that the server does not know. The body is
       #cmd("500 Internal Server Error").],
-    [501], [Not Implemented], [HEAD, POST, PUT or DELETE for a static file.],
+    [501], [Not Implemented], [POST, PUT or DELETE for a static file.],
     [503], [Service Unavailable], [A module does not run. The body is
       #cmd("External program") followed by the module name and the reason. If
       the module has already sent a status line, the text is appended to its
@@ -314,9 +347,11 @@ dialog.
 #idx("form login", "methods")
 On a route with form login and no session, every method that the server knows
 goes to the login step, not only GET. A GET gets the 302. A POST is treated as a
-login attempt, whatever its path. A HEAD, PUT or DELETE gets the status 200 and
-a #cmd("text/plain") body #cmd("Invalid REQUEST_METHOD \"HEAD\""), with the
-method that the client sent.
+login attempt, whatever its path. A PUT or DELETE gets the status 200 and a
+#cmd("text/plain") body #cmd("Invalid REQUEST_METHOD \"PUT\""), with the
+method that the client sent. A HEAD gets the same status 200 and the header
+#cmd("Content-Type: text/plain"), and no body. This holds for a HEAD for
+#cmd("/login") and #cmd("/logout") too.
 
 === The phrase table <ref-http-phrases>
 
@@ -501,6 +536,8 @@ the header #cmd("Transfer-Encoding: chunked") if all of these are true.
 - The response has no #cmd("Content-Length") header. The server finds out by
   looking for a header line that starts with #cmd("Content-Length:").
 - The status is not 1xx, not 204 and not 304.
+- The request is not a HEAD. A response to a HEAD has no body, so it is not
+  chunked and has no final chunk.
 
 Each chunk is the length in hexadecimal digits, a CR LF, the data, and a
 CR LF. The server ends the response with a chunk of length 0. If the server
@@ -520,8 +557,8 @@ the server to errors, such as the 404 in the next screen, are sent chunked.
 #idx("DOCROOT")
 The server reads static files from the UFS only. It does not read them from a
 data set. If the server has no UFS, it finds no file, and every request for a
-static path gets a 404. A static file is served for a GET. All other methods
-get a 501 (@ref-http-methods).
+static path gets a 404. A static file is served for a GET, and a HEAD gets the
+headers of the GET (@ref-http-methods). POST, PUT and DELETE get a 501.
 
 === The path <ref-http-path>
 

@@ -59,7 +59,7 @@ list is described under "Messages" in the _HTTPD Reference_.
 #idx("client")
 #idx("curl")
 Any HTTP client can talk to HTTPD. A browser shows the page. #cmd("curl")
-shows more, and three forms of it are used in this book:
+shows more, and four forms of it are used in this book:
 
 - *#cmd("curl url")* prints the body of the response and nothing else. Use it
   to see what a page contains.
@@ -70,16 +70,16 @@ shows more, and three forms of it are used in this book:
   #cmd("<"), and some lines of its own that start with #cmd("*"). Use it
   when it matters what the client sent, for example for the connection that
   is reused in "Two Requests on One Connection".
-
-One form does not work: #cmd("curl -I url"). The option sends a HEAD
-request, and HTTPD does not answer a HEAD request for a static file. The
-answer is #cmd("501 Not Implemented"):
+- *#cmd("curl -I url")* sends a HEAD request and prints the status line and
+  the headers, and nothing else. HTTPD answers a HEAD for a static file with
+  the headers that a GET gets, and with no body:
 
 #screen(raw(read("../ex/ug-static/head-request.txt")))
 
-To see only the headers of a file, send a GET request and throw the body
-away, as the next section does. A HEAD request for a path that belongs to a
-server module goes to the module, and the module decides (@ug-routes).
+The #cmd("Content-Length") is the size of the file. HTTPD 4.4.0 and earlier
+answer this request with #cmd("501 Not Implemented"). A HEAD request for a path
+that belongs to a server module goes to the module, and the module decides
+(@ug-routes).
 
 == Getting the Welcome Page <ug-first-welcome>
 
