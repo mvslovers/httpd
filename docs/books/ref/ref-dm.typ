@@ -114,9 +114,10 @@ method in the same way. It ignores the request body.
 The comparison of the target is not case sensitive, and the value only has to
 be the start of a name. HTTPDSRV tests the names in a fixed order and takes the
 first one that fits. The order is #cmd("FILE"), #cmd("FS"), #cmd("MGR"),
-#cmd("MOD"), #cmd("HTTPD"), #cmd("TASK"), #cmd("TRACE"), #cmd("WORKERS"). So #cmd("target=M")
-is #cmd("MGR"), #cmd("target=MO") is #cmd("MOD"), and #cmd("target=F") is
-#cmd("FILE"). A value that fits none of the names gives the help page
+#cmd("MOD"), #cmd("HTTPD"), #cmd("TASK"), #cmd("TRACE"), #cmd("WORKERS"). So
+#cmd("target=M") is #cmd("MGR"), #cmd("target=MO") is #cmd("MOD"),
+#cmd("target=F") is #cmd("FILE"), and #cmd("target=T") is #cmd("TASK"). The
+target #cmd("TRACE") needs at least the two letters #cmd("TR"). A value that fits none of the names gives the help page
 (@ref-dm-dsrv-help). The help page lists only the targets of this table.
 
 === Targets <ref-dm-dsrv-tgt>
@@ -311,65 +312,159 @@ the socket number, and the local and the remote address with the port.
 ==== Target TRACE <ref-dm-dsrv-trace>
 
 #idx("TRACE", "target")
+#idx("request trace")
+The target shows the request trace that the Parmlib keyword #cmd("TRACE")
+switches on (@ref-prm-diag). It needs no address. The answer is not HTML. It has
+the type #cmd("text/plain") and the header #cmd("Cache-Control: no-store"). If
+the keyword is not set, or its value was refused, the answer is the single line
 
-The target needs no address and answers with the type #cmd("text/plain"), not
-with HTML. It shows the request trace that the Parmlib keyword #cmd("TRACE")
-switches on (@ref-prm-diag). Without the keyword the answer is the single line
-#cmd("#HTTPTRC off"). The query parameter #cmd("min") is a number of
-milliseconds; a record that is finished and shorter is left out. A request that
-is still running is always shown.
+#screen(```
+#HTTPTRC off
+```)
 
-The first line starts with #cmd("#HTTPTRC v1") and gives the clock of the
-readout (#cmd("now"), in ticks, and #cmd("wall"), in seconds since 1970), the
-tick (#cmd("unit=1.024ms")), the number of records, the number of requests
-traced so far (#cmd("seq")), the requests that found no free record
-(#cmd("lost")), the hooks that found no record (#cmd("miss")) and the number of
-workers. Then comes one line for each record, in no particular order, as
-#cmd("name=value") words:
+The query parameter #cmd("min") is a number of milliseconds. With it, the answer
+leaves out each finished record whose time from the start to the last mark is
+shorter. A record of a request that is still running is always shown. A value
+that is not a number counts as 0.
+
+The first line of the answer starts with #cmd("#HTTPTRC v1") and has these
+words.
+
+#tab(caption: [The words of the first line])[
+  #table(columns: (1.4in, 1fr),
+    [Word], [Meaning],
+    [#cmd("now")], [The clock at the readout, in ticks of 1.024 ms (see below).],
+    [#cmd("wall")], [The time of the readout in seconds since 1 January 1970.],
+    [#cmd("unit")], [The length of a tick, always #cmd("1.024ms").],
+    [#cmd("slots")], [The number of records, the value of #cmd("TRACE").],
+    [#cmd("seq")], [The number of requests that got a record since the start.
+      It is also the number of the newest record.],
+    [#cmd("lost")], [The number of requests that got no record because all
+      records belonged to requests that were still running.],
+    [#cmd("miss")], [How often a phase mark found no record for its request.
+      A request that was lost causes a miss at each of its marks.],
+    [#cmd("workers")], [The number of workers now.],
+  )
+]
+
+One line for each record follows. The lines are in the order of the table, not
+of time: sort by #cmd("seq"). A line is a row of #cmd("name=value") words
+without a space inside a value. The line of the request that reads the trace is
+among them, and the request is still running.
 
 #tab(caption: [The words of a trace line])[
   #table(columns: (1.4in, 1fr),
     [Word], [Meaning],
     [#cmd("seq")], [The number of the request since the start.],
-    [#cmd("c")], [The address of the client block (HTTPC).],
-    [#cmd("w"), #cmd("tcb")], [The address of the worker (as in #cmd("WORKER(xxxxxx)")
-      on the WORKERS page) and of its task block. Both are 0 while no worker has
-      taken the connection.],
-    [#cmd("ip"), #cmd("port")], [The client address and port.],
-    [#cmd("n")], [The number of the request on its connection, from 0.],
-    [#cmd("resp")], [The status code at the last mark, 0 before one was set.],
-    [#cmd("ago")], [Milliseconds from the start of the request to the readout.],
-    [#cmd("live"), #cmd("last"), #cmd("st")], [1 while the request runs. The last
-      phase it reached, and the client state it was in (#cmd("IN"),
-      #cmd("GET"), #cmd("POST"), #cmd("DONE") and so on).],
-    [#cmd("age")], [Milliseconds from the start to the last mark, or to the
-      readout for a request that still runs.],
-    [#cmd("run") to #cmd("close")], [Milliseconds from the start to each phase,
-      or #cmd("-") if the request never got there. The start is the accept for
-      the first request of a connection and the end of the previous request for
-      a later one. The phases are #cmd("run") (a worker took the connection),
-      #cmd("line1") (request line read), #cmd("req") (headers read),
-      #cmd("parse"), #cmd("cred") (credential resolved), #cmd("route") (route
-      found and access passed), #cmd("lnk0") and #cmd("lnk1") (before and after
-      the module is linked), #cmd("snd1") and #cmd("sndl") (first and last data
-      handed to the TCP/IP stack), #cmd("done"), #cmd("end") (request reported)
-      and #cmd("close") (the connection closed under the record).],
-    [#cmd("polls")], [How often the server waited half a second for request
-      data.],
-    [#cmd("txn"), #cmd("txst"), #cmd("txms")], [The number of #cmd("send") calls,
-      how often the server paused on a closed send window, and the milliseconds
-      spent inside #cmd("send").],
-    [#cmd("sent"), #cmd("path")], [The bytes sent for the request, and the first
-      23 characters of the request path.],
+    [#cmd("c")], [The address of the client block (HTTPC), in hex.],
+    [#cmd("w"), #cmd("tcb")], [The address of the worker (the same as
+      #cmd("WORKER(xxxxxx)") on the WORKERS page and in #cmd("HTTPD061I")) and
+      of its task block, in hex. Both are 0 until a worker has taken the
+      connection.],
+    [#cmd("ip"), #cmd("port")], [The address and the port of the client.],
+    [#cmd("n")], [The number of the request on its connection, from 0. A
+      connection that is kept alive has one record for each request.],
+    [#cmd("resp")], [The status code at the last mark. It is 0 as long as no
+      response line was written.],
+    [#cmd("ago")], [The milliseconds from the start of the record to the
+      readout.],
+    [#cmd("live")], [1 while the request is running, 0 when it is finished.],
+    [#cmd("last"), #cmd("st")], [The last phase that the request reached, and
+      the state of the client at that mark (#cmd("IN"), #cmd("PARSE"),
+      #cmd("GET"), #cmd("HEAD"), #cmd("PUT"), #cmd("POST"), #cmd("DELETE"),
+      #cmd("DONE"), #cmd("REPORT"), #cmd("RESET") or #cmd("CLOSE")). #cmd("last")
+      is #cmd("q") if no phase was reached.],
+    [#cmd("age")], [The milliseconds from the start to the last mark, or to the
+      readout for a request that is still running.],
+    [#cmd("run") to #cmd("close")], [The milliseconds from the start to each
+      phase, or #cmd("-") if the request never got there (the next table).],
+    [#cmd("polls")], [How often the server waited half a second for the next
+      data of the request line or of a header line.],
+    [#cmd("txn")], [The number of calls of #cmd("send") for the request,
+      including calls that sent nothing.],
+    [#cmd("txst")], [How often the server paused for a tenth of a second
+      because TCP/IP took no data. Only the send of a chunked response counts
+      these pauses.],
+    [#cmd("txms")], [The milliseconds spent inside #cmd("send").],
+    [#cmd("sent")], [The bytes sent for the request. The server fills the word
+      when the request ends, so it is 0 for a request that is still running.],
+    [#cmd("path")], [The first 23 characters of the path of the request, without
+      the query. A character that is not printable shows as #cmd("?"). The word
+      is empty until the request is parsed. It is always the last word.],
   )
 ]
 
-The times come from the TOD clock, shifted so that one tick is 1.024
-milliseconds. A time is a difference of two ticks, so the wrap of the 32-bit
-tick after about 51 days does not matter. A request that took one second or more
-is kept in its record longer than a fast one: a fast record is the first to be
-reused, a running one is never reused. When all records are running, the
-next request is not traced and #cmd("lost") grows.
+The start of a record is the accept of the connection for the first request of
+a connection. For a later request on the same connection it is the end of the
+request before, so the time that the client needs to send its next request is
+part of the times of that record. These are the phases, in the order a request
+normally reaches them.
+
+#tab(caption: [The phases of a request])[
+  #table(columns: (0.9in, 1fr),
+    [Word], [The mark is set when ...],
+    [#cmd("run")], [a worker took the connection. For a later request of a
+      connection it is 0, because the worker still holds the connection.],
+    [#cmd("line1")], [the request line was read.],
+    [#cmd("req")], [the server stopped reading the request line and the header
+      lines. The mark is also set when the read failed or timed out, or when the
+      client closed the connection. Then #cmd("line1") is #cmd("-") or the
+      later phases are.],
+    [#cmd("parse")], [the request was parsed.],
+    [#cmd("cred")], [the credential of the request was resolved, with or
+      without a result.],
+    [#cmd("route")], [the request passed the check of the policy of its
+      route. A request that the check refuses, and the paths #cmd("/login")
+      and #cmd("/logout"), do not get the mark.],
+    [#cmd("lnk0"), #cmd("lnk1")], [just before the module of a #cmd("MOD=")
+      route is linked, and when it returns. A static file has neither. The time
+      between the two is the run of the module, including its load when the
+      server does not hold it in storage
+      (@ref-api-resident).],
+    [#cmd("snd1"), #cmd("sndl")], [the first and the last call of #cmd("send")
+      that handed data to TCP/IP. The headers count as data.],
+    [#cmd("done")], [the response is complete.],
+    [#cmd("end")], [the request was reported (SMF and the counters) and the
+      server is about to reset the connection.],
+    [#cmd("close")], [the connection was closed while the record was still
+      open. It is the mark of a connection that ends without another request.],
+  )
+]
+
+This is a trace of a connection that stays open, from the lab server. The client
+sent two requests on one connection and then closed it (the readout is cut to
+the words of interest):
+
+#screen(raw(read("../ex/ug-trouble/trace-keepalive.txt")))
+
+The first record is a request that a module answered. The server waited 4 ms
+for the request line, the module ran from 14 ms to 44 ms, and 532 bytes went to
+TCP/IP in 15 calls. The second record has the same worker, and its #cmd("run")
+is 0. The third record is the connection after its last request: the server
+waited for a next request that did not come, and the client closed the
+connection after 503 ms.
+
+The times come from the TOD clock. The server shifts the clock value right by 22
+bits and keeps 32 bits, so one tick is 1.024 milliseconds and the figures in a
+line are rounded down to a whole millisecond of that scale. The tick count wraps
+after about 51 days. The trace only uses the difference of two ticks, so the
+wrap does not matter, but the #cmd("now") of one readout cannot be compared with
+the #cmd("now") of a much later one.
+
+The table does not keep the records in time order. A new record takes the next
+free place, counted from a position that moves by one for each request. A record
+of a running request is never taken. A record of a finished request that took
+977 ticks (about one second) or more is taken only when no other record is left,
+so a slow request stays in the table longer than a fast one. The time of a
+request counts from the accept if it is the first request of its connection, and
+from its request line if it is a later one, so the time that a client takes to
+send its next request does not make a request slow. When all records belong to
+running requests, the next request gets none and #cmd("lost") grows.
+
+#note[The record holds the address and the port of the client and the first
+23 characters of the path of each request. Anyone who may call the HTTPDSRV
+route can read them. Give the route an #cmd("AUTH=") (see the start of this
+chapter), and switch #cmd("TRACE") on only while you look for a problem.]
 
 ==== Target TASK <ref-dm-dsrv-task>
 
