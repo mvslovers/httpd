@@ -242,6 +242,95 @@ The rules of the command differ from the rules of the member:
 The commands and their messages are described in 'Console Commands' in the
 _HTTPD Reference_, and their daily use in @ug-ops.
 
+== The Region and Parallel Modules <ug-config-region>
+
+#idx("REGION")#idx("region", "size")#idx("MAXTASK", "and the region")
+#idx("U0801")#idx("C stack")#idx("__stklen")
+The region of the server is the #cmd("REGION") on the #cmd("EXEC") statement of
+the procedure. The shipped procedure sets #cmd("REGION=8M"). It is not a
+keyword of the member, and the server does not change it. A server in which
+many module requests run at the same time may need more than 8M.
+
+*What a request to a module costs.* The module has a C stack. The C runtime
+takes it from the region in one piece when the module starts, and gives it
+back when the module ends. A request to a module that is held (see
+@ug-routes-resident) costs a stack too, because the stack belongs to the run
+and not to the copy of the module.
+
+#tab(caption: [What the region holds for module requests])[
+  #table(columns: (1.9in, 1.5in, 1fr),
+    [What], [Size], [Remark],
+    [Stack of a module without its own setting], [262,328 bytes, about 256 KB],
+      [The default of the C runtime. HTTPREXX and HTTPLUA take it, because
+      they set no stack size.],
+    [Stack of a module with its own setting], [The setting, and a few hundred
+      bytes more],
+      [The module sets #cmd("unsigned __stklen"). MVSMF sets 64 KB.],
+    [Stack of a worker], [64 KB], [One for each worker, up to #cmd("MAXTASK").
+      The value is in #cmd("HTTPD061I") as #cmd("STACKSIZE(65536)").],
+    [Stack of the socket thread], [32 KB], [One.],
+    [Resident copy of a module], [The size of the load module],
+      [One for each module held, not for each request. MVSMF is about 335 KB.],
+  )
+]
+
+*How the demand grows.* A worker serves a request from start to end, so at
+most #cmd("MAXTASK") requests run a module at the same time. With the default
+#cmd("MAXTASK=9") and modules that have the default stack, the stacks of the
+modules are up to 9 times 262,328 = 2,360,952 bytes, and the stacks of the workers
+are 9 times 64 KB. One more worker therefore costs at least 64 KB and 262,328
+bytes, about 320 KB, and the working storage of the module comes on top. The
+working storage of the REXX interpreter was not measured. The stack must be one
+free block. The free storage of the region must be whole enough for that, and
+not only large enough in sum.
+
+*What was measured.* The test used the 4.4.0 release candidate with the stock
+#cmd("REGION=8M"): 60 requests to URLs for #cmd("*.rexx") and #cmd("*.rxp"),
+9 at a time, with #cmd("MAXTASK=9").
+
+#tab(caption: [60 requests to REXX modules, 9 at a time])[
+  #table(columns: (2.6in, 1fr),
+    [Set-up], [Failed requests of 60, for each run],
+    [#cmd("REGION=8M"), #cmd("RESIDENT=YES")], [6, 32 and 0],
+    [#cmd("REGION=8M"), HTTPD 4.3.0 with the same module libraries],
+      [0, 4 and 0],
+    [#cmd("REGION=8M"), #cmd("RESIDENT=NO")], [0 (one run)],
+    [#cmd("REGION=16M"), #cmd("RESIDENT=YES")], [0 (one run)],
+  )
+]
+
+A mixed load of 6 requests at a time over all module types was clean in all
+set-ups. The sample is small and the runs do not depend on each other. It shows
+the order of magnitude and not a limit. It does not show that 4.4.0 is worse
+than 4.3.0. It was not run with requests to Lua.
+
+*What to do.*
+
+- If you expect many parallel requests to REXX or Lua, set #cmd("REGION=16M")
+  in the procedure before you raise #cmd("MAXTASK"). 16M held in the test, and
+  it is the largest value that was tried. If it is not enough, lower
+  #cmd("MAXTASK") and do not raise it.
+- Raise #cmd("MAXTASK") only together with the region. Each worker adds the
+  amounts of the table.
+- Do not take #cmd("RESIDENT=NO") as the cure. It was clean in one run, but it
+  brings back the fetch of the module for each request, and the loss of
+  storage after a failed fetch (@ug-routes-resident).
+- The author of a module can lower the demand with #cmd("__stklen"), as MVSMF
+  does (@ug-module). That is a change of the module and not of the server.
+
+*The symptom.* A request that cannot get its stack never reaches the module.
+The console shows #cmd("@@CRT0 - No storage for C stack") and then
+#cmd("HTTPD908E EXTERNAL PROGRAM name failed with U0801 ABEND"). The client
+gets the status 503 and the body #cmd("External program name failed with U0801
+ABEND"). In the test above, some failed requests got 500. The other requests of
+the server go on. A module that was linked with a LIBC/370 older than 1.0.3
+ends with #cmd("S80A") instead of #cmd("U0801"). @ug-trouble-module lists the
+reasons of #cmd("HTTPD908E"). #cmd("HTTPD904E") and #cmd("HTTPD999E") at the
+same time show the same shortage in the own storage of the server: it could
+not allocate an environment variable of a request, or the control block of a
+new connection. The client of such a request gets no response, and the
+connection is closed.
+
 == Keep-Alive and Client Time Limits <ug-config-time>
 
 #idx("CLIENT_TIMEOUT")#idx("KEEPALIVE_TIMEOUT")#idx("KEEPALIVE_MAX")

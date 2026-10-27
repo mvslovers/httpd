@@ -627,6 +627,16 @@ The program statement is
 //            PARM='STCUSER=&STCUSER STCGROUP=&STCGRP'
 ```)
 
+#idx("REGION", "installation")
+The region is 8M. Raise it before you raise #cmd("MAXTASK"), and when you expect
+many parallel requests to REXX or Lua: every request to a module takes the C
+stack of the module from the region, 262,328 bytes for a module with the default
+stack. In the test, 60 requests to REXX modules with 9 at a time failed in some
+runs with #cmd("REGION=8M"), and in none with #cmd("REGION=16M") or with
+#cmd("RESIDENT=NO") (one run each). To raise it, change the #cmd("REGION=") of
+the statement above. If 16M is not enough, lower #cmd("MAXTASK"). The numbers
+and the full advice are in @ug-config-region.
+
 The PARM is separated by blanks, not by commas. A #cmd("CONFIG=") in the PARM
 is a leftover of an old release. It gives #cmd("HTTPD024W") and
 #cmd("HTTPD024I"), and the server takes its configuration from the DD

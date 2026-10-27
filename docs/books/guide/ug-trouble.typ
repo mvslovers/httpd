@@ -666,9 +666,22 @@ same for the client and for the operator.
     [failed with Sxxx ABEND], [The module ended with the system abend xxx. Look
       for the dump (@ug-trouble-s0c4).],
     [failed with Unnnn ABEND], [The module ended with the user abend nnnn,
-      in decimal.],
+      in decimal. With U0801 the region had no free block for the C stack of
+      the module: see below.],
   )
 ]
+
+#idx("U0801")#idx("REGION", "too small")#idx("HTTPD904E")#idx("HTTPD999E")
+*Some requests fail under load with U0801.* The console shows
+#cmd("@@CRT0 - No storage for C stack") and #cmd("HTTPD908E EXTERNAL PROGRAM
+name failed with U0801 ABEND"), and the client gets 503. It happens when
+several requests run a module at the same time, and the other requests are
+served. The region has no free block of 262,328 bytes (for MVSMF, about 64 KB)
+for the stack of one more request. Raise the #cmd("REGION") in the procedure
+before you raise #cmd("MAXTASK"). 16M held in the one test that was made. If it
+is not enough, lower #cmd("MAXTASK"). @ug-config-region has the numbers. When
+#cmd("HTTPD904E") or #cmd("HTTPD999E") show up in the same minutes, the
+shortage reaches the own storage of the server.
 
 Only the abends leave a dump to look for. The other reasons mean that the
 module did not run or ended by itself. After the module ended, the server frees

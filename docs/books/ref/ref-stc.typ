@@ -79,7 +79,11 @@ S HTTPD,STCUSER=WEBSRV,STCGRP=WEBGRP
 #idx("STCGROUP", "PARM keyword")
 #idx("REGION", "started task")
 The program is #cmd("HTTPD"). The procedure sets #cmd("REGION=8M") and
-#cmd("TIME=1440"). The server reads its arguments from the PARM string. It
+#cmd("TIME=1440"). The region limits the stacks of the modules that run at the
+same time: 262,328 bytes for each request to a module with the default stack. A
+server with many parallel requests to REXX or Lua may need #cmd("REGION=16M").
+The section "The Region and Parallel Modules" in the _HTTPD User's Guide_ has
+the numbers. The server reads its arguments from the PARM string. It
 splits the string at blanks and not at commas. It knows these keywords.
 
 #tab(caption: [The PARM keywords])[

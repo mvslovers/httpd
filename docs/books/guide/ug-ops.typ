@@ -413,8 +413,10 @@ The second screen shows that a larger #cmd("MINTASK") starts the missing
 worker at once. The next screen shows the cut to 100. When MAXTASK is set below
 MINTASK, MINTASK follows it down, and when MINTASK is set above MAXTASK,
 MAXTASK follows it up. Every worker has a stack of 64 KB (the value
-#cmd("STACKSIZE(65536)") in #cmd("HTTPD061I")) and the region of the server is
-fixed in the procedure, so do not raise the limits without need.
+#cmd("STACKSIZE(65536)") in #cmd("HTTPD061I")), and every worker that runs a
+module needs the stack of that module on top. The region of the server is fixed
+in the procedure, so do not raise the limits without need
+(@ug-config-region).
 
 #screen(raw(read("../ex/ug-ops/set-maxtask-bad.txt")))
 
@@ -712,7 +714,8 @@ in a module, the module is the cause, and more workers do not cure it
 the sizes of the thread stacks, and #cmd("D C") the number of modules that the
 server holds. They do not show how much storage is left. Abends of workers and
 modules (#cmd("HTTPD062E"), #cmd("HTTPD908E")) are in the Master Trace Table
-(@ug-ops-mtt). Do not raise
+(@ug-ops-mtt). A module that fails under load with #cmd("U0801") found no
+free block for its stack: raise the region (@ug-config-region). Do not raise
 #cmd("MAXTASK") far above what the load needs.
 
 *Logins.* #cmd("D L") shows the users who are logged in. A login ends after the
