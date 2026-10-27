@@ -92,7 +92,8 @@
 #   ABEND_HITS     how many times to hit it (poison pool) (default: 12)
 #   FAULT_MARK     regex proving a handler faulted        (default: HTTPD908E|HTTPD062E|MVSMF99E)
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
-#   WAIT_SECS      max seconds to wait for the AS to end   (default: 120)
+#   WAIT_SECS      max seconds to wait for the listener to stop, and again
+#                  for the AS end record to reach CONSOLE_LOG (default: 120)
 #   JOBNAME        MVS jobname of the HTTPD started task   (default: HTTPD)
 #
 #   PROVOKE        pre-stop scenario: abend | longpoll     (default: abend)
@@ -250,6 +251,27 @@ while [ "$w" -lt "$WAIT_SECS" ]; do
 done
 [ "$ended" -eq 1 ] && echo "   listener closed after ~${w}s" || echo "   listener still up after ${WAIT_SECS}s"
 echo
+
+# --- 4b. wait for the AS end record to reach CONSOLE_LOG --------------------
+# A console log that arrives through a relay lags the listener closing, so the
+# window read below could miss the "$HASP395 ... ENDED" / IEF404I records and end
+# INCONCLUSIVE. Wait for either, bounded by WAIT_SECS. Only when the listener
+# closed: a server that is still up has not ended and will not log an end record.
+if [ "$ended" -eq 1 ]; then
+    echo "-- waiting up to ${WAIT_SECS}s for the AS end record in $CONSOLE_LOG --"
+    end_re="[\$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED|IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED"
+    e=0
+    end_logged=0
+    while :; do
+        if tail -c +"$((log_offset + 1))" "$CONSOLE_LOG" 2>/dev/null | grep -Eq "$end_re"; then
+            end_logged=1; break
+        fi
+        [ "$e" -ge "$WAIT_SECS" ] && break
+        e=$((e + 3)); sleep 3
+    done
+    [ "$end_logged" -eq 1 ] && echo "   end record logged after ~${e}s" || echo "   no end record after ${WAIT_SECS}s"
+    echo
+fi
 
 # --- 5. assert over the console-log slice captured for THIS run — note #1 ---
 window=$(mktemp 2>/dev/null || echo "/tmp/httpd122.$$")

@@ -27,7 +27,9 @@ This test observes the symptom in httpd's own address space.
    either faulting handlers (`abend`) or workers parked in an in-flight long
    poll (`longpoll`, the `#179` / `SA03` path).
 3. Issues `P HTTPD` (see adapters below).
-4. Waits up to `WAIT_SECS` for the listener to stop accepting.
+4. Waits up to `WAIT_SECS` for the listener to stop accepting, then up to
+   `WAIT_SECS` more for the `$HASP395` / `IEF404I` end record to reach
+   `CONSOLE_LOG` (a log that comes through a relay lags the listener).
 5. Asserts over the console-log slice appended during this run.
 
 ### Provocation modes (`PROVOKE`)
@@ -197,7 +199,7 @@ Environment variables (or a sourced `.env`):
 | `ABEND_HITS` | `12` | number of provocation requests |
 | `FAULT_MARK` | `HTTPD908E\|HTTPD062E\|MVSMF99E` | proof-of-fault regex |
 | `HTTPD_AUTH` | (unset) | `user:pass` if `LOGIN` gates GET |
-| `WAIT_SECS` | `120` | max wait for the AS to end |
+| `WAIT_SECS` | `120` | max wait for the listener to stop, and again for the AS end record in the log |
 | `JOBNAME` | `HTTPD` | MVS jobname of the HTTPD STC (scopes the end-capture assertion) |
 | `PROVOKE` | `abend` | pre-stop scenario: `abend` (fault handlers) or `longpoll` (park workers) |
 | `LONGPOLL_CMD` | (required for `longpoll`) | one blocking long-poll request, run `LONGPOLL_N`× concurrently |
