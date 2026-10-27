@@ -35,7 +35,9 @@ This test observes the symptom in httpd's own address space.
 Which shutdown path the run exercises:
 
 - **`abend`** (default) — `ABEND_HITS` requests to `ABEND_PATH` (default
-  `/abend`, whose handler executes `DC H'0'` → S0C1). Handlers fault *fast*, so
+  `/.abend`, the `ABEND0C1` module, which allocates and executes `DC H'0'` →
+  S0C1; needs the Parmlib route `MOD=ABEND0C1 /.abend AUTH=BASIC` of
+  `samplib/httpprm0` and `HTTPD_AUTH`). Handlers fault *fast*, so
   this drives libc370's **recovery-drain** path. Proof-of-scenario is a fault
   marker (`HTTPD062E` / `MVSMF99E`) in the window.
 - **`longpoll`** — launches `LONGPOLL_N` (default 4) concurrent, blocking
@@ -140,7 +142,7 @@ after the fix. Do not remove it.
 Proof that a handler faulted is `HTTPD062E` **or** `MVSMF99E`:
 
 - `HTTPD062E` — a **core** abend caught by the worker's `try(serve_client)`
-  (`src/httpd.c`). This is what `/abend` produces.
+  (`src/httpd.c`). This is what a fault in a module such as `ABEND0C1` produces.
 - `MVSMF99E` — an **mvsMF CGI** abend caught by mvsMF's inner ESTAE; the
   worker `try()` then returns 0, so `HTTPD062E` does not fire.
 
@@ -172,7 +174,7 @@ Environment variables (or a sourced `.env`):
 |---|---|---|
 | `HTTPD_HOST` | `MBT_MVS_HOST` or `127.0.0.1` | host serving the HTTPD listener |
 | `HTTPD_PORT` | `8080` | HTTPD listener port |
-| `ABEND_PATH` | `/abend` | path whose handler faults |
+| `ABEND_PATH` | `/.abend` | path whose handler faults |
 | `ABEND_HITS` | `12` | number of provocation requests |
 | `FAULT_MARK` | `HTTPD062E\|MVSMF99E` | proof-of-fault regex |
 | `HTTPD_AUTH` | (unset) | `user:pass` if `LOGIN` gates GET |

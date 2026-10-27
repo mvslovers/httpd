@@ -31,10 +31,10 @@
 #
 #   2. FAULT MARKER. Proof-of-fault is HTTPD062E *or* MVSMF99E. httpd emits
 #      HTTPD062E for a CORE abend caught by the worker's try(serve_client)
-#      (httpd.c:682) — this is what /abend produces. An mvsMF CGI abend is
+#      (httpd.c:682) — this is what the ABEND0C1 module produces. An mvsMF CGI abend is
 #      caught by mvsMF's inner ESTAE instead and logs MVSMF99E, so the worker
 #      try() returns 0 and HTTPD062E never fires. Accepting either keeps the
-#      test valid whether ABEND_PATH is core (/abend) or a CGI endpoint.
+#      test valid whether ABEND_PATH is a core path or a CGI endpoint.
 #
 #   3. ABNORMAL ADDRESS-SPACE END. A clean in-flight run (no S33E/__CRTGET/SVC
 #      dump) is NOT enough. After the 2026-07-23 recovery-exit relink the
@@ -78,7 +78,9 @@
 # ---------------------------------------------------------------------------
 #   HTTPD_HOST     host serving the HTTPD listener        (default: MBT_MVS_HOST or 127.0.0.1)
 #   HTTPD_PORT     HTTPD listener port to attack + poll   (default: 8080)
-#   ABEND_PATH     path whose handler faults              (default: /abend)
+#   ABEND_PATH     path whose handler faults              (default: /.abend)
+#                  needs the Parmlib route  MOD=ABEND0C1 /.abend  AUTH=BASIC
+#                  (samplib/httpprm0, commented out) and HTTPD_AUTH
 #   ABEND_HITS     how many times to hit it (poison pool) (default: 12)
 #   FAULT_MARK     regex proving a handler faulted        (default: HTTPD062E|MVSMF99E)
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
@@ -126,7 +128,7 @@ fi
 
 HTTPD_HOST=${HTTPD_HOST:-${MBT_MVS_HOST:-127.0.0.1}}
 HTTPD_PORT=${HTTPD_PORT:-8080}
-ABEND_PATH=${ABEND_PATH:-/abend}
+ABEND_PATH=${ABEND_PATH:-/.abend}
 ABEND_HITS=${ABEND_HITS:-12}
 FAULT_MARK=${FAULT_MARK:-HTTPD062E|MVSMF99E}
 WAIT_SECS=${WAIT_SECS:-120}
