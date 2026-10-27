@@ -484,7 +484,10 @@ and shows the count in the next one. A server that is stopping does not wait
 for the 10 seconds.
 
 If the server cannot read a file from the UFS in the middle of a response, it
-writes message HTTPD045E, cuts the response, and closes the connection.
+writes message HTTPD045E, cuts the response, and closes the connection. The
+server writes this message at most once in 60 seconds, too, and the next one
+shows the count of the errors that it held back. For an error in a file that a
+server-side include pulled in (@ref-http-ssi), the message names that file.
 
 == Chunked Transfer <ref-http-chunk>
 
@@ -695,7 +698,9 @@ the include. An include of a file that does not exist gets
 #cmd("<!-- Oops: we didn't find \"path\" -->"), and an include of a file with a
 binary MIME type gets a comment that starts with #cmd("<!-- Oops: we can't
 include a binary file"). One piece of output of a directive is limited to 4095
-characters.
+characters. A read error in an included file ends the response as it does in the
+page itself (@ref-http-stall). The includes that follow on the same line are
+not opened.
 
 The server reads the file line by line, in pieces of at most 254 characters, and
 looks for directives in each piece. A line that is longer than 254 characters is

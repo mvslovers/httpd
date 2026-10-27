@@ -183,7 +183,10 @@ offset. The fields are these.
     [#cmd("uptime")], [The start time of the server, as text.],
     [#cmd("ufssys")], [The UFS system handle, with a link to the target
       #cmd("FS").],
+    [#cmd("readerr_last")], [The time of the last console message about a read
+      error of the file system (#cmd("HTTPD045E")), 0 if there was none.],
     [#cmd("version")], [The version string of the server.],
+    [#cmd("readerr_held")], [The number of such read errors not yet reported.],
     [#cmd("cfg_maxtask"), #cmd("cfg_mintask")], [The configured maximum and
       minimum number of workers.],
     [#cmd("cfg_client_timeout")], [The client timeout in seconds.],

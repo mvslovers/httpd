@@ -396,9 +396,10 @@ not take data, the server tries again every 0.1 second. After 100 tries
 without progress, that is 10 seconds, it gives up on the client and writes
 #cmd("HTTPD065W"). It writes this message at most once in 60 seconds. If
 the server cannot read a file from the file system in the middle of a response,
-it writes #cmd("HTTPD045E"), cuts the response and closes the connection. A
-client that sees a response that stops in the middle should look for these two
-messages.
+it writes #cmd("HTTPD045E"), cuts the response and closes the connection. It
+writes this message at most once in 60 seconds, and a count at its end says how
+many errors it held back. A client that sees a response that stops in the middle
+should look for these two messages.
 
 == The Status Is Not 200 <ug-trouble-status>
 
@@ -534,6 +535,12 @@ that has no profile (see the capture in @ug-trouble-skip). A typing error in
 the class or in the resource name looks the same. Treat #cmd("HTTPD425W") as an
 error of your configuration. "What the Server Asks of the Security Product"
 in the _HTTPD Reference_ describes the check.
+
+For the console route of mvsMF there is a second answer. mvsMF 1.4.0 and later
+check READ on the same profile themselves. HTTPD answers 403 first to a user
+without READ. A user who passes the route when the profile is not defined gets
+status 500 from mvsMF, with the error category 4, because mvsMF refuses every
+user until the profile exists. Define the profile.
 
 === 404, There Is No File <ug-trouble-404>
 

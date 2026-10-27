@@ -390,11 +390,17 @@ rest of this range reports the start of the listener.
       it. The server has no handle for UFSD.],
       a: [The server goes on. The sessions of the clients to the file system
       are created only if the handle exists.]),
-    ..r("HTTPD045E UFS READ ERROR RC={rc}, RESPONSE ABORTED: {path}",
+    ..r("HTTPD045E UFS READ ERROR RC={rc}, RESPONSE ABORTED: {path}, {count} SUPPRESSED",
       [A read of a file failed while the server sent it. #var("path") is the
-      path of the request, cut after 40 characters.],
+      path of the request, or the path as written in the directive if the
+      error was in a file that a server-side include pulled in. It is cut after
+      40 characters. #var("count") is the number of read errors that the
+      server did not report since the last message of this kind, 0 if none.],
       a: [The server drops the data that is not sent and closes the connection.
-      The server goes on.]),
+      It writes this message at most once in 60 seconds. The first error after
+      a quiet minute is written at once, the others in the next 60 seconds are
+      only counted, and the count stays unreported until the next error. The
+      server goes on.]),
     ..r("HTTPD047E UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC={rc}",
       [The server could not initialize its credential key. Login does not
       work.],
