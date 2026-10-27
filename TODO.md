@@ -17,7 +17,7 @@ closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.
 The open issues are in milestone 4.5.0, except #176, #322 and #323, which are in 4.6.0. #326,
 #367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
 #370 is listed and not ranked against the rest, and so are #391 to #395 and #399 to
-#401, which the manuals work (#382) filed. #405, the follow-up to the manuals, is the change that
+#401, which the manuals work (#382) filed; #394 is closed and struck (PR #419). #405, the follow-up to the manuals, is the change that
 carries this edit and has no row. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
 no row. The ranked order is unchanged.
@@ -48,7 +48,7 @@ mvslovers/mbt#163.*
 | — | ~~#391~~ | ~~`SET MA` / `SET MI` without a number passes NULL to `strtoul`~~ | **Done** — both commands answer `HTTPD149I` and change nothing, also for a negative number; milestone 4.5.0 |
 | — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.5.0, not yet ranked |
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
-| — | #394 | diagnostic and display code — unchecked sizes and unescaped output | milestone 4.5.0, not yet ranked |
+| — | ~~#394~~ | ~~diagnostic and display code — unchecked sizes and unescaped output~~ | **Done** — the title buffers are bounded, `/.dm` escapes its title and chunk rule, `GET /abend` is gone, URL decoding no longer cuts the path, a large `POST` to a module route is left unread for the module (PR #419, docs in the Reference); what it left over is #426 (`HTTPDMTT`, PR #428) and #431; milestone 4.5.0 |
 | — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
 | — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
