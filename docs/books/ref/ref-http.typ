@@ -522,6 +522,14 @@ message at most once in 60 seconds. It counts the messages that it suppresses
 and shows the count in the next one. A server that is stopping does not wait
 for the 10 seconds.
 
+The limit holds for a chunked response and for the body of a static file that
+the server sends itself. After the server has given up, it does not keep the
+connection for another request, and the worker is free for the next client.
+
+#note[HTTPD 4.4.0 and earlier have this limit for a chunked response only. A
+client that stops reading a static file keeps its worker (httpd#440). The
+behaviour in this section is that of HTTPD 4.5.0.]
+
 If the server cannot read a file from the UFS in the middle of a response, it
 writes message HTTPD045E, cuts the response, and closes the connection. The
 server writes this message at most once in 60 seconds, too, and the next one

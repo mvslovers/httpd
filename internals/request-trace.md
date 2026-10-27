@@ -36,7 +36,8 @@ a stalled request to a worker and a phase. Off unless the Parmlib says
 `TM_DONE` `TM_END` `TM_CLOSE`. A mark is set once (`trc_mark`) except `TM_SNDL`,
 which follows the last `send()`. Counters per request: `polls` (0.5 s read
 waits in `http_gets`), `txn` / `txms` (calls and time in `send()`), `txst`
-(pauses in `send_raw_all` when the window is closed).
+(pauses when the window is closed: `send_wait`, called from `send_raw_all` for a
+chunked response and from `http_send_pause` for the body of a static file).
 
 The hypotheses the marks separate: a wait before a worker takes the connection
 (`run` large), reading the request (`polls`, `line1`, `req`), the credential

@@ -422,7 +422,9 @@ next request on a new connection.
 *The client waits for the data and the connection ends.* When the client does
 not take data, the server tries again every 0.1 second. After 100 tries
 without progress, that is 10 seconds, it gives up on the client and writes
-#cmd("HTTPD065W"). It writes this message at most once in 60 seconds. If
+#cmd("HTTPD065W"). This holds for a chunked response and for the body of a
+static file. The server does not use the connection again, and the worker is
+free. It writes this message at most once in 60 seconds. If
 the server cannot read a file from the file system in the middle of a response,
 it writes #cmd("HTTPD045E"), cuts the response and closes the connection. It
 writes this message at most once in 60 seconds, and a count at its end says how
@@ -908,10 +910,10 @@ phases in "The Display Modules" (target #cmd("TRACE")).
     [#cmd("lnk0") to #cmd("lnk1")], [The module ran. The time includes the load
       of the module if the server does not hold it in storage
       (@ug-trouble-module).],
-    [#cmd("snd1") to #cmd("sndl")], [The server sent the data. For a
-      chunked response, #cmd("txst") counts the pauses of a tenth of a second
-      in which TCP/IP took no data: the client or the network is slow to
-      receive.],
+    [#cmd("snd1") to #cmd("sndl")], [The server sent the data.
+      #cmd("txst") counts the pauses of a tenth of a second in which TCP/IP
+      took no data, for a chunked response and for a static file: the client
+      or the network is slow to receive.],
   )
 ]
 
