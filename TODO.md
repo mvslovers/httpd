@@ -45,7 +45,7 @@ mvslovers/mbt#163.*
 | — | ~~#377~~ | ~~docs — `REGION` sizing for setups with many parallel module requests~~ | **Done** — the passage is in the Reference ("The region") and in the installation guide (PR #389, follow-up PR #402); milestone 4.5.0 |
 | — | ~~#382~~ | ~~docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release~~ | **Done** — the books landed with PR #390; what the acceptance left over is #395 and #405 |
 | — | ~~#383~~ | ~~build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1~~ | **Done** — `mbt test --mvs` stays part of the 4.5.0 release acceptance |
-| — | #391 | `SET MA` / `SET MI` without a number passes NULL to `strtoul` | found in the manuals work; milestone 4.5.0, not yet ranked |
+| — | ~~#391~~ | ~~`SET MA` / `SET MI` without a number passes NULL to `strtoul`~~ | **Done** — both commands answer `HTTPD149I` and change nothing, also for a negative number; milestone 4.5.0 |
 | — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.5.0, not yet ranked |
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
 | — | #394 | diagnostic and display code — unchecked sizes and unescaped output | milestone 4.5.0, not yet ranked |

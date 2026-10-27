@@ -720,3 +720,11 @@ target = "HTTPD.LINKLIB"        # where the load modules end up
 
 [distribution.library.samplib]
 target = "HTTPD.SAMPLIB"
+
+# httptask() operand check of SET MAXTASK / SET MINTASK (issue #391): no
+# operand and a negative number are refused with a usage message instead of
+# reaching strtoul().  Free of httpd.h -> DUAL (host + MVS); helper source
+# listed for the host link.
+[test.TSTTASK]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tsttask.c", "src/httptask.c"]

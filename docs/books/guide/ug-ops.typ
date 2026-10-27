@@ -398,9 +398,10 @@ stop.
 Three settings can change while the server runs.
 
 *The number of workers.* #cmd("SET MA n") sets the largest number of worker
-threads, #cmd("SET MI n") the smallest. Always give the number. HTTPD takes the
-value 0 as 1 and a value above 100 as 100, and a word that is not a number as
-1. The new value holds until the server stops. The Parmlib member
+threads, #cmd("SET MI n") the smallest. Give the number: without one, and with
+a negative number, HTTPD answers #cmd("HTTPD149I") and changes nothing. HTTPD
+takes the value 0 as 1 and a value above 100 as 100, and a word that is not a
+number as 1. The new value holds until the server stops. The Parmlib member
 does not change, and #cmd("D C") still shows the values from the member.
 
 The answer is the dispatcher block of #cmd("D T"). It shows the new limits.
