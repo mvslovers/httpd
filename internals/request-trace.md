@@ -10,7 +10,7 @@ a stalled request to a worker and a phase. Off unless the Parmlib says
 - One block from the heap, anchored in `HTTPD.trace` (`0x50`, was `unused_50`).
   Nothing is writable module storage (#197). The size is `trc_size(slots)`:
   32 bytes, a hash of `2*slots` words, `slots` records of 128 bytes. At
-  `TRACE=256` that is about 33 KB. The block is freed after the worker pool and
+  `TRACE=256` that is 34,848 bytes. The block is freed after the worker pool and
   the client loop are gone (`httptrc_stop`).
 - Every hook is `if (HTTP_TRACING(httpc)) ...`: one load and a branch when the
   trace is off. `HTTPX` and `HTTPC` do not change. The switch is read at the

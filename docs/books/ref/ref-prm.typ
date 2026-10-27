@@ -333,16 +333,23 @@ The rules of #cmd("RES_NOPROFILE"):
       #cmd("SYSTERM"). If a write to the trace fails, HTTPD writes
       #cmd("HTTPD039W") once and switches the trace off until the next start.
       The server goes on.],
-    [#cmd("TRACE")], [0], [The number of records of the request trace, 0 or 16
-      to 1024. 0 is off. Any other value, and a text that is not a number, give
-      #cmd("HTTPD444W") and the trace stays off. With a valid number HTTPD
-      takes one block of 128 bytes a record plus the index, from the heap, at
-      the start, and writes #cmd("HTTPD066I"); if the block cannot be had it
-      writes #cmd("HTTPD067W") and the server runs without the trace. The trace
-      keeps for each request the worker that serves it and the time of each
-      phase. It does not change what the server does. A change takes a restart.
-      The target #cmd("TRACE") of #cmd("/.dsrv") shows the records
-      (@ref-dm-dsrv-trace).],
+    [#cmd("TRACE")], [0], [The number of records of the request trace: 0 or a
+      number from 16 to 1024. 0 is off. The request trace is not the trace of
+      #cmd("DEBUG"). It keeps, for each request, the worker that serves it, the
+      time of each phase of the request and a few counters, in a table of the
+      server. It does not change what the server does. The target #cmd("TRACE")
+      of #cmd("/.dsrv") shows the table (@ref-dm-dsrv-trace). HTTPD reads the
+      value at the start, so a change takes a restart. Any other value, and a
+      text that is not a number, give #cmd("HTTPD444W") and the trace stays off.
+      With a valid number HTTPD takes one block of storage from the region of
+      the server, 32 bytes plus 136 bytes for each record (34,848 bytes for 256
+      records, 139,296 bytes for 1024), and writes #cmd("HTTPD066I"). If the
+      region has no room for the block, HTTPD writes #cmd("HTTPD067W") and the
+      server runs without the trace. The server frees the block at the stop.
+      The table holds the most recent requests: when it is full, a new request
+      takes the record of a finished one. Switch the trace on to find a
+      problem and off after it. The table holds the client address and the path
+      of every request.],
     [#cmd("SMF")], [NONE], [#cmd("SMF=level") or #cmd("SMF=level TYPE=nnn"). The
       level is #cmd("NONE"), #cmd("ERROR"), #cmd("AUTH") or #cmd("ALL"), in any
       case. HTTPD compares only as many characters as the word has, so

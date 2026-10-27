@@ -56,6 +56,8 @@ The next table sends you to the right section.
       another], [@ug-trouble-module],
     [A response of a module takes about five seconds], [@ug-trouble-wait],
     [Requests wait, or a worker abends], [@ug-trouble-workers],
+    [One request takes long, and you want to know where the time goes],
+      [@ug-trouble-slow],
   )
 ]
 
@@ -294,6 +296,10 @@ common ones.
     [#cmd("HTTPD003W"), #cmd("HTTPD004W")], [The server could not log on as
       #cmd("STCUSER"). It runs with the identity the task inherited
       (@ug-trouble-login).],
+    [#cmd("HTTPD444W")], [The value of #cmd("TRACE") is not 0 and not a number
+      from 16 to 1024. The request trace stays off (@ug-config-trace).],
+    [#cmd("HTTPD067W")], [The server could not get the storage for the request
+      trace. It runs without it (@ug-config-trace).],
     [#cmd("HTTPD044W")], [The server could not create its handle to the file
       system. It serves no static files (@ug-trouble-static).],
     [#cmd("HTTPD047E")], [The server could not set up its credential key.
@@ -837,6 +843,85 @@ chunked. The wait in the capture is close to the default of
 #cmd("KEEPALIVE_TIMEOUT"), which is 5 seconds. "Chunked Transfer" in "HTTP
 Behaviour and Limits" in the _HTTPD Reference_ has the rules, and @ug-module
 shows the complete module.
+
+== A Request Is Slow <ug-trouble-slow>
+
+#idx("request trace", "slow request")
+#idx("TRACE")
+*Symptom.* A client says that one request takes long. You want to know whether
+the time went to the client, to the server, to a module or to the send. The
+request trace records the time of each phase of every request, so it answers
+this. It has to be on before the request is made, because the server reads
+#cmd("TRACE=") only at its start. If it is off, switch it on with the steps in
+@ug-config-trace and wait for the problem to come again.
+
+The target #cmd("TRACE") of HTTPDSRV shows the table. The parameter #cmd("min")
+is a number of milliseconds. It leaves out the finished requests that took less.
+A request that is still running is always in the answer. The first line of the
+answer holds the totals, and the filter #cmd("tail -n +2") cuts it. The filter
+#cmd("cut") keeps the words of interest: the number of the request, its worker,
+its number on the connection, whether it still runs, the last phase it reached,
+its age in milliseconds, the times of the request line and of the end of the
+headers, the number of waits for the client, and the path.
+
+The first capture was made while a client held a request back. The client had
+sent the request line and no header line, and the readout is from the third
+second:
+
+#screen(raw(read("../ex/ug-trouble/trace-slow-live.txt")))
+
+The first line is the request of the slow client. It still runs (#cmd("live=1")).
+Its last phase is #cmd("line1"): the server read the request line after 4 ms,
+and since then it has waited for the header lines. The word #cmd("req") is
+#cmd("-"), because the end of the headers was not reached. The server has
+gone back to waiting for the client seven times (#cmd("polls=7")), and each
+wait lasts up to half a second. The time is not the time of the server. The second line is the request
+that read the trace.
+
+The second capture was made after the client had sent the rest:
+
+#screen(raw(read("../ex/ug-trouble/trace-slow-done.txt")))
+
+The request ended with #cmd("last=end") after 5,537 ms. The end of the headers
+came at 5,517 ms, so the server needed 20 ms for everything that follows. The
+cause of the long request is the client.
+
+When the time is not in the wait for the client, find the largest gap between
+two phases. The next table says what each gap is. The Reference lists the
+phases in "The Display Modules" (target #cmd("TRACE")).
+
+#tab(caption: [Where the time of a request goes])[
+  #table(columns: (1.5in, 1fr),
+    [Gap], [Meaning],
+    [accept to #cmd("run")], [The request waited for a worker. All workers
+      were busy (@ug-trouble-workers).],
+    [#cmd("run") to #cmd("req")], [The server waited for the client to send the
+      request line and the headers. #cmd("polls") counts the waits of half a
+      second.],
+    [#cmd("req") to #cmd("parse")], [The server parsed the request. For a POST
+      it also read the body, so a client that sends its body slowly shows up
+      here.],
+    [#cmd("parse") to #cmd("cred")], [The server resolved the credential of the
+      request.],
+    [#cmd("cred") to #cmd("route")], [The server checked the policy of the
+      route, with the RACF check of #cmd("RES=") if the route has one.],
+    [#cmd("lnk0") to #cmd("lnk1")], [The module ran. The time includes the load
+      of the module if the server does not hold it in storage
+      (@ug-trouble-module).],
+    [#cmd("snd1") to #cmd("sndl")], [The server sent the data. For a
+      chunked response, #cmd("txst") counts the pauses of a tenth of a second
+      in which TCP/IP took no data: the client or the network is slow to
+      receive.],
+  )
+]
+
+The trace shows what the server did and nothing of the network. A request that
+is fast in the trace and slow for the client was slow in the client or in the
+network. On a connection that stays open, the record of the second
+request starts at the end of the first one, so its #cmd("line1") includes the
+time that the client needed to send it. A finished request that took a second or
+more stays in the table longer than a fast one, so a slow request is still there
+when you look.
 
 == Static Files Are Not Served <ug-trouble-static>
 

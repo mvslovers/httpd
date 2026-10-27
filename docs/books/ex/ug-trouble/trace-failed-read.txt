@@ -1,0 +1,6 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=TRACE" | tail -n +2 | cut -d" " -f1,3,7,8,10,11,13,14,15,16,24,25,26,27
+seq=1 w=17FA40 n=0 resp=0 live=0 last=end age=5 run=3 line1=- req=5 done=- end=5 close=- polls=0
+seq=2 w=17F9C0 n=0 resp=401 live=0 last=end age=25 run=2 line1=3 req=4 done=24 end=25 close=- polls=0
+seq=3 w=17F9C0 n=1 resp=0 live=0 last=close age=1004 run=0 line1=- req=1003 done=- end=- close=1004 polls=2
+seq=4 w=17FB40 n=0 resp=0 live=0 last=end age=9526 run=2 line1=- req=9525 done=- end=9526 close=- polls=19
+seq=5 w=17FA40 n=0 resp=0 live=1 last=sndl age=18 run=1 line1=2 req=4 done=- end=- close=- polls=0

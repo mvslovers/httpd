@@ -1,0 +1,8 @@
+PORT=8080
+DOCROOT=/www
+TRACE=64
+MOD=MVSMF /zosmf/info                    AUTH=NONE
+MOD=MVSMF /zosmf/services/authenticate   AUTH=NONE
+MOD=MVSMF /zosmf/*                       AUTH=TOKEN
+MOD=HTTPDSRV /.dsrv                      AUTH=FORM
+LOC=/pub/*                               AUTH=NONE
