@@ -11,13 +11,13 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-27, against `origin/main` 7d95496, after v4.4.0
+*Last reconciled against the tracker: 2026-10-27, against `origin/main` 381f49f (after PR #418 and #423; #401 closed, #421, #426 and #431 added), after v4.4.0
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
 closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
 The open issues are in milestone 4.5.0, except #176, #322 and #323, which are in 4.6.0. #326,
 #367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
-#370 is listed and not ranked against the rest, and so are #391 to #395 and #399 to
-#401, which the manuals work (#382) filed. #405, the follow-up to the manuals, is the change that
+#370 is listed and not ranked against the rest, and so are #391 to #395 and #399 and
+#400, which the manuals work (#382) filed (#401 is closed, see its row). #405, the follow-up to the manuals, is the change that
 carries this edit and has no row. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
 no row. The ranked order is unchanged.
@@ -52,7 +52,10 @@ mvslovers/mbt#163.*
 | — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
 | — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
-| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | items 1 to 3 are in PR #418 (strike this row when it merges); items 4 to 6 (dropped output, invalid directives, code page of values) stay open, and the `getenv()` fallback of `echo` is #421; milestone 4.5.0, not yet ranked |
+| — | ~~#401~~ | ~~SSI — `printenv` exposes the server environment, output not escaped, long lines split~~ | **Items 1 to 3 are Done** (PR #418, docs PR #423); the issue is closed with them. Items 4 to 6 (dropped output in `ssi_buffer()`, invalid directives, code page of values) are **not tracked by any open issue** since the close — they need a follow-up issue with a milestone (Product Owner) before they get a rank |
+| — | #421 | SSI — `<!--#echo var=...-->` falls back to `getenv()` and can print a server environment variable | **decided (board): variant B** — 4.5.0 only documents the fallback; dropping it is a behaviour change and comes in 4.6.0; the issue still carries milestone 4.5.0, which the Product Owner moves; not yet ranked |
+| — | #426 | `HTTPDMTT` writes Master Trace Table entries unescaped into HTML | milestone 4.5.0; PR #428 (also drops the CORS header on the display modules); not yet ranked |
+| — | #431 | small follow-ups from #394 — `&amp;` in the `/.dsrv` help, shutdown-acceptance diagnostics | milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
