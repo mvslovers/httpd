@@ -283,7 +283,9 @@ second is the check of #cmd("SESSION_TIMEOUT").]
       name #cmd("HTTPDBG") for output and writes its trace lines to it. If the
       DD name cannot be opened, HTTPD writes #cmd("HTTPD020E") with the
       #cmd("errno") and #cmd("HTTPD021I"), and the trace goes to the DD name
-      #cmd("SYSTERM").],
+      #cmd("SYSTERM"). If a write to the trace fails, HTTPD writes
+      #cmd("HTTPD039W") once and switches the trace off until the next start.
+      The server goes on.],
     [#cmd("SMF")], [NONE], [#cmd("SMF=level") or #cmd("SMF=level TYPE=nnn"). The
       level is #cmd("NONE"), #cmd("ERROR"), #cmd("AUTH") or #cmd("ALL"), in any
       case. HTTPD compares only as many characters as the word has, so

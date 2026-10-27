@@ -216,7 +216,8 @@ The next table shows what each DD of the procedure is for.
       #cmd("HTTPD020E FOPEN FOR DD:HTTPDBG FAILED, ERRNO=n") and
       #cmd("HTTPD021I DEBUG/TRACE OUTPUT WILL BE TO DD:SYSTERM"), and it sends
       the debug output to the standard error stream, which is the DD
-      #cmd("HTTPDERR").],
+      #cmd("HTTPDERR"). When a write fails, HTTPD writes #cmd("HTTPD039W")
+      once and stops the debug output until the next start.],
     [#cmd("HTTPSTAT")], [#cmd("SYSOUT=*")], [Not opened by HTTPD.],
     [#cmd("HTTPPRM")], [#cmd("DSN=&D(&M),") #cmd("DISP=SHR,FREE=CLOSE")], [The
       Parmlib member (@ref-stc-prm).],
@@ -646,6 +647,7 @@ The next messages do not change the return code.
       identity (@ref-stc-id).],
     [#cmd("HTTPD020W")], [The server runs on the built-in defaults.],
     [#cmd("HTTPD034W")], [The server runs without worker threads.],
+    [#cmd("HTTPD039W")], [The server runs with the debug output off.],
     [#cmd("HTTPD044W")], [The server runs without a file system.],
     [#cmd("HTTPD047E")], [The server runs, and logins do not work.],
     [#cmd("HTTPD440W"), #cmd("HTTPD441W"), #cmd("HTTPD442W")], [The route works.

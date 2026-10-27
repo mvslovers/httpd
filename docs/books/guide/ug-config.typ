@@ -388,7 +388,11 @@ ends with the text #cmd("SET TZ IN THE SYSENV OR ENVIRON DD TO OVERRIDE IT FOR A
 means on and 5 means the same as 1. With the trace on, HTTPD writes its trace
 lines to the DD name #cmd("HTTPDBG") of the procedure. If HTTPD cannot open the
 DD name, it writes #cmd("HTTPD020E") and #cmd("HTTPD021I"), and the trace goes
-to #cmd("SYSTERM"). Use the trace for a problem and switch it off after it.
+to #cmd("SYSTERM"). If a write to the trace fails, for example because the
+data set is full, HTTPD writes #cmd("HTTPD039W") once, switches the trace off
+and goes on. The trace stays off until the next start, and it ends at the point
+of the failure. Give the DD name more room and restart the server to trace
+again. Use the trace for a problem and switch it off after it.
 @ug-trouble helps with problems.
 
 == Recording SMF Records <ug-config-smf>

@@ -380,6 +380,18 @@ rest of this range reports the start of the listener.
       [The server opened the configuration and could not read it to the end.],
       a: [The start ends with the return code 8.],
       o: [Check the data set of the DD name #cmd("HTTPPRM") and start again.]),
+    ..r("HTTPD039W WRITE ERROR ON DD:HTTPDBG -- DEBUG OUTPUT SWITCHED OFF",
+      [A write of the trace failed, for example because the data set of the DD
+      name #cmd("HTTPDBG") is full. The server writes the message once in a
+      run, for the first failed write, from whichever thread meets it. The text
+      names #cmd("HTTPDBG") also when the trace goes to the standard error file
+      (#cmd("HTTPD021I")). The keyword #cmd("DEBUG=") must be greater than 0
+      for the message to appear.],
+      a: [The server switches the trace off and goes on. It writes no more
+      trace lines until the next start. The trace ends at the point of the
+      failure.],
+      o: [Give the DD name #cmd("HTTPDBG") a data set with more room, and
+      restart the server to trace again.]),
     ..r("HTTPD040I WAITING FOR SOCKET THREAD TO TERMINATE ({n})",
       [Written during the stop while the socket thread still runs. #var("n")
       counts from 1 to 9. The server waits one second between the messages.]),
