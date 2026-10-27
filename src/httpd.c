@@ -1134,6 +1134,7 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
        break out, loudly, instead of taking the address space down. */
     int     spin    = 0;
     short   last    = httpc->state;
+    unsigned lastsent = httpc->sent;
 
     if (HTTP_TRACING(httpc)) httptrc_run(httpc, work);
 
@@ -1141,7 +1142,10 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
         http_process_client(httpc);
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
 
-        if (httpc->state == last) {
+        /* A byte sent is progress too: a download stays in one state for
+           as many passes as it has buffers, and a slow client that is
+           still reading must not use up the passes (#440). */
+        if (httpc->state == last && httpc->sent == lastsent) {
             /* No progress.  In worker mode this client has exactly one owner
                -- this loop; it came off the work queue and nothing else
                processes it.  So if the no-progress pass was httppc()'s
@@ -1176,6 +1180,7 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
         else {
             spin = 0;
             last = httpc->state;
+            lastsent = httpc->sent;
         }
     }
     return 0;
