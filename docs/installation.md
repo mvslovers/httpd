@@ -775,6 +775,33 @@ If the logon fails the server **continues** on the inherited identity and says
 so with `HTTPD004W`, so a profile typo is not an outage — but it is also not
 what you asked for. Watch for that message where you expect `HTTPD004I`.
 
+### The region — `REGION=`
+
+The shipped procedure runs the server with `REGION=8M`. A mixed load of 6
+parallel requests across all module types ran clean in it.
+
+**Raise it before you raise `MAXTASK`, and when you expect many REXX or Lua
+requests at the same time.** Every request that runs a server module takes one
+contiguous block of storage for the C stack of that module: 262,328 bytes for a
+module that sets no stack size of its own, which is the case for HTTPREXX and
+HTTPLUA, and about 64 KB for mvsMF. Up to `MAXTASK` of them run at once, each
+on a worker thread with a stack of 64 KB of its own. Against the 4.4.0 release
+candidate, 60 REXX requests with 9 at a time failed in some runs with
+`REGION=8M`, and in none with `REGION=16M` or with `RESIDENT=NO` (one run each).
+
+To raise it, change the `REGION=` of the `EXEC` statement in your copy of the
+procedure:
+
+```
+//HTTPD    EXEC PGM=HTTPD,REGION=16M,TIME=1440,
+```
+
+If 16M is not enough, lower `MAXTASK`. The numbers, the table of what each part
+costs and the full recommendation are in
+[configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#region-size-and-parallel-module-requests-region-maxtask).
+The symptom of a region that is too small is under *Troubleshooting* at the end
+of this guide.
+
 ### The DD statements — do not add SYSPRINT, SYSTERM or SYSIN
 
 HTTPD writes its own STDOUT/STDERR and reads STDIN through private DDs
@@ -1909,6 +1936,7 @@ nothing above touches it.
 | `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a chunked (HTTP/1.1) response, so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | One request out of many takes 25 to 150 seconds under sustained load, the rest answer in about a second, and no console message appears | A known issue in this release, independent of `RESIDENT=`: single requests were seen to stall for 25 to 150 seconds in soak runs of 20,000 to 30,000 requests, with the median at 0.2 s and the 95th percentile near 1 s. The cause is not known and it has not been reproduced on demand. A request that a client abandoned at 60 s and sent again was answered the second time. Nothing to configure; use a client timeout and a retry. Tracked in [#350](https://github.com/mvslovers/httpd/issues/350) |
 | `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it. `106-0F` is not a storage shortage (that is `106-0C`): IBM describes it as an uncorrectable I/O error, or an error in the load module that made the channel program fail. Look at the library and the member, not at the region. A failed fetch costs the module's storage until the server stops; `RESIDENT=YES` (the default) avoids the per-request fetch, see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) and [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#resident-modules-resident) |
+| `@@CRT0 - No storage for C stack` on the console, `HTTPD908E EXTERNAL PROGRAM … failed with U0801 ABEND`, the client gets `503`; only under load, several module requests at the same time | The region has no free block of 262,328 contiguous bytes (about 64 KB for mvsMF) for the stack of one more module request. Raise `REGION` in the procedure (16M held in the one measured run) before you raise `MAXTASK`; if 16M is not enough, lower `MAXTASK`. `HTTPD904E` and `HTTPD999E` in the same window say the same of the server's own storage. Step 7, *The region*, and [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#region-size-and-parallel-module-requests-region-maxtask) |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |

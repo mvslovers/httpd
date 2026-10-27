@@ -65,7 +65,7 @@ DOCROOT=/www
 | Keyword | Default | Description |
 |---------|---------|-------------|
 | `MINTASK` | 3 | Minimum number of worker threads. Threads are pre-started at server initialization. |
-| `MAXTASK` | 9 | Maximum number of worker threads. Additional threads are started on demand. |
+| `MAXTASK` | 9 | Maximum number of worker threads. Additional threads are started on demand. Every worker that runs a module needs a stack of that module on top of its own: raise the `REGION` with it, see [Region size](#region-size-and-parallel-module-requests-region-maxtask). |
 | `CLIENT_TIMEOUT` | 10 | Seconds before an idle client in the request-reading phase is disconnected. |
 
 ## Keep-Alive
@@ -351,6 +351,10 @@ supplied PROC (`samplib/httpd`) bridges the two:
 Note the blank: `__start()` splits the PARM into `argv` on blanks, not commas.
 A PROC of your own that joins them with a comma will hand the whole string to
 `STCUSER=` and the group will be silently wrong.
+
+`REGION=8M` in this procedure is the stock value. A mixed load of 6
+parallel requests across all module types ran clean in it. A setup with many
+parallel REXX or Lua requests may need more: see [Region size and parallel module requests](#region-size-and-parallel-module-requests-region-maxtask).
 
 RAKF has no started-procedures table: it decides only *that* a caller is an
 STC, never *which* one, and hands every started task the same `STC/STCGROUP`
@@ -641,6 +645,87 @@ works as it always did. `F HTTPD,D CONFIG` shows how many modules are held
 **A deployed module takes effect at the next restart**, because the held copy
 stays in storage. Set `RESIDENT=NO` where a new module level must take effect
 without a restart, at the price of one fetch per request.
+
+### Region size and parallel module requests (`REGION`, `MAXTASK`)
+
+The `REGION` on the `EXEC` statement of the procedure (`8M` in the shipped
+one) is the one limit on everything the server holds. It is not a Parmlib
+keyword. A setup in which many module requests run at the same time may need
+more than the stock `8M`.
+
+**What a module request costs.** Every request that runs a server module
+takes one contiguous block of storage for the C stack of that module, from
+the region, for as long as the module runs.
+
+| What | Size | Where it is set |
+|------|------|-----------------|
+| C stack of a module that sets nothing | 262,328 bytes (about 256 KB) | the C runtime's default, `@@CRT0` in LIBC/370 |
+| C stack of a module with its own `__stklen` | that value plus 48 bytes. MVSMF sets 64 KB, and a request takes 65,584 bytes | `unsigned __stklen` in the module |
+| Stack of a worker thread | 64 KB, once per worker thread | `httpd.c`, the thread manager |
+| Stack of the socket thread | 32 KB, once | `httpd.c` |
+| Resident copy of a module (`RESIDENT=YES`) | the size of the load module, once per module and not per request. MVSMF is about 335 KB | see [Resident modules](#resident-modules-resident) |
+
+The REXX and Lua modules, HTTPREXX and HTTPLUA, set no `__stklen`, so each
+request to one of them takes the default 262,328 bytes. The interpreter then
+needs working storage of its own on top of that; how much was not measured.
+
+**How it grows.** A request runs on a worker thread, so at most `MAXTASK`
+module requests run at once, and the stacks add up to at most `MAXTASK`
+times the stack of the module. At the default `MAXTASK=9` and modules with the
+default stack that is 9 × 262,328 = 2,360,952 bytes, plus 9 × 64 KB for the
+worker threads. Each step of `MAXTASK` therefore costs at least one more
+worker stack and one more module stack, about 320 KB for a default-stack
+module, before the working storage of the module itself. The stack must be
+one *contiguous* free block, so the free storage of the region has to be
+whole enough to hold it, not only large enough in sum.
+
+**What was measured.** Against the 4.4.0 release candidate with the stock
+`REGION=8M`, 60 requests to `.rexx` and `.rxp` URLs, 9 at a time (`MAXTASK=9`):
+
+| Set-up | Failed requests of 60, one entry per run |
+|--------|------------------------------------------|
+| `REGION=8M`, `RESIDENT=YES` | 6, 32, 0 |
+| `REGION=8M`, 4.3.0, same module libraries | 0, 4, 0 |
+| `REGION=8M`, `RESIDENT=NO` | 0 (one run) |
+| `REGION=16M` | 0 (one run) |
+
+A mixed load of 6 requests at a time across all module types was clean in every
+set-up. The sample is small and the runs are not independent. It shows the
+order of magnitude, not a threshold, and it does not show a regression against
+4.3.0. It was not run with Lua requests.
+
+**Recommendation.**
+
+- For a setup that expects many parallel REXX or Lua requests, set
+  `REGION=16M` in the procedure before you raise `MAXTASK`. 16M held in the run
+  above and is the largest value that was tried. If it is not enough, lower
+  `MAXTASK` instead of raising it.
+- Raise `MAXTASK` only together with the region. Each extra worker adds the
+  amounts above.
+- Do not use `RESIDENT=NO` as the cure. It was clean in one run, but it brings
+  back the fetch of the module on every request and the loss of storage after a
+  failed fetch described under [Resident modules](#resident-modules-resident).
+- A module author can shrink the demand of a module by setting `__stklen`, as
+  MVSMF does. That is a change in the module, not in the server.
+
+**The symptom.** The request that cannot get its stack never reaches the
+module. On the console:
+
+```
+@@CRT0 - No storage for C stack
+HTTPD908E EXTERNAL PROGRAM REXX failed with U0801 ABEND
+```
+
+The client is answered `503`, with the text `External program REXX failed
+with U0801 ABEND` as the body. In the runs above some failed requests were
+answered `500`. Other requests of the same server go on. A module linked
+against a LIBC/370 older than 1.0.3 abends `S80A` instead of `U0801`: it
+requested the stack without a condition, and the abend came from inside the
+system. `HTTPD904E` and
+`HTTPD999E` show the same shortage elsewhere, in the server's own storage: an
+environment variable of a request, or the control block of a new connection,
+could not be allocated. The client of such a request gets no response and the
+connection is closed. See [messages.md](messages.md).
 
 ### Module context blocks (`CGI_CONTEXT_POINTERS`)
 
