@@ -279,6 +279,14 @@ host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 
+# Pure SSI helpers (#401): where a long line is held back so a split directive
+# is still found, and the HTML escaping of printenv/echo output.  Free of
+# httpd.h -> DUAL; httpssi.c calls httpesc(), so both sources are listed for
+# the host link.
+[test.TSTSSI]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstssi.c", "src/httpssi.c", "src/httpesc.c"]
+
 # httpbody() request-body length classifier (S7 Content-Length enforcement).
 # Free of httpd.h -> DUAL (host + MVS); helper source listed for the host link.
 [test.TSTBODY]
