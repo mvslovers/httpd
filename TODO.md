@@ -11,7 +11,7 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-27, against `origin/main` 366a2a3, after v4.4.0
+*Last reconciled against the tracker: 2026-10-27, against `origin/main` 1e12930, after v4.4.0
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
 closed). Every open issue is now in milestone 4.5.0, so nothing in this file waits on 4.4.0 any
 more. #326, #367 and #373 are closed and have no row. #376 and #377, both filed from the 4.4.0
