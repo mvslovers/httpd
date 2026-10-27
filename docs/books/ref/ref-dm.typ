@@ -339,7 +339,7 @@ words.
     [#cmd("slots")], [The number of records, the value of #cmd("TRACE").],
     [#cmd("seq")], [The number of requests that got a record since the start.
       It is also the number of the newest record.],
-    [#cmd("lost")], [The number of requests that got no record because all
+    [#cmd("lost")], [The number of requests that got no record. In practice all
       records belonged to requests that were still running.],
     [#cmd("miss")], [How often a phase mark found no record for its request.
       A request that was lost causes a miss at each of its marks.],
@@ -389,7 +389,7 @@ among them, and the request is still running.
     [#cmd("sent")], [The bytes sent for the request. The server fills the word
       when the request ends, so it is 0 for a request that is still running.],
     [#cmd("path")], [The first 23 characters of the decoded path of the request,
-      without the query. A character that is not printable shows as #cmd("?"). The word
+      without the query. A byte at or below hex 40 (a blank or a control character) shows as #cmd("?"). The word
       is empty until the request is parsed. It is always the last word.],
   )
 ]
@@ -407,9 +407,13 @@ normally reaches them.
       connection it is 0, because the worker still holds the connection.],
     [#cmd("line1")], [the request line was read.],
     [#cmd("req")], [the server stopped reading the request line and the header
-      lines. The mark is also set when the read failed or timed out, or when the
-      client closed the connection. Then #cmd("line1") can be #cmd("-"),
-      and the phases after #cmd("req") are #cmd("-").],
+      lines. The mark is also set when the read failed: the client closed the
+      connection, the read timed out, or the request line has no second word.
+      Then #cmd("line1") can be #cmd("-"). The request goes no further, so
+      #cmd("done") stays #cmd("-") and #cmd("resp") is 0. The first request of a
+      connection ends with the mark #cmd("end"). A later request of a connection
+      that is kept alive ends with the mark #cmd("close") and has no
+      #cmd("end").],
     [#cmd("parse")], [the request was parsed. For a POST the server has read
       the body by then.],
     [#cmd("cred")], [the credential of the request was resolved, with or
@@ -447,7 +451,7 @@ passed at 7 ms. The module was linked at 8 ms and returned at 27 ms (#cmd("lnk0"
 less than a millisecond. The response was complete at 27 ms, and the request was
 over at 28 ms.
 
-The next example shows a connection that stays open. The command shows 10 of
+The next example shows a connection that stays open. The command shows 11 of
 the words of each record. Records 3 and 4 are the two requests of one
 connection, and record 5 is the end of that connection. Records 1 and 2 are
 another connection, and record 6 is the request that reads the trace:
@@ -455,17 +459,34 @@ another connection, and record 6 is the request that reads the trace:
 #screen(raw(read("../ex/ug-trouble/trace-keepalive.txt")))
 
 Records 3 and 4 have the same worker (#cmd("w")), and #cmd("n") counts 0 and 1.
-The second record has #cmd("run=0"): the worker already held the connection, so
-the mark is the start of the record. Record 5 has no request line
+Record 4 has #cmd("run=0"): the worker already held the connection, so the
+mark is the start of the record. Record 5 has no request line
 (#cmd("last=close"), #cmd("resp=0")). It is the time from the end of record 4
-to the close of the connection, 502 ms, and in it the server waited once for the
+to the close of the connection, 508 ms, and in it the server waited once for the
 next data (#cmd("polls=1")). Record 6 is still running: #cmd("live=1"), and its
 last mark so far is #cmd("sndl"), because the server is sending the page that
 shows it.
 
+The last example shows requests whose read failed. The command shows 14 of the
+words of each record:
+
+#screen(raw(read("../ex/ug-trouble/trace-failed-read.txt")))
+
+Record 1 is a connection that the client closed before it sent anything. The
+server stopped reading at 5 ms (#cmd("req")), there is no request line
+(#cmd("line1=-")), and the record ends with #cmd("end"). Record 2 is a request
+that was answered with 401, and record 3 is the end of its connection after 1,004 ms, as
+in the example before: the connection was kept alive and the client closed it.
+That record has #cmd("close") and no #cmd("end"). Record 4 is a connection that
+sent nothing until the server gave up after about ten seconds, the default of
+#cmd("CLIENT_TIMEOUT"). The server waited 19 times for half a second
+(#cmd("polls=19")), and the record ends with #cmd("end"). None of the three has
+#cmd("done"), and all have #cmd("resp=0").
+
 The times come from the TOD clock. The server shifts the clock value right by 22
-bits and keeps 32 bits, so one tick is 1.024 milliseconds and the figures in a
-line are rounded down to a whole millisecond of that scale. The tick count wraps
+bits and keeps 32 bits, so one tick is 1.024 milliseconds. Only #cmd("now") is in ticks. The server
+converts every other time of a line to real milliseconds (1000 ticks are
+1024 milliseconds) and drops the fraction. The tick count wraps
 after about 51 days. The trace only uses the difference of two ticks, so the
 wrap does not matter, but the #cmd("now") of one readout cannot be compared with
 the #cmd("now") of a much later one.

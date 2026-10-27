@@ -593,9 +593,10 @@ whole page and follow the links.
 HTTPDSRV is for the browser. The parameter #cmd("target") says what to show:
 #cmd("HTTPD") (the default), #cmd("MGR"), #cmd("MOD"), #cmd("WORKERS"),
 #cmd("TASK"), #cmd("FILE"), #cmd("FS") and #cmd("TRACE"). Some of them need an
-address in the parameter #cmd("m"). The target #cmd("TRACE") answers in plain
-text, one line for each request (@ug-config-trace). The pages give the offset, the name, the meaning and the
-value of each field. The _HTTPD Reference_ lists the targets. The help page of
+address in the parameter #cmd("m"). The other targets answer with HTML pages. They give the offset, the name, the
+meaning and the value of each field. The target #cmd("TRACE") answers in plain
+text, one line for each request (@ug-config-trace). The _HTTPD Reference_ lists
+the targets. The help page of
 HTTPDSRV lists more targets than the module has, and says that some need an
 address when they do not. The Reference has the correct list, and this guide
 uses only the targets of the Reference.
