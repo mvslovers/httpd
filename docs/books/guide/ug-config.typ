@@ -263,8 +263,8 @@ and not to the copy of the module.
     [Stack of a module without its own setting], [262,328 bytes, about 256 KB],
       [The default of the C runtime. HTTPREXX and HTTPLUA take it, because
       they set no stack size.],
-    [Stack of a module with its own setting], [The setting, and a few hundred
-      bytes more],
+    [Stack of a module with its own setting], [The setting, and 48 bytes
+      more. For 64 KB that is 65,584 bytes.],
       [The module sets #cmd("unsigned __stklen"). MVSMF sets 64 KB.],
     [Stack of a worker], [64 KB], [One for each worker, up to #cmd("MAXTASK").
       The value is in #cmd("HTTPD061I") as #cmd("STACKSIZE(65536)").],
@@ -295,7 +295,7 @@ not only large enough in sum.
     [#cmd("REGION=8M"), HTTPD 4.3.0 with the same module libraries],
       [0, 4 and 0],
     [#cmd("REGION=8M"), #cmd("RESIDENT=NO")], [0 (one run)],
-    [#cmd("REGION=16M"), #cmd("RESIDENT=YES")], [0 (one run)],
+    [#cmd("REGION=16M")], [0 (one run)],
   )
 ]
 
