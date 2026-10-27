@@ -100,7 +100,7 @@ already returned (no worker parked → INCONCLUSIVE, not a real reproduction).
   (`IEF450I` / `$HASP310` / SVC dump all absent), and the address-space end was
   captured in the window (`$HASP395 ... ENDED` or `IEF404I`). A PASS on a build
   that still carries the libc370 defect is suspicious — the banner says so.
-  `HTTPD002I` / `HTTPD060I` worker-shutdown WTOs corroborate a clean drain but do
+  `HTTPD060I` / `HTTPD099I` shutdown WTOs corroborate a clean drain but do
   **not** gate the result; a PASS with none of them present emits a CAUTION.
 - **INCONCLUSIVE** — either the intended scenario didn't run (in `abend`, no
   fault marker `HTTPD908E` / `HTTPD062E` / `MVSMF99E`; in `longpoll`, no long-poll still in

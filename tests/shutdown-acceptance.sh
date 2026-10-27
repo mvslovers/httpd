@@ -54,11 +54,14 @@
 #      match only over-reports FAIL; the end-capture markers are scoped TIGHT to
 #      $JOBNAME so a miss downgrades to INCONCLUSIVE. Both err toward safe.
 #
-#   4. HTTPD060I / HTTPD002I ARE DIAGNOSTIC, NOT A GATE. Worker- and server-
-#      shutdown WTOs corroborate an orderly drain but never decide the verdict:
-#      the authoritative signal is the address-space end (note 3). The SA03 run
-#      produced zero HTTPD060I, so a PASS with zero of them emits a CAUTION, not
-#      a FAIL. Do not turn these into a hard requirement.
+#   4. HTTPD060I / HTTPD099I ARE DIAGNOSTIC, NOT A GATE. The thread-stop WTOs
+#      (MSG_THREAD_STOP, "HTTPD060I SHUTDOWN <name> ...") and the final
+#      "HTTPD099I HTTPD SHUTDOWN COMPLETE" (MSG_SHUTDOWN_DONE) corroborate an
+#      orderly drain but never decide the verdict: the authoritative signal is
+#      the address-space end (note 3). The SA03 run produced zero HTTPD060I, so
+#      a PASS with zero of them emits a CAUTION, not a FAIL. Do not turn these
+#      into a hard requirement. Both texts are upper case in include/httpdmsg.h;
+#      HTTPD002I is the APF message, not a shutdown message.
 #
 #   5. PROVOCATION MODE decides WHICH shutdown path you test. Default
 #      PROVOKE=abend faults handlers -- that is the recovery-drain path
@@ -71,9 +74,9 @@
 #      abend run does NOT establish the #179 fix; use longpoll for that.
 #
 #   6. RAKF COUNTS ARE DIAGNOSTIC, NEVER A GATE. #27 reported a RAKF0005 /
-#      RAKF000A pair naming HTTPX in FACILITY *after* "HTTPD002I Server is
-#      SHUTDOWN". Since this test already drives P HTTPD, it reports those counts
-#      for free. They must NOT become a FAIL condition: RAKF0004 (failed logon)
+#      RAKF000A pair naming HTTPX in FACILITY *after* the server-shutdown
+#      message of that build ("Server is SHUTDOWN"). Since this test already
+#      drives P HTTPD, it reports those counts for free. They must NOT become a FAIL condition: RAKF0004 (failed logon)
 #      is routine in this window and unrelated, RAKF0005 can be raised by any
 #      resource on a shared system, and #27 was never reproduced on a current
 #      build. A blanket RAKF assertion would misfire and mask real results.
@@ -269,8 +272,9 @@ hasp310=$(grep -Ec "[$]HASP310.*TERMINATED AT END OF MEMORY" "$window" 2>/dev/nu
 # not a false PASS. Note 3.
 hasp395=$(grep -Ec "[$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
 ief404=$(grep -Ec "IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
-# clean-shutdown WTOs (httpd.c:335 / :701) — DIAGNOSTIC ONLY, never a gate. Note 4.
-clean=$(grep -Ec "HTTPD002I Server is SHUTDOWN|HTTPD060I SHUTDOWN worker" "$window" 2>/dev/null || true)
+# clean-shutdown WTOs (MSG_THREAD_STOP / MSG_SHUTDOWN_DONE in include/httpdmsg.h) —
+# DIAGNOSTIC ONLY, never a gate. Note 4.
+clean=$(grep -Ec "HTTPD060I SHUTDOWN |HTTPD099I HTTPD SHUTDOWN COMPLETE" "$window" 2>/dev/null || true)
 # RAKF security violations (#27) — DIAGNOSTIC ONLY, never a gate. Note 6.
 # rakf5    : any RAKF0005 in the window (context; may be unrelated on a shared system)
 # rakfhttpx: the specific #27 signature — a RAKF000A detail line naming HTTPX in FACILITY
@@ -368,7 +372,7 @@ $ABEND_PATH reproduces #122's post-fault worker state before trusting this green
 EOF
 if [ "$clean" -eq 0 ]; then
     cat <<EOF
-CAUTION: not one HTTPD002I/HTTPD060I orderly-shutdown WTO appeared, yet the
+CAUTION: not one HTTPD060I/HTTPD099I orderly-shutdown WTO appeared, yet the
 address space ended normally. These corroborate a clean drain but do not gate
 the result (the authoritative gate is the address-space end above). Zero of
 them alongside a normal end is unusual — confirm the workers drained rather
