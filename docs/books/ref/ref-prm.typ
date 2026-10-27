@@ -135,8 +135,10 @@ an error of #cmd("socket") (#cmd("HTTPD028E")) and of #cmd("listen")
     [#cmd("KEEPALIVE_TIMEOUT")], [5], [The seconds that HTTPD waits for the
       lines of the next request on a connection that stays open. HTTPD limits
       the value to 1 to 255.],
-    [#cmd("KEEPALIVE_MAX")], [100], [The number of requests after which HTTPD
-      does not keep a connection open. HTTPD limits the value to 1 to 255.],
+    [#cmd("KEEPALIVE_MAX")], [100], [The number of requests a connection
+      carries before HTTPD closes it. HTTPD answers the request after that
+      number with #cmd("Connection: close"), so a connection carries the value
+      plus one request. HTTPD limits the value to 1 to 255.],
     [#cmd("CLIENT_TIMEOUT_MSG")], [1], [A number. A value above 0 means yes,
       any other value and a text that is not a number mean no. If yes, HTTPD
       writes one line to the console when a time limit ends while the client has
