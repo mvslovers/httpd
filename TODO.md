@@ -11,98 +11,18 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-26 against `origin/main` 8145027: #367 is closed (PR #368) and has no row any more; its follow-ups, #373, and #370 are filed and not yet ranked. Before that, 2026-10-26 with #254 and #262, which were closed but still
-had a section here, now struck through (the entry below that lists them as having no row was wrong
-about the sections); #367 and #370 are filed and not yet ranked. Before that, 2026-10-26 with the merge of #343 (PR #369), against
-`origin/main` 4622d81: #325, #327 and #343 are closed and have no row any more. #322 (`PREALLOC`,
-deferred beyond 4.4.0), #323, #326, #346, #350 and #351 are filed and not yet ranked. Before that,
-2026-10-26 with the libufs note in the installation
-guide (#324), against `origin/main` 36a9f38: fourteen issues open, and #361 is closed (PR #365:
-job numbers and private system names out of the installation guide and `mbt.toml`). #322 (`PREALLOC`, deferred beyond
-4.4.0), #323, #326, #346, #350 and #351 are filed and not yet ranked.
-#333 and #336 are closed (PRs #357 and #359) and #324 is closed, so none of them has a row any
-more; #319 stays open. Before that, 2026-10-26 for the 4.4.0 release candidate (#324), against
-`origin/main` f887d50: seventeen issues open besides this one. #254, #262, #263, #295, #296,
-#300, #307, #320, #328, #335, #352 and #353 and PR #305 were closed or merged and had no row.
-Before that, 2026-10-26 with #328 again (ufsd range >=1.5.1, `mbt.lock` re-pinned to 1.5.1; the ranked order unchanged). Before that, 2026-10-23 with the fix for #263 (`http_send_file()` asks `ufs_ferror()` at both read sites and ends the response on the first pass; `HTTPD045E` replaces the `HTTPD901E` spin): #263 closes with its PR and its row is gone, the ranked order of the rest unchanged. Before that, 2026-10-23 with #328 (ufsd range >=1.5.0, `mbt.lock` re-pinned to 1.5.0; libufs 1.5.0 is the first level with a reliable `ufs_ferror()`, which #263 needs; the ranked order unchanged). Before that, 2026-10-23 with the last local `__tzget()` declaration gone (#270, in `tbd/src/httpjes2.c`): #270 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-23 with the fix for #296 (the socket thread read its own task handle before the parent had stored it, so on a second CPU it could start with TASK(000000) and end at once; READY is now withheld, with HTTPD064E, when the thread is not running): #296 closes with its PR and its row is gone, the ranked order unchanged. Before that, 2026-10-22 with #318 (libc370 pin
-2.25.1, cc370 1.6.3; the changes since 2.23.0 reviewed, only the local
-`sleep()`/`usleep()`/`__tzget()` declarations needed code, the `src/` half of
-#270): #318 closes with its PR, #319 and #320 filed out of the review and not
-yet ranked; thirteen issues open, the ranked order unchanged. Before that,
-2026-10-20 after PR #317 (#307: the
-keep-alive reset clears the response status; libc370 pin 2.23.0 pushed just
-before it): #307 closed, its unranked row gone; eleven issues open, the
-ranked order unchanged. Before that, the same day after PRs #313, #314 and #316
-(#311 HTTPD063E for a worker without recovery, #312 SonarCloud analyses a
-32-bit target, #315 crtopts no longer read, ahead of libc370#113): all three
-filed and closed the same day; twelve issues open, the ranked order
-unchanged. Before that, 2026-10-19 after PR #310 (#309: wtof()
-arguments match their formats, ahead of libc370#654): #309 filed and closed
-with it; twelve issues open, the ranked order unchanged. Before that, the same
-day after the libc370 pin moved to 2.22.0 (direct commit, no code change).
-Before that, the same day after PR #308 (libc370 pin
-2.21.0, the release with libc370#388; no code change): twelve issues open, the
-ranked order unchanged. Before that, the same day after PR #306 (#303: the MIME
-lookup works with both `bsearch()` argument orders; libc370 pin 2.20.0): #303
-closed, #307 filed out of that PR's server test and not yet ranked; twelve issues
-open. Before that, the same day after PR #305 (resident modules,
-#198 step 2): #300 closed, rank 4 done; twelve issues open. Before that, the same
-day with the #250 docs PR: (b) and
-the reuse of a held copy measured, #250 closes; its rank 4 goes to #198's step 2
-(with #300), decided the same day. Before that, 2026-10-19 after PR #301 (the program
-fetch probe of #300, `internals/fetchprobe/`); #300 stays open and its row is
-corrected: the `106-0F` is not a property of one stand. Thirteen issues open,
-none of the ranked items moved. Before that, 2026-10-15 after the m38b soak (#297 /
-mvsmf#430: about 28,750 module requests at 0 bytes per request); #300 filed
-out of it and ranked low, beside its libc370 half, libc370#553; thirteen issues
-open, none of the ranked items moved. Before that, the same day after v4.3.0 (PR #299, the
-4.3.0 notes and guide; FMID THTP430; main now 4.4.0-dev, THTP440); twelve
-issues open, none of the ranked items moved. Before that, the same day while
-preparing 4.3.0: PR
-#298 merged and #297 closed (confirmed in a running server: 900 requests to
-a module relinked against libc370 2.12.1 lost nothing); twelve issues open,
-the ranked order otherwise unchanged. 4.3.0 is the libc370 2.12.1 relink and
-nothing else. Before that, the same day after #297 was filed (handed
-over from mvsmf#430; the cause is libc370#546, fixed in libc370 2.12.1) and PR
-#298 opened with the pin; thirteen issues open, #297 ranked first because it
-ends every CGI after some 50,000 requests. #295 and #296 were filed after
-v4.2.0 and are not yet ranked. Before that, 2026-10-13 after v4.2.0 (PR #294,
-the 4.2.0 notes and guide; FMID THTP420; main now 4.3.0-dev, THTP430); ten
-issues open, none of the ranked items moved. Before that, the same day after PR #293 (#292,
-the `[toolchain]` pin: cc370 1.6.1, libc370 2.10.3, and ufsd moved to the
-released `>=1.4.0`); ten issues open, none of the ranked items moved.
-Before that, 2026-10-11 after PR #289 (#288, a
-private session per explicit login, vector entry `0x144`) and PR #291 (#290,
-mbt-stc as a plugin, so `mbt run restart -- HTTPD` compresses
-`HTTPD.DEV.LINKLIB`) merged and v4.2.0-dev was re-cut on `c81e38e`; ten issues
-open, none of the ranked items moved. Before that, 2026-10-07 after PR #287 merged (#286,
-the move to mbt 3: mbt.toml, the webroot image through the mbt-ufs plugin,
-objects and load modules byte-identical to mbt 2), ten issues open, none of
-the ranked items moved. Before that, the same day after PR #285 merged (#284,
-the `[toolchain]` pin: cc370 1.4.0, libc370 2.6.0), ten issues open, none of
-the ranked items moved. libc370 2.5.0's stdio lock skip leaves `DEBUG=1`
-writes to `httpd->dbg` from module context unserialized; that is
-libc370#470, nothing to change here. Before that, 2026-10-05 after PR #283 merged (#275,
-cgistart's parameter-length check, mirroring libc370#446; its probe is not in
-the suite, mvslovers/mbt#163), ten issues open. The same day: #281 closed by
-PR #282 (HTTPD's startup step is libc370 2.4.0's `__premain()` hook), the
-libc370 pin moved to 2.4.0 in acdcb42, and #280 moved mbt to v2.2.0. None of
-the ranked items moved. Before that, 2026-10-04 after PR #279 merged (the
-docs/ / internals/ split, #278; #277 moved mbt to v2.1.3 before it), eleven
-issues open, none ranked or closed by either. Before that, 2026-10-04 after PR #276 merged (the
-`-Wextra` warnings cleared on mbt 37b889b; #274 bumped mbt just before it),
-eleven issues open — #275 filed out of that PR and not yet ranked. Before that,
-2026-10-01 after PR #273 merged (the
-libc370 2.0 port, #272) and v4.2.0-dev was published, ten issues open — #270
-and #271 filed since and not yet ranked; #265 and #266 closed. Before that,
-2026-09-14 after PR #267 merged — #266 filed out of the ftpd 1.1.0 test install and #265 out of the
-libc370 v1.0.6 release; #259 and #269 closed by #267; #264, #263 and #262 filed
-out of the 4.0.2 work itself, #259 filed by a user, and #258, #254, #250, #198,
-#176 carried over. #260 was filed and closed on 2026-09-05 by PR #261, the
-relink 4.0.2 delivers. Before them: #256 filed and fixed by PR #257 on
-2026-08-25, #252 filed and closed 2026-08-24 by
-PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
-#243 by PR #247.*
+*Last reconciled against the tracker: 2026-10-27, against `origin/main` 1e12930, after v4.4.0
+(published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
+closed). Every open issue is now in milestone 4.5.0, so nothing in this file waits on 4.4.0 any
+more. #326, #367 and #373 are closed and have no row. #376 and #377, both filed from the 4.4.0
+candidate, #382, #383 and #370 are listed and not ranked against the rest. #379 is closed (PR #380: `main` is
+4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
+no row. The ranked order is unchanged.
+The notes of the earlier reconciles, back to 2026-08-24, are in the history of this file
+(`git log -p TODO.md`). Two standing facts they carried: libc370 2.5.0's stdio lock skip leaves
+`DEBUG=1` writes to `httpd->dbg` from module context unserialized, which is libc370#470 and needs
+nothing here; and the probe for `cgistart`'s parameter-length check (#275) is not in the suite,
+mvslovers/mbt#163.*
 
 ---
 
@@ -114,13 +34,16 @@ PR #253, #237 by PR #249, #245 by PR #248, #233 by PR #244, #242 by PR #246 and
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | deferred beyond 4.4.0; not yet ranked |
-| — | #326 | build and test the HTTPD modules against the 4.4.0 candidate | the candidate; not yet ranked |
-| — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; not part of 4.4.0 |
+| — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.5.0; not yet ranked |
+| — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.5.0 |
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
-| — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; milestone 4.5.0, not yet ranked |
+| — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
+| — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
+| — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
+| — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
+| — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | PR #384 pins the released ufsd 1.5.2; `mbt test --mvs` stays part of the 4.5.0 release acceptance; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -491,8 +414,15 @@ explicit — decides anything there. `mvslovers/mvsmf#329` *is* this bug's shape
 Pointers only. The reasoning lives in the closing comments, which is where this
 project already writes it down properly.
 
+- **#373** — the follow-ups to #367 (PR #378, merged; on `main` only, so it
+  ships with 4.5.0, not in v4.4.0): the token path (`src/httptkcr.c`) refuses a
+  `CRED_FLAG_STALE` entry, so a token that resolves a refused cache entry stops
+  working at once and not when the grace period ends; `include/httpcgi.h` and
+  `docs/server-modules.md` say a module tests `http_new_session()` with `!= 0` or
+  `< 0`, never `== -1`; the RACF failure line is `HTTPD009W`.
 - **#367** — `http_new_session()` says why it failed; a cached password RACF
-  refused is dropped (PR #368, merged): `-1` none, `-2` refused, `-3` busy, `-4`
+  refused is dropped (PR #368, merged; on `main` only, so it ships with 4.5.0):
+  `-1` none, `-2` refused, `-3` busy, `-4`
   no storage; only RACINIT rc 4/8/12/28 count as a refusal (others
   are `-4`); the refused source is marked stale, not freed, never served by
   `cred_login()` (it asks RACF afresh) and freed after a 10 minute grace by
