@@ -414,10 +414,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_58</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_58), httpd->unused_58);
+        "<td>httpd->readerr_last</td>"
+        "<td>Time of Last UFS Read Error Message (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_last), httpd->readerr_last);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -428,10 +428,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_60</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_60), httpd->unused_60);
+        "<td>httpd->readerr_held</td>"
+        "<td>UFS Read Errors Not Yet Reported (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_held), httpd->readerr_held);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
