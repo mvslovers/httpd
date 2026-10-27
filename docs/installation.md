@@ -288,8 +288,7 @@ jobs API does not — and it does not fail uniformly:
 | request | answer |
 |---|---|
 | job list (`GET /zosmf/restjobs/jobs`) | `500`, `REASON_INCORRECT_JES_VSAM_HANDLE` |
-| spool retrieval | `500`, same reason |
-| anything resolving one job by name and id | **`404` job not found** |
+| anything resolving one job by name and id, including spool retrieval | **`404` job not found** |
 
 The 404 is the one to know about. `find_job_by_name_and_id()` returns NULL
 whether JES2 is unreachable or the job genuinely is not there, and its callers
@@ -297,6 +296,7 @@ report the second. A client is told the job does not exist while it does — so
 read the console, not the status code:
 
 ```
+IEC130I HASPCKPT DD STATEMENT MISSING
 Unable to open checkpoint dataset DD:HASPCKPT
 MVSMF201E UNABLE TO OPEN THE JES2 CHECKPOINT AND SPOOL DATA SETS
 ```

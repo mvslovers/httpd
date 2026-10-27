@@ -54,8 +54,9 @@
 //* out below.  A DD statement in this procedure still wins.
 //*
 //* Uncomment both lines if
-//*  - you run mvsMF 1.3.0 or earlier: without them every job list,
-//*    job lookup and spool read answers 500 (issue #256), or
+//*  - you run mvsMF 1.3.0 or earlier: without them the job list
+//*    answers 500, and a lookup by name and id or a spool read
+//*    answers 404 although the job exists (issue #256), or
 //*  - your JES2 uses a $DSNPRFX other than SYS1: the allocation only
 //*    looks for the SYS1 names.
 //* UNIT and VOL=SER must then match your own JES2 procedure.

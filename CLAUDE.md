@@ -174,8 +174,11 @@ In HTTPD 4.0.0, CGI registration moves from Lua defaults to Parmlib-only. No CGI
 **A module runs in HTTPD's task, so `samplib/httpd` is part of the modules'
 contract, not just the server's.** The LINK SVC dispatches into this task; a
 module has no allocations of its own and opens any ddname against the STC's.
-`HASPCKPT` / `HASPACE1` are there for exactly that reason — HTTPD never touches
-them, mvsMF's jobs API opens both through libc370's `jesopen()`. They were
+`HASPCKPT` / `HASPACE1` were there for exactly that reason — HTTPD never touches
+them, mvsMF's jobs API opens both through libc370's `jesopen()`. Since libc370
+2.24.0 (mvsMF 1.4.0 and later) `jesopen()` allocates them itself and the sample
+PROC carries them as comment lines; mvsMF 1.3.0 or earlier, or a JES2 with a
+`$DSNPRFX` other than `SYS1`, still needs them active. They were
 dropped in 4.0.0 on the reasoning that "nothing else in the server opens them",
 which was measured against `httpd/src/` alone and missed the three repos whose
 modules run in this address space; issue #256. **Before removing anything from the PROC, grep `../mvsmf`,
