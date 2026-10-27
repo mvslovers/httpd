@@ -1,4 +1,7 @@
-$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=TRACE" | grep "port=49908"
-seq=1 c=1C0FC8 w=17FA40 tcb=9BBAA8 ip=192.0.2.17 port=49908 n=0 resp=401 ago=5910 live=0 last=end st=RESET age=26 run=1 line1=2 req=5 parse=6 cred=6 route=6 lnk0=6 lnk1=25 snd1=15 sndl=18 done=25 end=26 close=- polls=0 txn=12 txst=0 txms=1 sent=292 path=/zosmf/info
-seq=2 c=1C0FC8 w=17FA40 tcb=9BBAA8 ip=192.0.2.17 port=49908 n=1 resp=401 ago=5883 live=0 last=end st=RESET age=30 run=0 line1=2 req=5 parse=7 cred=7 route=7 lnk0=7 lnk1=29 snd1=18 sndl=22 done=29 end=30 close=- polls=0 txn=12 txst=0 txms=0 sent=292 path=/zosmf/info
-seq=3 c=1C0FC8 w=17FA40 tcb=9BBAA8 ip=192.0.2.17 port=49908 n=2 resp=0 ago=5853 live=0 last=close st=CLOSE age=503 run=0 line1=- req=502 parse=- cred=- route=- lnk0=- lnk1=- snd1=- sndl=- done=- end=- close=503 polls=1 txn=0 txst=0 txms=0 sent=0 path=
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=TRACE" | tail -n +2 | cut -d" " -f1,3,7,8,11,13,14,16,26,27
+seq=1 w=17FA40 n=0 resp=401 last=end age=32 run=2 req=8 close=- polls=0
+seq=2 w=17FA40 n=1 resp=0 last=close age=3 run=0 req=2 close=3 polls=0
+seq=3 w=17F9C0 n=0 resp=401 last=end age=28 run=2 req=6 close=- polls=0
+seq=4 w=17F9C0 n=1 resp=401 last=end age=18 run=0 req=3 close=- polls=0
+seq=5 w=17F9C0 n=2 resp=0 last=close age=502 run=0 req=502 close=502 polls=1
+seq=6 w=17FB40 n=0 resp=0 last=sndl age=16 run=2 req=6 close=- polls=0

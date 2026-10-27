@@ -1,0 +1,2 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=TRACE"
+#HTTPTRC off

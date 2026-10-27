@@ -74,6 +74,8 @@ appears only in some cases.
     [#cmd("HTTPD430W")], [Only if the SMF level is above NONE and SMF is not
       active in the system (@ug-ops-smf).],
     [#cmd("HTTPD054I")], [HTTPD listens on the port.],
+    [#cmd("HTTPD066I")], [Only if #cmd("TRACE=") is set: the request trace is on
+      (@ug-config-trace).],
     [#cmd("HTTPD061I")], [One line for the socket thread and one for each
       worker that starts. The number of workers is the value of #cmd("MINTASK").],
     [#cmd("HTTPD001I")], [HTTPD is ready. The text is #cmd("READY - SERVING")
@@ -590,8 +592,9 @@ whole page and follow the links.
 #idx("/.dsrv")
 HTTPDSRV is for the browser. The parameter #cmd("target") says what to show:
 #cmd("HTTPD") (the default), #cmd("MGR"), #cmd("MOD"), #cmd("WORKERS"),
-#cmd("TASK"), #cmd("FILE") and #cmd("FS"). Some of them need an address in the
-parameter #cmd("m"). The pages give the offset, the name, the meaning and the
+#cmd("TASK"), #cmd("FILE"), #cmd("FS") and #cmd("TRACE"). Some of them need an
+address in the parameter #cmd("m"). The target #cmd("TRACE") answers in plain
+text, one line for each request (@ug-config-trace). The pages give the offset, the name, the meaning and the
 value of each field. The _HTTPD Reference_ lists the targets. The help page of
 HTTPDSRV lists more targets than the module has, and says that some need an
 address when they do not. The Reference has the correct list, and this guide

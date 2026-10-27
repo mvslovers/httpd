@@ -388,8 +388,8 @@ among them, and the request is still running.
     [#cmd("txms")], [The milliseconds spent inside #cmd("send").],
     [#cmd("sent")], [The bytes sent for the request. The server fills the word
       when the request ends, so it is 0 for a request that is still running.],
-    [#cmd("path")], [The first 23 characters of the path of the request, without
-      the query. A character that is not printable shows as #cmd("?"). The word
+    [#cmd("path")], [The first 23 characters of the decoded path of the request,
+      without the query. A character that is not printable shows as #cmd("?"). The word
       is empty until the request is parsed. It is always the last word.],
   )
 ]
@@ -408,9 +408,10 @@ normally reaches them.
     [#cmd("line1")], [the request line was read.],
     [#cmd("req")], [the server stopped reading the request line and the header
       lines. The mark is also set when the read failed or timed out, or when the
-      client closed the connection. Then #cmd("line1") is #cmd("-") or the
-      later phases are.],
-    [#cmd("parse")], [the request was parsed.],
+      client closed the connection. Then #cmd("line1") can be #cmd("-"),
+      and the phases after #cmd("req") are #cmd("-").],
+    [#cmd("parse")], [the request was parsed. For a POST the server has read
+      the body by then.],
     [#cmd("cred")], [the credential of the request was resolved, with or
       without a result.],
     [#cmd("route")], [the request passed the check of the policy of its
@@ -431,18 +432,36 @@ normally reaches them.
   )
 ]
 
-This is a trace of a connection that stays open, from the lab server. The client
-sent two requests on one connection and then closed it (the readout is cut to
-the words of interest):
+This is the record of one request, taken from the lab server. The command
+puts the words three to a row; the order of the words in the line is from left
+to right and from top to bottom:
+
+#screen(raw(read("../ex/ug-trouble/trace-record.txt")))
+
+The request was the first on its connection (#cmd("n=0")). A module answered it
+with the status 401. The server read the request line 3 ms after the accept and
+had all header lines at 6 ms (#cmd("req")). The check of the policy of the route
+passed at 7 ms. The module was linked at 8 ms and returned at 27 ms (#cmd("lnk0"),
+#cmd("lnk1")). It handed its first data to TCP/IP at 18 ms and its last at 21 ms
+(#cmd("snd1"), #cmd("sndl")), in 12 calls of #cmd("send") that took together
+less than a millisecond. The response was complete at 27 ms, and the request was
+over at 28 ms.
+
+The next example shows a connection that stays open. The command shows 10 of
+the words of each record. Records 3 and 4 are the two requests of one
+connection, and record 5 is the end of that connection. Records 1 and 2 are
+another connection, and record 6 is the request that reads the trace:
 
 #screen(raw(read("../ex/ug-trouble/trace-keepalive.txt")))
 
-The first record is a request that a module answered. The server waited 4 ms
-for the request line, the module ran from 14 ms to 44 ms, and 532 bytes went to
-TCP/IP in 15 calls. The second record has the same worker, and its #cmd("run")
-is 0. The third record is the connection after its last request: the server
-waited for a next request that did not come, and the client closed the
-connection after 503 ms.
+Records 3 and 4 have the same worker (#cmd("w")), and #cmd("n") counts 0 and 1.
+The second record has #cmd("run=0"): the worker already held the connection, so
+the mark is the start of the record. Record 5 has no request line
+(#cmd("last=close"), #cmd("resp=0")). It is the time from the end of record 4
+to the close of the connection, 502 ms, and in it the server waited once for the
+next data (#cmd("polls=1")). Record 6 is still running: #cmd("live=1"), and its
+last mark so far is #cmd("sndl"), because the server is sending the page that
+shows it.
 
 The times come from the TOD clock. The server shifts the clock value right by 22
 bits and keeps 32 bits, so one tick is 1.024 milliseconds and the figures in a

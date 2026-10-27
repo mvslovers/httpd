@@ -397,7 +397,62 @@ data set is full, HTTPD writes #cmd("HTTPD039W") once, switches the trace off
 and goes on. The trace stays off until the next start, and it ends at the point
 of the failure. Give the DD name more room and restart the server to trace
 again. Use the trace for a problem and switch it off after it.
-@ug-trouble helps with problems.
+@ug-trouble helps with problems. The trace of #cmd("DEBUG") is not the request
+trace of the next section.
+
+== The Request Trace <ug-config-trace>
+
+#idx("TRACE")#idx("request trace")#idx("HTTPD066I")#idx("HTTPD067W")#idx("HTTPD444W")
+When a request is slow, you need to know where its time went. The request trace
+is a table inside the server. For each request it records the time of each phase
+(the request line, the credential, the module, the send) and a few counters. You
+read it with #cmd("curl"). The trace is off by default, and it is not the trace
+of #cmd("DEBUG") (@ug-config-misc). This section switches it on, checks it and
+switches it off. How to find a slow request with it is in @ug-trouble-slow.
+
+Switch the trace on with the keyword #cmd("TRACE"). Its value is the number of
+requests that the table holds: 0, or a number from 16 to 1024. The value 0 is
+off. This member holds 64 requests. The routes are the ones of the lab server,
+and the route of HTTPDSRV is the one that shows the table:
+
+#screen(raw(read("../ex/ug-config/trace-on-prm.txt")))
+
+The server reads the keyword at the start, and no command changes it. Stop the
+server and start it again. The message #cmd("HTTPD066I") says that the trace is
+on, how many requests the table holds and how much storage it uses:
+
+#screen(raw(read("../ex/ug-config/trace-on.txt")))
+
+Each record needs 136 bytes, and the block has a header of 32 bytes. 64 records
+are 8,736 bytes, 256 are 34,848 and 1024 are 139,296. The server gets the block
+from its region at the start and frees it at the stop. If the region has no room
+for it, the server writes #cmd("HTTPD067W") and runs without the trace. Give the
+task a larger region, or a smaller value.
+
+The table holds the most recent requests, and a new request replaces an old one.
+Choose a number that is larger than the number of requests that the server
+serves in the time you want to look back. 64 is enough to start with.
+
+The display module HTTPDSRV shows the table, with the target #cmd("TRACE").
+Without a route for HTTPDSRV there is no way to read the trace (@ug-ops-dm).
+On a server where the trace is off, the answer is one line:
+
+#screen(raw(read("../ex/ug-config/trace-off.txt")))
+
+A value that is not valid does not stop the start. The server writes
+#cmd("HTTPD444W") and runs with the trace off. A value of 8 is too small:
+
+#screen(raw(read("../ex/ug-config/trace-bad-prm.txt")))
+
+#screen(raw(read("../ex/ug-config/trace-bad.txt")))
+
+To switch the trace off, remove the line or write #cmd("TRACE=0"), and restart
+the server.
+
+#note[The table holds the address of the client and the first 23 characters of
+the path of every request, and anyone who may call the route of HTTPDSRV can
+read them. Switch the trace on to look for a problem, and off when you have
+found it. Give the route of HTTPDSRV an #cmd("AUTH=") (@ug-ops-dm-auth).]
 
 == Recording SMF Records <ug-config-smf>
 
@@ -496,7 +551,8 @@ four cases:
     [Message], [A named value has its own warning: #cmd("HTTPD070E") for the
       code page, #cmd("HTTPD424W") for the realm, #cmd("HTTPD431W") and
       #cmd("HTTPD432W") for SMF, #cmd("HTTPD443W") for #cmd("RESIDENT"),
-      #cmd("HTTPD023E") for the port (the server goes on with 8080).],
+      #cmd("HTTPD023E") for the port (the server goes on with 8080),
+      #cmd("HTTPD444W") for #cmd("TRACE") (the trace stays off).],
   )
 ]
 

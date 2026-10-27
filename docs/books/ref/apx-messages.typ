@@ -93,7 +93,7 @@ The ranges are:
   [#cmd("050") to #cmd("099")], [Listener, workers and the stop
     (@apx-messages-run).],
   [#cmd("100") to #cmd("199")], [Console commands (@apx-messages-con).],
-  [#cmd("410") to #cmd("443")], [Routes, SMF and resident modules
+  [#cmd("410") to #cmd("444")], [Routes, SMF and resident modules
     (@apx-messages-route).],
   [#cmd("901") to #cmd("999")], [Diagnostics (@apx-messages-diag).],
 )
@@ -124,6 +124,8 @@ A message with a condition appears only under that condition.
 + The warnings that follow the bind, such as #cmd("HTTPD430W"),
   #cmd("HTTPD425W") or #cmd("HTTPD426W"), and #cmd("HTTPD440W") to
   #cmd("HTTPD442W").
++ #cmd("HTTPD066I"), only if #cmd("TRACE=") is set: the request trace is on.
+  (#cmd("HTTPD067W") instead if the storage for it was not available.)
 + #cmd("HTTPD061I") for the socket thread and for each worker thread. The
   threads write these lines themselves, so their order is not fixed.
 + #cmd("HTTPD001I"), the last message of the start. After it the server
@@ -712,7 +714,7 @@ Most of them are the answer of a command and have no response.
   )
 ]
 
-== Routes, SMF and Resident Modules (410 to 443) <apx-messages-route>
+== Routes, SMF and Resident Modules (410 to 444) <apx-messages-route>
 
 The routes are described in @ref-route and the keywords in @ref-prm. Several
 messages of this range say that a route could not be registered. A route that
@@ -722,7 +724,7 @@ root, with nothing that gates it. Therefore a lost route that asked for a gate
 server sets an error flag, writes #cmd("HTTPD419E") and refuses to start with
 #cmd("HTTPD420E").
 
-#tab(caption: [Messages 410 to 443])[
+#tab(caption: [Messages 410 to 444])[
   #table(columns: (2.9in, 1fr),
     [Message], [Meaning and action],
     ..r("HTTPD410W CGI= IS DEPRECATED, USE MOD= INSTEAD",
