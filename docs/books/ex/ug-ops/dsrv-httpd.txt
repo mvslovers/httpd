@@ -2,11 +2,11 @@ $ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=HTTPD" | sed -n 
 
 Offset  Data Name  Description  Contents
 +0000  httpd->eye  Eye Catcher  "*HTTPD*"
-+0008  httpd->httpx  Function Pointers for CGI modules  0009E2E8
++0008  httpd->httpx  Function Pointers for CGI modules  0009E170
 +000C  httpd->httpc  HTTP Client Array (0)  00000000
 +0010  httpd->addr  HTTP Address  0.0.0.0
 +0014  httpd->port  HTTP Port  8080
-+0018  httpd->listen  HTTP Listen Socket  3
++0018  httpd->listen  HTTP Listen Socket  1
 +001C  httpd->cfg_realm  Basic realm / server name  MVS.EXAMPLE
 +0020  httpd->dbg  HTTP Debug File Handle  00000000
 +0024  httpd->tzoffset  Time Zone Offset (seconds)  -18000
@@ -19,12 +19,12 @@ Offset  Data Name  Description  Contents
 +0034  httpd->mgr  Thread Manager Handle  000DAE18
 +0038  httpd->rname  Resource Name  "HTTPD.0007"
 +0044  httpd->route  Route Array (MOD= programs, LOC= static prefixes)  000DA6D4
-+0048  httpd->uptime  Server Up Time  Tue Oct 27 00:42:55 2026
++0048  httpd->uptime  Server Up Time  Tue Oct 27 03:03:47 2026
 +0050  httpd->unused_50  (reserved)  00000000
 +0054  httpd->ufssys  UFS System Handle  000DABB8
-+0058  httpd->unused_58  (reserved)  00000000
++0058  httpd->readerr_last  Time of Last UFS Read Error Message (#346)  0
 +005C  httpd->version  Version String  "4.5.0-dev"
-+0060  httpd->unused_60  (reserved)  00000000
++0060  httpd->readerr_held  UFS Read Errors Not Yet Reported (#346)  0
 +0064  httpd->cfg_maxtask  Config Max Task  9
 +0065  httpd->cfg_mintask  Config Min Task  3
 +0066  httpd->cfg_client_timeout  Config Client Timeout Seconds  10
@@ -37,11 +37,11 @@ Offset  Data Name  Description  Contents
 +006D  httpd->dbg_enabled  Debug Output Enabled  0
 +006E  httpd->bind_tries  Socket Bind Retry Count  10
 +006F  httpd->bind_sleep  Socket Bind Retry Delay (seconds)  10
-+0070  httpd->total_requests  Total HTTP Requests  6
-+0074  httpd->total_errors  Total Error Responses  0
-+0078  httpd->total_bytes_sent  Total Bytes Sent  75924
++0070  httpd->total_requests  Total HTTP Requests  4
++0074  httpd->total_errors  Total Error Responses  1
++0078  httpd->total_bytes_sent  Total Bytes Sent  2103
 +007C  httpd->active_connections  Active Connections  1
-+0080  httpd->xlate  Codepage Pair in Effect (#197)  000A92E8
++0080  httpd->xlate  Codepage Pair in Effect (#197)  000A9170
 +0084  httpd->giveup_last  Time of Last Send Give-up Message (#347)  0
 +0088  httpd->stc_prev_acee  STC ACEE Restored at Shutdown (#197)  009DCA30
 +008C  httpd->giveup_held  Send Give-ups Not Yet Reported (#347)  0
