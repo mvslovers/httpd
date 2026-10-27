@@ -18,7 +18,7 @@
 typedef unsigned char U;
 
 /* run the whole entry through mttline() in pieces of dstsize and return the
-   concatenated text; pieces[] records how many calls it took */
+   concatenated text; *calls is the number of calls it took */
 static int whole(const char *src, size_t srclen, int html, size_t dstsize,
                  char *out, size_t outsize, int *calls)
 {
@@ -29,6 +29,7 @@ static int whole(const char *src, size_t srclen, int html, size_t dstsize,
     int     c = 0;
 
     out[0] = 0;
+    if (calls) *calls = 0;
     while (left) {
         size_t n = mttline(buf, dstsize, p, left, html);
         size_t l = strlen((char *)buf);
@@ -49,7 +50,8 @@ int main(void)
     U       buf[64];
     char    out[256];
     size_t  n;
-    int     left, calls;
+    int     left;
+    int     calls = 0;
     const char *mixed = "<<<<<<<<<<&&&&&&&&&&\"\"\"\"\"''''' end";
 
     printf("=== HTTPD /.dmtt helper tests ===\n");
@@ -61,6 +63,7 @@ int main(void)
           "html: < > & \" ' each become their entity");
 
     n = mttline(buf, sizeof(buf), (const U *)"<b>x</b>", 8, 1);
+    CHECK(n == 8, "html: <b>x</b> all 8 source bytes taken");
     CHECK(strcmp((char *)buf, "&lt;b&gt;x&lt;/b&gt;") == 0,
           "html: <b>x</b> shows as text");
 

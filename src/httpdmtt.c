@@ -49,7 +49,9 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
     if ((rc = http_resp(httpc,200) < 0)) goto quit;
     if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
     if ((rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0)) goto quit;
-    if (data && (rc = http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") < 0)) goto quit;
+    if (data) {
+        if ((rc = http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") < 0)) goto quit;
+    }
     if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!data) {
@@ -91,6 +93,7 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
         MTENTRY     *mt     = mtentry[n];
         const UCHAR *p;
         size_t      left;
+        size_t      took;
 
         if (!mt) continue;
 
@@ -99,18 +102,16 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
            is bounded by its length, not by a NUL, and is written in pieces
            that never split an entity. */
         p       = (const UCHAR *)mt->mtentdat;
-        left    = (size_t)mt->mtentlen;
+        left    = mt->mtentlen > 0 ? (size_t)mt->mtentlen : 0;
 
-        while (left) {
-            size_t took = mttline(line, sizeof(line), p, left, !data);
-
-            if (took == 0) break;
-
+        took = mttline(line, sizeof(line), p, left, !data);
+        while (took != 0) {
             /* stop walking the table once the client is gone (#203) --
                quit still frees the CMTT copy */
             if (http_printf(httpc, "%s", line) < 0) goto quit;
             p       += took;
             left    -= took;
+            took    = mttline(line, sizeof(line), p, left, !data);
         }
 
         if (http_printf(httpc, "\n") < 0) goto quit;
