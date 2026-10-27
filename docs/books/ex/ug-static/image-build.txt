@@ -1,0 +1,58 @@
+$ ufsd-utils create httpd-webroot.img --size 1M --owner IBMUSER --group SYSPROG
+Creating httpd-webroot.img (1M, blksize=4096, inodes=10.0%)
+  Volume size:     256 blocks (1.00 MB)
+  Block size:      4096 bytes
+  Inode blocks:    2 (64 inodes)
+  Data blocks:     252 (free: 251)
+  Root owner:      IBMUSER/SYSPROG
+  Format:          UFS370 v1 (time64 timestamps)
+
+  Upload to MVS:  ufsd-utils upload httpd-webroot.img --dsn YOUR.DATASET.NAME
+Done.
+$ ufsd-utils cp -r static/ httpd-webroot.img:/
+  README.txt -> /README.txt (36 bytes, txt)
+  mkdir /admin
+    report.txt -> /admin/report.txt (50 bytes, txt)
+  mkdir /css
+    site.css -> /css/site.css (67 bytes, txt)
+  data.json -> /data.json (34 bytes, txt)
+  mkdir /denied
+    data.txt -> /denied/data.txt (50 bytes, txt)
+  mkdir /docs
+    index.html -> /docs/index.html (131 bytes, txt)
+    manual.txt -> /docs/manual.txt (85 bytes, txt)
+  mkdir /empty
+  mkdir /form
+    page.html -> /form/page.html (111 bytes, txt)
+  hello.txt -> /hello.txt (61 bytes, txt)
+  index.html -> /index.html (3573 bytes, txt)
+  logo.png -> /logo.png (70 bytes, bin)
+  mkdir /private
+    secret.txt -> /private/secret.txt (43 bytes, txt)
+  mkdir /pub
+    index.html -> /pub/index.html (98 bytes, txt)
+    notice.txt -> /pub/notice.txt (23 bytes, txt)
+  mkdir /token
+    api.txt -> /token/api.txt (38 bytes, txt)
+$ ufsd-utils ls -l httpd-webroot.img:/
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 .
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 ..
+-rwxr-xr-x   1 IBMUSER  SYSPROG          36 2026 Oct 27 05:42 README.txt
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 admin
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 css
+-rwxr-xr-x   1 IBMUSER  SYSPROG          34 2026 Oct 27 05:42 data.json
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 denied
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 docs
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 empty
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 form
+-rwxr-xr-x   1 IBMUSER  SYSPROG          61 2026 Oct 27 05:42 hello.txt
+-rwxr-xr-x   1 IBMUSER  SYSPROG        3573 2026 Oct 27 05:42 index.html
+-rwxr-xr-x   1 IBMUSER  SYSPROG          70 2026 Oct 27 05:42 logo.png
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 private
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 pub
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 token
+$ ufsd-utils ls -l httpd-webroot.img:/docs
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 .
+drwxr-xr-x   2 IBMUSER  SYSPROG         128 2026 Oct 27 05:42 ..
+-rwxr-xr-x   1 IBMUSER  SYSPROG         131 2026 Oct 27 05:42 index.html
+-rwxr-xr-x   1 IBMUSER  SYSPROG          85 2026 Oct 27 05:42 manual.txt

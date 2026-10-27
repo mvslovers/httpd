@@ -1,0 +1,5 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dm?m=10&l=16&t=CVTPTR" | sed -n "/<pre>/,/<\/pre>/p" | sed -e "s/<[^>]*>//g" | tr -cd "\n -~"
+
+Dump of CVTPTR 00000010 (16 byte chunks) (16 bytes total)
++00000 0001D048 00000000 078D2000 000D1152 :..}.............:
+

@@ -1,0 +1,13 @@
+$ curl -i -b cookies.txt -c cookies.txt http://localhost:8080/logout
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:52:57 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Set-Cookie: Sec-Uri=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT
+Set-Cookie: Sec-Token=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+You have been logged out.

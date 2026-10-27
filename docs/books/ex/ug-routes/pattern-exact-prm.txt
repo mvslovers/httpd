@@ -1,0 +1,5 @@
+PORT=8080
+DOCROOT=/www
+REALM=MVS.EXAMPLE
+LOC=/hello.txt                  AUTH=BASIC
+LOC=/pub                        AUTH=BASIC

@@ -53,8 +53,8 @@
  * where they are and both halves are filed under "configuration" below.  If
  * you are looking an id up, search the file -- do not trust the range.
  *
- * The catalog is documented for operators in docs/messages.md; keep the two
- * in step.
+ * The catalog is documented for operators in the appendix "Messages" of the
+ * HTTPD Reference (docs/books/ref/apx-messages.typ); keep the two in step.
  *
  * ---------------------------------------------------------------------
  * What the catalog found (issue #184)
@@ -195,8 +195,11 @@
 
 /** HTTPD045E a UFS read failed while a file was being sent: the filesystem,
  *  not the client, is at fault.  %d is the UFSD return code, %.40s the request
- *  path.  The response was abandoned and the connection closed (#263). */
-#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s"
+ *  path: the requested page, or the file named by the <!--#include --> that
+ *  failed (#346).  The response was abandoned and the connection closed
+ *  (#263).  Written at most once per READERR_INTERVAL; the last argument is
+ *  how many read errors the interval held back (#346). */
+#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s, %u SUPPRESSED"
 
 /** HTTPD047E without the key no credential can be sealed; login is dead */
 #define MSG_CREDKEY_FAILED	"HTTPD047E UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC=%d"
@@ -436,6 +439,9 @@
 
 /** HTTPD038E the Parmlib member opened but could not be read to the end */
 #define MSG_CFG_READ_ERROR	"HTTPD038E READ ERROR ON DD:%s -- CONFIGURATION INCOMPLETE"
+
+/** HTTPD039W a write to the debug DD failed; tracing is off for the rest of the run */
+#define MSG_DBG_WRITE_FAILED	"HTTPD039W WRITE ERROR ON DD:HTTPDBG -- DEBUG OUTPUT SWITCHED OFF"
 
 /** HTTPD020E the debug DD is present but unusable */
 #define MSG_CFG_DBG_FAILED	"HTTPD020E FOPEN FOR DD:HTTPDBG FAILED, ERRNO=%d"

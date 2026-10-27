@@ -1,0 +1,11 @@
+$ curl -i http://localhost:8080/private/secret.txt
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:50:40 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 43
+
+private: any logged-in user may read this.

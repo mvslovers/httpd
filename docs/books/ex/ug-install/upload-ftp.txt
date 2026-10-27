@@ -1,0 +1,38 @@
+$ ftp -v -n mvs.example.org 2121
+Connected to mvs.example.org.
+220 MVS 3.8j FTPD Server
+ftp> user HERC01
+331 Send password please.
+Password: 
+230 HERC01 is logged on.  Working directory is "HERC01.".
+Remote system type is MVS.
+ftp> progress off
+Progress bar off.
+ftp> binary
+200 Representation type is Image
+ftp> put httpd-4.4.0-load.xmit    'HERC01.HTTPD.LOAD.XMIT'
+local: httpd-4.4.0-load.xmit remote: 'HERC01.HTTPD.LOAD.XMIT'
+229 Entering Extended Passive Mode (|||22000|)
+125 Storing data set HERC01.HTTPD.LOAD.XMIT
+250 Transfer completed successfully.
+810960 bytes sent in 00:02 (288.34 KiB/s)
+ftp> put httpd-4.4.0-samplib.xmit 'HERC01.HTTPD.SAMP.XMIT'
+local: httpd-4.4.0-samplib.xmit remote: 'HERC01.HTTPD.SAMP.XMIT'
+229 Entering Extended Passive Mode (|||22000|)
+125 Storing data set HERC01.HTTPD.SAMP.XMIT
+250 Transfer completed successfully.
+21040 bytes sent in 00:00 (314.94 KiB/s)
+ftp> ls HTTPD.LOAD.XMIT
+229 Entering Extended Passive Mode (|||22000|)
+150 Opening data connection for file list
+Volume Unit    Referred Ext Used Recfm Lrecl BlkSz Dsorg Dsname
+TSO001 3390 2026/10/27  1   18  FB       80  3120  PS   HTTPD.LOAD.XMIT
+226 List completed successfully.
+ftp> ls HTTPD.SAMP.XMIT
+229 Entering Extended Passive Mode (|||22000|)
+150 Opening data connection for file list
+Volume Unit    Referred Ext Used Recfm Lrecl BlkSz Dsorg Dsname
+TSO001 3390 2026/10/27  1    1  FB       80  3120  PS   HTTPD.SAMP.XMIT
+226 List completed successfully.
+ftp> quit
+221 Quit command received. Goodbye.
