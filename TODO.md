@@ -35,7 +35,8 @@ mvslovers/mbt#163.*
 |---|---|---|---|
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
-| — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
+| — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | parked, milestone 4.6.0: the network-outage path does not reproduce; a stale cached password does (`test/live/submit-password.py`). Waits on a new occurrence with console log and dump saved before the restart |
+| — | #413 | hardening — a cached credential keeps a changed RACF password until max-age | **a decision** between re-verify, downstream-refusal marking and documentation only; milestone 4.6.0 |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.6.0 |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | measured on MVS/CE (`tests/soak.py`, `tests/soak-stalls.py`): none at 1 and 3 clients, 0.2-1.4 % of requests over 5 s at 6-9 clients while the guest CPU is saturated, no link to keep-alive or to host CPU pressure; the board dropped the quiet-host run (the shared host is never quiet); **a server-side trace** (worker assignment, TCP/IP, dispatcher) is the next step; not yet ranked |
