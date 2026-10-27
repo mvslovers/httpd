@@ -1484,7 +1484,7 @@ $HASP395 HTTPD    ENDED
 
 There is no `HTTPD098I`, `HTTPD416I` or `HTTPD099I`. Since 4.5.0 (libc370
 2.26.0) the server writes no `libc370 recovery:` or `libc370 @@@try.c failed()`
-line on a cancel; 4.3.0 and 4.4.0 did, about one per task and more with requests
+line on a cancel; 4.3.0 and 4.4.0 did, several lines, more when requests were
 in progress. A module linked with an older libc370 can still write
 `libc370 @@@try.c failed(): recovery cleanup-only, retry suppressed` (MVSMF
 1.3.0 does, one line). Start again as in the next section.

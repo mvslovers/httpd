@@ -209,7 +209,7 @@ When the job has ended, start the server as after a stop (@ug-ops-restart).
 
 *Lines from libc370.* HTTPD 4.3.0 and 4.4.0 wrote lines that start with
 #cmd("libc370 recovery:") and #cmd("libc370 @@@try.c failed()") during a
-cancel, about one for each task and more with requests in progress. They said
+cancel, several lines, more when requests were in progress. They said
 only that a task was ending, which #cmd("IEF450I") says as well. HTTPD 4.5.0 is
 built with libc370 2.26.0, and the server writes none of them.
 
