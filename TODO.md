@@ -54,6 +54,7 @@ mvslovers/mbt#163.*
 | — | ~~#399~~ | ~~`HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection~~ | **Done** — `HEAD` now answers with the headers a `GET` would send and no body (PR #427); the live check that the connection stays usable is PR #432; milestone 4.5.0 |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
 | — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | items 1 to 3 are in PR #418 (strike this row when it merges); items 4 to 6 (dropped output, invalid directives, code page of values) stay open, and the `getenv()` fallback of `echo` is #421; milestone 4.5.0, not yet ranked |
+| — | #440 | a slow reader of a large static file pins a worker and the worker later abends | fix in PR #446 (strike this row when it merges): the buffer shift after a partial send was wrong, and a stalled reader is now given up after the 10 s no-progress budget; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
