@@ -4,6 +4,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 #include "httpgive.h"
+#include "httpshft.h"
 #include "httpssi.h"
 #include <time.h>      /* time() */
 
@@ -17,6 +18,7 @@ enum sstate {
 
 /* forward reference static function prototypes */
 static int file_send(HTTPC *httpc, int binary, const char *path);
+static int send_body(HTTPC *httpc, int len);
 static int ufs_read_failed(HTTPC *httpc, const char *path);
 static int ssi_file_read(HTTPC *httpc, const char *path);
 static int ssi_process(HTTPC *httpc, char *ssi);
@@ -45,6 +47,22 @@ int
 http_send_file(HTTPC *httpc, int binary)
 {
     return file_send(httpc, binary, NULL);
+}
+
+/* send_body() - send len bytes from buf[pos].  A zero from http_send() is a
+ * closed window: wait it out within the no-progress budget instead of
+ * returning to a pass loop that would only try again at once (#440).
+ * Returns the bytes sent, or -1 once the client is given up on. */
+static int
+send_body(HTTPC *httpc, int len)
+{
+    int     stall   = 0;
+    int     rc;
+
+    while ((rc = http_send(httpc, &httpc->buf[httpc->pos], len)) == 0) {
+        if (http_send_pause(httpc, &stall) < 0) return -1;
+    }
+    return rc;
 }
 
 /* path names the file being read for HTTPD045E; NULL is the requested
@@ -117,7 +135,7 @@ sendit:
         /* we have unsent data in buffer */
         len = httpc->len - httpc->pos;
         if (len > 0) {
-            len = http_send(httpc, &httpc->buf[httpc->pos], len);
+            len = send_body(httpc, len);
             if (len>0) {
                 httpc->pos += len;
             }
@@ -125,23 +143,11 @@ sendit:
     }
 
     if (httpc->pos>0) {
-        len = httpc->len - httpc->pos;
-        if (len>0) {
-            /* shift data left */
-            memcpy(httpc->buf, &httpc->buf[httpc->pos], len);
-            /* clear remaining buffer */
-            avail = CBUFSIZE - httpc->len;
-            memset(&httpc->buf[len], 0, avail);
-            /* update data position and length */
-            httpc->pos -= len;
-            httpc->len -= len;
-        }
-        else {
-            /* reset buffer */
-            memset(httpc->buf, 0, CBUFSIZE);
-            httpc->pos = 0;
-            httpc->len = 0;
-        }
+        /* what went out is dropped from the front; a partial send leaves
+           the rest at the start of the buffer (#440) */
+        len = httpshft(httpc->buf, CBUFSIZE, httpc->pos, httpc->len);
+        httpc->len = len;
+        httpc->pos = 0;
     }
 
     if (httpc->substate==SSTATE_EOF) {
@@ -439,7 +445,6 @@ static int
 ssi_send_buffer(HTTPC *httpc)
 {
 	int		len		= 0;
-	int		avail;
 	
 	// wtof("%s: enter pos=%d len=%d", __func__, httpc->pos, httpc->len);
 
@@ -451,7 +456,7 @@ ssi_send_buffer(HTTPC *httpc)
         /* we have unsent data in buffer */
         len = httpc->len - httpc->pos;
         if (len > 0) {
-            len = http_send(httpc, &httpc->buf[httpc->pos], len);
+            len = send_body(httpc, len);
             if (len>0) {
                 httpc->pos += len;
             }
@@ -459,23 +464,11 @@ ssi_send_buffer(HTTPC *httpc)
     }
 
     if (httpc->pos>0) {
-        len = httpc->len - httpc->pos;
-        if (len>0) {
-            /* shift data left */
-            memcpy(httpc->buf, &httpc->buf[httpc->pos], len);
-            /* clear remaining buffer */
-            avail = CBUFSIZE - httpc->len;
-            memset(&httpc->buf[len], 0, avail);
-            /* update data position and length */
-            httpc->pos -= len;
-            httpc->len -= len;
-        }
-        else {
-            /* reset buffer */
-            memset(httpc->buf, 0, CBUFSIZE);
-            httpc->pos = 0;
-            httpc->len = 0;
-        }
+        /* what went out is dropped from the front; a partial send leaves
+           the rest at the start of the buffer (#440) */
+        len = httpshft(httpc->buf, CBUFSIZE, httpc->pos, httpc->len);
+        httpc->len = len;
+        httpc->pos = 0;
     }
 
 	// wtof("%s: exit httpc->len=%d", __func__, httpc->len);

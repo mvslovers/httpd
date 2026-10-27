@@ -344,6 +344,12 @@ sources = ["test/tstmttl.c", "src/mttline.c", "src/httpesc.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstgive.c", "src/httpgive.c"]
 
+# httpshft() send-buffer shift after a partial send (#440).  Free of httpd.h ->
+# DUAL (host + MVS); helper source listed for the host link.
+[test.TSTSHFT]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstshft.c", "src/httpshft.c"]
+
 # credexp() credential-reaper expiry decision (M2 session timeout).  Free of
 # project headers -> DUAL (host + MVS); helper source listed for the host link.
 [test.TSTEXPIR]

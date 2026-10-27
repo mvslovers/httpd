@@ -81,6 +81,35 @@ send_giveup(HTTPC *httpc)
              httpc->sent, held);
 }
 
+/* send_wait() - one pause of the no-progress budget, after send_raw() has
+** reported 0 (EWOULDBLOCK, the client's window is closed).  *stall counts the
+** pauses since the last byte went out.
+**
+** Returns 0 to try again, -1 when the client is given up on.  Every -1 leaves
+** the client at CSTATE_DONE.
+*/
+static int
+send_wait(HTTPC *httpc, int *stall, HTTPTRR *tr)
+{
+    if (httpc->state >= CSTATE_DONE) return -1;
+    /* a stopping server must not sit out the stall budget:
+       shutdown waits for the workers, so every worker wait
+       has to honor quiesce (#122, #205) */
+    if (httpc->httpd->flag
+        & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
+        httpc->state = CSTATE_DONE;
+        return -1;
+    }
+    if (++*stall > SEND_STALL_MAX) {
+        httpc->state = CSTATE_DONE;
+        send_giveup(httpc);
+        return -1;
+    }
+    if (tr) httptrc_stall(tr);
+    usleep(SEND_STALL_PAUSE);
+    return 0;
+}
+
 /* send_raw_all() - send the whole buffer or fail.
 **
 ** A chunk is only parseable if the byte count its header announced is
@@ -112,22 +141,7 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len, HTTPTRR *tr)
         if (rc == 0) {
             /* no progress: EWOULDBLOCK, the only case send_raw()
                still reports as 0 */
-            if (httpc->state >= CSTATE_DONE) return -1;
-            /* a stopping server must not sit out the stall budget:
-               shutdown waits for the workers, so every worker wait
-               has to honor quiesce (#122, #205) */
-            if (httpc->httpd->flag
-                & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
-                httpc->state = CSTATE_DONE;
-                return -1;
-            }
-            if (++stall > SEND_STALL_MAX) {
-                httpc->state = CSTATE_DONE;
-                send_giveup(httpc);
-                return -1;
-            }
-            if (tr) httptrc_stall(tr);
-            usleep(SEND_STALL_PAUSE);
+            if (send_wait(httpc, &stall, tr) < 0) return -1;
         }
         else {
             stall = 0;
@@ -181,4 +195,28 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
     rc = send_raw(httpc, buf, len, tr);
 
     return rc;
+}
+
+/* http_send_pause() - the wait between two tries of a caller whose
+** http_send() returned 0, the closed window of a non-chunked response.  Takes
+** the same no-progress budget as send_raw_all() and send_all(): *stall counts
+** the pauses since the last byte went out, and when it runs out the client is
+** given up on (HTTPD065W) and the worker is free (#440).  A caller that only
+** went round again on the zero would use up the 1000 passes of serve_client()
+** in a moment and report the stall as HTTPD901E.
+**
+** Returns 0 to try again, -1 with the client at CSTATE_DONE.  A response cut
+** off like this cannot carry another request, so the connection is not kept.
+*/
+extern int
+http_send_pause(HTTPC *httpc, int *stall)
+{
+    HTTPTRR *tr = HTTP_TRACING(httpc) ? httptrc_rec(httpc) : NULL;
+
+    if (send_wait(httpc, stall, tr) < 0) {
+        httpc->keepalive = 0;
+        return -1;
+    }
+
+    return 0;
 }
