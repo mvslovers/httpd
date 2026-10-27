@@ -2,6 +2,7 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"     /* operator message catalog */
+#include "httptask.h"     /* SET MAXTASK/MINTASK operand */
 #include <buildstamp.h>     /* MBT_COMMIT for DISPLAY VERSION */
 
 static int process(char *buf);
@@ -692,11 +693,12 @@ s_maxtask(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
     CTHDMGR     *mgr;
-	char		*next = NULL;
-	unsigned    value = strtoul(buf, &next, 10);
+	unsigned    value = 0;
 
-	if (value < 1) value = 1;
-	if (value > 100) value = 100;
+	if (httptask(buf, &value) != HTTP_TASK_OK) {
+		wtof(MSG_S_TASK_USAGE);
+		return 0;
+	}
 
     /* obtain a shared lock on httpd */
     lock(httpd,1);
@@ -735,11 +737,12 @@ s_mintask(char *buf)
     HTTPD       *httpd  = grt->grtapp1;
     int         rc      = 0;
     CTHDMGR     *mgr;
-	char		*next = NULL;
-	unsigned    value = strtoul(buf, &next, 10);
+	unsigned    value = 0;
 
-	if (value < 1) value = 1;
-	if (value > 100) value = 100;
+	if (httptask(buf, &value) != HTTP_TASK_OK) {
+		wtof(MSG_S_TASK_USAGE);
+		return 0;
+	}
 
     /* obtain a shared lock on httpd */
     lock(httpd,1);

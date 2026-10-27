@@ -293,11 +293,10 @@ source that was built.
 /F HTTPD,S MI n
 ```
 
-The number is decimal and is required. The server does not check for a missing
-number, so never enter the command without one. The server reads the number as
-an unsigned number. A value of 0 is 1, and a value above 100 is 100. A word that is not a number is 1. A
-negative number is read as a very large unsigned number, so #cmd("S MA -5")
-sets 100, not 1. The command sets the new limit and
+The number is decimal and is required. Without a number, and with a negative
+number, the command answers #cmd("HTTPD149I") and changes nothing. Otherwise
+a value of 0 is 1, and a value above 100 is 100. A word that is not a number
+is 1. The command sets the new limit and
 wakes the dispatcher, which creates or ends workers to fit. The answer is the
 dispatcher block of #cmd("DISPLAY THREADS") (messages #cmd("HTTPD107I") to
 #cmd("HTTPD111I")), followed by a line of dashes. The block shows the limits

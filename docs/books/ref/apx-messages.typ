@@ -51,7 +51,7 @@
 #idx("messages", "format")
 This appendix lists every numbered message of HTTPD in the order of the
 numbers. The header file of the product has one text for each message, and this
-appendix has one entry for each of those texts: 169 texts, which carry 161
+appendix has one entry for each of those texts: 170 texts, which carry 162
 distinct combinations of number and severity letter. Where two texts share a
 number, both are listed.
 
@@ -581,7 +581,7 @@ Most of them are the answer of a command and have no response.
   )
 ]
 
-#tab(caption: [Messages 120 to 148])[
+#tab(caption: [Messages 120 to 149])[
   #table(columns: (2.9in, 1fr),
     [Message], [Meaning and action],
     ..r("HTTPD120I ..SOCKET {socket} ....PORT {port} ......IP {address}",
@@ -675,6 +675,10 @@ Most of them are the answer of a command and have no response.
     ..r("HTTPD148I USAGE: DISPLAY MEMORY XXXXXX[,NNN] (D M XXXXXX)",
       [#cmd("DISPLAY MEMORY") has no address. The default length of a dump is
       256 bytes and the maximum is 4096.]),
+    ..r("HTTPD149I USAGE: SET MAXTASK|MINTASK N (S MA N, S MI N), N = 1 TO 100",
+      [#cmd("SET MAXTASK") or #cmd("SET MINTASK") has no number, or a negative
+      number. The limits do not change, and the dispatcher is not woken.],
+      o: [Give a decimal number.]),
   )
 ]
 
