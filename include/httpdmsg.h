@@ -195,8 +195,11 @@
 
 /** HTTPD045E a UFS read failed while a file was being sent: the filesystem,
  *  not the client, is at fault.  %d is the UFSD return code, %.40s the request
- *  path.  The response was abandoned and the connection closed (#263). */
-#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s"
+ *  path: the requested page, or the file named by the <!--#include --> that
+ *  failed (#346).  The response was abandoned and the connection closed
+ *  (#263).  Written at most once per READERR_INTERVAL; the last argument is
+ *  how many read errors the interval held back (#346). */
+#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s, %u SUPPRESSED"
 
 /** HTTPD047E without the key no credential can be sealed; login is dead */
 #define MSG_CREDKEY_FAILED	"HTTPD047E UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC=%d"

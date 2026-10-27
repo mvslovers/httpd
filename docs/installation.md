@@ -247,11 +247,20 @@ gated by HTTPD as well. First match wins, so the order matters. mvsMF's own
 installation guide has its side of this.
 
 The third line is the **console service**. It issues operator commands, and
-mvsMF itself checks no authority: any user who can log in could stop a started
-task or vary a device. So the console gets a route of its own that also needs
-READ on the RAKF resource `FACILITY MVSMF.CONSOLE` — define it in step 8. It has
-to stand **before** `/zosmf/*`: listed after the catch-all it is never reached,
-and nothing warns you.
+any user who can log in could stop a started task or vary a device. So the
+console gets a route of its own that also needs READ on the RAKF resource
+`FACILITY MVSMF.CONSOLE` — define it in step 8. What mvsMF does on its own
+depends on its level:
+
+| mvsMF | Check inside mvsMF | Without the profile |
+|---|---|---|
+| up to 1.3.0 | none: the route is the only gate | every user who can log in may issue operator commands |
+| 1.4.0 and up | READ on `FACILITY MVSMF.CONSOLE`, under the user's own identity | mvsMF refuses every user (`500`, category 4) until the profile is defined |
+
+HTTPD's check comes first at every level and answers `403` to a user without
+READ. Keep the route and its `RES=` at every level. The route has to stand
+**before** `/zosmf/*`: listed after the catch-all it is never reached, and
+nothing warns you.
 
 If mvsMF is not installed, HTTPD starts and those routes register normally — the
 program is not looked for until a request first matches. The failure then shows
@@ -980,8 +989,12 @@ client can log in.
 
    The shipped `HTTPPRM0` has one such route, the mvsMF console service, so
    `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
-   NOT GATED` is what an installation without the profile prints — and until
-   the profile exists every user who can log in may issue operator commands.
+   NOT GATED` is what an installation without the profile prints. The warning
+   is about HTTPD's own route. With mvsMF up to 1.3.0 it means the console is
+   open: until the profile exists every user who can log in may issue operator
+   commands. From mvsMF 1.4.0 the module checks READ on the same profile
+   itself and refuses every user (`500`, category 4) until it is defined, so
+   the console stays closed to everyone.
    **Do not edit `PROFILES` by hand; RAKF's maintainer recommends the commands.**
    On MVS/CE (RAKF 2.0.0) define the profile with `RDEFINE` and `PERMIT`.
    `RDEFINE` writes the universal line of a profile, `PERMIT` adds a line for a
@@ -1944,7 +1957,7 @@ nothing above touches it.
 | `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal, and that is the danger: the identity switch runs before the listener opens, so the server still comes up (`HTTPD054I`, `HTTPD001I`) on the inherited `STC`/`STCGROUP` identity, which holds ALTER on data sets on the stock profiles. A module that sets no identity of its own runs with it. Keep clients away, or `/P HTTPD`, until a start prints `HTTPD004I` instead |
 | `S RAKFUSER` ends `RAKFUIDS2 INPUT DATA INVALID OR OUT OF SEQ.`, `ABEND U0200` (TK5) | A `USERS` line has no password in columns 19-26, or a field sits in the wrong column — step 8 |
 | `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
-| `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD could not read a file it had opened; `RC=52` is an I/O error. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
+| `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path, s SUPPRESSED` | UFSD could not read a file it had opened; `RC=52` is an I/O error. `path` is the page, or the included file when the error was inside a server-side include. At most one line is written per 60 seconds; `s` counts the errors held back in between. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a chunked (HTTP/1.1) response, so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | One request out of many takes 25 to 150 seconds under sustained load, the rest answer in about a second, and no console message appears | A known issue in this release, independent of `RESIDENT=`: single requests were seen to stall for 25 to 150 seconds in soak runs of 20,000 to 30,000 requests, with the median at 0.2 s and the 95th percentile near 1 s. The cause is not known and it has not been reproduced on demand. A request that a client abandoned at 60 s and sent again was answered the second time. Nothing to configure; use a client timeout and a retry. Tracked in [#350](https://github.com/mvslovers/httpd/issues/350) |
 | `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it. `106-0F` is not a storage shortage (that is `106-0C`): IBM describes it as an uncorrectable I/O error, or an error in the load module that made the channel program fail. Look at the library and the member, not at the region. A failed fetch costs the module's storage until the server stops; `RESIDENT=YES` (the default) avoids the per-request fetch, see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) and [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#resident-modules-resident) |
@@ -1952,8 +1965,9 @@ nothing above touches it.
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
-| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means every user who can log in may issue operator commands |
+| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means, with mvsMF up to 1.3.0, that every user who can log in may issue operator commands. From mvsMF 1.4.0 the module refuses every user itself until the profile is defined, so the warning concerns HTTPD's route only |
 | `403` on `/zosmf/restconsoles/…`, plain-text body | The user has no READ on `FACILITY MVSMF.CONSOLE` — step 8. A `403` is HTTPD's gate, not mvsMF's |
+| `500` on `/zosmf/restconsoles/…`, z/OSMF error report with category 4 | mvsMF 1.4.0 and up: the check inside mvsMF refused the user. HTTPD's `403` comes first, so this shows when HTTPD let the request through: the profile is not defined (`HTTPD425W` at start) — step 8 — or the route stands after `/zosmf/*` and HTTPD's check is never made |
 | `/zosmf/restconsoles/…` answers `200` to a user the profile excludes | The usual causes: the route stands after `/zosmf/*` (check the order of the `HTTPD036I` lines at startup), or the profile is not loaded yet — reload it, step 8 |
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
 | `401` on a route showing `AUTH=NONE` | Not HTTPD's gate. mvsMF runs its own auth track on `/zosmf/*` — establish which layer answered before debugging HTTPD's |

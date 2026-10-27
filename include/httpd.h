@@ -125,9 +125,14 @@ struct httpd {
 	time64_t 	uptime;				/* 48 Server startup time		*/
     void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
-    void        *unused_58;         /* 58 (was: LUAX *luax)         */
+    unsigned    readerr_last;       /* 58 time() of the last HTTPD045E, */
+                                    /* ... 0 = none yet (#346); was */
+                                    /* ... LUAX *luax.  Locked as   */
+                                    /* ... lock(&readerr_last)      */
     const char  *version;			/* 5C HTTPD Version				*/
-    void        *unused_60;         /* 60 (was: lua_State *config)  */
+    unsigned    readerr_held;       /* 60 read errors counted since */
+                                    /* ... that message (#346); was */
+                                    /* ... lua_State *config        */
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
     UCHAR		cfg_mintask;		/* 65 config min task			*/
     UCHAR		cfg_client_timeout;	/* 66 client timeout seconds	*/
@@ -218,6 +223,7 @@ enum cstate {
 /* the give-up of a stalled client is reported to the operator at most once
    per interval (issue #347); the rest are counted in the next message */
 #define SEND_GIVEUP_INTERVAL 60     /* seconds between HTTPD065W    */
+#define READERR_INTERVAL     60     /* seconds between HTTPD045E    */
 
 enum rdw {
     RDW_NONE=0,                     /* no RDW (default)             */
