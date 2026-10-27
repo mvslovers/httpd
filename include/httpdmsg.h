@@ -379,6 +379,9 @@
  *  MOD= modules startup could hold (#198) */
 #define MSG_D_CFG_RESIDENT	"HTTPD137I RESIDENT %s  MODULES HELD %d"
 
+/** HTTPD138I DISPLAY CONFIG, the RES_NOPROFILE keyword (#351) */
+#define MSG_D_CFG_RESNOPROF	"HTTPD138I RES_NOPROFILE %s"
+
 /** HTTPD136I DISPLAY CONFIG, Basic realm / server name (#193): the REALM
  *  keyword's value, or the system's SMF ID when the Parmlib names none */
 #define MSG_D_CFG_REALM		"HTTPD136I REALM %s"
@@ -602,6 +605,17 @@
  *  authorization stage does nothing and only the AUTH= stage is left.  Args:
  *  class, resource, route path. */
 #define MSG_RES_NO_PROFILE	"HTTPD425W NO PROFILE FOR %.8s:%.32s -- %.24s NOT GATED"
+
+/** HTTPD426W as HTTPD425W, with RES_NOPROFILE=DENY (#351): the route refuses
+ *  every request with 403 until the profile exists.  Args: class, resource,
+ *  route path. */
+#define MSG_RES_NO_PROFILE_DENY	"HTTPD426W NO PROFILE FOR %.8s:%.32s -- %.24s REFUSES ALL REQUESTS"
+
+/** HTTPD427E RES_NOPROFILE is neither ALLOW nor DENY.  Fatal, followed by
+ *  HTTPD420E: the keyword exists to close a gate, and falling back to ALLOW
+ *  on a misspelling would leave it open without a word -- the failure #243
+ *  removed for AUTH=. */
+#define MSG_RES_NOPROF_BAD	"HTTPD427E INVALID RES_NOPROFILE VALUE \"%.16s\" (ALLOW|DENY)"
 
 /*
  * HTTPD43x -- SMF.  Split off HTTPD415W, which "LOC= requires a path"

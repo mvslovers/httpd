@@ -62,6 +62,7 @@ static const char * const parmlines[] = {
     "PORT=2280",
     "MAXTASK=17",
     "RESIDENT=NO",          /* the default is YES (#198) */
+    "RES_NOPROFILE=DENY",   /* the default is ALLOW (#351) */
     NULL
 };
 
@@ -163,6 +164,10 @@ main(int argc, char **argv)
                  "healthy HTTPPRM: MAXTASK parsed");
         CHECK_EQ((int)httpd.cfg_resident, 0,
                  "healthy HTTPPRM: RESIDENT=NO parsed");
+        CHECK_EQ((int)httpd.cfg_res_noprof, 1,
+                 "healthy HTTPPRM: RES_NOPROFILE=DENY parsed");
+        CHECK((httpd.flag & HTTPD_FLAG_CFGERR) == 0,
+              "healthy HTTPPRM: RES_NOPROFILE=DENY is not a config error");
 
         __dsfree(HTTPD_PARMLIB_DD);
     } else {

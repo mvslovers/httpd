@@ -51,7 +51,8 @@ Offset  Data Name  Description  Contents
 +009C  httpd->cgictx  CGI Context Pointers Array  000FB988
 +00A0  httpd->docroot  UFS Document Root Prefix  "/www"
 +0120  httpd->listen_queue  Listen Backlog  5
-+0121  httpd->unused_121  (reserved, alignment padding)  00 00 00
++0121  httpd->cfg_res_noprof  Config RES= Route Without Profile  ALLOW
++0122  httpd->unused_122  (reserved, alignment padding)  00 00
 +0124  httpd->codepage  Codepage Name (CODEPAGE=)  "" CP037 (default, no CODEPAGE keyword)
 +0134  httpd->cfg_keepalive_timeout  Keep-Alive Idle Timeout (seconds)  5
 +0135  httpd->cfg_keepalive_max  Max Requests per Connection  100

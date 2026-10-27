@@ -10,6 +10,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
+#include "httpracf.h"      /* httpracv() -- RES_NOPROFILE value (#351)    */
 #include "httpxlat.h"
 #include <unistd.h>          /* sleep()                                      */
 #include <mvs/enq.h>        /* ENQ()       -- port single-instance (#223)   */
@@ -267,6 +268,7 @@ set_defaults(HTTPD *httpd)
     httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
     httpd->cfg_resident     = 1;    /* hold every MOD= module (#198) */
+    httpd->cfg_res_noprof   = 0;    /* RES_NOPROFILE=ALLOW (#351) */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
                             | HTTPD_CLIENT_STATS;
     httpd->ufs_enabled      = 1;
@@ -566,6 +568,20 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
             httpd->cfg_resident = 0;
         else
             wtof(MSG_RES_BAD_VALUE, value);
+    }
+    else if (strcmp(key, "RES_NOPROFILE") == 0) {
+        /* ALLOW (the default) keeps SAF's reading of a resource no profile
+           covers: allowed (rc 4), with HTTPD425W at start.  DENY makes a RES=
+           route refuse such a request with 403 (#351).  A value that is
+           neither is fatal rather than ignored: ignoring it leaves the gate
+           open, which is the thing the keyword was written to prevent. */
+        int v = httpracv(value);
+        if (v >= 0)
+            httpd->cfg_res_noprof = (UCHAR)v;
+        else {
+            wtof(MSG_RES_NOPROF_BAD, value);
+            httpd->flag |= HTTPD_FLAG_CFGERR;
+        }
     }
     else if (strcmp(key, "CGI_CONTEXT_POINTERS") == 0) {
         i = atoi(value);

@@ -39,7 +39,6 @@ mvslovers/mbt#163.*
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.6.0 |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
-| — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
 | — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | the passage is in the Reference ("The region") and in the installation guide; the issue is still open, so whoever closes it checks the Done-when list; milestone 4.5.0, not yet ranked |
