@@ -256,9 +256,9 @@ http_printf(httpc, "Content-Type: text/plain\r\n\r\n");   /* WRONG */
 
 HTTPD does not recognize the end of the headers in such a call. The headers go
 out, the blank line goes out, but the response has neither a chunk framing nor
-a length. The example directory has the file #cmd("hello-pitfall.c"), which is
-HELLO with that one change. Its answer has no #cmd("Transfer-Encoding"), and the
-last line of the headers is empty:
+a length. The next capture is from HELLO with that one change in each of its
+three answers. The answer has no #cmd("Transfer-Encoding"), and the last line
+of the headers is empty:
 
 #screen(raw(read("../ex/ug-module/pitfall-blank-line-headers.txt")))
 

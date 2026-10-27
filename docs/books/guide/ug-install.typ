@@ -502,6 +502,8 @@ output repeats the statements and ends with a return code. In it you see the
 function #cmd("THTP440"), the statement #cmd("++VER(Z038) DELETE(THTP430)"),
 and one #cmd("++MOD") statement for each of the five modules.
 
+#screen(raw(read("../ex/ug-install/inst-smp-receive.txt")))
+
 *APPLYCHK.* The dry run. Its output has the same reports as the real run and
 changes nothing.
 
@@ -521,7 +523,9 @@ how many tracks and directory blocks of the library are still unused:
 *ACCEPT.* The same copy, into the distribution library
 #cmd("HTTPD.AHTTPLOD"). The output has five #cmd("HMA2380") lines with
 #cmd("LIBRARY=AHTTPLOD"), and it ends with #cmd("HMA2270 ACCEPT PROCESSING
-SUCCESSFULLY COMPLETED").
+SUCCESSFULLY COMPLETED"):
+
+#screen(raw(read("../ex/ug-install/inst-smp-accept.txt")))
 
 *CLEANUP.* The staging library goes away:
 

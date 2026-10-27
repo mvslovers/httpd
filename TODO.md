@@ -11,11 +11,14 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-27, against `origin/main` 1e12930, after v4.4.0
+*Last reconciled against the tracker: 2026-10-27, against `origin/main` 7d95496, after v4.4.0
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
-closed). Every open issue is now in milestone 4.5.0, so nothing in this file waits on 4.4.0 any
-more. #326, #367 and #373 are closed and have no row. #376 and #377, both filed from the 4.4.0
-candidate, #382, #383 and #370 are listed and not ranked against the rest. #379 is closed (PR #380: `main` is
+closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
+The open issues are in milestone 4.5.0, except #176, #322 and #323, which are in 4.6.0. #326,
+#367 and #373 are closed and have no row. #382 and #383 are closed and struck; #376 stays struck.
+#377 and #370 are listed and not ranked against the rest, and so are #391 to #395 and #399 to
+#401, which the manuals work (#382) filed. #405, the follow-up to the manuals, is the change that
+carries this edit and has no row. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
 no row. The ranked order is unchanged.
 The notes of the earlier reconciles, back to 2026-08-24, are in the history of this file
@@ -34,15 +37,23 @@ mvslovers/mbt#163.*
 | 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
-| — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.5.0; not yet ranked |
-| — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.5.0 |
+| — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
+| — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.6.0 |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
 | — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
-| — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
-| — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
-| — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | PR #384 pins the released ufsd 1.5.2; `mbt test --mvs` stays part of the 4.5.0 release acceptance; milestone 4.5.0, not yet ranked |
+| — | #377 | docs — `REGION` sizing for setups with many parallel module requests | the passage is in the Reference ("The region") and in the installation guide; the issue is still open, so whoever closes it checks the Done-when list; milestone 4.5.0, not yet ranked |
+| — | ~~#382~~ | ~~docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release~~ | **Done** — the books landed with PR #390; what the acceptance left over is #395 and #405 |
+| — | ~~#383~~ | ~~build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1~~ | **Done** — `mbt test --mvs` stays part of the 4.5.0 release acceptance |
+| — | #391 | `SET MA` / `SET MI` without a number passes NULL to `strtoul` | found in the manuals work; milestone 4.5.0, not yet ranked |
+| — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.5.0, not yet ranked |
+| — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
+| — | #394 | diagnostic and display code — unchecked sizes and unescaped output | milestone 4.5.0, not yet ranked |
+| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked |
+| — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
+| — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
+| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
