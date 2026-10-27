@@ -315,6 +315,10 @@ The rules of #cmd("RES_NOPROFILE"):
 
 #idx("DEBUG")
 #idx("SMF", "keyword")
+#idx("TRACE", "keyword")
+#idx("HTTPD066I")
+#idx("HTTPD067W")
+#idx("HTTPD444W")
 #idx("HTTPD431W")
 #idx("HTTPD432W")
 #tab(caption: [Keywords for diagnostics and for recording])[
@@ -329,6 +333,16 @@ The rules of #cmd("RES_NOPROFILE"):
       #cmd("SYSTERM"). If a write to the trace fails, HTTPD writes
       #cmd("HTTPD039W") once and switches the trace off until the next start.
       The server goes on.],
+    [#cmd("TRACE")], [0], [The number of records of the request trace, 0 or 16
+      to 1024. 0 is off. Any other value, and a text that is not a number, give
+      #cmd("HTTPD444W") and the trace stays off. With a valid number HTTPD
+      takes one block of 128 bytes a record plus the index, from the heap, at
+      the start, and writes #cmd("HTTPD066I"); if the block cannot be had it
+      writes #cmd("HTTPD067W") and the server runs without the trace. The trace
+      keeps for each request the worker that serves it and the time of each
+      phase. It does not change what the server does. A change takes a restart.
+      The target #cmd("TRACE") of #cmd("/.dsrv") shows the records
+      (@ref-dm-dsrv-trace).],
     [#cmd("SMF")], [NONE], [#cmd("SMF=level") or #cmd("SMF=level TYPE=nnn"). The
       level is #cmd("NONE"), #cmd("ERROR"), #cmd("AUTH") or #cmd("ALL"), in any
       case. HTTPD compares only as many characters as the word has, so

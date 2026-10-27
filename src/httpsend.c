@@ -10,17 +10,20 @@
 
 /* send_raw() - send raw bytes to socket without chunk framing */
 static int
-send_raw(HTTPC *httpc, const UCHAR *buf, int len)
+send_raw(HTTPC *httpc, const UCHAR *buf, int len, HTTPTRR *tr)
 {
     int rc;
     int pos = 0;
+    unsigned t0 = 0;
 
     for(pos=0; pos < len; pos+=rc) {
         if (pos < 0) {
             wtof(MSG_SEND_UNDERFLOW, pos);
             break;
         }
+        if (tr) t0 = httptrc_now();
         rc = send(httpc->socket, &buf[pos], len-pos, 0);
+        if (tr) httptrc_tx(tr, t0, httptrc_now(), rc);
         if (rc>0) {
             httpc->sent += rc;
         }
@@ -91,14 +94,14 @@ send_giveup(HTTPC *httpc)
 ** positive return, so that state is what stops it.
 */
 static int
-send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
+send_raw_all(HTTPC *httpc, const UCHAR *buf, int len, HTTPTRR *tr)
 {
     int rc;
     int pos;
     int stall = 0;
 
     for (pos = 0; pos < len; pos += rc) {
-        rc = send_raw(httpc, &buf[pos], len - pos);
+        rc = send_raw(httpc, &buf[pos], len - pos, tr);
         if (rc < 0) {
             /* set here rather than relying on the caller: the
                MSG_SEND_UNDERFLOW guard also returns negative, and the
@@ -123,6 +126,7 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
                 send_giveup(httpc);
                 return -1;
             }
+            if (tr) httptrc_stall(tr);
             usleep(SEND_STALL_PAUSE);
         }
         else {
@@ -137,6 +141,7 @@ extern int
 httpsend(HTTPC *httpc, const UCHAR *buf, int len)
 {
     int rc;
+    HTTPTRR *tr = HTTP_TRACING(httpc) ? httptrc_rec(httpc) : NULL;
 
     if (httpc->chunked) {
         /* RFC 7230 chunked transfer encoding */
@@ -161,9 +166,9 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
            client a truncated response had ended normally -- and close
            the connection rather than carry a torn chunk into the next
            request on it. */
-        if (send_raw_all(httpc, hdr, hdrlen) < 0
-         || send_raw_all(httpc, buf, len) < 0
-         || send_raw_all(httpc, crlf, 2) < 0) {
+        if (send_raw_all(httpc, hdr, hdrlen, tr) < 0
+         || send_raw_all(httpc, buf, len, tr) < 0
+         || send_raw_all(httpc, crlf, 2, tr) < 0) {
             httpc->chunked = 0;
             httpc->keepalive = 0;
             return -1;
@@ -173,7 +178,7 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
     }
 
     /* non-chunked: send raw */
-    rc = send_raw(httpc, buf, len);
+    rc = send_raw(httpc, buf, len, tr);
 
     return rc;
 }

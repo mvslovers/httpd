@@ -373,6 +373,13 @@ sources = ["test/tstnobd.c", "src/httpnobd.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tststat.c", "src/httpstat.c"]
 
+# The request trace table and its line format (issue #350): claim, find, mark,
+# end, keep-the-slow-ones, the ms conversion.  httptrcf.c is free of httpd.h and
+# of the clock -> DUAL (host + MVS); trc_cas() comes from the test.
+[test.TSTTRC]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tsttrc.c", "src/httptrcf.c"]
+
 # httpself()/httpthup() thread start-up hand-shake (issue #296): the socket
 # thread must not take a NULL cthread_self() as fact, and main() must not write
 # READY over a socket thread that is not running.  Free of httpd.h -> DUAL

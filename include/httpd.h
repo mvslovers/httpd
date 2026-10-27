@@ -49,6 +49,7 @@
 #include "httpbody.h"               /* request body classification  */
 #include "httpstat.h"               /* status code -> status line   */
 #include "httpnobd.h"               /* response has no body?        */
+#include "httptrc.h"                /* request trace (#350)         */
 #include "httprlm.h"                /* HTTP_REALM_CFG_MAX (#193)    */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
@@ -124,7 +125,9 @@ struct httpd {
     char        rname[12];          /* 38 resource name             */
     HTTPROUTE   **route;            /* 44 route table               */
 	time64_t 	uptime;				/* 48 Server startup time		*/
-    void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
+    HTTPTRC     *trace;             /* 50 request trace (#350), NULL*/
+                                    /* ... when TRACE= is not set;  */
+                                    /* ... was FTPD *ftpd           */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
     unsigned    readerr_last;       /* 58 time() of the last HTTPD045E, */
                                     /* ... 0 = none yet (#346); was */
@@ -169,7 +172,8 @@ struct httpd {
     UFS			*ufs;				/* 90 Unix "like" File System   */
     USHRT       cfg_session_maxage; /* 94 credential hard max-age   */
                                     /* ... (min), 0=off (#118)      */
-    UCHAR       unused_96[2];       /* 96 (was: HTTPT *httpt)       */
+    USHRT       cfg_trace;          /* 96 TRACE= records, 0 = off   */
+                                    /* ... (#350); was HTTPT *httpt */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */
     void        **cgictx;           /* 9C array of CGI context ptrs */
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */
@@ -696,6 +700,22 @@ extern HTTPD *cgihttpd(void)											asm("CGIHTTPD");
 extern HTTPC *cgihttpc(void)											asm("CGIHTTPC");
 extern int http_getc(HTTPC *httpc)                                      asm("HTTPGETC");
 extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTTPGETS");
+
+/* request trace (#350): HTTPD->trace is NULL unless TRACE=n is set, and every
+   hook is guarded by HTTP_TRACING so the off state costs a load and a branch */
+#define HTTP_TRACING(httpc) ((httpc)->httpd->trace)
+extern unsigned httptrc_now(void)                                      asm("HTRCNOW");
+extern void httptrc_start(HTTPD *httpd)                                asm("HTRCSTRT");
+extern void httptrc_stop(HTTPD *httpd)                                 asm("HTRCSTOP");
+extern HTTPTRR *httptrc_rec(HTTPC *httpc)                              asm("HTRCREC");
+extern void httptrc_open(HTTPC *httpc)                                 asm("HTRCOPEN");
+extern void httptrc_run(HTTPC *httpc, void *work)                      asm("HTRCRUN");
+extern void httptrc_mark(HTTPC *httpc, int mark)                       asm("HTRCMARK");
+extern void httptrc_poll(HTTPC *httpc)                                 asm("HTRCPOLL");
+extern void httptrc_tx(HTTPTRR *r, unsigned t0, unsigned t1, int rc)   asm("HTRCTX");
+extern void httptrc_stall(HTTPTRR *r)                                  asm("HTRCSTAL");
+extern void httptrc_next(HTTPC *httpc, int keep)                       asm("HTRCNEXT");
+extern void httptrc_close(HTTPC *httpc)                                asm("HTRCCLOS");
 
 
 #ifndef HTTP_PRIVATE

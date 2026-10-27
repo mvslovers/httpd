@@ -75,6 +75,8 @@ int http_in(HTTPC *httpc)
         goto quit;
     }
 
+    if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_LINE1);
+
     /* "GET path/to/resource HTTP/1.0\n" */
 
     /* remove newline character from request */

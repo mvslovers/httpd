@@ -537,6 +537,10 @@ initialize(int argc, char **argv)
 		httpd->cfg_maxtask = httpd->cfg_mintask;
 	}
 
+    /* request trace (#350): allocated before any worker can run, so the hooks
+       never see it appear; stays NULL when TRACE= is not set */
+    httptrc_start(httpd);
+
     /* create 1 dispatcher and max 9 worker threads (576K total storage stack) */
     /* Note: the thread manager will only start 3 threads initially */
     httpd->mgr = cthread_manager_init(httpd->cfg_maxtask, worker_thread, httpd, 64*1024);
@@ -761,6 +765,9 @@ terminate(void)
         free(httpd->cgictx);
         httpd->cgictx = NULL;
     }
+
+    /* every worker and every http_close() is done: no hook can run again */
+    httptrc_stop(httpd);
 
     /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
@@ -1086,6 +1093,7 @@ socket_thread(void *arg1, void *arg2)
                        returns 0 there, but is covered by the state check above
                        -- the narrow remaining window is benign, reclaimed at
                        address-space end.) */
+                    if (HTTP_TRACING(httpc)) httptrc_open(httpc);
                     if (cthread_queue_add(mgr, httpc)) {
                         http_close(httpc);
                     }
@@ -1126,6 +1134,8 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
        break out, loudly, instead of taking the address space down. */
     int     spin    = 0;
     short   last    = httpc->state;
+
+    if (HTTP_TRACING(httpc)) httptrc_run(httpc, work);
 
     while (httpc->state != CSTATE_CLOSE) {
         http_process_client(httpc);

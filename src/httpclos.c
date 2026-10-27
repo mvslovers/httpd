@@ -29,6 +29,10 @@ httpclos(HTTPC *httpc)
     if (lockrc==0) unlock(httpd,0);
 
     if (httpc) {
+        /* a request that never reached its end (timeout, abend, peer gone)
+           ends here, before http_reset() below can close it as a normal one */
+        if (httpd->trace) httptrc_close(httpc);
+
         if (httpd->active_connections > 0)
             httpd->active_connections--;
 

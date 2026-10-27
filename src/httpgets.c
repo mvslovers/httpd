@@ -43,6 +43,7 @@ int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)
                 time64(&now);
                 if (__64_cmp(&now, &timeout) == __64_SMALLER) {
                     /* no timeout, sleep for 0.50 seconds */
+                    if (HTTP_TRACING(httpc)) httptrc_poll(httpc);
                     errno = ecb = 0;
                     cthread_timed_wait(&ecb, 50, 0);
                     continue;

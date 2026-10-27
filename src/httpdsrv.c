@@ -21,6 +21,7 @@ static int display_fs(HTTPD *httpd, HTTPC *httpc);
 static int display_mgr(HTTPD *httpd, HTTPC *httpc);
 static int display_task(HTTPD *httpd, HTTPC *httpc);
 static int display_help(HTTPD *httpd, HTTPC *httpc);
+static int display_trace(HTTPD *httpd, HTTPC *httpc);
 static int display_workers(HTTPD *httpd, HTTPC *httpc);
 
 static int display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs);
@@ -126,6 +127,11 @@ int main(int argc, char **argv)
     }
 #endif
 
+    if (http_cmpn(target, "TRACE", len)==0) {
+        display_trace(httpd, httpc);
+        goto quit;
+    }
+
     if (http_cmpn(target, "WORKERS", len)==0) {
         display_workers(httpd, httpc);
         goto quit;
@@ -174,6 +180,57 @@ send_resp(HTTPD *httpd, HTTPC *httpc, int resp)
  
 quit:
     return rc;
+}
+
+/* The request trace (#350) as text/plain, one record per line.  A record that
+** is rewritten while it is copied is skipped (its seq changes), so a line is
+** never a mix of two requests. */
+static int
+display_trace(HTTPD *httpd, HTTPC *httpc)
+{
+    HTTPTRC     *t      = httpd->trace;
+    const char  *smin   = http_get_env(httpc, "QUERY_MIN");
+    unsigned    min     = smin ? (unsigned)atoi(smin) : 0;
+    unsigned    now;
+    unsigned    n;
+    char        line[448];
+    HTTPTRR     copy;
+
+    http_resp(httpc, 200);
+    http_printf(httpc, "Cache-Control: no-store\r\n");
+    http_printf(httpc, "Content-Type: text/plain\r\n");
+    http_printf(httpc, "\r\n");
+
+    if (!t) {
+        http_printf(httpc, "#HTTPTRC off\n");
+        return 0;
+    }
+
+    now = httptrc_now();
+    http_printf(httpc, "#HTTPTRC v1 now=%u wall=%u unit=1.024ms slots=%u "
+        "seq=%u lost=%u miss=%u workers=%u\n",
+        now, (unsigned)time(NULL), t->slots, t->seq, t->lost, t->miss,
+        httpd->mgr ? (unsigned)array_count(&httpd->mgr->worker) : 0);
+
+    for (n = 0; n < t->slots; n++) {
+        HTTPTRR     *r = &t->rec[n];
+        unsigned    seq = r->seq;
+        unsigned    s = r->state;
+
+        if (s == TRS_FREE) continue;
+        memcpy(&copy, r, sizeof(copy));
+        if (copy.seq != seq || r->seq != seq) continue;
+
+        if (s != TRS_LIVE && min) {
+            unsigned end = copy.t[copy.last];
+            if (trc_ms(end - copy.t[TM_OPEN]) < min) continue;
+        }
+
+        trc_line(line, sizeof(line), &copy, now);
+        http_printf(httpc, "%s\n", line);
+    }
+
+    return 0;
 }
 
 static int 
@@ -400,10 +457,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_50</td>"
-        "<td>(reserved)</td>"
+        "<td>httpd->trace</td>"
+        "<td>Request trace (NULL = off)</td>"
         "<td>%p</td></tr>\n",
-        O(unused_50), httpd->unused_50);
+        O(trace), httpd->trace);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -2640,6 +2697,11 @@ display_help(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, "<dt>?target=FS</dt>\n");
     http_printf(httpc, "<dd>Display the HTTPD ... Unix \"like\" File System Handle.</dd><br/>\n");
+
+    http_printf(httpc, "<dt>?target=TRACE[&min=ms]</dt>\n");
+    http_printf(httpc, "<dd>The request trace (Parmlib TRACE=n) as plain text, one line "
+        "per request: worker, a time per phase in ms from the accept, and counters. "
+        "min=ms leaves out finished requests that took less.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=HELP</dt>\n");
     http_printf(httpc, "<dd>Display this help text.</dd><br/>\n");

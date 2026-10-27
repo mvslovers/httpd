@@ -247,6 +247,12 @@
  *  held back (#347). */
 #define MSG_SEND_GIVEUP		"HTTPD065W CLIENT %u.%u.%u.%u ABANDONED, NO SEND PROGRESS FOR %d SEC, %u BYTES SENT, %u SUPPRESSED"
 
+/** HTTPD066I TRACE=n is set and the request trace table is allocated */
+#define MSG_TRACE_ACTIVE	"HTTPD066I REQUEST TRACE ON, %u RECORDS, %u BYTES"
+
+/** HTTPD067W TRACE=n is set but the table could not be allocated */
+#define MSG_TRACE_NO_STORAGE	"HTTPD067W NO STORAGE FOR REQUEST TRACE, TRACE OFF"
+
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
 
@@ -658,6 +664,9 @@
 
 /** HTTPD443W RESIDENT= is neither YES nor NO; the default stays */
 #define MSG_RES_BAD_VALUE	"HTTPD443W INVALID RESIDENT VALUE \"%s\" (YES|NO)"
+
+/** HTTPD444W TRACE= is neither 0 nor a record count in range; the trace stays off */
+#define MSG_TRACE_BAD_VALUE	"HTTPD444W INVALID TRACE VALUE \"%s\" (0 OR 16-1024), TRACE OFF"
 
 /* =====================================================================
 ** HTTPD9xx -- diagnostics, abend recovery, storage
