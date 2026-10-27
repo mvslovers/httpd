@@ -787,7 +787,8 @@ LOC=/admin/*          AUTH=BASIC RES=FACILITY:HTTPD.ADMIN
 
 The shipped configuration uses the same mechanism to put one part of an API
 behind a profile of its own: mvsMF's console service issues operator commands
-and checks nobody's authority, so it has a route ahead of the catch-all:
+and up to mvsMF 1.3.0 checks nobody's authority, so it has a route ahead of the
+catch-all:
 
 ```
 MOD=MVSMF /zosmf/restconsoles/*   AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE
@@ -795,8 +796,11 @@ MOD=MVSMF /zosmf/*                AUTH=TOKEN
 ```
 
 A user without READ on the resource gets `403`; everything else under
-`/zosmf/` is untouched. Swapped, the catch-all matches first and the console
-is open to every login — with no message.
+`/zosmf/` is untouched. From mvsMF 1.4.0 the module checks READ on the same
+resource itself and refuses every user until the profile is defined, so HTTPD's
+route is a first layer in front of it. Swapped, the catch-all matches first and
+HTTPD's check is never made, with no message: up to mvsMF 1.3.0 the console is
+then open to every login, and from 1.4.0 only mvsMF's own check is left.
 The profile is defined in [Installation](installation.md), step 8.
 
 ## SMF Recording

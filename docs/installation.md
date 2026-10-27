@@ -235,11 +235,20 @@ gated by HTTPD as well. First match wins, so the order matters. mvsMF's own
 installation guide has its side of this.
 
 The third line is the **console service**. It issues operator commands, and
-mvsMF itself checks no authority: any user who can log in could stop a started
-task or vary a device. So the console gets a route of its own that also needs
-READ on the RAKF resource `FACILITY MVSMF.CONSOLE` — define it in step 8. It has
-to stand **before** `/zosmf/*`: listed after the catch-all it is never reached,
-and nothing warns you.
+any user who can log in could stop a started task or vary a device. So the
+console gets a route of its own that also needs READ on the RAKF resource
+`FACILITY MVSMF.CONSOLE` — define it in step 8. What mvsMF does on its own
+depends on its level:
+
+| mvsMF | Check inside mvsMF | Without the profile |
+|---|---|---|
+| up to 1.3.0 | none: the route is the only gate | every user who can log in may issue operator commands |
+| 1.4.0 and up | READ on `FACILITY MVSMF.CONSOLE`, under the user's own identity | mvsMF refuses every user (`500`, category 4) until the profile is defined |
+
+HTTPD's check comes first at every level and answers `403` to a user without
+READ. Keep the route and its `RES=` at every level. The route has to stand
+**before** `/zosmf/*`: listed after the catch-all it is never reached, and
+nothing warns you.
 
 If mvsMF is not installed, HTTPD starts and those routes register normally — the
 program is not looked for until a request first matches. The failure then shows
@@ -968,8 +977,12 @@ client can log in.
 
    The shipped `HTTPPRM0` has one such route, the mvsMF console service, so
    `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
-   NOT GATED` is what an installation without the profile prints — and until
-   the profile exists every user who can log in may issue operator commands.
+   NOT GATED` is what an installation without the profile prints. The warning
+   is about HTTPD's own route. With mvsMF up to 1.3.0 it means the console is
+   open: until the profile exists every user who can log in may issue operator
+   commands. From mvsMF 1.4.0 the module checks READ on the same profile
+   itself and refuses every user (`500`, category 4) until it is defined, so
+   the console stays closed to everyone.
    **Do not edit `PROFILES` by hand; RAKF's maintainer recommends the commands.**
    On MVS/CE (RAKF 2.0.0) define the profile with `RDEFINE` and `PERMIT`.
    `RDEFINE` writes the universal line of a profile, `PERMIT` adds a line for a
@@ -1940,8 +1953,9 @@ nothing above touches it.
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
-| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means every user who can log in may issue operator commands |
+| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means, with mvsMF up to 1.3.0, that every user who can log in may issue operator commands. From mvsMF 1.4.0 the module refuses every user itself until the profile is defined, so the warning concerns HTTPD's route only |
 | `403` on `/zosmf/restconsoles/…`, plain-text body | The user has no READ on `FACILITY MVSMF.CONSOLE` — step 8. A `403` is HTTPD's gate, not mvsMF's |
+| `500` on `/zosmf/restconsoles/…`, z/OSMF error report with category 4 | mvsMF 1.4.0 and up: the check inside mvsMF refused the user. HTTPD's `403` comes first, so this shows when HTTPD let the request through: the profile is not defined (`HTTPD425W` at start) — step 8 — or the route stands after `/zosmf/*` and HTTPD's check is never made |
 | `/zosmf/restconsoles/…` answers `200` to a user the profile excludes | The usual causes: the route stands after `/zosmf/*` (check the order of the `HTTPD036I` lines at startup), or the profile is not loaded yet — reload it, step 8 |
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
 | `401` on a route showing `AUTH=NONE` | Not HTTPD's gate. mvsMF runs its own auth track on `/zosmf/*` — establish which layer answered before debugging HTTPD's |
