@@ -2619,8 +2619,8 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     if (!host)  host = "unknown";
 
     /* both come from the request; the page is HTML */
-    http_html_escape((UCHAR *)epath, sizeof(epath), (UCHAR *)path);
-    http_html_escape((UCHAR *)ehost, sizeof(ehost), (UCHAR *)host);
+    http_html_escape((UCHAR *)epath, sizeof(epath), (const UCHAR *)path);
+    http_html_escape((UCHAR *)ehost, sizeof(ehost), (const UCHAR *)host);
     
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 

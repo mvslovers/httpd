@@ -175,7 +175,7 @@ postdata:
                unauthenticated client gets its 401 and the connection closes. */
             {
                 const char *rpath = http_get_env(httpc, "REQUEST_PATH");
-                HTTPROUTE  *route = rpath ?
+                const HTTPROUTE *route = rpath ?
                     http_find_route(httpc->httpd, rpath) : NULL;
 
                 if (route && route->pgm) goto nodata;

@@ -21,7 +21,6 @@ int main(void)
     char          out[DM_ESC_MAX + 1];
     unsigned long v;
     int           ok;
-    int           i;
 
     printf("=== HTTPD /.dm helper tests ===\n");
 
@@ -65,7 +64,7 @@ int main(void)
 
     /* no replacement is longer than the documented maximum */
     ok = 1;
-    for (i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++) {
         char big[16];
         memset(big, 'G', sizeof(big));
         if (dmesc((unsigned char)i, big) > DM_ESC_MAX) ok = 0;

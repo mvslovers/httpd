@@ -29,9 +29,7 @@ static int fmt(char *dst, size_t size, const char *f, ...)
 
 static int guard_intact(const char *g)
 {
-    int i;
-
-    for (i = 0; i < GUARD; i++) {
+    for (int i = 0; i < GUARD; i++) {
         if (g[i] != 'G') return 0;
     }
     return 1;

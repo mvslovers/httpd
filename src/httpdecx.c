@@ -16,6 +16,23 @@ hexval(unsigned char c)
     return -1;
 }
 
+/* The byte for the escape at s ("%xx"), or -1 if s is not one we decode.
+   s[2] is read only when s[1] is a hex digit, so never past the NUL. */
+static int
+escbyte(const unsigned char *s, const unsigned char *atoe)
+{
+    int hi = hexval(s[1]);
+    int lo = hi < 0 ? -1 : hexval(s[2]);
+    int v;
+
+    if (lo < 0) return -1;
+
+    v = (hi << 4) | lo;
+    if (v == 0 || atoe[v] == 0) return -1;
+
+    return atoe[v];
+}
+
 unsigned char *
 httpdecx(unsigned char *str, const unsigned char *atoe, int plus)
 {
@@ -23,32 +40,19 @@ httpdecx(unsigned char *str, const unsigned char *atoe, int plus)
     unsigned char   *out    = str;
 
     while (*str) {
-        if (*str == '%') {
-            /* str[2] is read only when str[1] is a hex digit, so it is never
-               past the terminating NUL */
-            int hi = hexval(str[1]);
-            int lo = hi < 0 ? -1 : hexval(str[2]);
+        int c = (*str == '%') ? escbyte(str, atoe) : -1;
 
-            if (hi >= 0 && lo >= 0) {
-                int v = (hi << 4) | lo;
-
-                if (v != 0 && atoe[v] != 0) {
-                    *out++ = atoe[v];
-                    str += 3;
-                    continue;
-                }
-            }
-            *out++ = *str++;        /* not an escape we decode: keep the '%' */
-            continue;
+        if (c >= 0) {
+            *out++ = (unsigned char)c;
+            str += 3;
         }
-
-        if (plus && *str == '+') {
+        else if (plus && *str == '+') {
             *out++ = ' ';
             str++;
-            continue;
         }
-
-        *out++ = *str++;
+        else {
+            *out++ = *str++;        /* not an escape we decode: keep it */
+        }
     }
 
     *out = 0;
