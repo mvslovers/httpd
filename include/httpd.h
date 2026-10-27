@@ -608,6 +608,7 @@ extern int http_reset(HTTPC*)                                           asm("HTT
 extern int http_close(HTTPC*)                                           asm("HTTPCLOS");
 extern int http_send(HTTPC*,const UCHAR *,int)                          asm("HTTPSEND");
 extern UCHAR *http_decode(UCHAR*)                                       asm("HTTPDECO");
+extern UCHAR *http_decode_path(UCHAR*)                                  asm("HTTPDECP");
 extern int http_del_env(HTTPC *, const UCHAR *name)                     asm("HTTPDENV");
 extern unsigned http_find_env(HTTPC *, const UCHAR *name)               asm("HTTPFENV");
 extern int http_set_env(HTTPC *, const UCHAR *, const UCHAR *)          asm("HTTPSENV");

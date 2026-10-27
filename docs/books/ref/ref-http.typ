@@ -46,8 +46,8 @@ Every request passes the same stages, in this order.
 #idx("405 Method Not Allowed")
 #idx("501 Not Implemented")
 The server knows five methods: DELETE, GET, HEAD, POST and PUT. The comparison
-ignores case, so #cmd("get") is the same method as #cmd("GET"). Any other
-method gets a 405. The 405 is sent before the authentication check and before
+is case sensitive, as the method of an HTTP request is, so #cmd("get") is not
+the method #cmd("GET"). Any other method gets a 405. The 405 is sent before the authentication check and before
 the route lookup, so it is the same for every path. It carries no #cmd("Allow")
 header, the connection closes, and the body is #cmd("405 Method Not Allowed").
 
@@ -213,8 +213,10 @@ The server reads a body only for a POST. It handles the body this way.
 - If there is no #cmd("Content-Length"), or the length is 0, there is no body.
 - If the length is more than 3999, the answer is 413 Payload Too Large with the
   body #cmd("413 Payload Too Large"). The body is not read, and the connection
-  closes. This applies to routes with a program, too, because the check runs
-  before the route lookup.
+  closes. This does not apply to a route with a program: the server does not
+  read the body there either, and does not answer 413, but runs the module
+  after the authentication check. The module reads the body from the socket
+  itself, as it does for a PUT. The connection closes after the response.
 - Otherwise the server reads the body with one non-blocking read of at most
   #cmd("Content-Length") bytes. If this read fails, the server closes the
   connection without a response.
@@ -257,8 +259,8 @@ raw query string in #cmd("QUERY_STRING").
 
 *The path.* The server decodes the path and stores the result in
 #cmd("REQUEST_PATH"). The decoding turns each #cmd("%xx") into the character
-for that byte. It also turns a plus sign into a blank, in the path as well as
-in the query.
+for that byte. A plus sign stays a plus sign in the path. In the value of a
+query field it becomes a blank.
 
 *The query.* The server splits the query string at each ampersand. It splits
 each field at the first equal sign. The name is not decoded. The value is
@@ -268,11 +270,12 @@ decoded. A field without an equal sign gets an empty value.
 
 - The hexadecimal value of an escape goes through the code page table of the
   server (@ref-http-xlate).
-- An escape with a character that is not a hexadecimal digit gives the value 0.
-  That is the end of the string. So #cmd("%00") and #cmd("%zz") cut the path or
-  the value at that point.
-- A percent sign at the end of the text, without two characters behind it,
-  stays as it is.
+- A percent sign that is not followed by two hexadecimal digits stays as it is.
+  So #cmd("%zz") and a percent sign at the end of the text are kept in the
+  result.
+- An escape that gives the byte 0 stays as it is, too: #cmd("%00") does not cut
+  the path or the value, and no NUL character reaches #cmd("REQUEST_PATH") or
+  a #cmd("POST_") variable.
 
 *Escaping in output.* The server has one function that escapes text for HTML.
 It replaces the characters #cmd("&"), #cmd("<"), #cmd(">"), #cmd("\"") and
@@ -583,12 +586,6 @@ rules.
 #screen(raw(read("../ex/ug-static/dir-noslash.txt")))
 
 #screen(raw(read("../ex/ug-static/dir-noindex.txt")))
-
-#note[A GET for exactly #cmd("/abend"), in any case, does not serve a file. The
-static handler starts a program check (S0C1) in the worker task, as a test aid.
-The recovery of the worker catches it (message HTTPD062E), closes the
-connection, and the worker carries on. The check runs after the authentication
-check, so a route with #cmd("AUTH=") for #cmd("/abend") protects it.]
 
 === MIME types <ref-http-mime>
 

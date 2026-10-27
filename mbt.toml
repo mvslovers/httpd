@@ -292,6 +292,24 @@ host = false          # httpd.h + libufs -> MVS-only (test-mvs)
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
 
+# dbgtitle() bounded title formatter behind dbgdump/dbgenter/dbgexit (issue
+# #394).  Free of httpd.h: DUAL.
+[test.TSTDBGT]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstdbgt.c", "src/dbgtitle.c"]
+
+# dmchunk()/dmesc(), the pure helpers of the /.dm memory display (issue #394).
+# Free of httpd.h: DUAL.
+[test.TSTDMCHK]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstdmchk.c", "src/dmchunk.c"]
+
+# httpdecx() percent decoder behind http_decode() and the path decoder (issue
+# #394).  Free of httpd.h: DUAL.
+[test.TSTDECX]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstdecx.c", "src/httpdecx.c"]
+
 # Pure SSI helpers (#401): where a long line is held back so a split directive
 # is still found, and the HTML escaping of printenv/echo output.  Free of
 # httpd.h -> DUAL; httpssi.c calls httpesc(), so both sources are listed for

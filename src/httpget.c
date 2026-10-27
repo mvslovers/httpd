@@ -43,10 +43,6 @@ httpget(HTTPC *httpc)
         goto quit;
     }
 
-    if (http_cmp(path, "/abend")==0) {
-        __asm__("DC\tH'0'");
-    }
-
     /* try to open path from UFS */
     mime = http_mime(path);
     open_path = path;

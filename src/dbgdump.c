@@ -2,6 +2,7 @@
 **
 */
 #include "httpd.h"
+#include "dbgtitle.h"
 
 __asm__("\n&FUNC    SETC 'dump'");
 static void
@@ -73,7 +74,7 @@ dbgdump(void *buf, int len, const char *fmt, ...)
     if (fp) {
         dbgtime(NULL);
         va_start(list, fmt);
-        vsprintf(title, fmt, list);
+        dbgtitle(title, sizeof(title), fmt, list);
         va_end(list);
 
         dump(fp, title, buf, len, 16);

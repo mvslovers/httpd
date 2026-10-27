@@ -736,7 +736,7 @@ storage and unwritable on an APF/LNKLST fetch, issue #197.)
   here; the httpd-side S3 sanitiser is covered by `TSTSAFE`.)*
 
 **Hard to unit-test (integration / MVS-only) — verify behaviourally, not with mbtcheck**
-- **M1** abend recovery — drive via `GET /abend` (`httpget.c:36`); confirm the
+- **M1** abend recovery — drive via the ABEND0C1 module (route `MOD=ABEND0C1 /.abend`); confirm the
   worker survives (`HTTPD062E`) and FD / worker / `busy` counts stay flat.
 - Socket/keep-alive framing, CGI dispatch, SSI, auth — covered by the mvsMF
   `curl-*.sh` scripts against a live server.

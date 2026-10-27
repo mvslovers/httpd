@@ -35,9 +35,13 @@ This test observes the symptom in httpd's own address space.
 Which shutdown path the run exercises:
 
 - **`abend`** (default) — `ABEND_HITS` requests to `ABEND_PATH` (default
-  `/abend`, whose handler executes `DC H'0'` → S0C1). Handlers fault *fast*, so
-  this drives libc370's **recovery-drain** path. Proof-of-scenario is a fault
-  marker (`HTTPD062E` / `MVSMF99E`) in the window.
+  `/.abend`, the `ABEND0C1` module, which allocates and executes `DC H'0'` →
+  S0C1; needs the Parmlib route `MOD=ABEND0C1 /.abend AUTH=BASIC` of
+  `samplib/httpprm0` and `HTTPD_AUTH`). Handlers fault *fast*, so
+  this drives libc370's **recovery-drain** path. `ABEND0C1` exercises the
+  **module path** (`HTTPD908E`, response 503), not the worker path
+  (`HTTPD062E`). Proof-of-scenario is a fault marker (`HTTPD908E` /
+  `HTTPD062E` / `MVSMF99E`) in the window.
 - **`longpoll`** — launches `LONGPOLL_N` (default 4) concurrent, blocking
   long-poll requests (`LONGPOLL_CMD`) and checks that at least one is *still in
   flight* `LONGPOLL_SETTLE` s later, then issues `P HTTPD` while they are parked.
@@ -99,7 +103,7 @@ already returned (no worker parked → INCONCLUSIVE, not a real reproduction).
   `HTTPD002I` / `HTTPD060I` worker-shutdown WTOs corroborate a clean drain but do
   **not** gate the result; a PASS with none of them present emits a CAUTION.
 - **INCONCLUSIVE** — either the intended scenario didn't run (in `abend`, no
-  fault marker `HTTPD062E` / `MVSMF99E`; in `longpoll`, no long-poll still in
+  fault marker `HTTPD908E` / `HTTPD062E` / `MVSMF99E`; in `longpoll`, no long-poll still in
   flight at `P HTTPD`), or no crash/abnormal signature yet the address-space end
   was not captured (`$HASP395 ... ENDED` / `IEF404I` both absent — a truncated
   log looks the same as a clean end). Fix the provocation or extend the capture
@@ -137,15 +141,32 @@ after the fix. Do not remove it.
 
 ### Fault marker
 
-Proof that a handler faulted is `HTTPD062E` **or** `MVSMF99E`:
+Proof that a handler faulted is `HTTPD908E`, `HTTPD062E` **or** `MVSMF99E`:
 
-- `HTTPD062E` — a **core** abend caught by the worker's `try(serve_client)`
-  (`src/httpd.c`). This is what `/abend` produces.
-- `MVSMF99E` — an **mvsMF CGI** abend caught by mvsMF's inner ESTAE; the
-  worker `try()` then returns 0, so `HTTPD062E` does not fire.
+- `HTTPD908E` — an external module failed and httpd answered 503. This is what
+  the `ABEND0C1` module produces, so the default `abend` run tests the
+  **module path**, not the worker path.
+- `HTTPD062E` — a **core** abend caught by the worker's ESTAE around
+  `try(serve_client)` (`src/httpd.c`). `ABEND0C1` does **not** produce it, and
+  the default build has no core probe any more (the built-in `/abend` hook was
+  removed in #394).
+- `MVSMF99E` — an **mvsMF** handler abend caught by mvsMF's inner ESTAE; the
+  outer `try()` then returns 0, so neither `HTTPD908E` nor `HTTPD062E` fires.
 
-Accepting either keeps the test valid whether `ABEND_PATH` is a core path or a
-CGI endpoint.
+Accepting all three keeps the test valid whichever endpoint `ABEND_PATH` names.
+
+#### Why there is no separate core-path probe
+
+A module is linked into the worker's own task, so an `ABEND0C1` request abends
+inside the worker thread and is caught by the ESTAE that `http_link()` sets up
+there (`src/httppcgi.c` then logs `HTTPD908E`). The abend, the recovery and the
+worker's return to its pool are real; what differs from the worker path is only
+which ESTAE catches it (the link ESTAE instead of the one around
+`try(serve_client)`). A core probe would need a debug-only hook in the request
+path, which is exactly what #394 removed from the server, so the run is not
+extended with one. If a regression ever shows up
+only on the `HTTPD062E` path, add a dedicated test module rather than a hook in
+the core.
 
 ### Issuing `P HTTPD` and capturing the console log (adapters)
 
@@ -172,9 +193,9 @@ Environment variables (or a sourced `.env`):
 |---|---|---|
 | `HTTPD_HOST` | `MBT_MVS_HOST` or `127.0.0.1` | host serving the HTTPD listener |
 | `HTTPD_PORT` | `8080` | HTTPD listener port |
-| `ABEND_PATH` | `/abend` | path whose handler faults |
+| `ABEND_PATH` | `/.abend` | path whose handler faults |
 | `ABEND_HITS` | `12` | number of provocation requests |
-| `FAULT_MARK` | `HTTPD062E\|MVSMF99E` | proof-of-fault regex |
+| `FAULT_MARK` | `HTTPD908E\|HTTPD062E\|MVSMF99E` | proof-of-fault regex |
 | `HTTPD_AUTH` | (unset) | `user:pass` if `LOGIN` gates GET |
 | `WAIT_SECS` | `120` | max wait for the AS to end |
 | `JOBNAME` | `HTTPD` | MVS jobname of the HTTPD STC (scopes the end-capture assertion) |

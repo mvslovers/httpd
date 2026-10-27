@@ -29,12 +29,17 @@
 #      records the byte offset of CONSOLE_LOG immediately before provoking and
 #      asserts ONLY over bytes appended after that point. Do not remove this.
 #
-#   2. FAULT MARKER. Proof-of-fault is HTTPD062E *or* MVSMF99E. httpd emits
-#      HTTPD062E for a CORE abend caught by the worker's try(serve_client)
-#      (httpd.c:682) — this is what /abend produces. An mvsMF CGI abend is
-#      caught by mvsMF's inner ESTAE instead and logs MVSMF99E, so the worker
-#      try() returns 0 and HTTPD062E never fires. Accepting either keeps the
-#      test valid whether ABEND_PATH is core (/abend) or a CGI endpoint.
+#   2. FAULT MARKER. Proof-of-fault is HTTPD908E, HTTPD062E or MVSMF99E:
+#        HTTPD908E  an external module (CGI) failed and httpd answered 503.
+#                   This is what the ABEND0C1 module produces: it tests the
+#                   MODULE path, not the worker path.
+#        HTTPD062E  a CORE abend caught by the worker's ESTAE around
+#                   try(serve_client) (httpd.c). Nothing in the default
+#                   build provokes it (the built-in /abend hook is gone, #394).
+#        MVSMF99E   an mvsMF handler abend caught by mvsMF's inner ESTAE; the
+#                   outer try() returns 0, so neither of the above fires.
+#      Accepting all three keeps the test valid whichever endpoint ABEND_PATH
+#      names. A marker count of 0 makes the run INCONCLUSIVE, never a PASS.
 #
 #   3. ABNORMAL ADDRESS-SPACE END. A clean in-flight run (no S33E/__CRTGET/SVC
 #      dump) is NOT enough. After the 2026-07-23 recovery-exit relink the
@@ -78,9 +83,11 @@
 # ---------------------------------------------------------------------------
 #   HTTPD_HOST     host serving the HTTPD listener        (default: MBT_MVS_HOST or 127.0.0.1)
 #   HTTPD_PORT     HTTPD listener port to attack + poll   (default: 8080)
-#   ABEND_PATH     path whose handler faults              (default: /abend)
+#   ABEND_PATH     path whose handler faults              (default: /.abend)
+#                  needs the Parmlib route  MOD=ABEND0C1 /.abend  AUTH=BASIC
+#                  (samplib/httpprm0, commented out) and HTTPD_AUTH
 #   ABEND_HITS     how many times to hit it (poison pool) (default: 12)
-#   FAULT_MARK     regex proving a handler faulted        (default: HTTPD062E|MVSMF99E)
+#   FAULT_MARK     regex proving a handler faulted        (default: HTTPD908E|HTTPD062E|MVSMF99E)
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
 #   WAIT_SECS      max seconds to wait for the AS to end   (default: 120)
 #   JOBNAME        MVS jobname of the HTTPD started task   (default: HTTPD)
@@ -126,9 +133,9 @@ fi
 
 HTTPD_HOST=${HTTPD_HOST:-${MBT_MVS_HOST:-127.0.0.1}}
 HTTPD_PORT=${HTTPD_PORT:-8080}
-ABEND_PATH=${ABEND_PATH:-/abend}
+ABEND_PATH=${ABEND_PATH:-/.abend}
 ABEND_HITS=${ABEND_HITS:-12}
-FAULT_MARK=${FAULT_MARK:-HTTPD062E|MVSMF99E}
+FAULT_MARK=${FAULT_MARK:-HTTPD908E|HTTPD062E|MVSMF99E}
 WAIT_SECS=${WAIT_SECS:-120}
 STOP_ADAPTER=${STOP_ADAPTER:-manual}
 JOBNAME=${JOBNAME:-HTTPD}
@@ -245,7 +252,7 @@ echo
 window=$(mktemp 2>/dev/null || echo "/tmp/httpd122.$$")
 tail -c +"$((log_offset + 1))" "$CONSOLE_LOG" > "$window" 2>/dev/null || cp "$CONSOLE_LOG" "$window"
 
-# proof the provocation actually faulted a worker — HTTPD062E (core) or MVSMF99E (CGI)
+# proof the provocation actually faulted a worker — HTTPD908E (module, ABEND0C1), HTTPD062E (core) or MVSMF99E (mvsMF)
 faultmarks=$(grep -Ec "$FAULT_MARK" "$window" 2>/dev/null || true)
 # in-flight crash signatures from #122
 s33e=$(grep -c "S33E" "$window" 2>/dev/null || true)

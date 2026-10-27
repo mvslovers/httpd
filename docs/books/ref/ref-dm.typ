@@ -115,9 +115,7 @@ first one that fits. The order is #cmd("FILE"), #cmd("FS"), #cmd("MGR"),
 #cmd("MOD"), #cmd("HTTPD"), #cmd("TASK"), #cmd("WORKERS"). So #cmd("target=M")
 is #cmd("MGR"), #cmd("target=MO") is #cmd("MOD"), and #cmd("target=F") is
 #cmd("FILE"). A value that fits none of the names gives the help page
-(@ref-dm-dsrv-help). The help page also lists the targets #cmd("UFSDISKS"),
-#cmd("UFSIO"), #cmd("UFSPAGERS"), #cmd("UFSSB") and #cmd("UFSVDISK"). These
-five are not available. A request for one of them shows the help page again.
+(@ref-dm-dsrv-help). The help page lists only the targets of this table.
 
 === Targets <ref-dm-dsrv-tgt>
 
@@ -276,8 +274,8 @@ a path (@ref-route).
 
 The target shows the thread manager of the worker pool. It does not take an
 address: it ignores #cmd("m") and uses the manager of the server. The page
-prints #cmd("Invalid Eye Catcher") if the block is not a manager. (The help
-page says that the target needs an address. That is not so.)
+prints #cmd("Invalid Eye Catcher") if the block is not a manager. The help page
+says the same: the target takes no address.
 
 The fields are the task of the manager (with a link to the target #cmd("TASK")),
 the wait flag, the function that the workers run, the user data pointer, the
@@ -341,7 +339,7 @@ response.
 
 A value of #cmd("target") that matches no name gives the page "HTTPDSRV Help".
 It has the status 200, shows the usage line with the host and the path of the
-request, and lists the targets.
+request, and lists the targets. The host and the path are escaped for HTML.
 
 == HTTPDM, the Memory Display <ref-dm-dm>
 
@@ -360,8 +358,9 @@ HTTPDM takes the first name that is present from each row of the table.
   #table(columns: (1.5in, 0.8in, 1fr),
     [Parameter], [Default], [Meaning],
     [#cmd("title"), #cmd("t")], [none], [A title that is printed in the first
-      line of the dump. The text is put into the page as it is, without
-      escaping.],
+      line of the dump. In the HTML form the module escapes #cmd("<"),
+      #cmd(">"), #cmd("&"), #cmd("\"") and #cmd("'"), and the escaped title is cut
+      after 255 characters. With #cmd("d") other than 0 it is written as it is.],
     [#cmd("memory"), #cmd("mem"), #cmd("m")], [0], [The address to dump, in
       hexadecimal. HTTPDM keeps the low 24 bits of the value.],
     [#cmd("length"), #cmd("len"), #cmd("l")], [256], [The number of bytes to
@@ -376,10 +375,9 @@ HTTPDM takes the first name that is present from each row of the table.
   )
 ]
 
-The rule for #cmd("chunk"): HTTPDM rounds the number up to a multiple of 4 and
-limits it to 64. A number that is 0 after the rounding gives 16. The rounding
-uses the low byte of the number only, so a number of 253 or more wraps around
-and may give 16 instead of 64. Use a value from 4 to 64.
+The rule for #cmd("chunk"): a number of 0 gives 16. A number above 64 gives 64.
+Any other number is rounded up to a multiple of 4. So 1 to 4 give 4, 5 to 8
+give 8, and 61 to 64 give 64.
 
 === Output <ref-dm-dm-out>
 
@@ -406,8 +404,8 @@ In the HTML form every group of four bytes is a link. The link dumps the
 storage to which the four bytes point, with the same length, chunk size and
 data parameters. The link has the form
 #cmd("?m=address&l=length&c=chunk&d=data"). So you follow a chain of pointers
-with a click. In the character column the characters #cmd("<") and #cmd(">")
-are written as HTML entities.
+with a click. In the character column the characters #cmd("<"), #cmd(">") and
+#cmd("&") are written as HTML entities.
 
 An address that the task cannot read gives, in the HTML form, the line
 #cmd("ABEND S0C4 occured for DISPLAY MEMORY 0x...") in place of the rest of the
@@ -421,8 +419,8 @@ simply stops.
 - The largest dump is 4096 bytes per request.
 - HTTPDM keeps the low 24 bits of the address, because the system uses 24-bit
   addresses. The form always shows the address that the module used.
-- The title is not escaped. Anyone who can set the URL can put markup into the
-  page. For that reason the route belongs behind a login (@ref-dm-setup).
+- The route belongs behind a login (@ref-dm-setup), because the dump shows
+  storage of the server.
 - The dump can reach any storage of the server address space that the task may
   read. That may include data that the server holds for its users, such as
   cached credentials.

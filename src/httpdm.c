@@ -1,6 +1,7 @@
 /* HTTPDM.C - CGI Program, Display Memory */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "dmchunk.h"
 
 /* C stack for this load module; the @@crt0 default demands 256 KB of
 ** contiguous subpool 0 per request.  Must live in the module's own TU,
@@ -36,6 +37,7 @@ int main(int argc, char **argv)
     char        *length = NULL;
     char        *chunk  = NULL;
     char        *data   = NULL;
+    char        etitle[256];
     (void)argc;
 
     if (!httpd) {
@@ -75,17 +77,20 @@ int main(int argc, char **argv)
     if (!chunk) chunk = http_get_env(httpc, "QUERY_C");
     if (!chunk) chunk = http_get_env(httpc, "QUERY_S");
     if (!chunk) chunk = "16";
-    options.size = (int) strtoul(chunk, NULL, 0);
-
-    /* sanity check */
-    options.size = (options.size+3) & 0xFC; /* round to full word */
-    if (options.size <= 0)  options.size = 16;
-    if (options.size > 64)  options.size = 64;
+    options.size = dmchunk(strtoul(chunk, NULL, 0));
 
     if (!data) data = http_get_env(httpc, "QUERY_DATA");
     if (!data) data = http_get_env(httpc, "QUERY_D");
     if (!data) data = "0";
     options.data = (int) strtoul(data, NULL, 0);
+
+    /* The title comes from the URL and goes into the page twice, once as an
+       attribute value and once as text: escape it.  A text/plain dump
+       (data=1) is not parsed as markup and gets it as sent. */
+    if (!options.data && title[0]) {
+        http_html_escape((UCHAR *)etitle, sizeof(etitle), (UCHAR *)title);
+        options.title = etitle;
+    }
 
     display_memory(httpd, httpc, &options);
 
@@ -199,7 +204,7 @@ try_memory(HTTPD *httpd, HTTPC *httpc, OPTIONS *options)
     unsigned        addr    = 0;
     unsigned char   *area   = (unsigned char*)options->mem;
     unsigned char   e;
-    char            eChar[256];
+    char            eChar[DM_CHUNK_MAX * DM_ESC_MAX + 1];
 
     if (options->title && options->title[0]) {
         http_printf(httpc, "Dump of %s %08X (%d byte chunks) (%d bytes total)\n",
@@ -247,20 +252,11 @@ try_memory(HTTPD *httpd, HTTPC *httpc, OPTIONS *options)
         e = isgraph(*area) ? *area : *area==' ' ? ' ' : '.';
 
         if (options->data) {
-            ie += sprintf(&eChar[ie],"%c", e);
+            eChar[ie++] = e;
+            eChar[ie] = 0;
         }
         else {
-            switch(e) {
-            case '<':
-                ie += sprintf(&eChar[ie], "&lt;");
-                break;
-            case '>':
-                ie += sprintf(&eChar[ie], "&gt;");
-                break;
-            default:
-                ie += sprintf(&eChar[ie],"%c", e);
-                break;
-            }
+            ie += dmesc(e, &eChar[ie]);
         }
 
         area++;
