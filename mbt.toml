@@ -298,6 +298,12 @@ sources = ["test/tstbody.c", "src/httpbody.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstlkrc.c", "src/httplkrc.c"]
 
+# mttline(), the pure helper of the /.dmtt Master Trace Table display (issue
+# #426).  Escapes through httpesc(); free of httpd.h: DUAL.
+[test.TSTMTTL]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstmttl.c", "src/mttline.c", "src/httpesc.c"]
+
 # httpgive() is the flood guard in front of the console message written when
 # send_raw_all() abandons a stalled client (issue #347).  Free of httpd.h ->
 # DUAL (host + MVS); helper source listed for the host link.
