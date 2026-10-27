@@ -7,6 +7,18 @@
 /* httpesc() lives in httpesc.c (HTTPESC) */
 extern unsigned char *httpesc(unsigned char *, size_t, const unsigned char *);
 
+#define SSI_NONE ((size_t)-1)
+
+/* offset of the first occurrence of pat[0..n) in buf[from..len), or SSI_NONE */
+static size_t
+ssifind(const char *buf, size_t len, size_t from, const char *pat, size_t n)
+{
+    size_t  i = from;
+
+    while (i + n <= len && memcmp(&buf[i], pat, n) != 0) i++;
+    return (i + n <= len) ? i : SSI_NONE;
+}
+
 size_t
 httpssih(const char *buf, size_t len, size_t max)
 {
@@ -19,32 +31,27 @@ httpssih(const char *buf, size_t len, size_t max)
 
     /* walk the directives the way ssi_file_read() finds them: a start, then
        the first " -->" after it */
-    while (pos + 5 <= len) {
-        for (i = pos; i + 5 <= len; i++) {
-            if (memcmp(&buf[i], start, 5) == 0) break;
-        }
-        if (i + 5 > len) break;
-
-        for (k = i + 5; k + 4 <= len; k++) {
-            if (memcmp(&buf[k], stop, 4) == 0) break;
-        }
-        if (k + 4 > len) {
+    i = ssifind(buf, len, pos, start, 5);
+    while (i != SSI_NONE) {
+        k = ssifind(buf, len, i + 5, stop, 4);
+        if (k == SSI_NONE) {
             /* no end in this piece */
             hold = i;
-            goto limit;
+            i = SSI_NONE;
+        } else {
+            pos = k + 4;
+            i = ssifind(buf, len, pos, start, 5);
         }
-        pos = k + 4;
     }
 
     /* the piece may end in the first part of a start */
-    for (k = 4; k > 0; k--) {
-        if (len - pos >= k && memcmp(&buf[len - k], start, k) == 0) {
-            hold = len - k;
-            break;
+    if (hold == len) {
+        for (k = 4; k > 0 && hold == len; k--) {
+            if (len - pos >= k && memcmp(&buf[len - k], start, k) == 0)
+                hold = len - k;
         }
     }
 
-limit:
     if (len - hold > max) hold = len;
     return hold;
 }

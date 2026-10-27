@@ -298,8 +298,6 @@ readmore:
 	len = (int)hold;
 
 again:
-	// wtodumpf(cur, len, "%s: again", __func__);
-
 	/* look for start of Server Side Include */
 	ssilen = 0;
 	end = NULL;
@@ -538,15 +536,13 @@ quit:
 static int 
 ssi_printenv(HTTPC *httpc)
 {
-    HTTPV       *v      = NULL;
     unsigned    count   = array_count(&httpc->env);
-    unsigned    n;
     
     ssi_printf(httpc, "\n<h3>Server Variables</h3>\n");
     ssi_printf(httpc, "\n<table>\n");
     ssi_printf(httpc, " <tr><th>Variable</th><th>Value</th></tr>\n");
-    for(n=0; n<count; n++) {
-        v = httpc->env[n];
+    for(unsigned n=0; n<count; n++) {
+        const HTTPV *v = httpc->env[n];
 
         ssi_printf(httpc, " <tr><td>");
         ssi_text(httpc, v->name);

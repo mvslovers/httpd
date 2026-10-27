@@ -69,10 +69,9 @@ fake_xlate(unsigned char *buf, int len, const unsigned char *tbl)
 static UCHAR *
 fake_get_env(HTTPC *httpc, const UCHAR *name)
 {
-    unsigned n;
     unsigned count = array_count(&httpc->env);
 
-    for (n = 0; n < count; n++) {
+    for (unsigned n = 0; n < count; n++) {
         if (strcmp(httpc->env[n]->name, (const char *)name) == 0)
             return (UCHAR *)httpc->env[n]->value;
     }
