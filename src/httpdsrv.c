@@ -2609,23 +2609,29 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     int         rc;
     const char  *path   = NULL;
     const char  *host   = NULL;
+    char        epath[256];
+    char        ehost[128];
     
     if (!path)  path = http_get_env(httpc, "REQUEST_PATH");
     if (!path)  path = "unknown";
     
     if (!host)  host = http_get_env(httpc, "HTTP_HOST");
     if (!host)  host = "unknown";
+
+    /* both come from the request; the page is HTML */
+    http_html_escape((UCHAR *)epath, sizeof(epath), (UCHAR *)path);
+    http_html_escape((UCHAR *)ehost, sizeof(ehost), (UCHAR *)host);
     
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>HTTPDSRV Help</h2>\n");
-    http_printf(httpc, "<h3>Usage: http:/%s%s?target=name[&m=nnnnnnnn]</h3>\n", host, path);
+    http_printf(httpc, "<h3>Usage: http://%s%s?target=name[&amp;m=nnnnnnnn]</h3>\n", ehost, epath);
     http_printf(httpc, "<p>This module uses the QUERY variable "
         "\"target\" value to control which HTTPD storage area to display.<p>\n");
 
     http_printf(httpc, "<dl>\n");
 
-    http_printf(httpc, "<dt>?target=HTTPD</td>\n");
+    http_printf(httpc, "<dt>?target=HTTPD</dt>\n");
     http_printf(httpc, "<dd>Display the HTTPD storage areas. "
         "This is the default if ?target is omitted.</dd><br/>\n");
 
@@ -2638,8 +2644,9 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     http_printf(httpc, "<dt>?target=HELP</dt>\n");
     http_printf(httpc, "<dd>Display this help text.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=MGR&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the Thread Manager Handle at the memory address.</dd><br/>\n");
+    http_printf(httpc, "<dt>?target=MGR</dt>\n");
+    http_printf(httpc, "<dd>Display the Thread Manager of this server. "
+        "It takes no address.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=MOD&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the route array (MOD= programs and LOC= static "
@@ -2647,21 +2654,6 @@ display_help(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc, "<dt>?target=TASK&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Task Handle at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSDISKS&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Disk Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSIO&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Input / Output Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSPAGERS&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Pagers Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSSB&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Super Block at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSVDISK&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Virtual Disk Array at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=WORKERS&m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Manager Workers Array at the memory address.</dd><br/>\n");
