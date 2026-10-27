@@ -28,6 +28,12 @@ kind = "application"
 # changes how MVCK/MVCP/MVCS assemble.  Both are drop-ins, and 1.6.3 is what
 # the release is built and tested with.
 #
+# libc370 2.26.0: abendrpt() takes ABRPT_QUIET_TERM (mvslovers/libc370#712), and
+# __linkds() and __linkdsx() use it themselves (#714).  The three
+# abendrpt(ESTAE_CREATE, ...) calls in httpd.c set it, so cancelling a busy
+# server no longer writes one "cleanup only" console line per task (#258).  A
+# pin below 2.26.0 does not build: the flag is not declared.
+#
 # libc370 2.25.1: send() passes at most 256 bytes to the emulator and returns
 # that short count (mvslovers/libc370#160, 2.24.0); send_raw() and send_all()
 # already loop until the whole buffer is out, so nothing changes but the number
@@ -92,7 +98,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.3"
-libc370 = "2.25.1"
+libc370 = "2.26.0"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials

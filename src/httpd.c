@@ -397,7 +397,7 @@ initialize(int argc, char **argv)
     const char			*stcgroup	= HTTPD_STC_GROUP;
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
 	/* look for "CONFIG=", "STCUSER=" and "STCGROUP=" parms.
 	**
@@ -947,7 +947,7 @@ socket_thread(void *arg1, void *arg2)
          task ? task->stacksize : 0);
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
     if (task) httpd->sockstate = HTTP_THRD_RUNNING;
 
@@ -1186,7 +1186,7 @@ worker_thread(void *udata, CTHDWORK *work)
     http_enter("worker_thread()\n");
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
     sprintf(name, "WORKER(%06X)", (unsigned)work);
     wtof(MSG_THREAD_START, name, (unsigned)tcb, (unsigned)task, task ? task->stacksize : 0);
