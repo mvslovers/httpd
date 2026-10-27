@@ -3,6 +3,8 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "httpgive.h"
+#include <time.h>      /* time() */
 
 typedef enum sstate     SSTATE;
 enum sstate {
@@ -13,8 +15,9 @@ enum sstate {
 };
 
 /* forward reference static function prototypes */
-static int ufs_read_failed(HTTPC *httpc);
-static int ssi_file_read(HTTPC *httpc);
+static int file_send(HTTPC *httpc, int binary, const char *path);
+static int ufs_read_failed(HTTPC *httpc, const char *path);
+static int ssi_file_read(HTTPC *httpc, const char *path);
 static int ssi_process(HTTPC *httpc, char *ssi);
 static int ssi_echo(HTTPC *httpc, char *next);
 static int ssi_include(HTTPC *httpc, char *next);
@@ -40,12 +43,20 @@ static int ssi_buffer(HTTPC *httpc, const char *buf, int len);
 int
 http_send_file(HTTPC *httpc, int binary)
 {
+    return file_send(httpc, binary, NULL);
+}
+
+/* path names the file being read for HTTPD045E; NULL is the requested
+ * page, a path is a file pulled in by <!--#include --> */
+static int
+file_send(HTTPC *httpc, int binary, const char *path)
+{
     int     rc  = 0;
     int     len = 0;
     int     avail;
 
 	if (httpc->ssi) {
-		ssi_file_read(httpc);
+		ssi_file_read(httpc, path);
 		if (httpc->substate == SSTATE_ERROR) return rc;
 		goto sendit;
 	}
@@ -67,7 +78,7 @@ http_send_file(HTTPC *httpc, int binary)
             /* ufs_fread() returns what it got before the error, or 0
              * with neither EOF nor progress: either is a failed read,
              * whatever len says */
-            if (httpc->ufp && ufs_read_failed(httpc)) return rc;
+            if (httpc->ufp && ufs_read_failed(httpc, path)) return rc;
 
             if (len>0) {
                 /* we read some data */
@@ -151,15 +162,29 @@ sendit:
  * serve_client() reported the stall as HTTPD901E, a client fault, 1000
  * passes later (#263).  Returns 1 when the file has failed. */
 static int
-ufs_read_failed(HTTPC *httpc)
+ufs_read_failed(HTTPC *httpc, const char *path)
 {
+    HTTPD   *httpd  = httpc->httpd;
     int     err     = ufs_ferror(httpc->ufp);
-    UCHAR   *path;
+    unsigned held   = 0;
+    int     report;
+    int     lockrc;
 
     if (!err) return 0;
 
-    path = http_get_env(httpc, "REQUEST_PATH");
-    wtof(MSG_UFS_READ_ERROR, err, path ? (char *)path : "");
+    if (!path) path = (const char *)http_get_env(httpc, "REQUEST_PATH");
+
+    /* One line per READERR_INTERVAL: a file on a failing volume that is
+     * requested again and again must not flood the console.  The counters
+     * sit in the HTTPD block, not in a static (the module may be key 0),
+     * and are guarded like the give-up counters in httpsend.c. */
+    lockrc = lock(&httpd->readerr_last, LOCK_EXC);
+    report = httpgive(&httpd->readerr_last, &httpd->readerr_held,
+                      (unsigned)time(NULL), READERR_INTERVAL, &held);
+    if (lockrc == 0) unlock(&httpd->readerr_last, LOCK_EXC);
+
+    if (report)
+        wtof(MSG_UFS_READ_ERROR, err, path ? path : "", held);
 
     httpc->chunked   = 0;
     httpc->keepalive = 0;
@@ -171,7 +196,7 @@ ufs_read_failed(HTTPC *httpc)
 }
 
 static int
-ssi_file_read(HTTPC *httpc) 
+ssi_file_read(HTTPC *httpc, const char *path)
 {
     int     len 	= 0;
     int		ssilen  = 0;
@@ -288,7 +313,7 @@ checkeof:
 		}
 	}
 	else if (httpc->ufp) {
-		if (ufs_read_failed(httpc)) goto quit;
+		if (ufs_read_failed(httpc, path)) goto quit;
 		if (ufs_feof(httpc->ufp)) {
 			httpc->substate = SSTATE_EOF;
 		}
@@ -522,6 +547,10 @@ ssi_include(HTTPC *httpc, char *next)
     int			failed		= 0;
     char		uri[UFS_PATH_MAX];
 
+	/* an earlier include on this line already failed the response: it is
+	 * unframed now, so nothing more may be written into it */
+	if (httpc->substate == SSTATE_ERROR) return 0;
+
 	// wtof("%s: enter next=\"%s\"", __func__, next);
 
 	httpc->fp	= NULL;
@@ -581,7 +610,7 @@ ssi_include(HTTPC *httpc, char *next)
 	
 	/* processing the file */
 	while(httpc->state != CSTATE_DONE) {
-		http_send_file(httpc, 0);
+		file_send(httpc, 0, uri);
 	}
 	failed = (httpc->substate == SSTATE_ERROR);
 	

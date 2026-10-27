@@ -168,7 +168,7 @@ code is the test and the sequence is not.
 | `HTTPD040I` | `WAITING FOR SOCKET THREAD TO TERMINATE (n)` | Normal during shutdown, up to ten times, one per second. |
 | `HTTPD041I` | `FORCE DETACHING SOCKET THREAD` | The socket thread did not end within ten seconds and was detached. Worth reporting with the surrounding log. |
 | `HTTPD044W` | `UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not up, or `libufs` could not reach it. CGI routes still work; static files do not. |
-| `HTTPD045E` | `UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD failed a read while a file was being sent. `n` is the return code UFSD gave (`52` is an I/O error). `path` is the path of the request as the client asked for it, cut at 40 characters; for a file pulled in by a server-side include it is still the path of the page that was requested. Not a client fault and not a server bug: look at UFSD and the volume behind the file system. The response is abandoned and the connection is closed; what the client sees is under *A UFS read error on the wire* below. Before 4.4.0 the same fault ended as `HTTPD901E` after a thousand passes, with the worker spinning until then. |
+| `HTTPD045E` | `UFS READ ERROR RC=n, RESPONSE ABORTED: path, s SUPPRESSED` | UFSD failed a read while a file was being sent. `n` is the return code UFSD gave (`52` is an I/O error). `path` is the path of the request as the client asked for it, cut at 40 characters; for a file pulled in by a server-side include it is the path as written in the `include` directive, so the line names the file that failed and not the page that included it. `s` is how many such errors were held back since the previous `HTTPD045E` (see *A UFS read error on the wire* below). Not a client fault and not a server bug: look at UFSD and the volume behind the file system. The response is abandoned and the connection is closed; what the client sees is under *A UFS read error on the wire* below. Before 4.4.0 the same fault ended as `HTTPD901E` after a thousand passes, with the worker spinning until then. |
 | `HTTPD047E` | `UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC=n` | No credential can be sealed, so form login and session cookies are dead. Basic auth still works. |
 | `HTTPD050E` | `MAXSOCK IS ZERO, THE LISTENER IS IN AN INVALID STATE` | Internal: `select()` was handed an empty descriptor set. The socket thread ends. |
 | `HTTPD051E` | `SELECTEX() FAILED, RC=n ERRNO=e` | The accept loop cannot continue and the socket thread ends. The server must be restarted. |
@@ -207,6 +207,17 @@ What the client can tell depends on how the body was framed:
 The request is not counted as an error: where SMF writes a record for it, the
 record carries `resp_code` 200, and the server's error total does not change.
 `HTTPD045E` is the only sign on the server side that the response failed.
+
+`HTTPD045E` is written **at most once every 60 seconds**. A file on a failing
+volume that clients keep requesting would otherwise write a console line per
+request. The first error after a quiet minute is reported at once; any others
+inside the next 60 seconds are only counted, and the next `HTTPD045E` carries
+the count in its `s SUPPRESSED` field (`0` when nothing was held back). Every
+request is still aborted as described above; only the console line is rationed.
+If the errors stop, the count stays unreported until the next one.
+
+When a page has two or more server-side includes on one line and the first one
+fails to read, the later ones are not opened.
 
 ### Abandoned clients and the flood guard
 
