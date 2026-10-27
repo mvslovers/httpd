@@ -704,7 +704,9 @@ The six functions write to the debug file of the server, the DD #cmd("HTTPDBG").
 The server opens the file only if the keyword #cmd("DEBUG") is on (see
 @ref-prm). If it is off, the functions write nothing. If the file cannot be
 opened, the server writes #cmd("HTTPD020E") and the output goes to
-#cmd("stderr").
+#cmd("stderr"). If a write fails, the server writes #cmd("HTTPD039W") once and
+switches the debug output off until the next start. From then on the functions
+write nothing.
 
 #deflist(width: 1.35in,
   [#cmd("http_dbgw")], [Writes #cmd("len") bytes.],
