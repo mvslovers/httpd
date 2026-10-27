@@ -15,7 +15,7 @@ is to hold nothing worth going stale.
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
 closed). Every open issue is now in milestone 4.5.0, so nothing in this file waits on 4.4.0 any
 more. #326, #367 and #373 are closed and have no row. #376 and #377, both filed from the 4.4.0
-candidate, and #370 are listed and not ranked against the rest. #379 is closed (PR #380: `main` is
+candidate, #382, #383 and #370 are listed and not ranked against the rest. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
 no row. The ranked order is unchanged.
 The notes of the earlier reconciles, back to 2026-08-24, are in the history of this file
@@ -42,6 +42,8 @@ mvslovers/mbt#163.*
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
 | — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
+| — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
+| — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | **the final ufsd 1.5.2**: only 1.5.2-rc1 is published, and it must replace the rc before 4.5.0; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
