@@ -332,7 +332,8 @@ Read the console lines one after the other.
   no profile for #cmd("FACILITY:HTTPD.NOPROFILE"), so any user who is logged in
   passes. The text says the route is #cmd("NOT GATED"). A mistake in the
   resource name gives the same message (@ug-security). A class that RAKF does
-  not know gives no message and a 403 for every request. With
+  not define gives the same message with RAKF 1.2.x (measured on TK5). With
+  RAKF 2.0.0 (MVS/CE) it gives no message and a 403 for every request. With
   #cmd("RES_NOPROFILE=DENY") in the member the message is #cmd("HTTPD426W") and
   the route refuses every request (@ug-security-noprofile).
 - #cmd("HTTPD440W") is the missing module of the first route.

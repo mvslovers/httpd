@@ -358,8 +358,8 @@ follow #cmd("HTTPD414W") (a resource on a public route is ignored),
 #cmd("HTTPD412W") (the resource has no colon), #cmd("HTTPD413W") (an option that
 does not exist) and #cmd("HTTPD425W") (the profile does not exist, so the route
 is not gated; with #cmd("RES_NOPROFILE=DENY") it is #cmd("HTTPD426W") and the
-route refuses every request). The server registered all four routes in the end, and it did not
-stop.
+route refuses every request). The server registered all four routes in the
+end, and it did not stop.
 
 === Sessions That Are Too Short <ug-trouble-sess>
 
@@ -554,9 +554,9 @@ lets everybody pass. At the start the server tests every route that
 has #cmd("RES=") and a mode other than #cmd("NONE"), and it writes
 #cmd("HTTPD425W NO PROFILE FOR class:resource -- path NOT GATED") for each one
 that has no profile (see the capture in @ug-trouble-skip). A typing error in
-the resource name looks the same. A class that RAKF does not know gives no
-#cmd("HTTPD425W"): RAKF answers with the return code 8, and every request gets
-the 403. Treat #cmd("HTTPD425W") as an
+the resource name looks the same. A class that RAKF does not define gives the
+same with RAKF 1.2.x (measured on TK5). RAKF 2.0.0 (MVS/CE) gives the return
+code 8 instead, with no #cmd("HTTPD425W"), and no user passes. Treat #cmd("HTTPD425W") as an
 error of your configuration. "What the Server Asks of the Security Product"
 in the _HTTPD Reference_ describes the check.
 
@@ -572,7 +572,9 @@ For the console route of mvsMF there is a second answer. mvsMF 1.4.0 and later
 check READ on the same profile themselves. HTTPD answers 403 first to a user
 without READ. A user who passes the route when the profile is not defined gets
 status 500 from mvsMF, with the error category 4, because mvsMF refuses every
-user until the profile exists. Define the profile.
+user until the profile exists. That is the answer with the default
+#cmd("RES_NOPROFILE=ALLOW"). With #cmd("RES_NOPROFILE=DENY") HTTPD answers 403
+with the body above before mvsMF is called. Define the profile.
 
 === 404, There Is No File <ug-trouble-404>
 

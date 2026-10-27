@@ -189,7 +189,8 @@ stc_identity_restore(HTTPD *httpd)
 ** Stage 2 of auth_gate() permits every request to such a route: SAF answers
 ** rc 4 ("resource not protected"), httpracf() counts that as allowed, and
 ** #136 settled deliberately on keeping it that way.  But rc 4 is also exactly
-** what a typo in the class or in the resource name looks like, and the one
+** what a typo in the resource name looks like (and, with RAKF 1.2.x, in the
+** class), and the one
 ** keyword whose whole job is authorization should not fail quietly in the
 ** permissive direction (#137).  The decision itself is unchanged here -- this
 ** only makes the misconfiguration visible while it can still be fixed.

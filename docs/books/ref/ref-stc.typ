@@ -483,8 +483,8 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       #cmd("RES_NOPROFILE=DENY") the message is
       #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
       and every request that reaches the check gets status 403. A typing error
-      in the resource name looks like this. A class that RAKF does not know gives
-      the return code 8 and no message (see below).],
+      in the resource name looks like this. A class that RAKF does not define looks like this
+      with RAKF 1.2.x and does not with RAKF 2.0.0, see below.],
     [Authorization by SVC 244], [The security product allows or refuses the SVC
       for the account of the task. The server does not check the profile
       itself.],
@@ -500,15 +500,22 @@ silent without a profile as well, so a silent probe does not prove that a
 profile exists. #cmd("RES_NOPROFILE=DENY") acts on the return code 4 only. It
 does not change what a system answers with 0 or with 8.
 
-Two cases of RAKF show this. A class that RAKF does not define gives the return
-code 8 and the message #cmd("RAKF0012 UNDEFINED CLASS class"), whatever the
-resource is: a #cmd("RES=") route on such a class refuses every request with
-the plain 403, with either setting, and the probe stays silent. The classes
-#cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") give the return code 0 for a
-resource without a profile, so a route on one of them lets the request pass,
-and #cmd("RES_NOPROFILE=DENY") does not change it. Both answers were measured for
-the identity of the server (the probe at the start); the answer of RAKF for the
-access of a user in these classes was not measured.
+#idx("RAKF0012")
+The level of RAKF decides what a class that it does not define gives. RAKF 2.0.0
+(MVS/CE) gives the return code 8 for a class that is not in the class
+descriptor table of the system. It writes #cmd("RAKF0012 UNDEFINED CLASS class")
+to the console. The route refuses every request, the probe stays silent and
+#cmd("RES_NOPROFILE") changes nothing. A class with a typing error gives this
+answer. RAKF 1.2.x (measured on TK5) gives the return code 4 for such a class,
+with no message: the probe writes #cmd("HTTPD425W") or, with
+#cmd("RES_NOPROFILE=DENY"), #cmd("HTTPD426W"), and without the keyword the route
+is open. A resource name with a typing error gives the return code 4 on both
+levels when no profile covers the misspelled name. A measurement with the RAKF
+of MVS/CE and with that of TK5, made with the identity of the server as the
+probe does, gave the return code 0 on both for the classes #cmd("TAPEVOL"),
+#cmd("DASDVOL") and #cmd("TERMINAL") without a profile. HTTPD allows a request on the return code 0, so
+#cmd("RES_NOPROFILE=DENY") does not close such a route. The measurement did not
+use the ACEE of a client.
 
 The _HTTPD User's Guide_ shows how to define the profiles with RAKF, in
 "Authentication and Security".

@@ -430,5 +430,6 @@ The command #cmd("F HTTPD,D CONFIG") writes the values that HTTPD settled on,
 and the name of the member that it read (@ref-con). It shows the port, the
 tasks, the time limits, the two login limits, the document root, the code page,
 the realm, the SMF type and level, the state of #cmd("RESIDENT") and the value
-of #cmd("RES_NOPROFILE"). It does not show the other keywords. The display module #cmd("HTTPDSRV") shows the whole
-control block of the server, including those (@ref-dm).
+of #cmd("RES_NOPROFILE"). It does not show the other keywords. The display
+module #cmd("HTTPDSRV") shows the whole control block of the server, including
+those (@ref-dm).
