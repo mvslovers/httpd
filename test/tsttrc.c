@@ -19,6 +19,15 @@ trc_cas(volatile unsigned *mem, unsigned expect, unsigned newv)
     return 1;
 }
 
+/* CHECK does not stop the test: a missing record must fail here, not fault below */
+#define NEED(p, msg) \
+    do { \
+        if ((p) == NULL) { \
+            CHECK(0, msg); \
+            return mbt_test_summary("TSTTRC"); \
+        } \
+    } while (0)
+
 #define K(n) ((void *)(size_t)(0x100000 + (n) * 0x1000))
 
 static HTTPTRC *
@@ -26,7 +35,7 @@ table(unsigned slots)
 {
     HTTPTRC *t = calloc(1, trc_size(slots));
 
-    trc_init(t, slots);
+    if (t) trc_init(t, slots);
     return t;
 }
 
@@ -51,12 +60,14 @@ int main(void)
     CHECK_EQ((int)trc_ms(58000), 59392, "58000 ticks do not overflow");
 
     t = table(16);
+    NEED(t, "the table is allocated");
     CHECK_EQ((int)t->slots, 16, "slots");
     CHECK_EQ((int)t->hsize, 32, "two hash entries per record");
 
     /* open and find by key */
     a = trc_open(t, K(0), 1000);
     CHECK(a != NULL, "a record is claimed");
+    NEED(a, "a record is claimed");
     CHECK_EQ((int)a->seq, 1, "first request is number 1");
     CHECK_EQ((int)a->state, TRS_LIVE, "the record is in flight");
     CHECK_EQ((int)a->t[TM_OPEN], 1000, "open stamps TM_OPEN");
@@ -82,27 +93,32 @@ int main(void)
     /* keep-alive: the same key opens a new record */
     b = trc_open(t, K(0), 1200);
     CHECK(b != NULL, "the next request of the connection opens");
+    NEED(b, "the next request opens");
     CHECK_EQ((int)b->seq, 2, "with the next number");
     CHECK(trc_find(t, K(0)) == b, "and the key finds the new one");
     trc_end(b, TM_CLOSE, 1210);
 
     /* a slow first request is kept: timed from the accept */
     r = trc_open(t, K(1), 5000);
+    NEED(r, "a record is claimed");
     slow_seq = r->seq;
     trc_end(r, TM_END, 5000 + TRC_SLOW);
     CHECK_EQ((int)r->state, TRS_KEEP, "a request of TRC_SLOW ticks is kept");
     r = trc_open(t, K(2), 5000);
+    NEED(r, "a record is claimed");
     trc_end(r, TM_END, 5000 + TRC_SLOW - 1);
     CHECK_EQ((int)r->state, TRS_DONE, "one tick less is not");
 
     /* a later request on a connection is timed from its request line, not
     ** from the wait for it */
     r = trc_open(t, K(3), 8000);
+    NEED(r, "a record is claimed");
     r->reqn = 4;
     trc_mark(r, TM_LINE1, 8000 + 50000, 0);
     trc_end(r, TM_END, 8000 + 50010);
     CHECK_EQ((int)r->state, TRS_DONE, "client think time does not make it slow");
     r = trc_open(t, K(4), 8000);
+    NEED(r, "a record is claimed");
     r->reqn = 4;
     trc_end(r, TM_CLOSE, 8000 + 50000);
     CHECK_EQ((int)r->state, TRS_DONE, "an idle close is not slow either");
@@ -110,7 +126,7 @@ int main(void)
     /* the slow record survives a long run of fast requests */
     for (i = 0; i < 200; i++) {
         r = trc_open(t, K(5 + i % 10), 9000 + i);
-        CHECK(r != NULL, "fast requests keep getting records");
+        NEED(r, "a record is claimed");
         trc_end(r, TM_END, 9000 + i + 1);
     }
     for (i = 0, r = NULL; i < t->slots; i++)
@@ -120,16 +136,20 @@ int main(void)
     /* in-flight records are never taken, a full table loses the request */
     free(t);
     t = table(16);
+    NEED(t, "the table is allocated");
     for (i = 0; i < 16; i++)
         CHECK(trc_open(t, K(i), 1) != NULL, "fill the table");
     CHECK(trc_open(t, K(100), 1) == NULL, "a full table has no record");
     CHECK_EQ((int)t->lost, 1, "and counts the loss");
-    trc_end(trc_find(t, K(5)), TM_END, 2);
+    r = trc_find(t, K(5));
+    NEED(r, "a live key is found");
+    trc_end(r, TM_END, 2);
     CHECK(trc_open(t, K(100), 1) != NULL, "a finished record is reused");
 
     /* every live key is found again, also with the hash filling up */
     free(t);
     t = table(64);
+    NEED(t, "the table is allocated");
     for (i = 0; i < 64; i++)
         CHECK(trc_open(t, K(i), 1) != NULL, "open");
     n = 0;
@@ -140,8 +160,10 @@ int main(void)
     /* only kept records left: the oldest of them is overwritten, not refused */
     free(t);
     t = table(16);
+    NEED(t, "the table is allocated");
     for (i = 0; i < 16; i++) {
         r = trc_open(t, K(i), 100);
+        NEED(r, "a record is claimed");
         trc_end(r, TM_END, 100 + 2 * TRC_SLOW);
     }
     r = trc_open(t, K(100), 100);
@@ -151,7 +173,9 @@ int main(void)
     /* the line */
     free(t);
     t = table(16);
+    NEED(t, "the table is allocated");
     a = trc_open(t, (void *)(size_t)0x00A3F2B0, 0xFFFFFFF0u);
+    NEED(a, "a record is claimed");
     a->worker = (void *)(size_t)0x00A1C2D0;
     a->tcb    = (void *)(size_t)0x008C1234;
     a->addr   = (10u << 24) | (0u << 16) | (0u << 8) | 2;
@@ -172,7 +196,7 @@ int main(void)
     CHECK(strstr(line, " path=/zosmf/info") != NULL, "the path closes the line");
 
     trc_end(a, TM_END, 0x00000030u);
-    n = trc_line(line, sizeof(line), a, 0x00000FFFu);
+    trc_line(line, sizeof(line), a, 0x00000FFFu);
     CHECK(strstr(line, " live=0 last=end ") != NULL, "a finished record is not live");
     CHECK(strstr(line, " age=65 ") != NULL, "and ages up to its last mark");
 

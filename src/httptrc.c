@@ -95,13 +95,12 @@ httptrc_open(HTTPC *httpc)
 void
 httptrc_run(HTTPC *httpc, void *work)
 {
-    unsigned    *psa = (unsigned *)0;
-    HTTPTRR     *r   = find(httpc);
+    HTTPTRR     *r = find(httpc);
 
     if (!r) return;
 
     r->worker = work;
-    r->tcb    = (void *)psa[0x21C/4];       /* PSATOLD */
+    r->tcb    = (void *)*(unsigned *)0x21C; /* PSATOLD */
     trc_mark(r, TM_RUN, httptrc_now(), httpc->state);
 }
 

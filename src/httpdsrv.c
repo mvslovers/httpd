@@ -183,8 +183,9 @@ quit:
 }
 
 /* The request trace (#350) as text/plain, one record per line.  A record that
-** is rewritten while it is copied is skipped (its seq changes), so a line is
-** never a mix of two requests. */
+** is rewritten while it is copied is skipped (its seq changes).  A record just
+** claimed by trc_open() is filled after its state turns LIVE, so one line may
+** show a half-initialised new request under the old seq; fine for a display. */
 static int
 display_trace(HTTPD *httpd, HTTPC *httpc)
 {
