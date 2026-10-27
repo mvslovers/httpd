@@ -195,9 +195,14 @@ The time limits count in whole seconds. #cmd("D CONFIG") shows the values of
 #idx("HTTPD424W")
 #idx("HTTPD026E")
 #idx("HTTPD032E")
+#idx("RES_NOPROFILE")
+#idx("HTTPD426W")
+#idx("HTTPD427E")
 Which route needs a login is a property of the route, set with #cmd("AUTH=")
-(@ref-route). There is no keyword that sets a policy for all routes. The three
-keywords here set the name of the server and the life of a login.
+(@ref-route). There is no keyword that sets a login policy for all routes.
+Three of the four keywords here set the name of the server and the life of a
+login. The fourth, #cmd("RES_NOPROFILE"), sets what a route with #cmd("RES=")
+does when the security product has no profile for its resource.
 
 #tab(caption: [Keywords of the authentication values])[
   #table(columns: (1.55in, 0.8in, 1fr),
@@ -218,6 +223,14 @@ keywords here set the name of the server and the life of a login.
       whatever the client does, counted from the login. Activity does not renew
       it. The rules for a wrong value are those of #cmd("SESSION_TIMEOUT"). A
       value of 0 switches this limit off.],
+    [#cmd("RES_NOPROFILE")], [ALLOW], [#cmd("ALLOW") or #cmd("DENY"), in any
+      case. The value ends at the first blank. It decides what a route with
+      #cmd("RES=") does when no profile covers its resource. With #cmd("ALLOW")
+      the request passes, and the start writes #cmd("HTTPD425W"). With
+      #cmd("DENY") the request gets status 403, and the start writes
+      #cmd("HTTPD426W"). Any other value is fatal: HTTPD writes
+      #cmd("HTTPD427E") with the first 16 characters of the value and then
+      #cmd("HTTPD420E"), and the start ends with CC 0008.],
   )
 ]
 
@@ -232,6 +245,36 @@ minute, if at least one of the two limits is above 0.
 #note[The messages #cmd("HTTPD026W") and #cmd("HTTPD026E") have the same number
 and different meanings. The first is a line that is not a keyword line. The
 second is the check of #cmd("SESSION_TIMEOUT").]
+
+#idx("RES_NOPROFILE", "rules")
+#idx("RES=", "RES_NOPROFILE")
+The rules of #cmd("RES_NOPROFILE"):
+
+- *One value for the whole server.* The keyword is not an option of a route. It
+  applies to every route with #cmd("RES="), except the routes with
+  #cmd("AUTH=NONE"), which HTTPD does not check (@ref-route-auth).
+- *The check is made for each request.* With #cmd("DENY") a request to a route
+  whose resource has no profile gets status 403 and the body
+  #cmd("403 Forbidden: no RACF profile protects this resource"). The class and
+  the resource name are not sent. A request that a profile refuses gets the
+  plain #cmd("403 Forbidden"). A request without a login gets the 401 of the
+  first stage, as before.
+- *A profile that is defined later needs no restart.* The check looks at the
+  profile as the security product holds it at the time of the request. Under
+  RAKF the product holds a new profile after the started task #cmd("RAKFPROF")
+  has run ("RES=: Checking a Profile" in the _HTTPD User's Guide_). Until then
+  the route answers 403 with the body above. #cmd("HTTPD426W") is written at
+  the start only, so it stays in the log.
+- *HTTPD sees only the return code 4.* The security product answers 4 when no
+  profile covers the resource. HTTPD cannot tell why the product had none to
+  apply, and with #cmd("DENY") every return code 4 refuses. This book does not
+  state in which conditions, other than a missing profile, a product answers 4.
+- *The default does not change anything.* Without the keyword, or with
+  #cmd("ALLOW"), the check passes the return codes 0 and 4 and refuses every
+  other one, as in the releases before 4.5.0.
+- *A misspelled value is fatal on purpose.* HTTPD does not fall back to
+  #cmd("ALLOW"). A keyword that exists to close a gate must not leave the gate
+  open when it is misspelled.
 
 == Routes and Modules <ref-prm-route>
 
@@ -369,7 +412,9 @@ problem in the member gives a message, and the start goes on.
     [#cmd("HTTPD420E")], [A route lost its policy: #cmd("HTTPD419E") (a route
       that could not be registered), #cmd("HTTPD411E") (an unknown
       #cmd("AUTH=") value) or #cmd("HTTPD048E") (a retired #cmd("LOGIN") that
-      required a login). HTTPD reads the whole member first, so it writes all
+      required a login). Also #cmd("HTTPD427E"), a value of
+      #cmd("RES_NOPROFILE") that is neither #cmd("ALLOW") nor #cmd("DENY").
+      HTTPD reads the whole member first, so it writes all
       of these messages before it stops. It stops before it opens the port.
       @ref-route has the details.],
     [#cmd("HTTPD037E")], [Another address space already serves the port.],
@@ -384,6 +429,6 @@ problem in the member gives a message, and the start goes on.
 The command #cmd("F HTTPD,D CONFIG") writes the values that HTTPD settled on,
 and the name of the member that it read (@ref-con). It shows the port, the
 tasks, the time limits, the two login limits, the document root, the code page,
-the realm, the SMF type and level and the state of #cmd("RESIDENT"). It does not
-show the other keywords. The display module #cmd("HTTPDSRV") shows the whole
+the realm, the SMF type and level, the state of #cmd("RESIDENT") and the value
+of #cmd("RES_NOPROFILE"). It does not show the other keywords. The display module #cmd("HTTPDSRV") shows the whole
 control block of the server, including those (@ref-dm).

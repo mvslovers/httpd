@@ -118,6 +118,8 @@ come in this order.
     [#cmd("HTTPD137I")], [#cmd("RESIDENT YES MODULES HELD n") or
       #cmd("RESIDENT NO MODULES HELD n"). The count is the number of modules
       that the server holds in storage.],
+    [#cmd("HTTPD138I")], [#cmd("RES_NOPROFILE ALLOW") or
+      #cmd("RES_NOPROFILE DENY"), the value of the keyword (@ref-prm-auth).],
   )
 ]
 

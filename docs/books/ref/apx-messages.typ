@@ -122,7 +122,8 @@ A message with a condition appears only under that condition.
 + #cmd("HTTPD054I"), the listener is bound to the port. A bind that has to
   wait for the port adds #cmd("HTTPD030E") and #cmd("HTTPD030I") first.
 + The warnings that follow the bind, such as #cmd("HTTPD430W"),
-  #cmd("HTTPD425W") and #cmd("HTTPD440W") to #cmd("HTTPD442W").
+  #cmd("HTTPD425W") or #cmd("HTTPD426W"), and #cmd("HTTPD440W") to
+  #cmd("HTTPD442W").
 + #cmd("HTTPD061I") for the socket thread and for each worker thread. The
   threads write these lines themselves, so their order is not fixed.
 + #cmd("HTTPD001I"), the last message of the start. After it the server
@@ -163,9 +164,9 @@ Some messages end the start. The return code of the job tells which kind.
   )
 ]
 
-#note[The message #cmd("HTTPD048E") sets an error flag in the configuration.
-#cmd("HTTPD420E") follows at the end of the configuration and the start ends
-with the return code 8.]
+#note[The messages #cmd("HTTPD048E") and #cmd("HTTPD427E") set an error flag in
+the configuration. #cmd("HTTPD420E") follows at the end of the configuration and
+the start ends with the return code 8.]
 
 == Lifecycle and Identity (000 to 019) <apx-messages-start>
 
@@ -641,6 +642,9 @@ Most of them are the answer of a command and have no response.
     ..r("HTTPD137I RESIDENT {yesno}  MODULES HELD {n}",
       [Whether the server keeps the modules in storage (#cmd("YES") or
       #cmd("NO")) and how many it holds now.]),
+    ..r("HTTPD138I RES_NOPROFILE {value}",
+      [The value of the keyword #cmd("RES_NOPROFILE"): #cmd("ALLOW") or
+      #cmd("DENY"). It is the last line of #cmd("DISPLAY CONFIG").]),
     ..r("HTTPD140I HTTPD {version} ({commit})",
       [The answer of #cmd("DISPLAY VERSION"), in upper case.]),
     ..r("HTTPD141I .DISPCNT {count}",
@@ -755,8 +759,10 @@ server sets an error flag, writes #cmd("HTTPD419E") and refuses to start with
       o: [Correct the line in the configuration.]),
     ..r("HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE -- HTTPD WILL NOT START",
       [At least one route lost its policy (#cmd("HTTPD419E"), or
-      #cmd("HTTPD048E")). The message is written at the end of the
-      configuration, before the bind.],
+      #cmd("HTTPD048E")), or the value of #cmd("RES_NOPROFILE") is not valid
+      (#cmd("HTTPD427E")). The message is written at the end of the
+      configuration, before the bind. Its text is the same for every cause. The
+      cause is in the message before it.],
       a: [The start ends with the return code 8.],
       o: [Correct the lines that the other messages name.]),
     ..r("HTTPD421W MOD= REQUIRES A PROGRAM NAME (E.G. MOD=MVSMF /ZOSMF/* AUTH=BASIC)",
@@ -784,7 +790,27 @@ server sets an error flag, writes #cmd("HTTPD419E") and refuses to start with
       profile. The class is cut after 8 characters, the resource after 32 and
       the path after 24.],
       a: [The route is served, without a gate. The server goes on.],
+      o: [Define the profile, or correct the name in the configuration. To
+      refuse the requests instead, set #cmd("RES_NOPROFILE=DENY") (then
+      #cmd("HTTPD426W") replaces this message).]),
+    ..r("HTTPD426W NO PROFILE FOR {class}:{resource} -- {path} REFUSES ALL REQUESTS",
+      [As #cmd("HTTPD425W"), for a server that runs with
+      #cmd("RES_NOPROFILE=DENY"). The check at the start found no profile for
+      the resource of a route with #cmd("RES=") (not #cmd("AUTH=NONE")). The
+      class is cut after 8 characters, the resource after 32 and the path after
+      24.],
+      a: [The server goes on. The route answers every request that reaches the
+      check with status 403, until a profile exists. A profile that is defined
+      and loaded later takes effect without a restart, but this message is
+      written at the start only.],
       o: [Define the profile, or correct the name in the configuration.]),
+    ..r("HTTPD427E INVALID RES_NOPROFILE VALUE \"{value}\" (ALLOW|DENY)",
+      [The value of #cmd("RES_NOPROFILE") is neither #cmd("ALLOW") nor
+      #cmd("DENY"). The value is cut after 16 characters.],
+      a: [The server sets an error flag. It does not fall back to
+      #cmd("ALLOW"). #cmd("HTTPD420E") follows and the start ends with the
+      return code 8.],
+      o: [Write #cmd("ALLOW") or #cmd("DENY").]),
     ..r("HTTPD430I SMF TYPE {type} LEVEL {level}",
       [#unused #cmd("DISPLAY CONFIG") shows the same values in
       #cmd("HTTPD132I").]),

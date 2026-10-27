@@ -375,10 +375,88 @@ HTTPD therefore asks once for each route with #cmd("RES=") at the start. For a
 route without a profile it writes #cmd("HTTPD425W NO PROFILE FOR
 class:resource -- path NOT GATED"). The route still works, and every user who
 is logged in passes. Look for #cmd("HTTPD425W") after each change. The probe
-is not made for #cmd("AUTH=NONE") routes.]
+is not made for #cmd("AUTH=NONE") routes. To make such a route refuse instead,
+set #cmd("RES_NOPROFILE=DENY") (@ug-security-noprofile).]
 
 HTTPD asks for the access READ for all methods. It has no separate permission
 for PUT, POST or DELETE.
+
+=== Refusing a Route Whose Profile Is Missing <ug-security-noprofile>
+
+#idx("RES_NOPROFILE")#idx("HTTPD426W")#idx("HTTPD427E")#idx("HTTPD138I")
+#idx("RES=", "profile missing")#idx("403", "no profile")
+The default is the permissive reading of the note above. A route that was
+written to close a resource is open to every user who can log in as long as its
+profile is forgotten, misspelled or not loaded yet. The mvsMF console route
+(#cmd("FACILITY:MVSMF.CONSOLE")) is the case that matters: without its profile
+every user who can log in may issue operator commands through mvsMF up to
+1.3.0.
+
+The keyword #cmd("RES_NOPROFILE=DENY") turns the missing profile into a closed
+route. It is one setting for the whole server, not an option of a route. A
+switch on each route would have to be remembered on exactly the routes where a
+profile is forgotten. The setting applies to every route with #cmd("RES=") that
+is not #cmd("AUTH=NONE"). Put it in the member:
+
+#screen(raw(read("../ex/ug-security/noprofile-deny-prm.txt")))
+
+The route is the same as before. At the start, #cmd("HTTPD426W") replaces
+#cmd("HTTPD425W") for each route without a profile. The next capture shows the
+lines that matter. The other lines of the start are left out.
+
+#screen(raw(read("../ex/ug-security/noprofile-deny-start.txt")))
+
+The server starts. A route that refuses is the safe state, and you can define
+the profile while the server runs. Until the profile exists, a request is
+answered like this:
+
+#tab(caption: [The answers of a route whose profile is missing])[
+  #table(columns: (1.9in, 1fr),
+    [Request], [Answer],
+    [Without a login], [Status 401. The first stage answers, as before.],
+    [A user who is logged in, whether or not the user would be permitted],
+      [Status 403 with the body
+      #cmd("403 Forbidden: no RACF profile protects this resource"). The class
+      and the resource name are not in the answer. They are in
+      #cmd("HTTPD426W").],
+  )
+]
+
+Define the profile and permit the users, as in @ug-install-rakfsetup, and run
+#cmd("RAKFPROF"). Do not restart HTTPD. The check is made for each request
+against the profile as RAKF holds it then. After #cmd("RAKFPROF") has run, a
+user whom the profile permits gets the real answer. A user whom it does not
+permit gets the plain #cmd("403 Forbidden"), the same answer as for a profile
+that refuses. Before #cmd("RAKFPROF") has run, #cmd("RDEFINE") and
+#cmd("PERMIT") change nothing the server can see, and the route still answers
+with the body about the missing profile. #cmd("HTTPD426W") belongs to the start
+and stays in the log. A start after the profile exists does not write it.
+
+The two bodies tell you which case you have: _no RACF profile protects this
+resource_ means that RAKF has no profile for the resource. Check the class and
+the name in the route against the profile, and check that #cmd("RAKFPROF") ran.
+The plain #cmd("403 Forbidden") means that a profile exists and does not permit
+the user.
+
+*When to turn it on.* Turn it on when every route with #cmd("RES=") has its
+profile and the start writes no #cmd("HTTPD425W"). On a new system, set it
+before the first start if the profile definitions are part of the installation.
+Do not turn it on while a route still depends on the permissive reading, for
+example a #cmd("RES=") that is kept for documentation and has no profile behind
+it. Drop that #cmd("RES=") first. Nothing changes without the keyword. A member
+that does not have it behaves as before, and #cmd("D C") shows
+#cmd("HTTPD138I RES_NOPROFILE ALLOW").
+
+*What the setting does not do.* HTTPD sees only the answer of the security
+product that says "no profile" (return code 4). It cannot tell why the product
+had none to apply, and with #cmd("DENY") every such answer refuses. This guide
+does not state in which conditions, other than a missing profile, a product
+gives that answer. The setting does not touch a route with #cmd("AUTH=NONE"),
+and it does not change the answer of a profile that exists.
+
+*A wrong value stops the start.* A value that is neither #cmd("ALLOW") nor
+#cmd("DENY") is not read as #cmd("ALLOW"). It gives #cmd("HTTPD427E") and
+#cmd("HTTPD420E"), and the server does not start (@ug-trouble-policy).
 
 == What Needs No Login <ug-security-exempt>
 
@@ -451,7 +529,8 @@ HTTPD is a small server. Know the limits before you open it to a network.
   warn when a general route hides a specific one.
 - *A path without a route is public.* There is no default that denies.
 - *A wrong class or resource name opens the route.* HTTPD warns once at the
-  start (#cmd("HTTPD425W")) and not again.
+  start (#cmd("HTTPD425W")) and not again. With #cmd("RES_NOPROFILE=DENY") the
+  route is closed instead (@ug-security-noprofile).
 - *A password is at most 8 characters.* HTTPD changes the user ID and the
   password to upper case and cuts both at 8 characters.
 - *The cache can outlive a password change.* See @ug-security-pwchange.

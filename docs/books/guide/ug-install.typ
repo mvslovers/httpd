@@ -802,6 +802,15 @@ itself and refuses every user until it exists, so the warning then concerns
 only this route. Define it. A start without the message does not prove that the profile is
 right. It proves only that the message is not there, so look at the table.
 
+From HTTPD 4.5.0 the keyword #cmd("RES_NOPROFILE=DENY") turns the permissive
+reading into a refusal. Once the profiles are defined and the start prints no
+#cmd("HTTPD425W"), add the keyword to the member. A route whose profile is
+forgotten or not loaded yet then answers 403, and the start prints
+#cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
+instead of opening the route to everyone who can log in. Leave it off while a
+route still relies on the permissive reading. @ug-security-noprofile has the
+details. The shipped member has the keyword as a comment line.
+
 On MVS/CE, the commands #cmd("RDEFINE") and #cmd("PERMIT") define a profile.
 Run them in a TSO batch step. The capture defines the console profile, a second
 one, #cmd("HTTPD.ADMIN"), which a route such as #cmd("LOC=/admin/*") could
@@ -1055,8 +1064,8 @@ The display modules are not reachable. Nothing names them until you add a
     [No #cmd("HTTPD004I"), or #cmd("HTTPD004W") instead], [The user of the
       task is not defined in RAKF, or the logon failed
       (@ug-install-rakfsetup).],
-    [#cmd("HTTPD425W") at the start], [A route names a resource that has no
-      profile (@ug-install-rakfsetup).],
+    [#cmd("HTTPD425W") or #cmd("HTTPD426W") at the start], [A route names a
+      resource that has no profile (@ug-install-rakfsetup).],
     [#cmd("HTTPD044W") at the start], [UFSD is not running
       (@ug-install-ufsd).],
     [#cmd("UFSD062E") at the mount], [The webroot data set has not the block

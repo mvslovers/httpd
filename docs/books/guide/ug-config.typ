@@ -153,6 +153,8 @@ corrections. Each line has a message of its own:
     [#cmd("HTTPD133I")], [The source of the configuration.],
     [#cmd("HTTPD137I")], [Whether modules are resident, and how many are
       held.],
+    [#cmd("HTTPD138I")], [The value of #cmd("RES_NOPROFILE")
+      (@ug-security-noprofile).],
   )
 ]
 
