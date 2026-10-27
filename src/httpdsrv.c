@@ -414,10 +414,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_58</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_58), httpd->unused_58);
+        "<td>httpd->readerr_last</td>"
+        "<td>Time of Last UFS Read Error Message (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_last), httpd->readerr_last);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -428,10 +428,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_60</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_60), httpd->unused_60);
+        "<td>httpd->readerr_held</td>"
+        "<td>UFS Read Errors Not Yet Reported (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_held), httpd->readerr_held);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -623,11 +623,17 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_121</td>"
+        "<td>httpd->cfg_res_noprof</td>"
+        "<td>Config RES= Route Without Profile</td>"
+        "<td>%s</td></tr>\n",
+        O(cfg_res_noprof), httpd->cfg_res_noprof ? "DENY" : "ALLOW");
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_122</td>"
         "<td>(reserved, alignment padding)</td>"
-        "<td>%02X %02X %02X</td></tr>\n",
-        O(unused_121), httpd->unused_121[0], httpd->unused_121[1],
-        httpd->unused_121[2]);
+        "<td>%02X %02X</td></tr>\n",
+        O(unused_122), httpd->unused_122[0], httpd->unused_122[1]);
 
     /* An empty codepage is the default, not "none": set_defaults() leaves it
     ** empty and http_xlate_init() reads that as CP037.  Say so -- a bare ""

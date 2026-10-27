@@ -133,6 +133,15 @@ HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosy
 | [mvsmf](https://github.com/mvslovers/mvsmf) | z/OSMF-compatible REST API |
 | [ftpd](https://github.com/mvslovers/ftpd) | Standalone FTP daemon (replaces embedded FTPD from 3.x) |
 
+## Manuals
+
+The _HTTPD User's Guide_ (ML07-0001) and the _HTTPD Reference_ (ML07-0002) are
+attached to each release from 4.5.0 on as `ml07-0001-<edition>.pdf` and
+`ml07-0002-<edition>.pdf`. Their sources are in [`docs/books`](docs/books); the
+web form is published on Read the Docs. Installation, upgrade and removal
+step by step are in [docs/installation.md](docs/installation.md), the README of
+the installation package.
+
 ## For Developers
 
 Build instructions, the architecture overview and the ASCII/EBCDIC translation system are documented in [internals/development.md](internals/development.md); how to write your own server modules is in [docs/server-modules.md](docs/server-modules.md).

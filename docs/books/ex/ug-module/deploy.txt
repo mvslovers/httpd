@@ -1,0 +1,8 @@
+$ mbt deploy --target env
+[mbt] Deploy target: HTTPD.DEV.LINKLIB
+[mbt] Modules (1): HELLO
+[mbt] Packed 1 module(s) -> hello.deploy.xmit
+[mbt] Uploading hello.deploy.xmit -> IBMUSER.MBT.XMIT.IN...
+[mbt] RECEIVE IBMUSER.MBT.XMIT.IN -> IBMUSER.HELLO.MBTDPLY, IEBCOPY -> HTTPD.DEV.LINKLIB (replace, DISP=SHR)...
+[mbt] HTTPD.DEV.LINKLIB: 35% of 248 tracks used, 1 extent(s)
+[mbt] Deploy complete: 1 module(s) -> HTTPD.DEV.LINKLIB

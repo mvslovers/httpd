@@ -1,0 +1,8 @@
+PORT=8080
+DOCROOT=/www
+RESIDENT=MAYBE
+MOD=NOSUCH /nosuch/*            AUTH=NONE
+LOC=/a/*                        AUTH=NONE RES=FACILITY:HTTPD.ADMIN
+LOC=/b/*                        AUTH=BASIC RES=NOCOLON
+LOC=/c/*                        AUTH=NONE BOGUS=1
+LOC=/d/*                        RES=FACILITY:HTTPD.NOPROFILE

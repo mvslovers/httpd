@@ -28,3 +28,7 @@ dist/
 # OS
 .DS_Store
 *:Zone.Identifier
+
+# Manuals (docs/books)
+docs/books/*.pdf
+docs/books/site/

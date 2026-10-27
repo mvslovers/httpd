@@ -1,0 +1,9 @@
+$ mbt deps
+[mbt] mvslovers/httpd >=4.2.0 -> 4.4.0
+[mbt]   staged -> .mbt/deps/httpd (sha 3528a9744617)
+[mbt] Locked 1 dependency(ies) -> mbt.lock
+$ mbt build -v
+[mbt] libc370 2.25.1 in $HOME/.local/cc370 (>= 2.25.1)
+cc370 -O1 -std=gnu99 -Wall -Wextra -Werror -I .mbt/deps/httpd/include -I .mbt/include -I .mbt -MMD -MP -c src/hello.c -o build/hello.o
+ld370 -L$HOME/.local/cc370/lib -e @@CRT0 build/hello.o -lcc370rt .mbt/deps/httpd/lib/httpd.a -lc --rent --reus -iebcopy -o build/HELLO
+[mbt] Build complete

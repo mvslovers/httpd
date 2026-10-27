@@ -22,13 +22,16 @@
 ** allocated here through __dsalcf(DDNAME=...), so the vector needs nothing
 ** from the JCL and the test carries its own fixture.
 **
-** Two rounds, and the first one matters as much as the second:
+** Three rounds, and the first one matters as much as the others:
 **
 **   round 1  a HEALTHY HTTPPRM is read and parsed, with the member's values
 **            actually in the HTTPD block.  Without this the second round
 **            proves nothing -- a http_prm_read() that failed for any reason
 **            at all would pass it.
 **   round 2  the SAME member behind the lying BLKSIZE returns non-zero.
+**   round 3  a member with RES_NOPROFILE=DENNY sets HTTPD_FLAG_CFGERR, which
+**            http_config() turns into HTTPD420E and no start, and does not
+**            read as the default (#351).
 **
 ** http_prm_read() rather than http_config(): everything http_config() does
 ** after the read binds the listener and initializes UFS, which a test running
@@ -62,6 +65,16 @@ static const char * const parmlines[] = {
     "PORT=2280",
     "MAXTASK=17",
     "RESIDENT=NO",          /* the default is YES (#198) */
+    "RES_NOPROFILE=DENY",   /* the default is ALLOW (#351) */
+    NULL
+};
+
+/* A misspelled security keyword must refuse the start (#351): ignoring it
+** would leave the RES= gate open.  PORT first, so a parse that stops early
+** cannot be mistaken for one that rejected the value. */
+static const char * const badlines[] = {
+    "PORT=2281",
+    "RES_NOPROFILE=DENNY",
     NULL
 };
 
@@ -70,7 +83,7 @@ static const char * const parmlines[] = {
 ** Returns 0 on success.
 ** ----------------------------------------------------------------- */
 static int
-write_parmlib(const char *dsn)
+write_parmlib(const char *dsn, const char * const *lines)
 {
     char  dd[9];
     char  ddspec[16];
@@ -95,8 +108,8 @@ write_parmlib(const char *dsn)
         return -1;
     }
 
-    for (i = 0; parmlines[i]; i++)
-        fprintf(fp, "%s\n", parmlines[i]);
+    for (i = 0; lines[i]; i++)
+        fprintf(fp, "%s\n", lines[i]);
 
     fclose(fp);
     __dsfree(dd);
@@ -142,7 +155,7 @@ main(int argc, char **argv)
     printf("TSTPRM -- a DD:%s read error must refuse the start "
            "(dsn '%s')\n\n", HTTPD_PARMLIB_DD, dsn);
 
-    if (write_parmlib(dsn) != 0) {
+    if (write_parmlib(dsn, parmlines) != 0) {
         /* No vector, no verdict -- say so loudly rather than pass on a test
         ** that never ran.  wtof() as well as printf(), the libc370 #145
         ** lesson: a stdio failure can take buffered SYSPRINT with it. */
@@ -163,6 +176,10 @@ main(int argc, char **argv)
                  "healthy HTTPPRM: MAXTASK parsed");
         CHECK_EQ((int)httpd.cfg_resident, 0,
                  "healthy HTTPPRM: RESIDENT=NO parsed");
+        CHECK_EQ((int)httpd.cfg_res_noprof, 1,
+                 "healthy HTTPPRM: RES_NOPROFILE=DENY parsed");
+        CHECK((httpd.flag & HTTPD_FLAG_CFGERR) == 0,
+              "healthy HTTPPRM: RES_NOPROFILE=DENY is not a config error");
 
         __dsfree(HTTPD_PARMLIB_DD);
     } else {
@@ -193,6 +210,30 @@ main(int argc, char **argv)
         __dsfree(HTTPD_PARMLIB_DD);
     } else {
         CHECK(0, "read error on HTTPPRM: allocated");
+    }
+
+    /* ---- round 3: an invalid RES_NOPROFILE value refuses the start -- */
+
+    if (__dsalcf(dd, "DSN=%s;DISP=(OLD,DELETE)", dsn) == 0)
+        __dsfree(dd);
+
+    if (write_parmlib(dsn, badlines) != 0) {
+        CHECK(0, "bad RES_NOPROFILE: fixture written");
+    } else if (alloc_httpprm(dsn, 0) == 0) {
+        memset(&httpd, 0, sizeof(httpd));
+        rc = http_prm_read(&httpd);
+
+        CHECK_EQ(rc, 0, "RES_NOPROFILE=DENNY: the member was read");
+        CHECK((httpd.flag & HTTPD_FLAG_CFGERR) != 0,
+              "RES_NOPROFILE=DENNY: sets HTTPD_FLAG_CFGERR");
+        CHECK_EQ((int)httpd.cfg_res_noprof, 0,
+                 "RES_NOPROFILE=DENNY: does not read as DENY");
+        CHECK_EQ((int)httpd.port, 2281,
+                 "RES_NOPROFILE=DENNY: the line before it was parsed");
+
+        __dsfree(HTTPD_PARMLIB_DD);
+    } else {
+        CHECK(0, "bad RES_NOPROFILE: allocated");
     }
 
     /* Scratch data set: gone either way, so a re-run finds a clean slate

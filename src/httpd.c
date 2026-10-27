@@ -189,10 +189,16 @@ stc_identity_restore(HTTPD *httpd)
 ** Stage 2 of auth_gate() permits every request to such a route: SAF answers
 ** rc 4 ("resource not protected"), httpracf() counts that as allowed, and
 ** #136 settled deliberately on keeping it that way.  But rc 4 is also exactly
-** what a typo in the class or in the resource name looks like, and the one
+** what a typo in the resource name looks like (and, with RAKF 1.2.x, in the
+** class), and the one
 ** keyword whose whole job is authorization should not fail quietly in the
 ** permissive direction (#137).  The decision itself is unchanged here -- this
 ** only makes the misconfiguration visible while it can still be fixed.
+**
+** With RES_NOPROFILE=DENY (#351) the same condition is not allowed but
+** refused: auth_gate() answers 403 for the route until the profile exists, and
+** the line says so (HTTPD426W instead of HTTPD425W).  The probe itself is the
+** same RACHECK either way.
 **
 ** DEBUG 1 already traces the same condition (httpxauth.c), but per request and
 ** only for someone who knew to look.  This line is unconditional and lands in
@@ -245,7 +251,8 @@ res_probe(HTTPD *httpd)
 
 		if (racf_auth(NULL, route->resclass, route->resname, route->resattr)
 		    == HTTP_RACF_NOTPROT) {
-			wtof(MSG_RES_NO_PROFILE,
+			wtof(httpd->cfg_res_noprof ? MSG_RES_NO_PROFILE_DENY
+			                           : MSG_RES_NO_PROFILE,
 			     route->resclass, route->resname, route->path);
 		}
 	}
