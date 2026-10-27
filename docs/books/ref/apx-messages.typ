@@ -482,7 +482,8 @@ rest of this range reports the start of the listener.
       a: [The start ends with the return code 8, after the clean up.]),
     ..r("HTTPD065W CLIENT {a.b.c.d} ABANDONED, NO SEND PROGRESS FOR {seconds} SEC, {bytes} BYTES SENT, {n} SUPPRESSED",
       [A client did not receive any data for the whole time of the limit (10
-      seconds), so the server gave up. This happens on a chunked response.
+      seconds), so the server gave up. This happens on a chunked response and on
+      the body of a static file.
       #var("bytes") is the number of bytes that were sent. The server writes
       the message at most once in 60 seconds. #var("n") is the number of
       messages that it held back in the meantime. A server that stops writes

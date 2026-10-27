@@ -383,8 +383,8 @@ among them, and the request is still running.
     [#cmd("txn")], [The number of calls of #cmd("send") for the request,
       including calls that sent nothing.],
     [#cmd("txst")], [How often the server paused for a tenth of a second
-      because TCP/IP took no data. Only the send of a chunked response counts
-      these pauses.],
+      because TCP/IP took no data. The send of a chunked response and the send
+      of a static file count these pauses.],
     [#cmd("txms")], [The milliseconds spent inside #cmd("send").],
     [#cmd("sent")], [The bytes sent for the request. The server fills the word
       when the request ends, so it is 0 for a request that is still running.],
