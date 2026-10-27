@@ -4,6 +4,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 #include "httpgive.h"
+#include "httpssi.h"
 #include <time.h>      /* time() */
 
 typedef enum sstate     SSTATE;
@@ -22,11 +23,11 @@ static int ssi_process(HTTPC *httpc, char *ssi);
 static int ssi_echo(HTTPC *httpc, char *next);
 static int ssi_include(HTTPC *httpc, char *next);
 static int ssi_printenv(HTTPC *httpc);
-static int ssi_system_env(HTTPC *httpc);
 
 /* output handlers */
 static int ssi_printf(HTTPC *httpc,  const char *fmt, ... );
 static int ssi_printv(HTTPC *httpc, const char *fmt, va_list args);
+static int ssi_text(HTTPC *httpc, const char *text);
 static int ssi_send_buffer(HTTPC *httpc);
 static int ssi_buffer(HTTPC *httpc, const char *buf, int len);
 
@@ -203,11 +204,18 @@ ssi_file_read(HTTPC *httpc, const char *path)
     int		ssicnt	= 0;
     int		newline = 1;
     int     avail	= CBUFSIZE - httpc->len;
+    int		keep	= 0;	/* bytes at the start of tmp held from the last piece */
+    int		eol		= 0;	/* the piece ended the line */
+    int		more	= 0;	/* the last piece did not end the line */
+    int		lastrem	= 0;	/* text left after the last directive of that piece */
+    size_t	hold;
 	char	*pbuf 	= NULL;
+	char	*cur	= NULL;
 	char	*ssi	= NULL;
 	char	*end	= NULL;
 	char	*p;
-	char	tmp[256];
+	char	c;
+	char	tmp[512];
 
 	// wtof("%s: enter", __func__);
 	
@@ -224,38 +232,78 @@ ssi_file_read(HTTPC *httpc, const char *path)
 	if (avail <= (int)(sizeof(tmp) * 2)) goto quit;
 
 	// wtof("%s: fgets()", __func__);
-	
-	/* read one line from the file */
+
+readmore:
+	/* the next piece of a line needs the same room as the first one. If
+	 * there is none, what is held goes out as text and the rest of the
+	 * line is read on the next call: a directive split there is not
+	 * recognised, but nothing is lost */
+	if (more) {
+		avail = CBUFSIZE - httpc->len;
+		if (avail <= (int)(sizeof(tmp) * 2)) {
+			ssi_send_buffer(httpc);
+			avail = CBUFSIZE - httpc->len;
+		}
+		if (avail <= (int)(sizeof(tmp) * 2)) {
+			if (keep > 0) ssi_buffer(httpc, tmp, keep);
+			goto quit;
+		}
+	}
+
+	/* read the line, or the next piece of a line longer than tmp: a piece
+	 * that does not end in a newline is followed by more of the same line */
 	if (httpc->fp) {
 		/* use CLIB version of fgets() */
-		pbuf = fgets(tmp, sizeof(tmp)-1, httpc->fp);
+		pbuf = fgets(&tmp[keep], sizeof(tmp)-keep, httpc->fp);
 	}
 	else if (httpc->ufp) {
 		/* use UFS version of fgets() */
-		pbuf = ufs_fgets(tmp, sizeof(tmp)-1, httpc->ufp);
+		pbuf = ufs_fgets(&tmp[keep], sizeof(tmp)-keep, httpc->ufp);
 	}
 			
-	if (!pbuf) goto checkeof;
+	if (!pbuf) {
+		/* what was held back is not a directive: it goes out as text,
+		 * and a line that ran into the end of the file gets its newline */
+		if (keep > 0) {
+			ssi_buffer(httpc, tmp, keep);
+			lastrem = keep;
+		}
+		if (more && lastrem > 0 && newline) ssi_buffer(httpc, "\n", 1);
+		goto checkeof;
+	}
 
 	tmp[sizeof(tmp)-1] = 0;	/* just in case */
 
 	/* strip the newline from the tmp buffer */
 	p = strrchr(tmp, '\n');
+	eol = (p != NULL);
 	if (p) *p = 0;
 
 	len = strlen(tmp);
 	if (len==0) {
-		ssi_buffer(httpc, "\n", 1);
+		/* an empty line, or the newline that ends a long one -- which, as
+		 * for a line that ends in a directive, is not written when the
+		 * piece before it ended with one */
+		if (newline && (!more || lastrem > 0)) ssi_buffer(httpc, "\n", 1);
 		goto quit;
 	}
 
+	/* a piece that does not end the line may end in the middle of a
+	 * directive: keep that part back and join it with the next piece */
+	hold = len;
+	if (!eol) hold = httpssih(tmp, len, SSI_HOLDMAX);
+	c = tmp[hold];
+	tmp[hold] = 0;
+	cur = tmp;
+	len = (int)hold;
+
 again:
-	// wtodumpf(tmp, len, "%s: again", __func__);
+	// wtodumpf(cur, len, "%s: again", __func__);
 
 	/* look for start of Server Side Include */
 	ssilen = 0;
 	end = NULL;
-	ssi = strstr(tmp, "<!--#");
+	ssi = strstr(cur, "<!--#");
 	if (ssi) end = strstr(ssi+5, " -->");
 	if (end) {
 		end += 4;
@@ -263,16 +311,16 @@ again:
 	}
 
 	if (ssilen > 0) {
-		char	c;
+		char	sc;
 		
 		/* copy anything before the Server Side Include */
-		len = ssi - tmp;
+		len = ssi - cur;
 		// wtof("%s: is SSI ssilen=%d, len=%d", __func__, ssilen, len);
 		if (len > 0) {
-			ssi_buffer(httpc, tmp, len);
+			ssi_buffer(httpc, cur, len);
 		}
 				
-		c = ssi[ssilen];
+		sc = ssi[ssilen];
 		ssi[ssilen] = 0;
 		// wtodumpf(ssi, ssilen, "%s: ssi", __func__);
 		/* at this point ssi *should* look like:
@@ -284,25 +332,34 @@ again:
 		len = ssi_process(httpc, ssi);
 		if (!ssicnt) newline = len;
 		ssicnt++;
-		ssi[ssilen] = c;
+		ssi[ssilen] = sc;
 
 		/* see if we have any other Server Side Includes */
-		end = &ssi[ssilen];
-		strcpy(tmp, end);
-		len = strlen(tmp);
-		if (!len) goto quit;
+		cur = &ssi[ssilen];
+		len = strlen(cur);
+		if (!len) goto piecedone;
 
 		// wtof("%s: goto again", __func__);
 		goto again;
 	}
 
 	/* Not a Server Side Include */
-	// wtof("%s: not SSI \"%s\"", __func__, tmp);
-	if (newline) strcat(tmp, "\n");
-	if (strlen(tmp)) {
-		ssi_printf(httpc, "%s", tmp);
+	// wtof("%s: not SSI \"%s\"", __func__, cur);
+	if (len > 0) ssi_buffer(httpc, cur, len);
+
+piecedone:
+	lastrem = len;
+	tmp[hold] = c;
+	if (eol) {
+		if (len > 0 && newline) ssi_buffer(httpc, "\n", 1);
+		goto quit;
 	}
-	goto quit;
+
+	/* the line goes on: move the held part to the front and read more */
+	more = 1;
+	keep = (int)strlen(&tmp[hold]);
+	memmove(tmp, &tmp[hold], keep + 1);
+	goto readmore;
 
 checkeof:
 	/* check for end-of-file */
@@ -460,7 +517,7 @@ ssi_echo(HTTPC *httpc, char *next)
 	if (!p) p = getenv(var);
 	if (p) {
 		// wtof("%s: result \"%s\"", __func__, p);
-		ssi_printf(httpc, "%s", p);
+		ssi_text(httpc, p);
 		goto quit;
 	}
 
@@ -475,6 +532,9 @@ quit:
 	return 0;
 }
 
+/* <!--#printenv --> lists the variables of this request, nothing of the
+ * server's own environment. Names and values come from the client, so
+ * both are written as HTML text. */
 static int 
 ssi_printenv(HTTPC *httpc)
 {
@@ -488,46 +548,15 @@ ssi_printenv(HTTPC *httpc)
     for(n=0; n<count; n++) {
         v = httpc->env[n];
 
-        ssi_printf(httpc, " <tr><td>%s</td><td>%s</td></tr>\n", v->name, v->value);
+        ssi_printf(httpc, " <tr><td>");
+        ssi_text(httpc, v->name);
+        ssi_printf(httpc, "</td><td>");
+        ssi_text(httpc, v->value);
+        ssi_printf(httpc, "</td></tr>\n");
     }
     ssi_printf(httpc, "</table>\n");
 
-	ssi_system_env(httpc);
-	
 	return 0;
-}
-
-static int
-ssi_system_env(HTTPC *httpc)
-{
-    CLIBGRT     *grt    = __grtget();
-    int			lockrc	= -1;
-    unsigned	n;
-    unsigned	count;
-	__ENVVAR    *v;
-
-	if (!grt) goto quit;
-	
-    lockrc = lock(&grt->grtenv,LOCK_SHR);
-
-    ssi_printf(httpc, "\n<h3>System Variables</h3>\n");
-    ssi_printf(httpc, "<table>\n");
-    ssi_printf(httpc, " <tr><th>Variable</th><th>Value</th></tr>\n");
-
-	count = array_count(&grt->grtenv);
-	for(n=0; n < count; n++) {
-		v = grt->grtenv[n];
-		if (!v) continue;
-		
-        ssi_printf(httpc, " <tr><td>%s</td><td>%s</td></tr>\n", v->name, v->value);
-	}
-
-    ssi_printf(httpc, "</table>\n");
-
-quit:
-    if (lockrc==0) unlock(&grt->grtenv,0);
-    return 0;
-
 }
 
 static int
@@ -685,6 +714,22 @@ ssi_printv(HTTPC *httpc, const char *fmt, va_list args)
     }
 
     return rc;
+}
+
+/* write a value as HTML text: it may come from the client */
+static int
+ssi_text(HTTPC *httpc, const char *text)
+{
+	char	buf[128];
+	size_t	len;
+
+	if (!text) return 0;
+	while (*text) {
+		len = httpssie(buf, sizeof(buf), &text);
+		if (!len) break;
+		ssi_buffer(httpc, buf, (int)len);
+	}
+	return 0;
 }
 
 static int

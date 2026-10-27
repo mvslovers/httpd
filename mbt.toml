@@ -271,6 +271,13 @@ host = false                 # httpd.h -> MVS-only (test-mvs)
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
 
+# SSI output of httpfile.c (#401): printenv shows the request only, printenv
+# and echo escape their values, long lines and split directives.  Needs
+# httpd.h and the real HTTPFILE -> MVS-only.
+[test.TSTSSIF]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false          # httpd.h + libufs -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly

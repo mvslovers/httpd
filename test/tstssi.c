@@ -60,7 +60,7 @@ int main(void)
                                                   "an open directive is held from its start");
     CHECK_EQ((int)hold("text <!--#echo var=\"X\" --"), 5,
                                                   "a split ' -->' holds the directive");
-    CHECK_EQ((int)hold("<!--#a x --> <!--#b y"), 14,
+    CHECK_EQ((int)hold("<!--#a x --> <!--#b y"), 13,
                                                   "only the open directive is held");
     CHECK_EQ((int)hold("<!--#"), 0,                "the bare start is held");
 
