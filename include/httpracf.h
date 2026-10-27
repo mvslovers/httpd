@@ -40,4 +40,12 @@ int httpracf(int rc);
 ** else. */
 int httpracr(int rc, int refuse_noprof);
 
+/* Read the value of RES_NOPROFILE= (#351): 1 for DENY, 0 for ALLOW, -1 for
+** anything else.  The token ends at the first blank or at the end of the
+** string, and the match is caseless, like the other Parmlib values.  -1 is a
+** configuration error the caller must refuse to start on -- a misspelled
+** value must not read as ALLOW, which would leave the gate open unannounced.
+** Pure and free of httpd.h so that the fatal path is dual-tested. */
+int httpracv(const char *value);
+
 #endif /* HTTPRACF_H */

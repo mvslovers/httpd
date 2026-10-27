@@ -86,5 +86,23 @@ int main(void)
         CHECK(same, "default: httpracr() agrees with httpracf() for every rc");
     }
 
+    /* ---- httpracv(): the RES_NOPROFILE= value.  Anything that is not
+    ** ALLOW or DENY must come back -1 -- that is what the parser turns into
+    ** HTTPD427E and a refused start, so a typo cannot read as ALLOW. */
+    CHECK(httpracv("DENY") == 1, "value DENY -> 1");
+    CHECK(httpracv("ALLOW") == 0, "value ALLOW -> 0");
+    CHECK(httpracv("deny") == 1, "value deny (caseless) -> 1");
+    CHECK(httpracv("Allow") == 0, "value Allow (caseless) -> 0");
+    CHECK(httpracv("DENY # note") == 1, "value DENY followed by a blank -> 1");
+    CHECK(httpracv("DENNY") == -1, "value DENNY -> -1 (refuse the start)");
+    CHECK(httpracv("DENYX") == -1, "value DENYX -> -1");
+    CHECK(httpracv("DEN") == -1, "value DEN (prefix) -> -1");
+    CHECK(httpracv("ALLOWED") == -1, "value ALLOWED -> -1");
+    CHECK(httpracv("") == -1, "empty value -> -1");
+    CHECK(httpracv(" DENY") == -1, "leading blank -> -1");
+    CHECK(httpracv("YES") == -1, "value YES -> -1");
+    CHECK(httpracv("0") == -1, "value 0 -> -1");
+    CHECK(httpracv(NULL) == -1, "NULL -> -1");
+
     return mbt_test_summary("TSTRACF");
 }

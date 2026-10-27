@@ -10,6 +10,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
+#include "httpracf.h"      /* httpracv() -- RES_NOPROFILE value (#351)    */
 #include "httpxlat.h"
 #include <unistd.h>          /* sleep()                                      */
 #include <mvs/enq.h>        /* ENQ()       -- port single-instance (#223)   */
@@ -581,12 +582,9 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
            route refuse such a request with 403 (#351).  A value that is
            neither is fatal rather than ignored: ignoring it leaves the gate
            open, which is the thing the keyword was written to prevent. */
-        int vlen = 0;
-        while (value[vlen] && value[vlen] != ' ') vlen++;
-        if (vlen == 4 && http_cmpn((const UCHAR *)value, (const UCHAR *)"DENY", 4) == 0)
-            httpd->cfg_res_noprof = 1;
-        else if (vlen == 5 && http_cmpn((const UCHAR *)value, (const UCHAR *)"ALLOW", 5) == 0)
-            httpd->cfg_res_noprof = 0;
+        int v = httpracv(value);
+        if (v >= 0)
+            httpd->cfg_res_noprof = (UCHAR)v;
         else {
             wtof(MSG_RES_NOPROF_BAD, value);
             httpd->flag |= HTTPD_FLAG_CFGERR;

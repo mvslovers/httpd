@@ -521,6 +521,8 @@ What `DENY` does:
   the trace. Once the profile is defined and loaded the route answers normally,
   with no restart — a user the profile permits gets the real answer, one it does
   not permit gets the plain `403 Forbidden`.
+- The gate sees only SAF's answer "no profile" (rc 4); it cannot tell why SAF
+  had none to apply, and under `DENY` every such reason refuses.
 - A profile that exists behaves as before: a user it permits passes, one it does
   not permit is refused.
 - Nothing changes without the keyword. A configuration that does not carry
