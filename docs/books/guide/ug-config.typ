@@ -284,9 +284,8 @@ working storage of the REXX interpreter was not measured. The stack must be one
 free block. The free storage of the region must be whole enough for that, and
 not only large enough in sum.
 
-*What was measured.* The test used the 4.4.0 release candidate with the stock
-#cmd("REGION=8M"): 60 requests to URLs for #cmd("*.rexx") and #cmd("*.rxp"),
-9 at a time, with #cmd("MAXTASK=9").
+*What was measured.* The test used the 4.4.0 release candidate: 60 requests to
+URLs for #cmd("*.rexx") and #cmd("*.rxp"), 9 at a time.
 
 #tab(caption: [60 requests to REXX modules, 9 at a time])[
   #table(columns: (2.6in, 1fr),
