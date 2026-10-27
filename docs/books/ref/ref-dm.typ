@@ -464,8 +464,14 @@ are as the table holds them, without escaping. The module reads an entry up to
 its length in the table, or up to a null character if that comes first.
 
 If the module cannot get storage for the copy, it prints "Unable to allocate
-Master Trace Table." and ends. The module frees the copy at the end. If the
-client closes the connection, the module stops after the current line.
+Master Trace Table." and ends. The module frees the copy at the end.
+
+The module sends an entry in pieces of at most 255 characters, after any
+escaping, and checks every send. At the first send that fails, for example
+because the client has closed the connection, it stops and sends nothing more:
+not the rest of the entry, not the next entries and not the closing lines of the
+HTML page. An entry longer than one piece can therefore end in the middle of
+the line. The module frees the copy in this case too.
 
 === Limits <ref-dm-dmtt-lim>
 
