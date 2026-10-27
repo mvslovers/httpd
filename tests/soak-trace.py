@@ -114,7 +114,7 @@ print(f"**{n_hit} of {len(stalls)} stalls matched to a trace record.**\n")
 
 if matched:
     print("## Stall to worker to phase\n")
-    print("| time | kind | lvl | dt s | ka | w | tcb | n | server age ms | last | phase (largest gap, ms) | polls | txn | txst | txms | path |")
+    print("| time | kind | lvl | dt s | ka | w | tcb | n | age ms at last sighting | last | phase (largest gap, ms) | polls | txn | txst | txms | path |")
     print("|---|---|--:|--:|:-:|---|---|--:|--:|---|---|--:|--:|--:|--:|---|")
     for r, d in matched:
         t = __import__("time").strftime("%H:%M:%S", __import__("time").gmtime(r["t"]))
