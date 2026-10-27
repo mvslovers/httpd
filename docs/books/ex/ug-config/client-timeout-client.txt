@@ -1,0 +1,4 @@
+$ exec 3<>/dev/tcp/localhost/8080
+$ printf 'GET /hello.tx' >&3
+$ sleep 6
+$ exec 3>&-

@@ -1,0 +1,11 @@
+$ curl -i -b cookies.txt http://localhost:8080/form/page.html
+HTTP/1.1 302 Moved Temporarily
+Date: Tue, 27 Oct 2026 05:52:57 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Location: /login
+Set-Cookie: Sec-Uri=YYaWmZRhl4GHhUuIo5ST; path=/
+Transfer-Encoding: chunked
+

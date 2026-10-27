@@ -1,0 +1,15 @@
+$ curl -i http://localhost:8080/
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:51:01 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Content-Type: text/html
+X-Content-Type-Options: nosniff
+Transfer-Encoding: chunked
+
+<!DOCTYPE html>
+<html><head><title>Documents</title></head>
+<body><h1>Documents</h1>
+<p>This is docs/index.html.</p></body></html>

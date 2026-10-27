@@ -1,0 +1,12 @@
+$ curl -sv -o /dev/null -o /dev/null -o /dev/null http://localhost:8080/hello.txt http://localhost:8080/hello.txt http://localhost:8080/hello.txt 2>&1 | grep -E "Connected|Re-using|Connection|^< HTTP|Closing|keep-alive|Keep-Alive|left intact"
+* Connected to localhost (::1) port 8080
+< HTTP/1.1 200 OK
+< Connection: keep-alive
+* Connection #0 to host localhost left intact
+* Re-using existing http: connection with host localhost
+< HTTP/1.1 200 OK
+< Connection: keep-alive
+* Connection #0 to host localhost left intact
+* Re-using existing http: connection with host localhost
+< HTTP/1.1 200 OK
+< Connection: close

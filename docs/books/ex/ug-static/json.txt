@@ -1,0 +1,11 @@
+$ curl -i http://localhost:8080/data.json
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:41:42 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 34
+
+{"name": "httpd", "static": true}
