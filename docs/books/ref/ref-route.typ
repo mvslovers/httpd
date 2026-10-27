@@ -482,7 +482,9 @@ Then it sends the line #cmd("External program name text") to the body, where
     [#cmd("failed with Sxxx ABEND")], [The module ended with the system abend
       xxx.],
     [#cmd("failed with Unnnn ABEND")], [The module ended with the user abend
-      nnnn, in decimal.],
+      nnnn, in decimal. #cmd("U0801") with the console line
+      #cmd("@@CRT0 - No storage for C stack") means that the region had no
+      block for the stack of the module (@ref-stc-region).],
   )
 ]
 

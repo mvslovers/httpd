@@ -668,7 +668,9 @@ same for the client and for the operator.
     [failed with Sxxx ABEND], [The module ended with the system abend xxx. Look
       for the dump (@ug-trouble-s0c4).],
     [failed with Unnnn ABEND], [The module ended with the user abend nnnn,
-      in decimal.],
+      in decimal. #cmd("U0801"), with the console line
+      #cmd("@@CRT0 - No storage for C stack"), is a region that is too small,
+      see below.],
   )
 ]
 
@@ -677,6 +679,17 @@ module did not run or ended by itself. After the module ended, the server frees
 its storage. If that fails, it writes #cmd("HTTPD906W") with the module name and
 the return code, and the storage stays until the server restarts. The worker
 lives on in every case and serves the next request.
+
+*The abend is U0801, and it comes under load.* Every request that runs a module
+takes one block of storage for its stack: about 256 KB for a module that sets
+nothing, which is the case for REXX and Lua, and about 64 KB for mvsMF. Up to
+#cmd("MAXTASK") requests run at once. When the region has no free block of that
+size, the console shows #cmd("@@CRT0 - No storage for C stack") and
+#cmd("HTTPD908E EXTERNAL PROGRAM name failed with U0801 ABEND"), and the client
+gets 503. The other requests go on. Raise the #cmd("REGION") of the procedure
+(16M held in the one run that was measured) before you raise #cmd("MAXTASK"). If
+16M is not enough, lower #cmd("MAXTASK"). "The Started Task and the Package" in
+the _HTTPD Reference_ has the sizes and the measurement.
 
 *The module is in a library, and the route still fails.* The LINK searches the
 STEPLIB of the started task first, and then the link list. Check that the
@@ -811,7 +824,8 @@ Check in this order:
 connection with keep-alive holds its worker, also while the connection is idle,
 for at most #cmd("KEEPALIVE_TIMEOUT") seconds between two requests. When all
 workers up to #cmd("MAXTASK") are busy, a further client has to wait for a free
-worker. Raise #cmd("MAXTASK") with #cmd("F HTTPD,SET MAXTASK n"), or lower
+worker. Raise #cmd("MAXTASK") with #cmd("F HTTPD,SET MAXTASK n"), but read about
+the region in @ug-trouble-module first, or lower
 #cmd("KEEPALIVE_TIMEOUT") (@ug-config). The command #cmd("F HTTPD,D T") shows
 the threads of the server. If one request is stuck in a module, the module is
 the cause, and more workers do not cure it.

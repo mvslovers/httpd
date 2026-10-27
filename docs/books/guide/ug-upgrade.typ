@@ -514,7 +514,9 @@ to look for. The first two matter for the safety of the system.
   #cmd("MOD=MVSMF /zosmf/restconsoles/*") with
   #cmd("AUTH=TOKEN RES=FACILITY:MVSMF.CONSOLE"), before the route
   #cmd("/zosmf/*"). The console service issues operator commands for every
-  caller who can log in, and mvsMF checks nothing itself. The route must come
+  caller who can log in, and mvsMF up to 1.3.0 checks nothing itself. From
+  mvsMF 1.4.0 on it checks READ on the same profile too and refuses every user
+  until the profile exists; the route stays as a first layer. The route must come
   before the catch-all, because the first match wins. A member that has only
   the line #cmd("/zosmf/*") has no check on the console service. Add the route,
   and define the profile in RAKF (@ug-security). Without a profile the check

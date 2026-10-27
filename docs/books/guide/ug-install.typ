@@ -628,6 +628,11 @@ The program statement is
 //            PARM='STCUSER=&STCUSER STCGROUP=&STCGRP'
 ```)
 
+The #cmd("REGION=8M") is the stock value. A server that is to run many REXX or
+Lua requests at the same time needs more, and #cmd("MAXTASK") must not be
+raised without it: "The Started Task and the Package" in the _HTTPD Reference_
+gives the sizes, and "Troubleshooting" the symptom.
+
 The PARM is separated by blanks, not by commas. A #cmd("CONFIG=") in the PARM
 is a leftover of an old release. It gives #cmd("HTTPD024W") and
 #cmd("HTTPD024I"), and the server takes its configuration from the DD
@@ -787,8 +792,10 @@ HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/* NOT GAT
 ```)
 
 With the shipped member this is what a system without the profile prints. Until
-the profile exists, every user who can log in may issue operator commands.
-Define it. A start without the message does not prove that the profile is
+the profile exists, every user who can log in may issue operator commands
+through mvsMF up to 1.3.0. From mvsMF 1.4.0 on, mvsMF checks the same profile
+itself and refuses every user until it exists, so the warning then concerns
+only this route. Define it. A start without the message does not prove that the profile is
 right. It proves only that the message is not there, so look at the table.
 
 On MVS/CE, the commands #cmd("RDEFINE") and #cmd("PERMIT") define a profile.

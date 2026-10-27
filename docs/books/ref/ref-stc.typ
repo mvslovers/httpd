@@ -100,6 +100,86 @@ HTTPD ignores any other word in the PARM string, without a message. The
 configuration of the server comes from the Parmlib member and not from the PARM
 string. @ref-prm lists the keywords of the member.
 
+=== The region <ref-stc-region>
+
+#idx("REGION", "size")
+#idx("U0801")
+#idx("C stack")
+The #cmd("REGION") of the #cmd("EXEC") statement is the one limit on all the
+storage that the server holds. It is not a Parmlib keyword. A server that runs
+many module requests at the same time may need more than the #cmd("8M") of the
+shipped procedure.
+
+Every request that runs a module takes one contiguous block of storage for the
+C stack of the module, from the region, for as long as the module runs.
+
+#tab(caption: [What a module request costs])[
+  #table(columns: (2.2in, 1fr),
+    [What], [Size],
+    [C stack of a module that sets nothing], [262,328 bytes, about 256 KB. It
+      is the default of the C runtime (#cmd("@@CRT0") of LIBC/370). A module
+      that sets #cmd("__stklen") gets that size (@ref-api-start).],
+    [C stack of a module with its own #cmd("__stklen")], [The value plus 48
+      bytes. mvsMF sets 64 KB, so a request of mvsMF takes 65,584 bytes.],
+    [Stack of a worker thread], [64 KB, once per worker thread.],
+    [Stack of the socket thread], [32 KB, once.],
+    [Resident copy of a module], [The size of the load module, once per module
+      and not per request (#cmd("RESIDENT"), @ref-prm-route).],
+  )
+]
+
+A request runs on a worker thread, so at most #cmd("MAXTASK") module requests
+run at once, and their stacks add up to #cmd("MAXTASK") times the stack of the
+module. At the default #cmd("MAXTASK=9") and modules with the default stack
+that is 9 times 262,328 = 2,360,952 bytes, plus 9 times 64 KB for the worker
+threads. The stack is one contiguous block, so the free storage of the region
+has to be whole enough to hold it and not only large enough in sum. Each step
+of #cmd("MAXTASK") costs at least one more worker stack and one more module
+stack, before the working storage of the module itself.
+
+If the request cannot get its stack, the module does not start. The console
+shows
+
+#screen(```
+@@CRT0 - No storage for C stack
+HTTPD908E EXTERNAL PROGRAM REXX failed with U0801 ABEND
+```)
+
+and the client gets status 503 with the text #cmd("External program REXX failed
+with U0801 ABEND"). The other requests of the server go on. A module that is
+linked against a LIBC/370 older than 1.0.3 does not ask for the stack with a
+condition and abends #cmd("S80A") instead, from inside the system.
+#cmd("HTTPD904E") and #cmd("HTTPD999E") are the same shortage in the storage of
+the server itself.
+
+#idx("MAXTASK", "and REGION")
+Only a measurement shows the size that a site needs. This one was made against
+a release candidate of 4.4.0 with the stock #cmd("REGION=8M"): 60 requests to
+REXX pages, 9 at a time (#cmd("MAXTASK=9")). The table gives the failed
+requests of the 60, one entry per run.
+
+#tab(caption: [A measurement of parallel module requests])[
+  #table(columns: (2.6in, 1fr),
+    [Set-up], [Failed requests of 60],
+    [#cmd("REGION=8M"), #cmd("RESIDENT=YES")], [6, 32, 0],
+    [#cmd("REGION=8M"), HTTPD 4.3.0 with the same module libraries], [0, 4, 0],
+    [#cmd("REGION=8M"), #cmd("RESIDENT=NO")], [0 (one run)],
+    [#cmd("REGION=16M")], [0 (one run)],
+  )
+]
+
+A mixed load of 6 requests at a time across all module types was clean in every
+set-up. The sample is small and the runs are not independent. It shows an order
+of magnitude and not a threshold. It was not run with Lua requests. Three rules
+follow from it.
+
+- For many parallel REXX or Lua requests, set #cmd("REGION=16M") in the
+  procedure before you raise #cmd("MAXTASK"). 16M is the largest value that was
+  tried. If it is not enough, lower #cmd("MAXTASK") and do not raise it.
+- Raise #cmd("MAXTASK") only together with the region.
+- Do not use #cmd("RESIDENT=NO") as the cure. It brings back the fetch of the
+  module on every request.
+
 == The DD Statements <ref-stc-dd>
 
 #idx("DD names")

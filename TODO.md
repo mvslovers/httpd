@@ -40,7 +40,7 @@ mvslovers/mbt#163.*
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
-| — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
+| — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
 | — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
 | — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | PR #384 pins the released ufsd 1.5.2; `mbt test --mvs` stays part of the 4.5.0 release acceptance; milestone 4.5.0, not yet ranked |

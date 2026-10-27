@@ -833,7 +833,10 @@ its code did not expect, and that each one is worth a bug report.
       found", "could not be loaded", "was dispatched without a program name",
       "could not be started, ESTAE create failed", "returned rc n", "failed
       with Sxxx ABEND" or "failed with Unnnn ABEND". The name is "(none)" if
-      there is none.],
+      there is none. "failed with U0801 ABEND", with
+      #cmd("@@CRT0 - No storage for C stack") before it on the console, means
+      that the region had no free block for the stack of the module (see
+      @ref-stc-region).],
       a: [The server frees the storage of the program (#cmd("HTTPD906W") if
       that fails). If no response header went out, the client gets the status
       503 with the same text. The server goes on.]),
