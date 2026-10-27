@@ -2693,7 +2693,7 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     http_printf(httpc, "<dd>Display the HTTPD storage areas. "
         "This is the default if ?target is omitted.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=FILE&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=FILE&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the File Handle at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=FS</dt>\n");
@@ -2711,14 +2711,14 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     http_printf(httpc, "<dd>Display the Thread Manager of this server. "
         "It takes no address.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=MOD&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=MOD&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the route array (MOD= programs and LOC= static "
         "prefixes) at the memory address. Was ?target=CGI.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=TASK&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=TASK&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Task Handle at the memory address.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=WORKERS&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=WORKERS&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Manager Workers Array at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "</dl>\n");
