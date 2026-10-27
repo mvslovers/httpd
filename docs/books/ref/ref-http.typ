@@ -674,16 +674,20 @@ of the closing marker. A line can hold several directives.
       #cmd("<!-- Oops: we didn't find var=\"X\" -->").],
     [#cmd("<!--#include virtual=\"path\" -->")], [Inserts the file. The form
       with #cmd("file=") is the same.],
-    [#cmd("<!--#printenv -->")], [Inserts two HTML tables. The first is headed
-      #cmd("Server Variables") and lists the variables of the request. The
-      second is headed #cmd("System Variables") and lists the environment table
-      of the server itself.],
+    [#cmd("<!--#printenv -->")], [Inserts one HTML table, headed
+      #cmd("Server Variables"), with a row for each variable of the request
+      (@ref-api-env). It lists nothing of the environment of the server.],
   )
 ]
 
-The server does not escape any value that it inserts. A request variable that
-holds a header value from the client therefore reaches the page as the client
-sent it.
+#idx("server-side includes", "escaping")
+The server writes every value that #cmd("echo") inserts, and every name and
+value that #cmd("printenv") lists, as HTML text. The five characters
+#cmd("&"), #cmd("<"), #cmd(">"), #cmd("\"") and #cmd("'") become the entities
+#cmd("&amp;"), #cmd("&lt;"), #cmd("&gt;"), #cmd("&quot;") and #cmd("&#39;"). A
+header value from the client therefore reaches the page as text and not as
+markup. The server never cuts a value to do this. Text that comes from the
+page itself, from the file or from a file that it includes, is sent as it is.
 
 Text that the server does not recognize as a directive is sent as it is. That
 covers an unknown directive name and a missing blank in front of the closing
@@ -697,15 +701,22 @@ Includes can be nested up to 10 levels. Below that level the server writes
 the include. An include of a file that does not exist gets
 #cmd("<!-- Oops: we didn't find \"path\" -->"), and an include of a file with a
 binary MIME type gets a comment that starts with #cmd("<!-- Oops: we can't
-include a binary file"). One piece of output of a directive is limited to 4095
-characters. A read error in an included file ends the response as it does in the
-page itself (@ref-http-stall). The includes that follow on the same line are
-not opened.
+include a binary file"). The comment that the server writes in place of a
+directive is limited to 4095 characters. A value that #cmd("echo") or
+#cmd("printenv") writes is not cut at that limit. A read error in an included
+file ends the response as it does in the page itself (@ref-http-stall). The
+includes that follow on the same line are not opened.
 
-The server reads the file line by line, in pieces of at most 254 characters, and
-looks for directives in each piece. A line that is longer than 254 characters is
-split, and the server appends a line feed to each piece that does not end in
-one. A directive that is cut by the split is not recognized.
+The server reads the file line by line and looks for directives in each line. A
+line can be of any length. The server reads a long line in pieces and sends it
+as one line. A directive that a read cuts in two is joined again, and the server
+recognizes it, if it is at most 384 characters long. A longer directive that a
+read cuts in two is not recognized in every case. The server then sends it as
+text, like any other text that is not a directive. The same happens when the
+output buffer of the response is still full after the server has tried to send
+it, at the moment the rest of a long line is due: the part of the line that was
+held back goes out as text, and a directive that spans that cut is not
+recognized.
 
 == Character Translation <ref-http-xlate>
 
