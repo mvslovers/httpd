@@ -56,10 +56,12 @@ rules.
   tools, not production endpoints.
 
 HTTPDSRV, HTTPDM and HTTPDMTT send the response header
-#cmd("Cache-Control: no-store") and the header
-#cmd("Access-Control-Allow-Origin: *"). The second header lets a page of any
-other origin read the answer in a browser that holds a session with the
-server.
+#cmd("Cache-Control: no-store"). None of them sends
+#cmd("Access-Control-Allow-Origin"), so a page of another origin cannot read an
+answer in a browser that holds a session with the server. The #cmd("text/plain")
+answers of HTTPDM and HTTPDMTT (#cmd("d") set to a number other than 0) and the
+pages of HTTPDSRV also send #cmd("X-Content-Type-Options: nosniff"), so a
+browser does not take the text for HTML.
 
 A display module that is started in another way than by HTTPD (for example from
 JCL) does nothing. It writes the message #cmd("HTTPD920E") to the console and a
@@ -453,6 +455,13 @@ of the table. With #cmd("d") set to another number, the response is
 #cmd("text/plain") and has the lines only. The module prints the text of an
 entry as text. It does not read the text as a format, so a percent sign in a
 message does no harm.
+
+In the HTML page the module escapes #cmd("<"), #cmd(">"), #cmd("&"),
+#cmd("\"") and #cmd("'") in every entry, so a message such as
+#cmd("<b>") shows as that text and is not read as markup. The table holds the
+messages of every job, not only those of HTTPD. In the plain form the entries
+are as the table holds them, without escaping. The module reads an entry up to
+its length in the table, or up to a null character if that comes first.
 
 If the module cannot get storage for the copy, it prints "Unable to allocate
 Master Trace Table." and ends. The module frees the copy at the end. If the
