@@ -188,6 +188,41 @@ runs for a long time has to look at them itself (@ug-module-drain). Before you
 stop the server, check with #cmd("D T") that no worker serves a client you care
 about (@ug-ops-d-threads).
 
+== Cancelling <ug-ops-cancel>
+
+#idx("cancel")
+#idx("C HTTPD")
+#idx("S222")
+#cmd("P") is the way to stop HTTPD (@ug-ops-stop). The console command
+#cmd("C") ends the address space at once, whether the server is idle or
+serving. Cancel a server only when it does not end after #cmd("P"):
+
+#screen(raw(read("../ex/ug-ops/cancel.txt")))
+
+The system ends the task, not HTTPD. #cmd("IEF450I") shows the abend code
+S222, the code of a cancel by the operator. The shutdown of the server does not
+run. The console shows none of #cmd("HTTPD098I"), #cmd("HTTPD060I"),
+#cmd("HTTPD416I") and #cmd("HTTPD099I"), so you get no counters for the run.
+An idle server and a server with clients connected give the same lines.
+
+When the job has ended, start the server as after a stop (@ug-ops-restart).
+
+*Lines from libc370.* HTTPD 4.3.0 and 4.4.0 wrote lines that start with
+#cmd("libc370 recovery:") and #cmd("libc370 @@@try.c failed()") during a
+cancel, several lines, more when requests were in progress. They said
+only that a task was ending, which #cmd("IEF450I") says as well. HTTPD 4.5.0 is
+built with libc370 2.26.0, and the server writes none of them.
+
+#note[A server module carries its own copy of libc370. A module that was
+linked with a level older than 2.26.0 can still write
+#cmd("libc370 @@@try.c failed(): recovery cleanup-only, retry suppressed") when
+a request is inside it at the cancel. MVSMF 1.3.0, which was linked with
+libc370 2.12.1, writes one such line in front of #cmd("IEF450I"). The line is
+harmless. It goes away when the module is built with libc370 2.26.0 or later.]
+
+The quiet cancel changes only the line for a task that ends because of the
+cancel. An abend of a request is reported as before (@ug-ops-abend).
+
 == Restarting <ug-ops-restart>
 
 #idx("restart")

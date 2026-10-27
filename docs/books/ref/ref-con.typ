@@ -408,3 +408,12 @@ every message. The _HTTPD User's Guide_ shows a stop from the console in
 #cmd("/F HTTPD,SHUTDOWN") in its comments. The server has no such command. A
 command with this word gets #cmd("HTTPD101E") and the help text. Use
 #cmd("/P HTTPD").]
+
+#idx("CANCEL command")
+#cmd("/C HTTPD") ends the address space with the system abend S222. The
+shutdown does not run: the console shows #cmd("IEE301I"), #cmd("IEF450I") and
+#cmd("$HASP395"), and none of #cmd("HTTPD098I"), #cmd("HTTPD060I"),
+#cmd("HTTPD416I") and #cmd("HTTPD099I"). The server itself writes no
+#cmd("libc370 recovery:") line and no #cmd("libc370 @@@try.c failed()") line.
+A module that was linked with libc370 older than 2.26.0 can still write the
+second one. The _HTTPD User's Guide_ shows a cancel in "Operating HTTPD".

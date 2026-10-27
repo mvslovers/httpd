@@ -1470,6 +1470,25 @@ Operator commands:
 Commands abbreviate to the capitalised prefix, which is why `DISPLAY Threads`
 and `DISPLAY TIme` need one and two letters respectively.
 
+### Cancelling
+
+`/P HTTPD` is the way to stop. `/C HTTPD` ends the address space at once with
+the system abend S222, and the shutdown does not run:
+
+```
+C HTTPD
+IEE301I HTTPD    CANCEL COMMAND ACCEPTED
+IEF450I HTTPD HTTPD - ABEND S222 U0000 - TIME=12.07.14
+$HASP395 HTTPD    ENDED
+```
+
+There is no `HTTPD098I`, `HTTPD416I` or `HTTPD099I`. Since 4.5.0 (libc370
+2.26.0) the server writes no `libc370 recovery:` or `libc370 @@@try.c failed()`
+line on a cancel; 4.3.0 and 4.4.0 did, several lines, more when requests were
+in progress. A module linked with an older libc370 can still write
+`libc370 @@@try.c failed(): recovery cleanup-only, retry suppressed` (MVSMF
+1.3.0 does, one line). Start again as in the next section.
+
 ### Restarting
 
 After `/P HTTPD`, wait for `$HASP395 HTTPD ENDED` before `/S HTTPD`. With
