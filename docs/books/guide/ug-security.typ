@@ -370,7 +370,10 @@ user gets the 401 of the first stage.
 product answers that no profile covers the resource (return code 4), HTTPD
 counts the request as permitted. Whether the product gives that answer for an
 unprotected resource depends on its settings. If it refuses instead (return
-code 8 or above), the user gets the 403. A typing error in the class or in the resource name looks the same.
+code 8 or above), the user gets the 403. A typing error in the resource name
+looks the same as a missing profile. A class that RAKF does not know is a
+different case: RAKF answers it with the return code 8 and writes
+#cmd("RAKF0012 UNDEFINED CLASS"), and every user gets the 403.
 HTTPD therefore asks once for each route with #cmd("RES=") at the start. For a
 route without a profile it writes #cmd("HTTPD425W NO PROFILE FOR
 class:resource -- path NOT GATED"). The route still works, and every user who
@@ -528,8 +531,9 @@ HTTPD is a small server. Know the limits before you open it to a network.
 - *Routes match once.* The first route that matches decides. HTTPD does not
   warn when a general route hides a specific one.
 - *A path without a route is public.* There is no default that denies.
-- *A wrong class or resource name opens the route.* HTTPD warns once at the
-  start (#cmd("HTTPD425W")) and not again. With #cmd("RES_NOPROFILE=DENY") the
+- *A wrong resource name opens the route.* HTTPD warns once at the
+  start (#cmd("HTTPD425W")) and not again. A class that RAKF does not know
+  closes it for every user instead, and HTTPD does not warn. With #cmd("RES_NOPROFILE=DENY") the
   route is closed instead (@ug-security-noprofile).
 - *A password is at most 8 characters.* HTTPD changes the user ID and the
   password to upper case and cuts both at 8 characters.

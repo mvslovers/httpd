@@ -554,7 +554,9 @@ lets everybody pass. At the start the server tests every route that
 has #cmd("RES=") and a mode other than #cmd("NONE"), and it writes
 #cmd("HTTPD425W NO PROFILE FOR class:resource -- path NOT GATED") for each one
 that has no profile (see the capture in @ug-trouble-skip). A typing error in
-the class or in the resource name looks the same. Treat #cmd("HTTPD425W") as an
+the resource name looks the same. A class that RAKF does not know gives no
+#cmd("HTTPD425W"): RAKF answers with the return code 8, and every request gets
+the 403. Treat #cmd("HTTPD425W") as an
 error of your configuration. "What the Server Asks of the Security Product"
 in the _HTTPD Reference_ describes the check.
 

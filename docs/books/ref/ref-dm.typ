@@ -220,6 +220,8 @@ offset. The fields are these.
       in HTTPDM.],
     [#cmd("docroot")], [The UFS document root.],
     [#cmd("listen_queue")], [The listen backlog.],
+    [#cmd("cfg_res_noprof")], [The value of #cmd("RES_NOPROFILE"): the page shows
+      #cmd("ALLOW") or #cmd("DENY").],
     [#cmd("codepage")], [The code page name from the #cmd("CODEPAGE") keyword.
       When the keyword is not set, the page shows "CP037 (default, no CODEPAGE
       keyword)".],

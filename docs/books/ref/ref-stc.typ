@@ -483,7 +483,8 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       #cmd("RES_NOPROFILE=DENY") the message is
       #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
       and every request that reaches the check gets status 403. A typing error
-      in the class or in the resource name looks like this.],
+      in the resource name looks like this. A class that RAKF does not know gives
+      the return code 8 and no message (see below).],
     [Authorization by SVC 244], [The security product allows or refuses the SVC
       for the account of the task. The server does not check the profile
       itself.],
@@ -498,6 +499,16 @@ and a system with no security product gives 0. On those systems the probe stays
 silent without a profile as well, so a silent probe does not prove that a
 profile exists. #cmd("RES_NOPROFILE=DENY") acts on the return code 4 only. It
 does not change what a system answers with 0 or with 8.
+
+Two cases of RAKF show this. A class that RAKF does not define gives the return
+code 8 and the message #cmd("RAKF0012 UNDEFINED CLASS class"), whatever the
+resource is: a #cmd("RES=") route on such a class refuses every request with
+the plain 403, with either setting, and the probe stays silent. The classes
+#cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") give the return code 0 for a
+resource without a profile, so a route on one of them lets the request pass,
+and #cmd("RES_NOPROFILE=DENY") does not change it. Both answers were measured for
+the identity of the server (the probe at the start); the answer of RAKF for the
+access of a user in these classes was not measured.
 
 The _HTTPD User's Guide_ shows how to define the profiles with RAKF, in
 "Authentication and Security".
