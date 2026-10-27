@@ -152,7 +152,8 @@ the answer above, and the path #cmd("/docs/") gets the index file.
 #idx("Content-Type")
 #idx("file extension")
 HTTPD chooses the #cmd("Content-Type") from the extension of the file name:
-the text after the last dot in the last part of the path. The comparison
+the text after the last dot in the last part of the path. If that part has no
+dot, HTTPD looks at the whole path. The comparison
 ignores case, so #cmd("LOGO.PNG") and #cmd("logo.png") are the same.
 
 #tab(caption: [Some content types])[
@@ -295,8 +296,9 @@ either. It never answers with 304, and it sends no #cmd("Last-Modified") or
 #screen(raw(read("../ex/ug-static/conditional-ignored.txt")))
 
 A client that sends these headers gets the whole file each time. A server
-module on a route with a program decides about all methods and headers for its
-own paths. @ug-routes tells how routes are matched.
+module on a route with a program decides about the methods #cmd("GET"),
+#cmd("HEAD"), #cmd("POST"), #cmd("PUT") and #cmd("DELETE") and about the
+headers for its own paths. @ug-routes tells how routes are matched.
 
 == Static Locations <ug-static-loc>
 

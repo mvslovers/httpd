@@ -365,8 +365,8 @@ Leave it at the default.
 wire and the EBCDIC in HTTPD. The names are #cmd("CP037") (the default),
 #cmd("IBM1047") and #cmd("LEGACY"), in any case. #cmd("LEGACY") is the table
 of HTTPD 3.3.x. An empty value is #cmd("CP037"). Another name gives
-#cmd("HTTPD070E"), and HTTPD uses #cmd("CP037"). #cmd("D C") shows the code
-page in effect (#cmd("HTTPD134I")).
+#cmd("HTTPD070E"), and HTTPD uses #cmd("CP037"). #cmd("D C") shows the name as
+the member has it (#cmd("HTTPD134I")), also when it is not one of the three.
 
 === The Time Zone
 
@@ -421,10 +421,11 @@ There are two ways to set the level.
 #screen(raw(read("../ex/ug-ops/set-stats-all.txt")))
 
 Check the level with #cmd("D C"). The line #cmd("HTTPD132I") shows the type and
-the level (the capture in @ug-config-dc). HTTPD compares the level with the
-four names for as many characters as you write. #cmd("ERR") is
+the level (the capture in @ug-config-dc). In the member, HTTPD compares the
+level with the four names for as many characters as you write. #cmd("ERR") is
 #cmd("ERROR"). #cmd("A") is #cmd("AUTH"), because #cmd("AUTH") comes before
-#cmd("ALL"). Write the whole name. A word that is no level gives
+#cmd("ALL"). Write the whole name. The console command #cmd("SET STATS")
+accepts only the whole name. A word that is no level gives
 #cmd("HTTPD431W") in the member and #cmd("HTTPD126E") at the console. A type
 outside the range gives #cmd("HTTPD432W").
 
@@ -497,9 +498,9 @@ Because the first case is silent, check the result with #cmd("D C")
 === Refusals
 
 #idx("refuse to start")#idx("HTTPD420E")
-In two cases HTTPD does not start. The message #cmd("HTTPD420E") says that the
+In some cases HTTPD does not start. The message #cmd("HTTPD420E") says that the
 authorization policy of the routes is incomplete. The server ends with the
-return code 8.
+return code 8. Two causes are the common ones.
 
 - A route has an #cmd("AUTH=") value that does not exist. The message
   #cmd("HTTPD419E") says that the policy of that route is lost.
@@ -526,8 +527,9 @@ message so that nobody believes it still works.
       the start, because the routes without #cmd("AUTH=") would turn public.],
     [#cmd("TZOFFSET=")], [#cmd("HTTPD025W"), then #cmd("HTTPD025I")], [Delete
       it. The offset of the system applies (@ug-config-misc).],
-    [#cmd("RECLAIM=")], [#cmd("HTTPD422W")], [Delete it. The message says that
-      the reclaim of the storage of modules is always on.],
+    [#cmd("RECLAIM=")], [#cmd("HTTPD422W")], [An option of a #cmd("MOD") route,
+      not a keyword. Delete it. The message says that the reclaim of the
+      storage of modules is always on.],
     [#cmd("CGI=")], [#cmd("HTTPD410W")], [Write #cmd("MOD=") instead. HTTPD
       reads the line as a #cmd("MOD=") route.],
   )

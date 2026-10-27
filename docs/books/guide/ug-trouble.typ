@@ -202,9 +202,11 @@ sample member. The Reference has it in "The Started Task and the Package".
 #idx("HTTPD002I")
 #idx("APF", "troubleshooting")
 #idx("SVC 244")
-*Symptom.* The console shows the banner and the C library line, then
-#cmd("HTTPD012E name UNABLE TO DYNAMICALLY OBTAIN APF AUTHORIZATION") and no
-#cmd("HTTPD002I"). The step ends.
+*Symptom.* The console shows
+#cmd("HTTPD012E name UNABLE TO DYNAMICALLY OBTAIN APF AUTHORIZATION") first.
+The banner and the C library line follow, each with a leading plus sign
+because the step is not authorized, and there is no #cmd("HTTPD002I"). The
+step ends.
 
 The server needs to be authorized. At the entry it tests whether the step is
 authorized. If it is not, the server asks for the authorization with SVC 244,

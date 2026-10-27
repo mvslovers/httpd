@@ -361,8 +361,9 @@ how you find a request that does not end (@ug-ops-monitor).
 #idx("DISPLAY MEMORY")
 #cmd("D M address,length") dumps storage of the server. The address is in hex
 and must be below 16 MB (hex 00FFFFFF), else the server answers with
-#cmd("HTTPD144E"). The length is a decimal number, or a hex number with the
-prefix #cmd("0x"). The default is 256 bytes, and the largest dump is 4096. An
+#cmd("HTTPD144E"). Without an address the answer is #cmd("HTTPD148I"), a line
+that shows the syntax. The length is a decimal number, or a hex number with the
+prefix #cmd("0x"). A number with a leading 0 is octal. The default is 256 bytes, and the largest dump is 4096. An
 address that the task cannot read ends the dump with #cmd("HTTPD147E"), and the
 server goes on.
 
@@ -395,9 +396,9 @@ stop.
 Three settings can change while the server runs.
 
 *The number of workers.* #cmd("SET MA n") sets the largest number of worker
-threads, #cmd("SET MI n") the smallest. Always give the number. HTTPD takes a
-value below 1 as 1 and a value above 100 as 100, and a word that is not a
-number as 1. The new value holds until the server stops. The Parmlib member
+threads, #cmd("SET MI n") the smallest. Always give the number. HTTPD takes the
+value 0 as 1 and a value above 100 as 100, and a word that is not a number as
+1. The new value holds until the server stops. The Parmlib member
 does not change, and #cmd("D C") still shows the values from the member.
 
 The answer is the dispatcher block of #cmd("D T"). It shows the new limits.

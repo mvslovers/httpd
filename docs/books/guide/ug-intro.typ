@@ -130,7 +130,7 @@ The installation steps are in @ug-install. In short, a system needs this:
   [UFSD], [Needed for static files. HTTPD links the UFS library into its load
     module, so there is nothing more to install, but the UFSD started task has
     to run and hold a web root image. A site that uses HTTPD only for server
-    modules can set #cmd("UFS=0") (@ug-static-noufsd). The build of HTTPD requires UFSD 1.5.1
+    modules can set #cmd("UFS=0") (@ug-static-noufsd). The build of HTTPD requires UFSD 1.5.2
     or later.],
   [mvsMF], [Needed only for the routes of the sample Parmlib member that name
     it. Without such a route HTTPD serves files only.],

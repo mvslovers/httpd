@@ -21,7 +21,8 @@ definition has an entry of its own.
     without it is public (@ug-routes, @ug-security).],
   [Basic], [The login mode #cmd("AUTH=BASIC"). The server answers a request
     without credentials with 401 and a #cmd("WWW-Authenticate") header that
-    names the _realm_ (@ug-security).],
+    names the _realm_. A request with the header #cmd("X-CSRF-ZOSMF-HEADER")
+    gets the 401 without that header (@ug-security).],
   [chunked transfer], [A way to send a body of unknown length. The response has
     the header #cmd("Transfer-Encoding: chunked") and no #cmd("Content-Length").
     The server adds the header itself when a module ends the headers with a
@@ -105,8 +106,9 @@ definition has an entry of its own.
     (@ug-static).],
   [STCUSER], [The PARM keyword of the procedure that names the user id under
     which the started task runs after its start. The matching keyword for the
-    group is #cmd("STCGROUP"). Without a user id of its own the task keeps the
-    identity that it inherited (@ug-security, @ug-trouble).],
+    group is #cmd("STCGROUP"). The default is the user #cmd("HTTPD") in the group
+    #cmd("USER"). Only if the logon fails does the task keep the identity that
+    it inherited (@ug-security, @ug-trouble).],
   [STEPLIB], [The DD of the procedure with the load libraries. The system
     searches it first and then the _link list_ (@ug-routes).],
   [SVC 244], [The service call through which a program obtains _APF_

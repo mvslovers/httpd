@@ -170,7 +170,7 @@ skips the initialisation and the warning ("The HTTPPRM Keywords" in the
 _HTTPD Reference_).
 
 If you want static files, UFSD must run before HTTPD, as a started task of its
-own. HTTPD 4.4.0 is built against UFSD 1.5.1. A UFSD older than 1.5.0 is
+own. HTTPD 4.5 is built against UFSD 1.5.2 (HTTPD 4.4.0 against 1.5.1). A UFSD older than 1.5.0 is
 untested. The _UFSD User's Guide_ installs UFSD.
 
 === mvsMF Is Optional <ug-install-mvsmf>
