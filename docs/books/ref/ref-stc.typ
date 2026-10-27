@@ -511,9 +511,11 @@ with no message: the probe writes #cmd("HTTPD425W") or, with
 #cmd("RES_NOPROFILE=DENY"), #cmd("HTTPD426W"), and without the keyword the route
 is open. A resource name with a typing error gives the return code 4 on both
 levels when no profile covers the misspelled name. A measurement with the RAKF
-of MVS/CE and with that of TK5, made with the identity of the server as the
-probe does, gave the return code 0 on both for the classes #cmd("TAPEVOL"),
-#cmd("DASDVOL") and #cmd("TERMINAL") without a profile. HTTPD allows a request on the return code 0, so
+of MVS/CE (RAKF 2.0.0) and with that of TK5 (RAKF 1.2.x) gave the return code 0
+on both for a batch user, the operator #cmd("IBMUSER"), for the classes
+#cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") without a profile. The
+start probe, which runs with the identity of the server, stays silent for these
+classes, so its answer is not 4. HTTPD allows a request on the return code 0, so
 #cmd("RES_NOPROFILE=DENY") does not close such a route. The measurement did not
 use the ACEE of a client.
 
