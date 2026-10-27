@@ -48,6 +48,7 @@
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 #include "httpbody.h"               /* request body classification  */
 #include "httpstat.h"               /* status code -> status line   */
+#include "httpnobd.h"               /* response has no body?        */
 #include "httprlm.h"                /* HTTP_REALM_CFG_MAX (#193)    */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */

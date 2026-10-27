@@ -312,6 +312,14 @@ sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstracf.c", "src/httpracf.c"]
 
+# httpnobd() "does this response carry a message body" decision (issue #399):
+# a response to HEAD, 1xx, 204 and 304 never does, so httpprtv() must not
+# frame it as chunked.  Free of httpd.h -> DUAL (host + MVS); helper source
+# listed for the host link.
+[test.TSTNOBD]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstnobd.c", "src/httpnobd.c"]
+
 # httpstat() status code -> status line table (issue #181).  A code the table
 # does not know is answered with 500, so a gap is silent on the wire -- the
 # test pins every code httpd itself emits.  Free of httpd.h -> DUAL (host +

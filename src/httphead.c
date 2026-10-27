@@ -11,10 +11,14 @@ httphead(HTTPC *httpc)
 
     http_enter("httphead()\n");
 
-    /* not implemented */
-    rc = http_resp_not_implemented(httpc);
+    /* HEAD answers what GET would answer -- status, headers, Content-Length --
+    ** and stops at the blank line.  httpget() sees CSTATE_HEAD and sends no
+    ** body; httpprtv() drops the text an error path prints after its
+    ** headers and does not frame the response as chunked (#399).
+    */
+    rc = http_get(httpc);
 
-    httpc->state = CSTATE_DONE;
+    if (httpc->state == CSTATE_HEAD) httpc->state = CSTATE_DONE;
     http_exit("httphead(), rc=%d\n", rc);
     return rc;
 }
