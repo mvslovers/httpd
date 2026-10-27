@@ -193,8 +193,10 @@ without the UFSD started task there is nothing to serve statically.
 Nothing about the *install* needs it: the SYSMOD declares no prerequisite and
 `libufs` is linked statically into the load modules. HTTPD does not contact
 UFSD when it starts and does not check that UFSD runs: it only creates the
-control block of its file system. It asks UFSD for a session when it opens a
-file, once per request, and when it gets none the request is answered `404`.
+control block of its file system. It asks UFSD for a session when it first
+opens a file on a connection and keeps that session until the connection
+closes. When it gets none, the request is answered `404`, and the next request
+on the connection asks again.
 
 The server starts, listens, and every `MOD=` route is dispatched as usual. What
 fails is whatever needs the file system: static file requests, and the calls a
