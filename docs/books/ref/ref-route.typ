@@ -86,8 +86,8 @@ LOC=/*                            AUTH=NONE
 #idx("first match")
 HTTPD compares the path of the request with the pattern of each route. The path
 is the part of the URI before the first question mark. HTTPD decodes it first:
-each #cmd("%xx") becomes the character, and a plus sign becomes a blank. The
-query string never takes part in the match.
+each #cmd("%xx") becomes the character. A plus sign stays a plus sign
+(@ref-http-url). The query string never takes part in the match.
 
 A pattern is a wildcard pattern if it contains #cmd("*") or #cmd("?"). Any
 other pattern is a plain path.
