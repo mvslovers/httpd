@@ -705,8 +705,8 @@ of the closing marker. A line can hold several directives.
     [Directive], [Effect],
     [#cmd("<!--#echo var=\"X\" -->")], [Inserts the value of the request
       variable X. If there is none, the server looks for an environment variable
-      of that name. If there is neither, it inserts the comment
-      #cmd("<!-- Oops: we didn't find var=\"X\" -->").],
+      of its own, of that name (see below). If there is neither, it inserts the
+      comment #cmd("<!-- Oops: we didn't find var=\"X\" -->").],
     [#cmd("<!--#include virtual=\"path\" -->")], [Inserts the file. The form
       with #cmd("file=") is the same.],
     [#cmd("<!--#printenv -->")], [Inserts one HTML table, headed
@@ -714,6 +714,22 @@ of the closing marker. A line can hold several directives.
       (@ref-api-env). It lists nothing of the environment of the server.],
   )
 ]
+
+#idx("server-side includes", "server environment")
+The name in an #cmd("echo") directive is looked up in two places, in this order.
+First the server looks at the request variables (@ref-api-env). If the request
+has no variable of that name, the server looks at its own environment, the one
+that the server task runs with, and inserts the variable of that name from it.
+So a page can print a single variable of the server environment by name. The
+name comes from the page, never from the request: a client cannot choose it and
+cannot make the server read any other variable. The directive can therefore be
+used only by someone who can put a page into the document root. A client cannot
+do it. The directive #cmd("printenv") never reads the server environment.
+
+#note[The server drops the second look in HTTPD 4.6.0 (httpd#421). From that
+version #cmd("echo") reads the request variables only, and a variable that is
+not among them gives the #cmd("Oops") comment. A page that prints a variable of
+the server environment must not rely on this.]
 
 #idx("server-side includes", "escaping")
 The server writes every value that #cmd("echo") inserts, and every name and
