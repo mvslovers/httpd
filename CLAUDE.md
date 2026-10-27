@@ -45,7 +45,7 @@ every merge, and if it ever disagrees with `gh issue list`, the tracker wins.
 
 ```toml
 [dependencies]
-"mvslovers/ufsd" = ">=1.5.1"
+"mvslovers/ufsd" = ">=1.5.2-rc1"
 "mvslovers/crypto370" = ">=1.0.1"
 
 [tools]
