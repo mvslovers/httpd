@@ -483,7 +483,8 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       #cmd("RES_NOPROFILE=DENY") the message is
       #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
       and every request that reaches the check gets status 403. A typing error
-      in the class or in the resource name looks like this.],
+      in the resource name looks like this. A class that the security product
+      does not know does not, see below.],
     [Authorization by SVC 244], [The security product allows or refuses the SVC
       for the account of the task. The server does not check the profile
       itself.],
@@ -498,6 +499,19 @@ and a system with no security product gives 0. On those systems the probe stays
 silent without a profile as well, so a silent probe does not prove that a
 profile exists. #cmd("RES_NOPROFILE=DENY") acts on the return code 4 only. It
 does not change what a system answers with 0 or with 8.
+
+#idx("RAKF0012")
+RAKF 2.0.0 gives the return code 8 for a class that is not in the class
+descriptor table of the system. It writes #cmd("RAKF0012 UNDEFINED CLASS class")
+to the console. The route refuses every request, the probe stays silent and
+#cmd("RES_NOPROFILE") changes nothing. A class with a typing error gives this
+answer. A resource name with a typing error gives the return code 4 when no
+profile covers the misspelled name. A measurement with RAKF on MVS/CE, made
+with the identity of the server as the probe does, gave the return code 0 for
+the classes #cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") without a
+profile. HTTPD allows a request on the return code 0, so
+#cmd("RES_NOPROFILE=DENY") does not close such a route. The measurement did not
+use the ACEE of a client.
 
 The _HTTPD User's Guide_ shows how to define the profiles with RAKF, in
 "Authentication and Security".

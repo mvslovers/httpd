@@ -293,8 +293,10 @@ and the body #cmd("403 Forbidden"). Otherwise HTTPD goes on with the request.
       code 0 as well. Every code of 8 and above is a refusal. If the security
       product answers a resource without a profile with 4, nothing is checked
       in fact. RAKF answers 4. Whether another product does depends on its
-      settings, not on HTTPD; @ref-stc-rakf has the detail. If it answers with 8 or above, the user gets the 403, and HTTPD
-      writes no #cmd("HTTPD425W"). Because a mistake in the class or in the name looks the same, HTTPD
+      settings, not on HTTPD; @ref-stc-rakf has the detail. If it answers
+      with 8 or above, the user gets the 403, and HTTPD writes no
+      #cmd("HTTPD425W"). A class that RAKF does not know is such a case. A
+      mistake in the resource name looks like a missing profile, so HTTPD
       checks every route with a resource once at the start, and writes
       #cmd("HTTPD425W") for each one that has no profile. The message names the
       class, the resource and the pattern of the route. HTTPD does not check
