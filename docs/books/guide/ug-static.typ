@@ -240,8 +240,9 @@ document root:
   the file name.
 - It decodes the path. Each #cmd("%xx") becomes the character with that
   hexadecimal value, translated through the table of #cmd("CODEPAGE"). A plus
-  sign becomes a blank, also in the path. To ask for a plus sign in a file
-  name, write #cmd("%2B").
+  sign stays a plus sign in the path. To ask for a blank in a file name, write
+  #cmd("%20"). A percent sign that is not followed by two hexadecimal digits,
+  and the escape #cmd("%00"), stay as they are.
 - It refuses a path with two dots in a row. The check is on the decoded
   path, so #cmd("%2e%2e") does not help either. The answer is a 404. A file
   name that has two dots in a row, such as #cmd("a..b.txt"), cannot be served.

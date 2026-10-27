@@ -443,7 +443,8 @@ and Limits" in the _HTTPD Reference_ has the full list.
     [404], [There is no file for the path (@ug-trouble-404).],
     [405], [The method is not one that the server knows
       (@ug-trouble-method).],
-    [413], [The body of the request is larger than 3999 bytes.],
+    [413], [The body of a POST is larger than 3999 bytes, and the route has no
+      program. A module route gets such a body unread.],
     [414], [The request line is longer than 3998 characters.],
     [500], [The server cannot build the response, or a module asked for a
       status code that the server does not know. The server then writes

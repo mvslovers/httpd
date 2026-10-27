@@ -174,7 +174,10 @@ must be a #cmd("Content-Type") header. Then the whole body is in
 #cmd("POST_STRING"), raw and not decoded. If the type is exactly
 #cmd("application/x-www-form-urlencoded"), the server also splits the body into
 the #cmd("POST_name") variables and decodes their values. A body of 4000 bytes
-or more is refused with the status 413. A chunked body, or a body without a
+or more is not read, and the module runs without #cmd("POST_STRING"). The
+module reads that body from the socket in #cmd("httpc->socket"), as it does for
+a PUT. The connection closes after the response. On a route without a
+program, such a body gets the status 413. A chunked body, or a body without a
 #cmd("Content-Type"), gives no #cmd("POST_STRING"). The server does not read the
 body of a PUT: the module reads it from the socket in #cmd("httpc->socket").
 A request with more than 256 parameters gets the status 400.

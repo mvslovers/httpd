@@ -361,8 +361,8 @@ HTTPDM takes the first name that is present from each row of the table.
     [Parameter], [Default], [Meaning],
     [#cmd("title"), #cmd("t")], [none], [A title that is printed in the first
       line of the dump. In the HTML form the module escapes #cmd("<"),
-      #cmd(">"), #cmd("&"), #cmd("\"") and #cmd("'"), and the escaped title is cut
-      after 255 characters. With #cmd("d") other than 0 it is written as it is.],
+      #cmd(">"), #cmd("&"), #cmd("\"") and #cmd("'"), and the escaped title has at
+      most 255 characters, a replacement is never cut in two. With #cmd("d") other than 0 it is written as it is.],
     [#cmd("memory"), #cmd("mem"), #cmd("m")], [0], [The address to dump, in
       hexadecimal. HTTPDM keeps the low 24 bits of the value.],
     [#cmd("length"), #cmd("len"), #cmd("l")], [256], [The number of bytes to

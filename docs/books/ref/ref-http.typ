@@ -323,7 +323,8 @@ one line of #cmd("text/plain").
       #cmd("404 document \"path\" not found"), with the decoded path.],
     [405], [Method Not Allowed], [A method that the server does not know
       (@ref-http-methods).],
-    [413], [Payload Too Large], [A body of more than 3999 bytes.],
+    [413], [Payload Too Large], [A body of more than 3999 bytes, for a route
+      without a program (@ref-http-body).],
     [414], [URI Too Long], [A request line of more than 3998 characters.],
     [500], [Internal Server Error], [The server cannot build the response, for
       example because it cannot set the file name of a script, or a module asks

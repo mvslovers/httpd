@@ -318,7 +318,7 @@ header get 400 too. A method other than GET, HEAD, PUT, POST and DELETE gets
 The body of a request is treated by the method.
 
 #deflist(width: 1.35in,
-  [POST], [HTTPD reads the body with one #cmd("recv") if the header #cmd("Content-Length") is present and the length is between 1 and 3999. It converts the body to EBCDIC with #cmd("http_atoe") and stores it in #cmd("POST_STRING"). If the header #cmd("Content-Type") is exactly #cmd("application/x-www-form-urlencoded"), in any case, it also splits the body into the fields #cmd("POST_name") and decodes the values. A body of 4000 bytes or more is not read: the status is 413 and the connection is closed. A request without a body, or with a chunked body, has no #cmd("POST_STRING"). A request with a body and no #cmd("Content-Type") is not read either.],
+  [POST], [HTTPD reads the body with one #cmd("recv") if the header #cmd("Content-Length") is present and the length is between 1 and 3999. It converts the body to EBCDIC with #cmd("http_atoe") and stores it in #cmd("POST_STRING"). If the header #cmd("Content-Type") is exactly #cmd("application/x-www-form-urlencoded"), in any case, it also splits the body into the fields #cmd("POST_name") and decodes the values. A body of 4000 bytes or more is not read. On a route without a program the status is 413 and the connection is closed. On a route with a program, the module runs after the authentication check, the body is still on the socket, and the connection closes after the response. A request without a body, or with a chunked body, has no #cmd("POST_STRING"). A request with a body and no #cmd("Content-Type") is not read either.],
   [PUT], [HTTPD does not read the body. The module reads it from the socket in #cmd("httpc->socket").],
   [DELETE, GET, HEAD], [HTTPD does not read a body.],
 )
@@ -580,7 +580,7 @@ The names are compared without regard to case.
   [#cmd("http_new_env")], [Builds a variable block and returns it, or NULL. The sum of name and value must not exceed 8192 bytes, else the function fails with #cmd("errno") E2BIG. It also returns NULL when it has no storage. The block comes from subpool 0. The function does not add it to the client. The other functions do that.],
   [#cmd("http_set_http_env")], [Stores the value as #cmd("HTTP_name"). The server uses it for the headers. A header called #cmd("Cookie") is split into the variables #cmd("HTTP_Cookie-name"). The name must fit in 256 bytes.],
   [#cmd("http_set_query_env")], [Stores the value as #cmd("QUERY_name"). The name must fit in 256 bytes.],
-  [#cmd("http_decode")], [Decodes a URL-encoded string in place and returns it. A sequence #cmd("%xx") becomes the character of the server code page (see @ref-api-xlate). A #cmd("+") becomes a blank. An incomplete #cmd("%") at the end stays as it is.],
+  [#cmd("http_decode")], [Decodes a URL-encoded string in place and returns it. A sequence #cmd("%xx") becomes the character of the server code page (see @ref-api-xlate). A #cmd("+") becomes a blank. A #cmd("%") that is not followed by two hexadecimal digits stays as it is, and so does the escape #cmd("%00"). The server decodes the path of a request with a function of its own, in which a #cmd("+") stays a plus sign (@ref-http-url).],
 )
 
 A module that creates its own variables chooses names that do not collide with
