@@ -330,8 +330,9 @@ Read the console lines one after the other.
 - #cmd("HTTPD425W") is for #cmd("/d/*"). The route has a #cmd("RES=") and no
   #cmd("AUTH="), so it gets Basic authentication. But the security product has
   no profile for #cmd("FACILITY:HTTPD.NOPROFILE"), so any user who is logged in
-  passes. The text says the route is #cmd("NOT GATED"). A mistake in the class
-  or in the resource name gives the same message (@ug-security). With
+  passes. The text says the route is #cmd("NOT GATED"). A mistake in the
+  resource name gives the same message (@ug-security). A class that RAKF does
+  not know gives no message and a 403 for every request. With
   #cmd("RES_NOPROFILE=DENY") in the member the message is #cmd("HTTPD426W") and
   the route refuses every request (@ug-security-noprofile).
 - #cmd("HTTPD440W") is the missing module of the first route.
