@@ -84,6 +84,11 @@ names it differently, change the two #cmd("EXEC") statements.
 
 #screen(raw(read("../ex/ug-remove/uclin-job.txt")))
 
+Save the job as #cmd("uclin.jcl") and submit it the way the install job is
+submitted (@ug-install-job). With FTP:
+
+#screen(raw(read("../ex/ug-remove/submit-ftp.txt")))
+
 The job has 35 #cmd("DEL") statements, 20 against the CDS and 15 against the
 ACDS. In each zone they fall into these groups.
 
