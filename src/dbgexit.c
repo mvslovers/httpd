@@ -2,6 +2,7 @@
 **
 */
 #include "httpd.h"
+#include "dbgtitle.h"
 
 int
 dbgexit(const char *fmt, ...)
@@ -15,7 +16,7 @@ dbgexit(const char *fmt, ...)
 
     if (fp) {
         va_start(list, fmt);
-        vsprintf(title, fmt, list);
+        dbgtitle(title, sizeof(title), fmt, list);
         va_end(list);
 
         dbgtime(NULL);
