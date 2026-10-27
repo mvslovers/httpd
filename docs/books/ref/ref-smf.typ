@@ -59,7 +59,7 @@ its fields. The body begins at offset 18.
     [10], [0A], [1], [binary], [The century indicator of the date: 0 for the
       years 19xx, 1 for 20xx.],
     [11], [0B], [3], [packed], [The date as the digits #cmd("YYDDD") and the
-      sign F: the two digits of the year within the century and the three
+      sign C, which is positive: the two digits of the year within the century and the three
       digits of the day of the year.],
     [14], [0E], [4], [characters], [The system ID (SID) of the system that
       writes the record.],
@@ -257,8 +257,8 @@ A program that reads the records follows these rules.
   360 000, one minute is 6 000.
 - The date in the header is split in two fields. The century indicator at
   offset 10 is 0 for 19xx and 1 for 20xx. The three bytes at offset 11 are
-  packed decimal #cmd("YYDDDF"). The 15th of March 2027 is the 74th day of the
-  year. The century indicator is 1 and the three bytes are hex #cmd("27 07 4F").
+  packed decimal #cmd("YYDDDC"). The 15th of March 2027 is the 74th day of the
+  year. The century indicator is 1 and the three bytes are hex #cmd("27 07 4C").
 - The two #cmd("duration_us") fields are unsigned 4-byte numbers. They wrap
   after about 4 294 seconds (71 minutes).
 - Read #cmd("uri") and #cmd("method") up to the first binary zero, or up to the

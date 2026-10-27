@@ -66,8 +66,11 @@ header, the connection closes, and the body is #cmd("405 Method Not Allowed").
 A route with a program has no restriction by method. The module decides which
 methods it accepts and sends its own response to the others.
 
-HEAD is not implemented for static files. The server answers with a 501 and
-no body. The response has no #cmd("Content-Length") and uses chunked transfer.
+HEAD is not implemented for static files. The server answers with a 501. The
+response has no #cmd("Content-Length"), uses chunked transfer and carries the
+text #cmd("501 Not Implemented") as its body, which a HEAD response should not
+have. A client such as curl with #cmd("-I") reads only the headers and does not
+show the body.
 
 #screen(raw(read("../ex/ug-static/head-request.txt")))
 
@@ -119,6 +122,9 @@ the connection, because keep-alive is not yet decided when they are sent.
 
 All these bodies are #cmd("text/plain"). A header line without a colon is
 skipped without a message.
+
+If the request line is empty, or has a method but no URI, the server closes
+the connection without sending a response.
 
 === The headers <ref-http-headers>
 
@@ -184,7 +190,12 @@ The server translates the body from ASCII to EBCDIC. If the content type is
 #cmd("application/x-www-form-urlencoded"), it sets #cmd("POST_STRING") to the
 body, and it sets one #cmd("POST_") variable for each field. The values are
 decoded as described in @ref-http-url. For any other content type, it sets
-only #cmd("POST_STRING").
+only #cmd("POST_STRING"). The comparison covers the whole value, in any case.
+A value with a parameter, such as
+#cmd("application/x-www-form-urlencoded; charset=UTF-8"), is therefore "any
+other content type": the server sets #cmd("POST_STRING") and splits no fields.
+If the request has a body but no #cmd("Content-Type") header, the server does
+not read the body and sets nothing.
 
 A PUT body is not read by the server. A module that handles PUT reads the body
 from the socket itself.
@@ -261,7 +272,8 @@ one line of #cmd("text/plain").
       the display modules.],
     [302], [Moved Temporarily], [A GET on a route with form login and no
       session. The response has #cmd("Location: /login") and a #cmd("Set-Cookie")
-      header for the cookie #cmd("Sec-Uri").],
+      header for the cookie #cmd("Sec-Uri"). Only GET gets a 302
+      (@ref-http-form-methods).],
     [303], [See Other], [A successful login by POST. The response has a
       #cmd("Location") header and a #cmd("Set-Cookie") header for the cookie
       #cmd("Sec-Token").],
@@ -296,6 +308,15 @@ authentication. It does not add it for a route with token or form
 authentication. It does not add it if the request has the header
 #cmd("X-CSRF-ZOSMF-HEADER"), because the browser would open its own credential
 dialog.
+
+=== Other methods on a route with form login <ref-http-form-methods>
+
+#idx("form login", "methods")
+On a route with form login and no session, every method that the server knows
+goes to the login step, not only GET. A GET gets the 302. A POST is treated as a
+login attempt, whatever its path. A HEAD, PUT or DELETE gets the status 200 and
+a #cmd("text/plain") body #cmd("Invalid REQUEST_METHOD \"HEAD\""), with the
+method that the client sent.
 
 === The phrase table <ref-http-phrases>
 
@@ -637,27 +658,49 @@ The server processes server-side includes in a file with the MIME type
 chunked on HTTP/1.1, because it has no #cmd("Content-Length"). The directory
 index in @ref-http-path shows this.
 
-The server knows three directives. Each one must end with a blank in front of
-the closing marker.
+The server knows three directives. A directive starts with #cmd("<!--#") and
+ends at the first blank-and-marker, #cmd(" -->"), so a blank must stand in front
+of the closing marker. A line can hold several directives.
 
 #tab(caption: [Server-side include directives])[
   #table(columns: (2.6in, 1fr),
     [Directive], [Effect],
     [#cmd("<!--#echo var=\"X\" -->")], [Inserts the value of the request
       variable X. If there is none, the server looks for an environment variable
-      of that name.],
+      of that name. If there is neither, it inserts the comment
+      #cmd("<!-- Oops: we didn't find var=\"X\" -->").],
     [#cmd("<!--#include virtual=\"path\" -->")], [Inserts the file. The form
       with #cmd("file=") is the same.],
-    [#cmd("<!--#printenv -->")], [Inserts the variables of the request.],
+    [#cmd("<!--#printenv -->")], [Inserts two HTML tables. The first is headed
+      #cmd("Server Variables") and lists the variables of the request. The
+      second is headed #cmd("System Variables") and lists the environment table
+      of the server itself.],
   )
 ]
 
-A text that looks like a directive but is not valid is sent as it is. Includes
-can be nested up to 10 levels. Below that level the server writes
+The server does not escape any value that it inserts. A request variable that
+holds a header value from the client therefore reaches the page as the client
+sent it.
+
+Text that the server does not recognize as a directive is sent as it is. That
+covers an unknown directive name and a missing blank in front of the closing
+marker. A directive that has a known name but a bad argument is not sent as it
+is. The server writes a comment in its place:
+#cmd("<!-- Unable to parse 'echo' request -->") or
+#cmd("<!-- Unable to parse 'include' request -->").
+
+Includes can be nested up to 10 levels. Below that level the server writes
 #cmd("<!-- Oops: Maximum Server Side Include levels exceeded -->") in place of
-the include. An include of a file that does not exist, or of a binary file,
-gets a comment that starts with #cmd("<!-- Oops:"). One piece of output of a
-directive is limited to 4096 bytes.
+the include. An include of a file that does not exist gets
+#cmd("<!-- Oops: we didn't find \"path\" -->"), and an include of a file with a
+binary MIME type gets a comment that starts with #cmd("<!-- Oops: we can't
+include a binary file"). One piece of output of a directive is limited to 4095
+characters.
+
+The server reads the file line by line, in pieces of at most 254 characters, and
+looks for directives in each piece. A line that is longer than 254 characters is
+split, and the server appends a line feed to each piece that does not end in
+one. A directive that is cut by the split is not recognized.
 
 == Character Translation <ref-http-xlate>
 

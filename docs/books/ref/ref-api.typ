@@ -57,7 +57,7 @@ HTTPD builds a parameter list of three words for the module.
 #tab(caption: [The parameter list of a module])[#table(
   columns: (0.8in, 1.6in, 1fr),
   [*Word*], [*Content*], [*Meaning*],
-  [0], [address of a parameter], [A halfword length and the text of the parameter: the request path in double quotes, for example #cmd("\"/zosmf/info\""). The text has at most 255 characters, the quotes included.],
+  [0], [address of a parameter], [A halfword length and the text of the parameter: the request path in double quotes, for example #cmd("\"/zosmf/info\""). The text has at most 254 characters, the quotes included; a longer path is cut.],
   [1], [address of HTTPD], [The server control block, with the eye catcher #cmd("*HTTPD*").],
   [2], [address of HTTPC], [The control block of the client, with the eye catcher #cmd("*HTTPC*"). The high bit is set to mark the end of the list.],
 )]
@@ -95,7 +95,7 @@ The module finds in #cmd("main"):
   [#cmd("argc")], [2.],
   [#cmd("argv[0]")], [The name of the module, up to 8 characters.],
   [#cmd("argv[1]")], [The decoded #cmd("REQUEST_PATH"), without the quotes.],
-  [HTTPD, HTTPC], [Read #cmd("grt->grtapp1") and #cmd("grt->grtapp2"), or call #cmd("cgihttpd()") and #cmd("cgihttpc()"). The two functions look first in the runtime table of the program, then in the global one, and check the eye catcher. They return NULL and write a console message if HTTPD is not found.],
+  [HTTPD, HTTPC], [Read #cmd("grt->grtapp1") and #cmd("grt->grtapp2"). The server has the functions #cmd("cgihttpd()") and #cmd("cgihttpc()") for this lookup, but they are not part of the client library, and a module cannot link them.],
   [HTTPX], [Call #cmd("http_get_httpx(httpd)").],
 )
 
@@ -775,7 +775,7 @@ From HTTPD 4.5 the function reports why it failed:
 #tab(caption: [The results of http_new_session])[#table(
   columns: (2.1in, 0.5in, 1fr),
   [*Constant*], [*Value*], [*Meaning*],
-  [#cmd("HTTP_SESSION_NONE")], [-1], [The request has no credential.],
+  [#cmd("HTTP_SESSION_NONE")], [-1], [The request is not authenticated, or it carries no password to log on again with. A credential that came from a token alone has no password.],
   [#cmd("HTTP_SESSION_REFUSED")], [-2], [RACF refused the logon (return code 4, 8, 12 or 28 of RACINIT). The server marks the credential as stale. It does not answer by password or token from it any more and frees it 600 seconds later. The current request still runs on it. The module answers 401.],
   [#cmd("HTTP_SESSION_BUSY")], [-3], [The client has 16 sessions, all in use, or the credential store is full. A session is replaced only if it has been idle for 60 seconds or more.],
   [#cmd("HTTP_SESSION_NOMEM")], [-4], [The server is out of storage, or RACF could not be asked: RACF is not active, an installation exit or a terminal or time restriction stopped the logon. The server then writes the message #cmd("HTTPD009W"); a refusal of the password is not written.],
@@ -1046,7 +1046,7 @@ each request:
   [#cmd("HTTPD443W")], [The value of #cmd("RESIDENT") is not YES or NO.],
 )]
 
-The server holds at most 255 modules. It deletes them when it ends. Two
+The server holds every module that it could load. Its count of the held modules, which #cmd("D C") and the server block show, stops at 255. The server deletes the modules when it ends. Two
 consequences follow for the module author:
 
 - A new level of a resident module does not take effect until the server is

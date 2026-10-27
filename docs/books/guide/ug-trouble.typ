@@ -525,9 +525,9 @@ changes". The started task #cmd("RAKFPROF") does it:
 
 #screen(raw(read("../ex/ug-install/rakf-reload.txt")))
 
-The opposite fault is silent. A resource that has no profile is not
-protected, and the security product answers that the access is allowed. The
-route then lets everybody pass. At the start the server tests every route that
+The opposite fault is silent. Under RAKF a resource that has no profile is not
+protected, and the product answers that the access is allowed. The route then
+lets everybody pass. At the start the server tests every route that
 has #cmd("RES=") and a mode other than #cmd("NONE"), and it writes
 #cmd("HTTPD425W NO PROFILE FOR class:resource -- path NOT GATED") for each one
 that has no profile (see the capture in @ug-trouble-skip). A typing error in

@@ -112,8 +112,10 @@ of one of two kinds.
       letters does not count. #cmd("/status") matches #cmd("/STATUS") and does
       not match #cmd("/status/").],
     [With #cmd("*") or #cmd("?")], [The whole path must match. The case of the
-      letters counts. #cmd("*") stands for any characters, also a slash.
-      #cmd("?") stands for one character.],
+      letters counts. #cmd("*") stands for any characters, also a slash. At the
+      end of the pattern it also stands for no character, so #cmd("/pub/*")
+      matches #cmd("/pub/"). Anywhere else it stands for at least one
+      character. #cmd("?") stands for one character.],
   )
 ]
 

@@ -203,11 +203,11 @@ offset. The fields are these.
       more.],
     [#cmd("active_connections")], [The number of open client connections.],
     [#cmd("xlate")], [The address of the code page pair in effect.],
-    [#cmd("giveup_last"), #cmd("giveup_held")], [The time of the last console
-      message about a client that was given up, and the number of such cases not
-      yet reported.],
+    [#cmd("giveup_last")], [The time of the last console message about a client
+      that was given up.],
     [#cmd("stc_prev_acee")], [The address of the ACEE that the server restores
       at shutdown.],
+    [#cmd("giveup_held")], [The number of such cases not yet reported.],
     [#cmd("ufs")], [The UFS session handle of the server.],
     [#cmd("cfg_session_maxage")], [The hard maximum age of a credential in
       minutes, 0 for off.],

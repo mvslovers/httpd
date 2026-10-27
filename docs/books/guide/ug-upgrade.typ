@@ -518,7 +518,7 @@ to look for. The first two matter for the safety of the system.
   before the catch-all, because the first match wins. A member that has only
   the line #cmd("/zosmf/*") has no check on the console service. Add the route,
   and define the profile in RAKF (@ug-security). Without a profile the check
-  permits everybody, and #cmd("HTTPD425W") says so at the start.
+  permits everybody under RAKF, and #cmd("HTTPD425W") says so at the start.
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
 - *Resident modules.* From 4.4.0 the keyword #cmd("RESIDENT") has the default

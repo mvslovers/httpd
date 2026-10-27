@@ -115,8 +115,9 @@ characters.
 
 The form sends a POST to #cmd("/login") with the fields #cmd("userid") and
 #cmd("password"). A wrong password gets the page again, with the text
-#cmd("Invalid userid or password"). The status is 200, and HTTPD closes the
-connection:
+#cmd("Invalid userid or password"). The status is 200. HTTPD closes the
+connection after every POST that has a body, so it does so after a failed login
+and after a successful one:
 
 #screen(raw(read("../ex/ug-security/form-2-post-bad.txt")))
 
@@ -365,9 +366,11 @@ shows no permit for #cmd("HTTPD.DENIED"), and the user gets the 403. The 403 has
 #cmd("403 Forbidden"). A user without a login never reaches this stage. The
 user gets the 401 of the first stage.
 
-#note[*A profile that does not exist permits everybody.* When the security
-product says that no profile covers the resource, HTTPD counts the request as
-permitted. A typing error in the class or in the resource name looks the same.
+#note[*A profile that does not exist can permit everybody.* When the security
+product answers that no profile covers the resource (return code 4), HTTPD
+counts the request as permitted. Whether the product gives that answer for an
+unprotected resource depends on its settings. If it refuses instead (return
+code 8 or above), the user gets the 403. A typing error in the class or in the resource name looks the same.
 HTTPD therefore asks once for each route with #cmd("RES=") at the start. For a
 route without a profile it writes #cmd("HTTPD425W NO PROFILE FOR
 class:resource -- path NOT GATED"). The route still works, and every user who

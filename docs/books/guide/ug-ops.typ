@@ -564,7 +564,7 @@ flag byte (offset +002C) is the state, the counters of requests, errors and
 bytes sent and the number of active connections are the same as in #cmd("D S"),
 and the up time is the time of the start. The screen is cut after the counters:
 
-#screen(raw(read("../ex/ug-ops/dsrv-httpd.txt").split("\n").slice(0, 44).join("\n")))
+#screen(raw(read("../ex/ug-ops/dsrv-httpd.txt").split("\n").slice(0, 43).join("\n")))
 
 The block of the manager of the worker pool shows the limits that are in effect
 now and the number of requests that were handed out:

@@ -100,8 +100,10 @@ other pattern is a plain path.
       It does not match #cmd("/status/").],
     [Wildcard pattern], [HTTPD matches the whole path against the pattern with
       the library function #cmd("__patmat"). The case of the letters counts.
-      #cmd("*") stands for any characters, also a slash. #cmd("?") stands
-      for one character. Any other character stands for itself.],
+      #cmd("*") stands for any characters, also a slash. At the end of the
+      pattern it also stands for no character. Anywhere else it stands for at
+      least one character. #cmd("?") stands for one character. Any other
+      character stands for itself.],
   )
 ]
 
@@ -112,7 +114,8 @@ Some examples:
     [Pattern], [Matches], [Does not match],
     [#cmd("/zosmf/*")], [#cmd("/zosmf/info"), #cmd("/zosmf/a/b")], [#cmd("/zosmf"), #cmd("/ZOSMF/info")],
     [#cmd("/.dsrv")], [#cmd("/.dsrv"), #cmd("/.DSRV")], [#cmd("/.dsrv/x")],
-    [#cmd("*.rexx")], [#cmd("/a/b.rexx")], [#cmd("/a/b.REXX")],
+    [#cmd("*.rexx")], [#cmd("/a/b.rexx")], [#cmd("/a/b.REXX"), #cmd(".rexx")],
+    [#cmd("/a*b")], [#cmd("/axb"), #cmd("/a/b")], [#cmd("/ab")],
     [#cmd("/doc?.html")], [#cmd("/doc1.html")], [#cmd("/doc12.html")],
   )
 ]
@@ -284,9 +287,13 @@ and the body #cmd("403 Forbidden"). Otherwise HTTPD goes on with the request.
     [Two #cmd("RES="), one line], [The last well-formed value counts.],
     [With #cmd("AUTH=NONE")], [HTTPD ignores the resource. See
       @ref-route-auth.],
-    [Resource without a profile], [RACF answers that the resource is not
-      protected. HTTPD counts this as permitted. Nothing is checked in fact.
-      Because a mistake in the class or in the name looks the same, HTTPD
+    [Resource without a profile], [HTTPD counts the return code 4 of the
+      check, "no profile covers the resource", as permitted, and the return
+      code 0 as well. Every code of 8 and above is a refusal. If the security
+      product answers a resource without a profile with 4, nothing is checked
+      in fact. RAKF answers 4. Whether another product does depends on its
+      settings, not on HTTPD; @ref-stc-rakf has the detail. If it answers with 8 or above, the user gets the 403, and HTTPD
+      writes no #cmd("HTTPD425W"). Because a mistake in the class or in the name looks the same, HTTPD
       checks every route with a resource once at the start, and writes
       #cmd("HTTPD425W") for each one that has no profile. The message names the
       class, the resource and the pattern of the route. HTTPD does not check

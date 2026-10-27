@@ -48,6 +48,17 @@ The book describes HTTPD 4.5, as it comes with the release. HTTPREXX and
 HTTPLUA, the server modules for REXX Server Pages and for Lua, have their own
 books.
 
+== The Examples in This Book
+
+The console screens and the client sessions in this book are output that was
+recorded from a running HTTPD. None of them was typed by hand. Before they were
+printed, some values were replaced: passwords by asterisks, session tokens by
+#cmd("<token>"), the digits of job and task numbers by #cmd("n"), the names and
+addresses of the test systems by #cmd("localhost"), #cmd("mvs.example.org") and
+the address #cmd("192.0.2.17") of the documentation range, and the home
+directory of the user by #cmd("$HOME"). The addresses in the examples are
+therefore not real addresses.
+
 == How This Book Is Organized
 
 #deflist(width: 1.35in,

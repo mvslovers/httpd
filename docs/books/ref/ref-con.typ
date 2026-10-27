@@ -159,8 +159,10 @@ levels are described in @ref-smf.
 The command writes one block for each thread. A line of dashes
 (#cmd("HTTPD199I")) ends each block. The order of the blocks is: the main
 thread, the socket thread, the dispatcher (the manager of the worker pool)
-and then the worker threads. A block exists only when the thread exists.
-Without a worker pool there are no dispatcher and no worker blocks.
+and then the worker threads. A block exists only when the thread exists, with
+one exception: if there is no socket thread, the command still writes the
+#cmd("HTTPD103I") line of the socket thread, with the address 00000000 and no
+other line. Without a worker pool there are no dispatcher and no worker blocks.
 
 #tab(caption: [The messages of DISPLAY THREADS])[
   #table(columns: (0.85in, 1fr),
@@ -223,8 +225,8 @@ The next screen shows a server with three idle workers.
 ```
 
 #var("xxxxxx") is the address in hex. #var("nnn") is the length in bytes. A
-number without a prefix is decimal. A number with the prefix #cmd("0x") is hex.
-One separator character stands between the address and the length. The comma is
+length with the prefix #cmd("0x") is hex, and a length with a leading 0 is
+octal. Any other length is decimal. One separator character stands between the address and the length. The comma is
 the one to use. The default is 256 bytes. A length that is 0 or below becomes
 256. A length above 4096 becomes 4096.
 
@@ -289,8 +291,11 @@ source that was built.
 /F HTTPD,S MI n
 ```
 
-The number is decimal and is required. A value below 1 is 1 and a value above
-100 is 100. A word that is not a number is 1. The command sets the new limit and
+The number is decimal and is required. The server does not check for a missing
+number, so never enter the command without one. The server reads the number as
+an unsigned number. A value of 0 is 1, and a value above 100 is 100. A word that is not a number is 1. A
+negative number is read as a very large unsigned number, so #cmd("S MA -5")
+sets 100, not 1. The command sets the new limit and
 wakes the dispatcher, which creates or ends workers to fit. The answer is the
 dispatcher block of #cmd("DISPLAY THREADS") (messages #cmd("HTTPD107I") to
 #cmd("HTTPD111I")), followed by a line of dashes. The block shows the limits
@@ -333,10 +338,11 @@ spelled in full. @ref-smf describes the levels.
     [#cmd("HTTPD126I")], [#cmd("SMF LEVEL SET TO level"). The level changes
       at once.],
     [#cmd("HTTPD125I")], [#cmd("STATISTICS COUNTERS RESET"). The word
-      #cmd("RESET") (or the beginning of it) follows the level, or it is the
-      only operand. The three counters requests, errors and bytes are set to
+      #cmd("RESET") follows the level, where the beginning of the word is enough,
+      or it is the only operand, where it must be spelled in full. The three counters requests, errors and bytes are set to
       zero. The count of open connections is not changed. With only
-      #cmd("RESET"), the level is not changed.],    [#cmd("HTTPD126E")], [#cmd("INVALID SET STATS VALUE \"text\""). The first
+      #cmd("RESET"), the level is not changed.],
+    [#cmd("HTTPD126E")], [#cmd("INVALID SET STATS VALUE \"text\""). The first
       operand is not a level and not #cmd("RESET").],
     [#cmd("HTTPD127W")], [#cmd("MISSING STATS NONE|ERROR|AUTH|ALL [RESET]").
       There is no operand.],
