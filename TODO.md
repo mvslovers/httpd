@@ -43,7 +43,7 @@ mvslovers/mbt#163.*
 | — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
 | — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
-| — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | **the final ufsd 1.5.2**: only 1.5.2-rc1 is published, and it must replace the rc before 4.5.0; milestone 4.5.0, not yet ranked |
+| — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | PR #384 pins the released ufsd 1.5.2; `mbt test --mvs` stays part of the 4.5.0 release acceptance; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source

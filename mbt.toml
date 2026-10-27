@@ -122,7 +122,9 @@ include = ["credentials/include"]
 cflags = ["-Wno-error"]
 
 [dependencies]
-"mvslovers/ufsd" = ">=1.5.1"
+# 1.5.2 is the first level with the free-block fix (ufsd#169); libufs.h
+# and ufsdrc.h are unchanged from 1.5.1.
+"mvslovers/ufsd" = ">=1.5.2"
 "mvslovers/crypto370" = ">=1.0.1"
 
 # -- The webroot disk (issue #252) --------------------------------
