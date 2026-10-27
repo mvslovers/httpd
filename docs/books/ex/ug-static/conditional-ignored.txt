@@ -1,0 +1,12 @@
+$ curl -i -H "If-Modified-Since: Tue, 27 Oct 2026 00:00:00 GMT" http://localhost:8080/hello.txt
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:41:53 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 61
+
+Hello from the HTTPD document root.
+This file is plain text.

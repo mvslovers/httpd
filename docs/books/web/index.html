@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HTTPD manuals</title>
+<link rel="stylesheet" href="bookmaster.css">
+<style>
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+.card { border-top: 6px solid var(--ink); padding: 1rem 0 0; }
+.card h3 { border: 0; margin: 0 0 .5rem; padding: 0; font-size: 1.35rem; }
+.card .num { color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; font-size: .85rem; }
+.card ul { list-style: none; padding: 0; font-family: 'IBM Plex Sans', sans-serif; }
+main.landing { max-width: 60rem; margin: 0 auto; }
+</style>
+</head>
+<body class="bm-landing">
+<header class="bm-top"><nav class="bm-crumbs" aria-label="Breadcrumb"><a href="https://mvslovers.readthedocs.io/">mvslovers</a><span class="sep">›</span><a href="index.html">HTTPD</a></nav><span class="num">mvslovers manuals</span></header>
+<main class="landing">
+<h2>HTTPD (httpd) for MVS 3.8j</h2>
+<p>An HTTP/1.1 server for MVS 3.8j. It serves static files from a UFS file system of UFSD and runs server modules, such as mvsMF, that provide REST APIs for MVS. Two books describe HTTPD 4.5. Both are Drafts.</p>
+<div class="cards">
+  <section class="card">
+    <h3>User's Guide</h3>
+    <p class="num">ML07-0001</p>
+    <p>Installing and configuring HTTPD, routes and server modules, authentication with the security system, serving files, operating the started task, writing a server module, upgrading and removing.</p>
+    <ul><li><a href="guide/index.html">Read online</a></li><li><a href="ml07-0001-0.pdf">Download PDF</a></li></ul>
+  </section>
+  <section class="card">
+    <h3>Reference</h3>
+    <p class="num">ML07-0002</p>
+    <p>Every Parmlib keyword, the route syntax, the console commands, the started task, the HTTP behaviour and limits, the server module interface, the display modules, the SMF records and the HTTPD messages.</p>
+    <ul><li><a href="reference/index.html">Read online</a></li><li><a href="ml07-0002-0.pdf">Download PDF</a></li></ul>
+  </section>
+</div>
+</main>
+</body>
+</html>

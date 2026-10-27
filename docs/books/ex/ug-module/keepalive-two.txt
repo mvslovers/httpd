@@ -1,0 +1,10 @@
+$ curl -sv -o /dev/null -o /dev/null http://localhost:8080/hello http://localhost:8080/hello?name=again 2>&1 | grep -E "Re-using|^< HTTP|^< Transfer|Connection"
+< HTTP/1.1 200 OK
+< Connection: keep-alive
+< Transfer-Encoding: chunked
+* Connection #0 to host localhost left intact
+* Re-using existing http: connection with host localhost
+< HTTP/1.1 200 OK
+< Connection: keep-alive
+< Transfer-Encoding: chunked
+* Connection #0 to host localhost left intact

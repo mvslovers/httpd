@@ -269,7 +269,7 @@ is_asset_exempt(const char *path)
 **   Stage 1 (authenticate): does the route require an identity?  If so and the
 **     client is not authenticated -> 401 (challenge per the route's AUTH mode).
 **   Stage 2 (authorize): if the route sets RES=class:resource, RACHECK it under
-**     the client's ACEE (http_check_auth) -> 403 on deny.
+**     the client's ACEE (racf_auth, see Stage 2) -> 403 on deny.
 ** On 401/403 the response is emitted and httpc->state is set to CSTATE_DONE;
 ** the caller detects that and stops.
 **

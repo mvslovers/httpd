@@ -1,0 +1,14 @@
+$ curl -i -b cookies.txt http://localhost:8080/form/page.html
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:52:57 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Content-Type: text/html
+X-Content-Type-Options: nosniff
+Transfer-Encoding: chunked
+
+<!DOCTYPE html>
+<html><head><title>Form</title></head>
+<body><h1>Page behind the login form</h1></body></html>
