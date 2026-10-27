@@ -53,8 +53,8 @@
  * where they are and both halves are filed under "configuration" below.  If
  * you are looking an id up, search the file -- do not trust the range.
  *
- * The catalog is documented for operators in docs/messages.md; keep the two
- * in step.
+ * The catalog is documented for operators in the appendix "Messages" of the
+ * HTTPD Reference (docs/books/ref/apx-messages.typ); keep the two in step.
  *
  * ---------------------------------------------------------------------
  * What the catalog found (issue #184)

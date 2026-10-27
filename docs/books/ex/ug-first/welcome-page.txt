@@ -1,0 +1,180 @@
+$ curl http://localhost:8080/
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Welcome to HTTPD</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #0d0f12;
+            color: #f2f2f2;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        header {
+            padding: 24px 8%;
+            border-bottom: 1px solid #24272b;
+        }
+
+        .brand {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 0.15em;
+        }
+
+        main {
+            width: min(1000px, 84%);
+            margin: auto;
+            padding: 100px 0;
+        }
+
+        .status {
+            color: #76d68e;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        h1 {
+            max-width: 800px;
+            margin: 24px 0;
+            font-size: clamp(3rem, 9vw, 7rem);
+            line-height: 0.95;
+            letter-spacing: -0.05em;
+        }
+
+        .intro {
+            max-width: 600px;
+            color: #9da4ad;
+            font-size: 1.2rem;
+            line-height: 1.7;
+        }
+
+        .meta {
+            margin-top: 70px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 50px;
+            font-family: monospace;
+        }
+
+        .meta-item {
+            min-width: 130px;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 8px;
+            color: #777;
+            font-size: 0.75rem;
+        }
+
+        .links {
+            margin-top: 60px;
+        }
+
+        .link {
+            color: #8ab4ff;
+            text-decoration: none;
+        }
+
+        .link:hover {
+            text-decoration: underline;
+        }
+
+        .optional {
+            margin-top: 8px;
+            color: #777;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        footer {
+            padding: 24px 8%;
+            border-top: 1px solid #24272b;
+            color: #777;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        footer a {
+            color: #8ab4ff;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="brand">HTTPD</div>
+</header>
+
+<main>
+
+    <div class="status">
+        ● SERVER ONLINE
+    </div>
+
+    <h1>It works.<br>The mainframe is online.</h1>
+
+    <p class="intro">
+        You are connected to HTTPD, an HTTP/1.1 server running on MVS 3.8j.
+    </p>
+
+    <section class="meta">
+
+        <div class="meta-item">
+            <span class="label">SYSTEM</span>
+            MVS 3.8j
+        </div>
+
+        <div class="meta-item">
+            <span class="label">SERVER</span>
+            HTTPD
+        </div>
+
+        <div class="meta-item">
+            <span class="label">PROTOCOL</span>
+            HTTP/1.1
+        </div>
+
+    </section>
+
+    <section class="links">
+
+        <div>
+            <a class="link" href="/mvsmf/index.html">
+                Open mvsMF →
+            </a>
+
+            <div class="optional">
+                Available if mvsMF is installed.
+            </div>
+        </div>
+
+    </section>
+
+</main>
+
+<footer>
+    <a href="https://github.com/mvslovers/httpd">HTTPD</a> for MVS
+</footer>
+
+</body>
+</html>

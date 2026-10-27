@@ -1,0 +1,12 @@
+$ curl -i -b cookies.txt -c cookies.txt -d userid=IBMUSER -d password=****** http://localhost:8080/login
+HTTP/1.1 303 See Other
+Date: Tue, 27 Oct 2026 05:52:56 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: close
+Cache-Control: no-store
+Location: /form/page.html
+Set-Cookie: Sec-Uri=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT
+Set-Cookie: Sec-Token=<token>
+Transfer-Encoding: chunked
+

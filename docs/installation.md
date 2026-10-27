@@ -23,6 +23,18 @@ console messages and, for an install problem, the job output.
 **Questions and general support** are on Discord:
 <https://discord.gg/gaUAFKGCR>
 
+## The manuals
+
+This guide is the README of the installation package. It installs, upgrades and
+removes HTTPD. For everything else there are two manuals: the _HTTPD User's
+Guide_ (ML07-0001) and the _HTTPD Reference_ (ML07-0002). They are attached to
+each release from 4.5.0 on as `ml07-0001-<edition>.pdf` and
+`ml07-0002-<edition>.pdf`, and their sources are in `docs/books` in the
+repository. The configuration keywords, the messages, the writing of server
+modules, the SMF records and the migration from HTTPD 3.x, which used to be
+separate pages under `docs/`, are in these manuals; the pages that remain here
+only say where.
+
 ---
 
 One placeholder is used throughout:

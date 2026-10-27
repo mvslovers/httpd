@@ -1,0 +1,2 @@
+PORT=0
+DOCROOT=/www

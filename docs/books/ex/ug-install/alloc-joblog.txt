@@ -1,0 +1,7 @@
+                                                J E S 2   J O B   L O G
+ 7.10.55 JOB   nn  $HASP373 HTTPDALC STARTED - INIT  1 - CLASS A - SYS TK5R
+ 7.10.55 JOB   nn  IEF403I HTTPDALC - STARTED - TIME=07.10.55
+ 7.10.55 JOB   nn  IEFACTRT - Stepname  Procstep  Program   Retcode
+ 7.10.55 JOB   nn  HTTPDALC   ALLOC               IEFBR14   RC= 0000
+ 7.10.55 JOB   nn  IEF404I HTTPDALC - ENDED - TIME=07.10.55
+ 7.10.55 JOB   nn  $HASP395 HTTPDALC ENDED

@@ -205,7 +205,7 @@ corrected, and because the second one is the evidence behind section 12a:
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
-and `docs/messages.md` §*A refused start* is where the resulting contract is
+and the Reference appendix "Messages", section *A Start That Ends*, is where the resulting contract is
 written down.
 
 **v4.0.2 shipped on 2026-09-05:** the libc370 1.0.4 relink (#260/PR #261), plus
@@ -267,7 +267,7 @@ product decision.
 Closed with PR #329: `docs/configuration.md` documents the six keywords.
 
 Ranked above #250 only because it costs no MVS time. `httpprm.c` is the
-authority for what the parser accepts; `docs/configuration.md` is what an
+authority for what the parser accepts; the Reference chapter "The HTTPPRM Keywords" is what an
 operator reads, and the two disagree by six keywords.
 
 ### ~~3 · #262 — TSTSP keeps the whole suite red~~
