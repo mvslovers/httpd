@@ -49,9 +49,8 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
     if ((rc = http_resp(httpc,200) < 0)) goto quit;
     if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
     if ((rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0)) goto quit;
-    if (data) {
-        if ((rc = http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") < 0)) goto quit;
-    }
+    rc = data ? http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") : 0;
+    if (rc < 0) goto quit;
     if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!data) {
