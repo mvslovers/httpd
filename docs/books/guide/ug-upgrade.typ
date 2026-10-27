@@ -379,14 +379,11 @@ hop that needs the allocation job. Every hop after it does not.
 + Send the XMIT files, edit the install job and submit it, as in
   @ug-upgrade-hop. The #cmd("APPLY") step deletes #cmd("THTP400") from the
   new, empty library without a complaint, copies the five modules in, and ends
-  with 0004. The #cmd("ACCEPT") step ends with 0000. The measured install of
-  this crossing had ten #cmd("HMA2240") lines and ten #cmd("HMA2380") lines
-  over the #cmd("APPLY") and the #cmd("ACCEPT") together.
+  with 0004. The #cmd("ACCEPT") step ends with 0000.
 + Install 4.2.0, 4.3.0, 4.4.0 and 4.5.0 in turn, each as in
   @ug-upgrade-hop. These hops skip the allocation job.
 
-The install of 4.1.0 leaves the old libraries as they were. The measured run
-kept all six members of #cmd("HTTPD.V4R0M1.LINKLIB"), mvsMF included. After the
+The install of 4.1.0 leaves the old libraries as they were. After the
 crossing, check these points:
 
 - *mvsMF.* The old library held the module #cmd("MVSMF"). The new

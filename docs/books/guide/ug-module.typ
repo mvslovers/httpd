@@ -118,9 +118,8 @@ In #cmd("main") the module finds:
   [#cmd("argv[0]")], [The name of the module, up to 8 characters.],
   [#cmd("argv[1]")], [The decoded request path, without quotes.],
   [HTTPD, HTTPC], [Read #cmd("grt->grtapp1") and #cmd("grt->grtapp2"), as the
-    program does, or call #cmd("cgihttpd()") and #cmd("cgihttpc()"). These
-    check the eye catcher of the block, and they return NULL and write a console
-    message if HTTPD is not found.],
+    program does. Compare the eye catcher of each block (#cmd("HTTPD_EYE") and
+    #cmd("HTTPC_EYE")) before you use it.],
   [The vector], [#cmd("http_get_httpx(httpd)") returns the HTTPX. In the
     program the macro #cmd("httpx") is defined with it.],
 )
@@ -293,9 +292,10 @@ the whole body. This is not a fault of the module.
 
 Three more rules go with the end of the headers.
 
-- Do not send a line break alone as a call of its own in the body. The call
-  with exactly carriage return and line feed is taken for the end of the
-  headers. Put the line break in a longer text.
+- Do not send a line break alone as a call of its own before the headers have
+  ended. The call with exactly carriage return and line feed is taken for the
+  end of the headers. After that, a line break alone in the body is data. Put
+  the line break in a longer text anyway.
 - If the module sends a header line with #cmd("Content-Length:") through
   #cmd("http_printf"), HTTPD sees it and does not chunk. The module then must
   send exactly that number of bytes. A header line that goes out with
@@ -434,10 +434,11 @@ Two rules go with it.
 
 - Every library in an authorized #cmd("STEPLIB") must be APF authorized. A
   library that is not authorized takes the authority away from the whole task,
-  and the failure that follows does not name the cause. The development library
-  needs its own entry, beside the one of the SMP library. MVS 3.8j reads the
-  list at the IPL and has no dynamic APF, so the entry needs an IPL
-  (@ug-install).
+  and the failure that follows does not name the cause. Where HTTPD is
+  authorized by its library (#cmd("HTTPD002I") says #cmd("AUTHORIZED BY
+  LIBRARY")), the development library needs its own entry, beside the one of
+  the SMP library. MVS 3.8j reads the list at the IPL and has no dynamic APF,
+  so the entry needs an IPL (@ug-install).
 - Use the development library only on a test system. It sits first in the
   concatenation, and it runs whatever was deployed last. The library
   #cmd("HTTPD.LINKLIB") belongs to SMP, and only the install job writes it.
@@ -543,7 +544,9 @@ The text says what happened.
     [could not be loaded], [The LINK failed for another reason, for example a
       fetch error or too little storage.],
     [could not be started, ESTAE create failed], [The ESTAE could not be set.],
-    [returned rc n], [The module returned the negative code n.],
+    [returned rc n], [The module returned the negative code n. Only a module
+      with its own start routine can return it, because the start routine of
+      the shipped library turns a negative code of #cmd("main") into 0.],
     [failed with Snnn ABEND], [A system abend with the code Snnn.],
     [failed with Unnnn ABEND], [A user abend with the code Unnnn, in decimal.],
   )
@@ -578,8 +581,7 @@ while (more_to_send) {
 ```)
 
 A module that does not look keeps its worker busy while the server tries to
-stop, and the operator sees the messages #cmd("HTTPD040I") and
-#cmd("HTTPD041I") (@ug-ops-stop). Both flag macros exist from HTTPD 4.0.
+stop (@ug-ops-stop). Both flag macros exist from HTTPD 4.0.
 
 == HTTPD Levels and the Function Vector <ug-module-levels>
 

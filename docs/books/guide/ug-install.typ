@@ -348,8 +348,9 @@ The job has no #cmd("DELETE") step on purpose. After the SYSMOD is accepted,
 the distribution library holds the accepted copy of every module. A rerun that
 scratched it would leave the SMP records saying "accepted" with an empty
 library behind them, and nothing would tell you. The comment in the job gives
-the rule: if you must start over, delete the data sets by hand and reject the
-SYSMOD first.
+the rule: if you must start over, cut the FMID out with UCLIN (@ug-remove), and
+then delete the data sets by hand. An accepted function cannot be rejected or
+restored.
 
 Edit #cmd("UNIT") and #cmd("VOL=SER") if #cmd("SYSDA") is not what you want.
 Pin the volume if you use the APF list (@ug-install-auth). Submit the job. A
@@ -962,8 +963,8 @@ The member used in the capture had three mvsMF routes. The shipped member has
 four active routes, so a start with it shows the lines for the routes that
 you have.
 
-A start that does not come up ends the task with condition code 8. A clean stop
-ends with 0. The messages in front of a refused start say why. The most common
+A start that does not come up ends the task with a condition code other than
+0, and 8 for a refused configuration. A clean stop ends with 0. The messages in front of a refused start say why. The most common
 ones:
 
 - #cmd("HTTPD037E HTTPD IS ALREADY ACTIVE ON PORT n, THIS INSTANCE ENDS"):
