@@ -154,9 +154,8 @@ the server itself.
 
 #idx("MAXTASK", "and REGION")
 Only a measurement shows the size that a site needs. This one was made against
-a release candidate of 4.4.0 with the stock #cmd("REGION=8M"): 60 requests to
-REXX pages, 9 at a time (#cmd("MAXTASK=9")). The table gives the failed
-requests of the 60, one entry per run.
+a release candidate of 4.4.0: 60 requests to REXX pages, 9 at a time. The
+table gives the failed requests of the 60, one entry per run.
 
 #tab(caption: [A measurement of parallel module requests])[
   #table(columns: (2.6in, 1fr),
