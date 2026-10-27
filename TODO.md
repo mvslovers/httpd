@@ -52,7 +52,7 @@ mvslovers/mbt#163.*
 | — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
 | — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
-| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | milestone 4.5.0, not yet ranked |
+| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | items 1 to 3 are in PR #418 (strike this row when it merges); items 4 to 6 (dropped output, invalid directives, code page of values) stay open, and the `getenv()` fallback of `echo` is #421; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source

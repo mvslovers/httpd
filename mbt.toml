@@ -277,6 +277,13 @@ host = false                 # httpd.h -> MVS-only (test-mvs)
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
 
+# SSI output of httpfile.c (#401): printenv shows the request only, printenv
+# and echo escape their values, long lines and split directives.  Needs
+# httpd.h and the real HTTPFILE -> MVS-only.
+[test.TSTSSIF]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false          # httpd.h + libufs -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
@@ -284,6 +291,14 @@ host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
 [test.TSTSAFE]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstsafe.c", "src/httpesc.c", "src/httpsrdr.c"]
+
+# Pure SSI helpers (#401): where a long line is held back so a split directive
+# is still found, and the HTML escaping of printenv/echo output.  Free of
+# httpd.h -> DUAL; httpssi.c calls httpesc(), so both sources are listed for
+# the host link.
+[test.TSTSSI]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstssi.c", "src/httpssi.c", "src/httpesc.c"]
 
 # httpbody() request-body length classifier (S7 Content-Length enforcement).
 # Free of httpd.h -> DUAL (host + MVS); helper source listed for the host link.
