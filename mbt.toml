@@ -2,7 +2,7 @@ schema = 3
 
 [project]
 name = "httpd"
-version = "4.4.0-dev"
+version = "4.5.0-dev"
 kind = "application"
 
 [toolchain]
@@ -601,7 +601,7 @@ extra = ["build/webroot/httpd-webroot.img"]
 # it: the element summary prints "MOD HTTPD NOT SEL", nothing is copied, and
 # every condition code still reads success -- RECEIVE/APPLY CHECK/APPLY/ACCEPT
 # all RC 00, HMA2270 SUCCESSFULLY COMPLETED, REC APP ACC in both zones, empty
-# target library.  Measured on mvsdev 2026-09-14 (mbt#98, JOB00291) with a
+# target library.  Measured on a test system 2026-09-14 (mbt#98) with a
 # FRESH, FREE fmid installing into a dataset unrelated to any other install:
 # it still lost to the owner of the module name.  So versioning the datasets
 # never bought a clean cut -- the collision was never on the dataset.
@@ -632,12 +632,12 @@ extra = ["build/webroot/httpd-webroot.img"]
 #
 # Verified free the way TFTP110 and TUFS120 were, on 2026-09-14: LIST CDS
 # SYSMOD(THTP410) and LIST ACDS SYSMOD(THTP410) each answered RC 04 with "THE
-# FOLLOWING SELECTED ENTRIES WERE NOT FOUND" -- mvsdev (MVS/CE, FMIDCHK
-# JOB00288, HMASMP LVL 04.48).  That is the check that counts: the SMPPTS scan
+# FOLLOWING SELECTED ENTRIES WERE NOT FOUND" -- test system (MVS/CE,
+# HMASMP LVL 04.48).  That is the check that counts: the SMPPTS scan
 # shows only what was *received*, while the CDS and ACDS store hashed member
 # names, so a LIST against both zones is the only way to see what is applied or
 # accepted.
-# THTP411: mvsdev (MVS/CE) FMIDCHK JOB00343, RC 04 NOT FOUND in CDS and ACDS,
+# THTP411: test system (MVS/CE), RC 04 NOT FOUND in CDS and ACDS,
 # 2026-09-14.  Never spent: 4.1.1 was not cut -- the libc370 2.0 port made the
 # next release 4.2.0 -- and it stays unassigned.
 # THTP420: free on the maintainer's word (2026-10-13), as TFTP120 was for ftpd
@@ -645,32 +645,32 @@ extra = ["build/webroot/httpd-webroot.img"]
 # installs that follow the release are the first check.
 # THTP430 (4.3.0, deleting THTP420): free on the maintainer's word
 # (2026-10-15) -- NO LIST was run on any stand before 4.3.0 was tagged.  The
-# SMP installs on m38r, m38b, m38l and m38x that follow it are the first check
+# SMP installs on the production systems that follow it are the first check
 # -- read their LIST and member lists.
-# THTP410 (spent by 4.1.0) was checked on BOTH: mvsdev FMIDCHK JOB00288 and
-# drnmig3a FMIDCHK JOB00034, each RC 04 NOT FOUND in CDS and ACDS.
-# Name the stands every time.
+# THTP410 (spent by 4.1.0) was checked on BOTH of two systems, each RC 04 NOT FOUND
+# in CDS and ACDS.  Name the systems every time (generically, in these notes).
 # A round that silently covers one stand where the previous line covered two
 # reads as equally thorough and is not -- an id present on the stand you skipped
 # and absent on the one you checked is exactly what the second check is for.
-# The same job found THTP400 REC APP ACC in both zones on mvsdev, carrying all
-# five modules: 4.0.x is installed there, so that stand is the 4.0.x -> 4.1.0
-# hop.  DELETE CARRIES THAT HOP TOO -- measured end to end on drnmig3a
+# The same job found THTP400 REC APP ACC in both zones on the first system, carrying all
+# five modules: 4.0.x is installed there, so that system is the 4.0.x -> 4.1.0
+# hop.  DELETE CARRIES THAT HOP TOO -- measured end to end on the second
+# system,
 # 2026-09-14 with throwaway ids TTMP400 -> TTMP410 and the real module names,
-# under an isolated TSTH HLQ (T402INST JOB00038, T410INST JOB00040).  SMP
+# under an isolated TSTH HLQ.  SMP
 # reported HMA2240 SUCCESSFULLY DELETED LMOD for each module against the NEW,
 # still-empty library without complaint, copied all five in, and MOD(HTTPD)
 # came back FMID = RMID = TTMP410 with TTMP400 a DELBY tombstone in both zones
-# (OWNCHK JOB00042).  The predecessor's library was left untouched, every
+# The predecessor's library was left untouched, every
 # member in place -- so the crossing is safe as well as automatic.
-# CONFIRMED FOR REAL on mvsdev 2026-09-14 with the published 4.1.0 package and
-# the real ids: HTTPDINS JOB00347 installed THTP410 over an installed THTP400
+# CONFIRMED FOR REAL on the first system 2026-09-14 with the published 4.1.0 package and
+# the real ids: HTTPDINS installed THTP410 over an installed THTP400
 # (APPLY 0004 / ACCEPT 0000, HMA2240 x10, HMA2380 x10), MOD(HTTPD) came back
-# FMID = RMID = THTP410 and THTP400 became a DELBY tombstone (OWNCHK JOB00348).
+# FMID = RMID = THTP410 and THTP400 became a DELBY tombstone.
 # HTTPD.V4R0M1.LINKLIB kept all six of its members, MVSMF included.  No UCLIN is
 # needed for it; the guide said otherwise until this was run.  APPLY ends
 # RC 04 on HMA2461 and the ACCEPT still runs, which is the relaxed gate earning
-# its keep: COND CODE 0004 / 0000 in that order on JOB00040.  THTP400 is spent either way and must never be reused;
+# its keep: COND CODE 0004 / 0000 in that order.  THTP400 is spent either way and must never be reused;
 # after this release it is a tombstone (TYPE = FUNCTION / DELBY = THTP410),
 # which LIST reports at RC 00 -- so the "RC 04 + empty list = free" rule reads
 # it as occupied, which is correct.
@@ -678,7 +678,7 @@ extra = ["build/webroot/httpd-webroot.img"]
 # a throwaway id alone the run measures the ownership wall above -- MOD(HTTPD)
 # belongs to whoever installed it -- instead of whatever it meant to measure.
 # TTST400 is not available as that id either: smp-todo.md O2 records it spent on
-# the 4.0.0 test install (2026-08-24, JOB01974, UCLIN'd back out), and a spent
+# the 4.0.0 test install (2026-08-24, UCLIN'd back out), and a spent
 # id is never reused.  TTST001-TTST004 went to the ++VER DELETE measurement.
 # Pick a fresh one, the way ftpd used TTMP110 and TTMP111 for its 1.1.0 runs.
 # THE ID FOLLOWS THE VERSION.  With a prefix, mbt derives fmid and delete from

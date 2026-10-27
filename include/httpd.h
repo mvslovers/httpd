@@ -665,8 +665,15 @@ extern int http_check_auth(HTTPC *, const char *classname,
 extern int http_logout(HTTPC *)                                           asm("HTTPLOUT");
 extern UCHAR *http_get_password(HTTPC *, UCHAR *out, unsigned outlen)      asm("HTTPGPWD");
 extern const char *http_realm(HTTPD *)                                     asm("HTTPGRLM");
+/* http_new_session() results (#367); see httpcgi.h for the contract.  These
+   defines are duplicated there: keep the two sets identical. */
+#define HTTP_SESSION_NONE    (-1)   /* not authenticated, or no password */
+#define HTTP_SESSION_REFUSED (-2)   /* RACF refused the logon */
+#define HTTP_SESSION_BUSY    (-3)   /* per-client cap, all in use, or store full */
+#define HTTP_SESSION_NOMEM   (-4)   /* out of storage, or RACF failed otherwise */
 extern int http_new_session(HTTPC *)                                       asm("HTTPNSES");
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
+extern CRED *httptkcr(const char *b64, unsigned maxage)					asm("HTTPTKCR");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
 extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");

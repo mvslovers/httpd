@@ -1,5 +1,5 @@
 //HTTPWEBR JOB (ACCT),'ALLOC HTTPD WEBROOT',CLASS=A,MSGCLASS=H,
-//             MSGLEVEL=(1,1),NOTIFY=&SYSUID
+//             MSGLEVEL=(1,1)
 //*
 //* HTTPWEBR - allocate the dataset the webroot disk is uploaded to
 //*
@@ -23,6 +23,11 @@
 //* rounds the request up to a track boundary; the few blocks that adds
 //* sit past the end of the filesystem, because the superblock -- not
 //* the dataset -- is what says how large the filesystem is.
+//*
+//* The job card has no NOTIFY operand on purpose: NOTIFY=&SYSUID is
+//* replaced only by TSO SUBMIT and mvsMF, and any other way in (FTP,
+//* a card reader) gets IEF627I and a JCL error.  Add NOTIFY=<your
+//* userid> to the card if you want a message when the job ends.
 //*
 //* Change the dataset name, UNIT and VOLUME to suit.  The name below
 //* is the one the installation guide uses.  An image larger than the

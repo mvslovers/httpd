@@ -18,7 +18,14 @@
 **   - CRED_SESSION_MAX: at the limit a login is refused while every session
 **     was used within CRED_SESSION_IDLE, and otherwise ends the client's idle
 **     one -- never another client's;
-**   - no credential, or one without a password, gets no session.
+**   - no credential, or one without a password, gets no session;
+**   - the result says why (#367): -1 nothing to log on with, -2 RACF refused,
+**     -3 the client's sessions are all in use; a refusal marks the cache CRED
+**     stale without freeing it; cred_login() never serves it and keeps it for
+**     CRED_STALE_GRACE (asking RACF afresh, which may take it back), then
+**     drops it, as does the reaper;
+**   - http_logout() gives the slot back: an ended session no longer counts
+**     against the limit.
 **
 ** MVS-only (blowfish + RACF SVCs), and the RACF part needs APF like TSTGUID;
 ** without it that part is skipped, not failed.
@@ -46,17 +53,40 @@ sessions_of(CRED ***array, CREDID *id)
     return found;
 }
 
-/* log on through the Basic cache and turn it into a session, as a login does */
+#define LOGIN_NOCRED  (-100)    /* cred_login() found nothing */
+#define LOGIN_NOTOKEN (-101)    /* the session has no token to hand out */
+
+/* log on through the Basic cache and turn it into a session, as a login does.
+   Returns 0, or what http_new_session() returned. */
 static int
 login(HTTPC *httpc, unsigned addr, CREDTOK *tok)
 {
+    unsigned char ibmuser[] = "IBMUSER";
+    unsigned char sys1[]    = "SYS1";
+    int rc;
+
     httpc->addr = addr;
-    httpc->cred = cred_login(addr, (unsigned char *)"IBMUSER",
-                             (unsigned char *)"SYS1", 0);
-    if (!httpc->cred) return -1;
-    if (http_new_session(httpc) != 0) return -1;
+    httpc->cred = cred_login(addr, ibmuser, sys1, 0);
+    if (!httpc->cred) return LOGIN_NOCRED;
+    rc = http_new_session(httpc);
+    if (rc != 0) return rc;
     return http_get_token(httpc, tok->c, sizeof(tok->c)) ==
-           (int)sizeof(CREDTOK) ? 0 : -1;
+           (int)sizeof(CREDTOK) ? 0 : LOGIN_NOTOKEN;
+}
+
+/* the credential a request would get from this token (cookie or Bearer), no
+   max-age: what httppc.c's token path decides, #373 */
+static CRED *
+by_token(CREDTOK *tok)
+{
+    size_t  len = 0;
+    char   *b64 = base64_encode((void *)tok, sizeof(CREDTOK), &len);
+    CRED   *cred;
+
+    if (!b64) return NULL;
+    cred = httptkcr(b64, 0);
+    free(b64);
+    return cred;
 }
 
 int main(void)
@@ -69,16 +99,28 @@ int main(void)
     CRED     *shared;
     CRED     *bare;
     CRED     *victim;
+    CRED     *stale;
+    CRED     *again;
+    CRED     *sess;
+    CREDID    id;
+    CREDTOK   tokn;
+    time64_t  zero;
+    CREDTOK   tokstale;
     CREDID    noid;
     CREDTOK   toka;
     CREDTOK   tokb;
     CREDTOK   tokx;
     CREDTOK   tok[CRED_SESSION_MAX];
     unsigned char buf[16];
+    unsigned char ibmuser[] = "IBMUSER";
+    unsigned char sys1[]    = "SYS1";
+    unsigned char oldpw[]   = "OLDPW";
     unsigned  addr  = 0xC0A8017B;   /* 192.168.1.123 */
     unsigned  addr2 = 0xC0A8017C;   /* another client, same user */
     unsigned  n, alive;
     int       rc;
+
+    memset(&zero, 0, sizeof(zero));
 
     printf("=== HTTPD private login sessions (issue #288) tests ===\n");
 
@@ -99,12 +141,14 @@ int main(void)
     a->httpd = b->httpd = x->httpd = httpd;
 
     /* --- no session without a password credential (no RACF needed) ------- */
-    CHECK(http_new_session(a) == -1, "no credential -> no session (-1)");
+    CHECK(http_new_session(a) == HTTP_SESSION_NONE,
+          "no credential -> no session (-1)");
 
     credid_init(&noid);                      /* passflg clear: no password */
     bare = cred_new(&noid, NULL, NULL, 0);
     a->cred = bare;
-    CHECK(http_new_session(a) == -1, "credential without password -> -1");
+    CHECK(http_new_session(a) == HTTP_SESSION_NONE,
+          "credential without password -> -1");
     CHECK(a->cred == bare, "a refused session leaves httpc->cred alone");
     cred_free(&bare);
     a->cred = NULL;
@@ -117,12 +161,12 @@ int main(void)
     }
 
     /* --- the Basic cache is unchanged by design --------------------------- */
-    shared = cred_login(addr, (unsigned char *)"IBMUSER",
-                        (unsigned char *)"SYS1", 0);
+    shared = cred_login(addr, ibmuser,
+                        sys1, 0);
     CHECK(shared != NULL, "cred_login succeeds");
     if (!shared) return mbt_test_summary("TSTSESS");
-    CHECK(cred_login(addr, (unsigned char *)"IBMUSER",
-                     (unsigned char *)"SYS1", 0) == shared,
+    CHECK(cred_login(addr, ibmuser,
+                     sys1, 0) == shared,
           "a second cred_login() is the same cached CRED");
 
     /* --- two logins, two sessions ----------------------------------------- */
@@ -167,8 +211,8 @@ int main(void)
 
     /* all of them were used this second: none may be ended under a request
        that could still hold it (CRED_SESSION_IDLE), so the login is refused */
-    CHECK(login(a, addr, &tok[CRED_SESSION_MAX - 1]) == -1,
-          "at the limit with every session recently used, the login is refused");
+    CHECK(login(a, addr, &tok[CRED_SESSION_MAX - 1]) == HTTP_SESSION_BUSY,
+          "at the limit with every session recently used, the login is refused (-3)");
     CHECK(sessions_of(array, &shared->id) == CRED_SESSION_MAX,
           "and no session was ended for it");
 
@@ -192,11 +236,122 @@ int main(void)
     CHECK(cred_find_by_token(&tokx) == x->cred,
           "the other client's session was not touched");
 
+    /* --- an ended session gives its slot back (#367) ---------------------- */
+    /* a->cred is the session just minted.  Every other session is still
+       recent, so a session can only be had if the logout freed a slot -- no
+       idle one is there to be evicted. */
+    CHECK(http_logout(a) == 0, "logout of the newest session succeeds");
+    CHECK(cred_find_by_token(&tok[CRED_SESSION_MAX - 1]) == NULL,
+          "the logged-out session is gone from the store");
+    CHECK(sessions_of(array, &shared->id) == CRED_SESSION_MAX - 1,
+          "and no longer counts against the limit");
+    CHECK(login(a, addr, &tokn) == 0,
+          "so the next login gets a session without ending another one");
+    CHECK(sessions_of(array, &shared->id) == CRED_SESSION_MAX,
+          "the client is back at CRED_SESSION_MAX, not above it");
+    credtok_logout_arr(array, &tokn);
+
     /* --- clean up: every session and the cache CRED ----------------------- */
     credtok_logout_arr(array, &tokb);
     credtok_logout_arr(array, &tokx);
     for (n = 0; n < CRED_SESSION_MAX; n++) credtok_logout_arr(array, &tok[n]);
     CHECK(sessions_of(array, &shared->id) == 0, "all sessions logged out");
+    credtok_logout_arr(array, &shared->token);
+
+    /* --- RACF refuses the cached password (#367) -------------------------- */
+    /* a Basic cache entry whose password RACF no longer accepts is what a
+       changed password leaves behind: cred_login() answers from the cache and
+       never asks RACF.  The CRED is built by hand, with no ACEE. */
+    id = credid_init(NULL);
+    credid_update(&id, &addr, ibmuser, oldpw);
+    credid_enc(&id, &id);
+    tokstale = credtok_rand(httpd->credkey, &id);
+    stale = cred_new(&id, &tokstale, NULL, 0);
+    CHECK(stale != NULL && cred_add(stale) == 0, "a cache entry with a dead password");
+    if (!stale) return mbt_test_summary("TSTSESS");
+    CHECK(cred_login(addr, ibmuser, oldpw, 0) == stale,
+          "the cache answers with it, RACF is not asked");
+
+    CHECK(by_token(&tokstale) == stale,
+          "before it is marked, the entry resolves by its token");
+
+    a->addr = addr;
+    a->cred = stale;
+    CHECK(http_new_session(a) == HTTP_SESSION_REFUSED,
+          "RACF refuses the logon -> -2");
+    CHECK(a->cred == stale, "httpc->cred is left alone");
+    CHECK(cred_find_by_token(&tokstale) == stale,
+          "the entry the request holds is not freed under it");
+    CHECK((stale->flags & CRED_FLAG_STALE) != 0, "it is marked stale");
+    CHECK(difftime64(stale->stale, zero) > 0, "with the time it was marked");
+    CHECK(sessions_of(array, &stale->id) == 0, "and no session was made");
+
+    /* the token is refused too (#373), not only the password: a marked entry
+       stays linked for the requests that hold it, but nothing new reaches it */
+    CHECK(by_token(&tokstale) == NULL,
+          "a marked entry no longer resolves by its token");
+
+    /* a marked entry is never served, and not freed within the grace period
+       either: the lookup that finds it refreshes `last`, the floor is the
+       mark.  cred_login() asks RACF, which refuses -> NULL */
+    n = array_count(array);
+    again = cred_login(addr, ibmuser, oldpw, 0);
+    CHECK(again == NULL, "the old password is no longer accepted from the cache");
+    CHECK(cred_find_by_token(&tokstale) == stale,
+          "the marked entry is kept within the grace period");
+    CHECK((stale->flags & CRED_FLAG_STALE) != 0 && array_count(array) == n,
+          "still marked, nothing added");
+
+    /* the reaper keeps it within the grace period whatever its `last` says,
+       and frees it afterwards -- the idle TTL given is far beyond its age */
+    memset(&stale->last, 0, sizeof(stale->last));
+    CHECK(cred_reap(2000000000U, 0) == 0,
+          "a fresh stale entry is not reaped, even with an ancient `last`");
+    CHECK(cred_find_by_token(&tokstale) == stale, "it is still there");
+    stale->stale = zero;                    /* marked long ago */
+    stale->last  = time64(NULL);
+    CHECK(cred_reap(2000000000U, 0) == 1,
+          "a stale entry past the grace period is reaped, even with a fresh `last`");
+    CHECK(cred_find_by_token(&tokstale) == NULL, "and gone");
+
+    /* the other way out: past the grace period the next cred_login() drops it
+       and asks RACF, even with SESSION_MAXAGE 0 (never) */
+    stale = cred_new(&id, &tokstale, NULL, 0);
+    CHECK(stale != NULL && cred_add(stale) == 0, "a second dead-password entry");
+    if (!stale) return mbt_test_summary("TSTSESS");
+    a->cred = stale;
+    CHECK(http_new_session(a) == HTTP_SESSION_REFUSED, "refused again -> -2");
+    stale->stale = zero;                    /* marked long ago */
+    again = cred_login(addr, ibmuser, oldpw, 0);
+    CHECK(again == NULL, "an aged stale entry is not served");
+    CHECK(cred_find_by_token(&tokstale) == NULL, "and was dropped");
+
+    /* RACF accepts the password again (set back): the marked entry is cleared
+       and returned, not duplicated */
+    shared = cred_login(addr, ibmuser, sys1, 0);
+    CHECK(shared != NULL, "a fresh cache entry with a good password");
+    if (!shared) return mbt_test_summary("TSTSESS");
+    CHECK(login(a, addr, &tokn) == 0, "a session is minted from it");
+    sess = cred_find_by_token(&tokn);
+    CHECK(sess != NULL && (sess->flags & CRED_FLAG_SESSION) != 0,
+          "and it is a private session");
+    CHECK(by_token(&shared->token) == shared,
+          "the unmarked cache entry resolves by its token");
+    shared->flags |= CRED_FLAG_STALE;
+    shared->stale  = time64(NULL);
+    CHECK(by_token(&shared->token) == NULL,
+          "marked, it does not resolve by its token (#373)");
+    CHECK(sess != NULL && by_token(&tokn) == sess,
+          "a session minted from it earlier is not touched by the mark");
+    n = array_count(array);
+    again = cred_login(addr, ibmuser, sys1, 0);
+    CHECK(again == shared, "RACF accepts: the marked entry is taken back");
+    CHECK((shared->flags & CRED_FLAG_STALE) == 0 && difftime64(shared->stale, zero) == 0,
+          "mark and time are cleared");
+    CHECK(array_count(array) == n, "no second CRED for the same credentials");
+    CHECK(by_token(&shared->token) == shared,
+          "taken back, the entry resolves by its token again");
+    credtok_logout_arr(array, &tokn);
     credtok_logout_arr(array, &shared->token);
 
     return mbt_test_summary("TSTSESS");
