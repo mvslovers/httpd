@@ -660,7 +660,7 @@ the region, for as long as the module runs.
 | What | Size | Where it is set |
 |------|------|-----------------|
 | C stack of a module that sets nothing | 262,328 bytes (about 256 KB) | the C runtime's default, `@@CRT0` in LIBC/370 |
-| C stack of a module with its own `__stklen` | that value plus a few hundred bytes. MVSMF sets 64 KB, so about 64 KB | `unsigned __stklen` in the module |
+| C stack of a module with its own `__stklen` | that value plus 48 bytes. MVSMF sets 64 KB, and a request takes 65,584 bytes | `unsigned __stklen` in the module |
 | Stack of a worker thread | 64 KB, once per worker thread | `httpd.c`, the thread manager |
 | Stack of the socket thread | 32 KB, once | `httpd.c` |
 | Resident copy of a module (`RESIDENT=YES`) | the size of the load module, once per module and not per request. MVSMF is about 335 KB | see [Resident modules](#resident-modules-resident) |
@@ -687,7 +687,7 @@ whole enough to hold it, not only large enough in sum.
 | `REGION=8M`, `RESIDENT=YES` | 6, 32, 0 |
 | `REGION=8M`, 4.3.0, same module libraries | 0, 4, 0 |
 | `REGION=8M`, `RESIDENT=NO` | 0 (one run) |
-| `REGION=16M`, `RESIDENT=YES` | 0 (one run) |
+| `REGION=16M` | 0 (one run) |
 
 A mixed load of 6 requests at a time across all module types was clean in every
 set-up. The sample is small and the runs are not independent. It shows the
