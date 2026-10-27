@@ -16,8 +16,9 @@ is to hold nothing worth going stale.
 closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
 The open issues are in milestone 4.5.0, except #176, #322 and #323, which are in 4.6.0. #326,
 #367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
-#370 is listed and not ranked against the rest, and so are #391 to #395 and #399 to
-#401, which the manuals work (#382) filed; #394 is closed and struck (PR #419). #405, the follow-up to the manuals, is the change that
+#370 is listed and not ranked against the rest, and so are #391 to #395, #400 and
+#401, which the manuals work (#382) filed; #394 is closed and struck (PR #419). #399 is closed and struck (PR #427, live test
+PR #432). #405, the follow-up to the manuals, is the change that
 carries this edit and has no row. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
 no row. The ranked order is unchanged.
@@ -50,7 +51,7 @@ mvslovers/mbt#163.*
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
 | — | ~~#394~~ | ~~diagnostic and display code — unchecked sizes and unescaped output~~ | **Done** — the title buffers are bounded, `/.dm` escapes its title and chunk rule, `GET /abend` is gone, URL decoding no longer cuts the path, a large `POST` to a module route is left unread for the module (PR #419, docs in the Reference); what it left over is #426 (`HTTPDMTT`, PR #428) and #431; milestone 4.5.0 |
 | — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
-| — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
+| — | ~~#399~~ | ~~`HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection~~ | **Done** — `HEAD` now answers with the headers a `GET` would send and no body (PR #427); the live check that the connection stays usable is PR #432; milestone 4.5.0 |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
 | — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | items 1 to 3 are in PR #418 (strike this row when it merges); items 4 to 6 (dropped output, invalid directives, code page of values) stay open, and the `getenv()` fallback of `echo` is #421; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
