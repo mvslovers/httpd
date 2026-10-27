@@ -64,7 +64,13 @@ used. `trc_ms` converts without overflow (`ticks/1000*1024 + ...`).
 
 ## Reading it
 
-`/.dsrv?target=TRACE[&min=ms]` gives `text/plain`. `tests/soak-trace.py` polls
-it during a soak run and joins the stalls of `soak-stalls.py` to the records by
-client port and time (`wall` and `ago` in the output give the wall clock of a
-record's start).
+`/.dsrv?target=TRACE[&min=ms]` gives `text/plain`. `tests/soak.py
+--trace-sec N` polls it during a run (`OUT.trace`); `tests/soak-trace.py` joins
+the stalls to the records by client port and time (`wall` and `ago` in the
+output give the wall clock of a record's start).
+
+`w=` is the address of the worker's `CTHDWORK`. `tests/soak-workers.py` lists
+the workers in creation order with the number of connections dispatched to
+each (from `/.dsrv?target=MGR`), which is the denominator a per-worker stall
+rate needs: the trace table keeps slow records longer than fast ones, so
+counting records per worker overstates the workers that stall.

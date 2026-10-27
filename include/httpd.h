@@ -702,8 +702,9 @@ extern int http_getc(HTTPC *httpc)                                      asm("HTT
 extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTTPGETS");
 
 /* request trace (#350): HTTPD->trace is NULL unless TRACE=n is set, and every
-   hook is guarded by HTTP_TRACING so the off state costs a load and a branch */
-#define HTTP_TRACING(httpc) ((httpc)->httpd->trace)
+   hook is guarded by HTTP_TRACING so the off state costs two loads and a
+   branch; a handle without HTTPD (the unit tests) is never traced */
+#define HTTP_TRACING(httpc) ((httpc)->httpd && (httpc)->httpd->trace)
 extern unsigned httptrc_now(void)                                      asm("HTRCNOW");
 extern void httptrc_start(HTTPD *httpd)                                asm("HTRCSTRT");
 extern void httptrc_stop(HTTPD *httpd)                                 asm("HTRCSTOP");
