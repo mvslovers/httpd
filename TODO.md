@@ -35,11 +35,10 @@ mvslovers/mbt#163.*
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.5.0; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.5.0 |
-| — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
 | — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
-| — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
+| — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
 | — | #382 | docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release | the Technical Writer; milestone 4.5.0, not yet ranked |
 | — | #383 | build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1 | PR #384 pins the released ufsd 1.5.2; `mbt test --mvs` stays part of the 4.5.0 release acceptance; milestone 4.5.0, not yet ranked |
@@ -208,7 +207,7 @@ corrected, and because the second one is the evidence behind section 12a:
 
 **The return-code work is finished.** #226 and #245 between them settled every
 exit that could end a refused start `CC 0000`; nothing in that thread is open,
-and `docs/messages.md` §*A refused start* is where the resulting contract is
+and the Reference appendix "Messages", section *A Start That Ends*, is where the resulting contract is
 written down.
 
 **v4.0.2 shipped on 2026-09-05:** the libc370 1.0.4 relink (#260/PR #261), plus
@@ -258,15 +257,19 @@ off so no `0\r\n\r\n` follows, keep-alive off, `HTTPD045E` on the console. What
 stays true: the status line is always out before the first read, so a client
 sees a torn 200, never a 500 — the only honest signal left is a body that stops
 short. An error in an `<!--#include -->`d file ends the including response too.
-`HTTPD045E` is one line per failed request; a file that is read again and again
-writes it again and again, and there is no rate limit.
+`HTTPD045E` names the included file when the error is inside an include, is
+written at most once a minute (the rest are counted into `s SUPPRESSED`), and a
+second include after a failed one is not opened (#346). Not done, deliberately:
+reading the first block before the status line so that an error there could
+still be answered with a 500 — that is new behaviour for clients and needs a
+product decision.
 
 ### ~~2 · #254 — six Parmlib keywords the parser accepts are undocumented~~
 
 Closed with PR #329: `docs/configuration.md` documents the six keywords.
 
 Ranked above #250 only because it costs no MVS time. `httpprm.c` is the
-authority for what the parser accepts; `docs/configuration.md` is what an
+authority for what the parser accepts; the Reference chapter "The HTTPPRM Keywords" is what an
 operator reads, and the two disagree by six keywords.
 
 ### ~~3 · #262 — TSTSP keeps the whole suite red~~

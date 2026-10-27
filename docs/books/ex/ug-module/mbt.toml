@@ -1,0 +1,23 @@
+schema = 3
+
+[project]
+name = "hello"
+version = "1.0.0"
+kind = "application"
+
+[toolchain]
+mbt = "3.0"
+cc370 = "1.6.3"
+libc370 = "2.25.1"
+
+[dependencies]
+"mvslovers/httpd" = ">=4.2.0"
+
+[module.HELLO]
+dep_startup = true
+rent = true
+reus = true
+sources = ["src/hello.c"]
+
+[deploy]
+target = "HTTPD.DEV.LINKLIB"

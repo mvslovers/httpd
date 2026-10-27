@@ -1,0 +1,57 @@
+     DATE 26.300  TIME 07:04:56      HMASMP LVL 04.48 MESSAGES AND CONTROL STATEMENTS                        PAGE 0001
+ 
+HMA4240    HMASMP EXEC PARM = 'DATE=U'
+ APPLY S(THTP440) CHECK .
+ 
+ 
+HMA4180    INLINE JCLIN PROCESSING SUCCESSFUL FOR SYSMOD=THTP440
+ 
+HMA2050    APPLY PROCESSING COMPLETED - HIGHEST RETURN CODE IS 00
+     DATE 26.300  TIME 07:05:14      HMASMP LVL 04.48 MESSAGES AND CONTROL STATEMENTS                        PAGE 0002
+ 
+SYSMOD STATUS REPORT FOR APPLY CHECK PROCESSING
+ 
+  NOTE:  '-' INDICATES THE REQUISITE SYSMOD CONDITION IS NOT SATISFIED
+         '*' INDICATES THE NON SATISFIED REQUISITE SYSMOD CONDITION IS BYPASSED
+ 
+ 
+SYSMOD   STATUS    TYPE      FMID     REQUISITE AND SUPEDBY SYSMODS
+ 
+THTP430  DELETED   FUNCTION  THTP430
+ 
+THTP440  APPLIED   FUNCTION  THTP440
+     DATE 26.300  TIME 07:05:14      HMASMP LVL 04.48 MESSAGES AND CONTROL STATEMENTS                        PAGE 0003
+ 
+ELEMENT SUMMARY REPORT FOR APPLY CHECK PROCESSING
+ 
+ 
+ELEM   ELEMENT   ELEM      CURRENT  CURRENT  MAC/SRC   DISTSRC   ASSEM    LOAD MOD  ---LMOD SYSLIB---  SYSMOD   SYSMOD
+TYPE   NAME      STATUS    FMID     RMID     SYSLIB    LIBRARY   NAMES                                 NAME     STATUS
+ 
+MOD    ABEND0C1  APPLIED   THTP440  THTP440                               ABEND0C1  LINKLIB            THTP440  APPLIED
+                 NOT SEL                                                                               THTP430  DELETED
+ 
+MOD    HTTPD     APPLIED   THTP440  THTP440                               HTTPD     LINKLIB            THTP440  APPLIED
+                 NOT SEL                                                                               THTP430  DELETED
+ 
+MOD    HTTPDM    APPLIED   THTP440  THTP440                               HTTPDM    LINKLIB            THTP440  APPLIED
+                 NOT SEL                                                                               THTP430  DELETED
+ 
+MOD    HTTPDMTT  APPLIED   THTP440  THTP440                               HTTPDMTT  LINKLIB            THTP440  APPLIED
+                 NOT SEL                                                                               THTP430  DELETED
+ 
+MOD    HTTPDSRV  APPLIED   THTP440  THTP440                               HTTPDSRV  LINKLIB            THTP440  APPLIED
+                 NOT SEL                                                                               THTP430  DELETED
+     DATE 26.300  TIME 07:05:14      HMASMP LVL 04.48 MESSAGES AND CONTROL STATEMENTS                        PAGE 0004
+ 
+DELETED FUNCTION REPORT FOR  APPLY CHECK PROCESSING
+ 
+SYSMOD          DELETED THE
+CAUSING THE     FOLLOWING SYSMODS
+DELETION        TYPE       SYSMOD
+ 
+THTP440         FUNCTION   THTP430
+ 
+     DATE 26.300  TIME 07:05:14      HMASMP LVL 04.48 MESSAGES AND CONTROL STATEMENTS                        PAGE 0005
+ 
+HMA2050    HMASMP PROCESSING COMPLETED - HIGHEST RETURN CODE IS 00

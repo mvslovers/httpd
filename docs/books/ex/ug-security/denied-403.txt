@@ -1,0 +1,11 @@
+$ curl -i -u IBMUSER:****** http://localhost:8080/denied/data.txt
+HTTP/1.1 403 Forbidden
+Date: Tue, 27 Oct 2026 05:52:48 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+403 Forbidden

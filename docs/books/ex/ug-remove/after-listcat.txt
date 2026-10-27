@@ -1,0 +1,41 @@
+IDCAMS  SYSTEM SERVICES                                           TIME: 07:10:11        10/27/26     PAGE   1
+ 
+  LISTCAT LEVEL(HTTPD)
+NONVSAM ------- HTTPD.BREXX
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.HTML
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.HTML.TK5
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.ICON
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.LUA
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.SAMPLIB
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.STATS
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.UFSDISK0
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.UFSDISK1
+     IN-CAT --- SYS1.UCAT.TK5
+NONVSAM ------- HTTPD.V3R3M0.LINKLIB
+     IN-CAT --- SYS1.UCAT.TK5
+IDCAMS  SYSTEM SERVICES                                           TIME: 07:10:11        10/27/26     PAGE   2
+         THE NUMBER OF ENTRIES PROCESSED WAS:
+                   AIX -------------------0
+                   ALIAS -----------------0
+                   CLUSTER ---------------0
+                   DATA ------------------0
+                   GDG -------------------0
+                   INDEX -----------------0
+                   NONVSAM --------------10
+                   PAGESPACE -------------0
+                   PATH ------------------0
+                   SPACE -----------------0
+                   USERCATALOG -----------0
+                   TOTAL ----------------10
+         THE NUMBER OF PROTECTED ENTRIES SUPPRESSED WAS 0
+IDC0001I FUNCTION COMPLETED, HIGHEST CONDITION CODE WAS 0
+ 
+IDC0002I IDCAMS PROCESSING COMPLETE. MAXIMUM CONDITION CODE WAS 0
