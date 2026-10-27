@@ -49,7 +49,7 @@ mvslovers/mbt#163.*
 | — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.5.0, not yet ranked |
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
 | — | #394 | diagnostic and display code — unchecked sizes and unescaped output | milestone 4.5.0, not yet ranked |
-| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked |
+| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are in a PR, the XMIT sizes and the 4.4.0-framed examples are re-checked at the release |
 | — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
 | — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | milestone 4.5.0, not yet ranked |
