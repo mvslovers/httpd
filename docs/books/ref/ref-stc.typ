@@ -483,8 +483,8 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       #cmd("RES_NOPROFILE=DENY") the message is
       #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
       and every request that reaches the check gets status 403. A typing error
-      in the resource name looks like this. A class that the security product
-      does not know does not, see below.],
+      in the resource name looks like this. A class that RAKF does not define looks like this
+      with RAKF 1.2.x and does not with RAKF 2.0.0, see below.],
     [Authorization by SVC 244], [The security product allows or refuses the SVC
       for the account of the task. The server does not check the profile
       itself.],
@@ -501,15 +501,21 @@ profile exists. #cmd("RES_NOPROFILE=DENY") acts on the return code 4 only. It
 does not change what a system answers with 0 or with 8.
 
 #idx("RAKF0012")
-RAKF 2.0.0 gives the return code 8 for a class that is not in the class
+The level of RAKF decides what a class that it does not define gives. RAKF 2.0.0
+(MVS/CE) gives the return code 8 for a class that is not in the class
 descriptor table of the system. It writes #cmd("RAKF0012 UNDEFINED CLASS class")
 to the console. The route refuses every request, the probe stays silent and
 #cmd("RES_NOPROFILE") changes nothing. A class with a typing error gives this
-answer. A resource name with a typing error gives the return code 4 when no
-profile covers the misspelled name. A measurement with RAKF on MVS/CE, made
-with the identity of the server as the probe does, gave the return code 0 for
-the classes #cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") without a
-profile. HTTPD allows a request on the return code 0, so
+answer. RAKF 1.2.x (measured on TK5) gives the return code 4 for such a class,
+with no message: the probe writes #cmd("HTTPD425W") or, with
+#cmd("RES_NOPROFILE=DENY"), #cmd("HTTPD426W"), and without the keyword the route
+is open. A resource name with a typing error gives the return code 4 on both
+levels when no profile covers the misspelled name. A measurement with the RAKF
+of MVS/CE (RAKF 2.0.0) and with that of TK5 (RAKF 1.2.x) gave the return code 0
+on both for a batch user, the operator #cmd("IBMUSER"), for the classes
+#cmd("TAPEVOL"), #cmd("DASDVOL") and #cmd("TERMINAL") without a profile. The
+start probe, which runs with the identity of the server, stays silent for these
+classes, so its answer is not 4. HTTPD allows a request on the return code 0, so
 #cmd("RES_NOPROFILE=DENY") does not close such a route. The measurement did not
 use the ACEE of a client.
 
