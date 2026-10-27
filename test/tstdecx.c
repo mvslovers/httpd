@@ -34,6 +34,11 @@ int main(void)
     /* a table that is not the identity, so a missing lookup shows */
     for (i = 0; i < 256; i++) tab[i] = (unsigned char)i;
     tab[0x41] = 'Z';
+    /* the ASCII code of each byte the checks use, to the compiler's char */
+    tab[0x20] = ' ';
+    tab[0x2B] = '+';
+    tab[0x2F] = '/';
+    tab[0x42] = 'B';
 
     /* ordinary decoding */
     dec("hello", 1, out);
