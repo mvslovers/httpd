@@ -1,0 +1,18 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=MGR" | sed -n "/<table>/,/<\/table>/p" | sed -e "s/<\/t[dh]><t[dh]>/  /g" -e "s/<[^>]*>//g" | tr -cd "\n -~"
+
+Offset  Data Name  Description  Contents
++0000  mgr->eye  Eye Catcher  "CTHDMGR"
++0008  mgr->task  Thread Manager Task Handle  001A9FC8
++000C  mgr->wait  Wait For Work ECB  809CD330
++0010  mgr->func  Thread Function Address  00098F1C
++0014  mgr->udata  Thread User Data  000DB390
++0018  mgr->stacksize  Thread Stack Size  65536
++001C  mgr->worker  Worker Threads Array  000FB6D4
++0020  mgr->queue  Worker Queue Array  000FB07C
++0024  mgr->state  Current State  4 "WAITING"
++0028  mgr->mintask  Minimum Worker Threads  3
++002C  mgr->maxtask  Maximum Worker Threads  9
++0030  mgr->dispatched  Dispatched Worker Threads Count  8
++0038  mgr->start  Round Robin Start Index  2
++003C  mgr->rname  Resource Name String  "CTHDMGR.0007.000DAE18"
+

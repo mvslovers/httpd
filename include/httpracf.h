@@ -24,4 +24,28 @@
 */
 int httpracf(int rc);
 
+/* The verdict of the RES= route gate (#351).  httpracf() answers "may this
+** pass" and so cannot say WHY an rc 4 passed; a route that must not run on a
+** missing profile needs the difference, so the gate asks this instead. */
+#define HTTP_RACF_V_ALLOW   0   /* a profile permits, or none exists and   */
+                                /* the server was not told to refuse that  */
+#define HTTP_RACF_V_DENY    1   /* refused by a profile, or not a SAF rc   */
+#define HTTP_RACF_V_NOPROF  2   /* no profile, and RES_NOPROFILE=DENY      */
+
+/* Map a raw racf_auth() rc to HTTP_RACF_V_*.  refuse_noprof is the
+** RES_NOPROFILE=DENY setting; with it 0 the answer is exactly httpracf()'s
+** (rc 0 and 4 allow, everything else denies), so the default does not move.
+** A refusal (8 and up) and the -1 "unauthenticated" sentinel are DENY in
+** either setting: a stricter setting must never turn a denial into anything
+** else. */
+int httpracr(int rc, int refuse_noprof);
+
+/* Read the value of RES_NOPROFILE= (#351): 1 for DENY, 0 for ALLOW, -1 for
+** anything else.  The token ends at the first blank or at the end of the
+** string, and the match is caseless, like the other Parmlib values.  -1 is a
+** configuration error the caller must refuse to start on -- a misspelled
+** value must not read as ALLOW, which would leave the gate open unannounced.
+** Pure and free of httpd.h so that the fatal path is dual-tested. */
+int httpracv(const char *value);
+
 #endif /* HTTPRACF_H */

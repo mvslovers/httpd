@@ -1,0 +1,21 @@
+$ ftp -v -n mvs.example.org 2121
+Connected to mvs.example.org.
+220 MVS 3.8j FTPD Server
+ftp> user HERC01
+331 Send password please.
+Password: 
+230 HERC01 is logged on.  Working directory is "HERC01.".
+Remote system type is MVS.
+ftp> progress off
+Progress bar off.
+ftp> quote site filetype=jes
+200 SITE command was accepted
+ftp> put httpd-4.4.0-inst.jcl
+local: httpd-4.4.0-inst.jcl remote: httpd-4.4.0-inst.jcl
+229 Entering Extended Passive Mode (|||22000|)
+125 Sending Job to JES internal reader FIXrecfm 80
+250-It is known to JES as JOBnnnnn
+250 Transfer completed successfully.
+5982 bytes sent in 00:00 (83.86 KiB/s)
+ftp> quit
+221 Quit command received. Goodbye.

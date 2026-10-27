@@ -1,0 +1,2 @@
+$ curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" http://localhost:8080/hello
+200 0.069525s

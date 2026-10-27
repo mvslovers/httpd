@@ -1,0 +1,170 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=MOD&m=000DA6D4" | sed -n "/<table>/,/<\/table>/p" | sed -e "s/<\/t[dh]><t[dh]>/  /g" -e "s/<[^>]*>//g" | tr -cd "\n -~"
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  0
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  11
++000C  route->path  Path Name  "/zosmf/info"
++0010  route->pgm  Program Name (NULL = LOC static route)  "MVSMF"
++0014  route->auth  Auth Mode (AUTH=)  0 NONE (public -- AUTH=NONE or no AUTH=)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  0
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  28
++000C  route->path  Path Name  "/zosmf/services/authenticate"
++0010  route->pgm  Program Name (NULL = LOC static route)  "MVSMF"
++0014  route->auth  Auth Mode (AUTH=)  0 NONE (public -- AUTH=NONE or no AUTH=)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  21
++000C  route->path  Path Name  "/zosmf/restconsoles/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "MVSMF"
++0014  route->auth  Auth Mode (AUTH=)  3 TOKEN (bare 401, API route)
++0015  route->resattr  RACF Access Attribute  02 READ
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "FACILITY"
++001C  route->resname  RACF Resource Name (RES=)  "MVSMF.CONSOLE"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  8
++000C  route->path  Path Name  "/zosmf/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "MVSMF"
++0014  route->auth  Auth Mode (AUTH=)  3 TOKEN (bare 401, API route)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  0
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  6
++000C  route->path  Path Name  "/.dsrv"
++0010  route->pgm  Program Name (NULL = LOC static route)  "HTTPDSRV"
++0014  route->auth  Auth Mode (AUTH=)  1 FORM (HTML login form)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  0
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  4
++000C  route->path  Path Name  "/.dm"
++0010  route->pgm  Program Name (NULL = LOC static route)  "HTTPDM"
++0014  route->auth  Auth Mode (AUTH=)  2 BASIC (401 WWW-Authenticate)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  0
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  6
++000C  route->path  Path Name  "/.dmtt"
++0010  route->pgm  Program Name (NULL = LOC static route)  "HTTPDMTT"
++0014  route->auth  Auth Mode (AUTH=)  2 BASIC (401 WWW-Authenticate)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  6
++000C  route->path  Path Name  "/pub/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  0 NONE (public -- AUTH=NONE or no AUTH=)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  10
++000C  route->path  Path Name  "/private/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  2 BASIC (401 WWW-Authenticate)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  7
++000C  route->path  Path Name  "/form/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  1 FORM (HTML login form)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  8
++000C  route->path  Path Name  "/token/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  3 TOKEN (bare 401, API route)
++0015  route->resattr  RACF Access Attribute  00 READ (assumed, RESATTR not set)
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "(none)"
++001C  route->resname  RACF Resource Name (RES=)  "(none)"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  8
++000C  route->path  Path Name  "/admin/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  2 BASIC (401 WWW-Authenticate)
++0015  route->resattr  RACF Access Attribute  02 READ
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "FACILITY"
++001C  route->resname  RACF Resource Name (RES=)  "HTTPD.ADMIN"
+
+
+Offset  Data Name  Description  Contents
++0000  route->eye  Eye Catcher  "*ROUTE*"
++0008  route->wild  Is Wildcard  1
++0009  route->unused_09  Reserved (was: login required, retired)  0
++000A  route->len  Path Length  9
++000C  route->path  Path Name  "/denied/*"
++0010  route->pgm  Program Name (NULL = LOC static route)  "(none)"
++0014  route->auth  Auth Mode (AUTH=)  2 BASIC (401 WWW-Authenticate)
++0015  route->resattr  RACF Access Attribute  02 READ
++0018  route->resclass  RACF Class (RES=, NULL = no resource gate)  "FACILITY"
++001C  route->resname  RACF Resource Name (RES=)  "HTTPD.DENIED"
+

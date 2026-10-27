@@ -1,0 +1,4 @@
+$ curl -i -b cookies.txt -d userid=IBMUSER -d password=wrongpw http://localhost:8080/login | grep -E "^HTTP|^Connection|Invalid"
+HTTP/1.1 200 OK
+Connection: close
+<h2 class="message">Invalid userid or password</h2>
