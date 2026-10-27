@@ -943,6 +943,11 @@ client can log in.
    `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
    NOT GATED` is what an installation without the profile prints — and until
    the profile exists every user who can log in may issue operator commands.
+   Once the profiles are defined and the start prints no `HTTPD425W`, add
+   `RES_NOPROFILE=DENY` to `HTTPPRM0`: a `RES=` route whose profile is later
+   forgotten or not yet loaded then answers `403` and the start prints
+   `HTTPD426W`, instead of opening the route to everyone who can log in. Leave
+   it off while a route still relies on the permissive reading.
    **Do not edit `PROFILES` by hand; RAKF's maintainer recommends the commands.**
    On MVS/CE (RAKF 2.0.0) define the profile with `RDEFINE` and `PERMIT`.
    `RDEFINE` writes the universal line of a profile, `PERMIT` adds a line for a

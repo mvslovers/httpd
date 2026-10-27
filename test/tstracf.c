@@ -52,5 +52,39 @@ int main(void)
     CHECK(httpracf(3) == 0, "rc 3 -> denied");
     CHECK(httpracf(5) == 0, "rc 5 -> denied");
 
+    /* ---- httpracr(): the RES= gate verdict, with and without
+    ** RES_NOPROFILE=DENY (#351).  The default (0) must answer exactly what
+    ** httpracf() does, so no existing configuration moves. */
+    CHECK(httpracr(0, 0) == HTTP_RACF_V_ALLOW,
+          "default: rc 0 (profile permits) -> allow");
+    CHECK(httpracr(4, 0) == HTTP_RACF_V_ALLOW,
+          "default: rc 4 (no profile) -> allow, as before");
+    CHECK(httpracr(8, 0) == HTTP_RACF_V_DENY, "default: rc 8 -> deny");
+    CHECK(httpracr(-1, 0) == HTTP_RACF_V_DENY,
+          "default: rc -1 (no ACEE) -> deny");
+
+    CHECK(httpracr(0, 1) == HTTP_RACF_V_ALLOW,
+          "DENY: rc 0 (profile permits) -> still allow");
+    CHECK(httpracr(4, 1) == HTTP_RACF_V_NOPROF,
+          "DENY: rc 4 (no profile) -> refused, told apart from a denial");
+    CHECK(httpracr(8, 1) == HTTP_RACF_V_DENY,
+          "DENY: rc 8 (profile refuses) -> deny, not NOPROF");
+    CHECK(httpracr(12, 1) == HTTP_RACF_V_DENY, "DENY: rc 12 -> deny");
+    CHECK(httpracr(-1, 1) == HTTP_RACF_V_DENY,
+          "DENY: rc -1 (no ACEE) -> deny, not NOPROF");
+    CHECK(httpracr(5, 1) == HTTP_RACF_V_DENY,
+          "DENY: an rc that is not a SAF multiple -> deny");
+
+    {
+        int rc;
+        int same = 1;
+        for (rc = -16; rc <= 16; rc++) {
+            int v = httpracr(rc, 0);
+            if ((v == HTTP_RACF_V_ALLOW) != (httpracf(rc) != 0)) same = 0;
+            if (v == HTTP_RACF_V_NOPROF) same = 0;
+        }
+        CHECK(same, "default: httpracr() agrees with httpracf() for every rc");
+    }
+
     return mbt_test_summary("TSTRACF");
 }

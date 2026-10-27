@@ -170,7 +170,10 @@ struct httpd {
 #define HTTPD_CGICTX_MAX    255     /* ... maximum number of cgictx */
     char        docroot[128];       /* A0 UFS document root prefix  */
     UCHAR       listen_queue;       /* 120 listen backlog           */
-    UCHAR       unused_121[3];      /* 121 alignment padding        */
+    UCHAR       cfg_res_noprof;     /* 121 RES_NOPROFILE=DENY: a RES=*/
+                                    /* ... route refuses while its  */
+                                    /* ... profile is missing (#351) */
+    UCHAR       unused_122[2];      /* 122 alignment padding        */
     char        codepage[16];       /* 124 codepage name            */
     UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */

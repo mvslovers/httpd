@@ -194,6 +194,11 @@ stc_identity_restore(HTTPD *httpd)
 ** permissive direction (#137).  The decision itself is unchanged here -- this
 ** only makes the misconfiguration visible while it can still be fixed.
 **
+** With RES_NOPROFILE=DENY (#351) the same condition is not allowed but
+** refused: auth_gate() answers 403 for the route until the profile exists, and
+** the line says so (HTTPD426W instead of HTTPD425W).  The probe itself is the
+** same RACHECK either way.
+**
 ** DEBUG 1 already traces the same condition (httpxauth.c), but per request and
 ** only for someone who knew to look.  This line is unconditional and lands in
 ** the job log and the Master Trace Table.
@@ -245,7 +250,8 @@ res_probe(HTTPD *httpd)
 
 		if (racf_auth(NULL, route->resclass, route->resname, route->resattr)
 		    == HTTP_RACF_NOTPROT) {
-			wtof(MSG_RES_NO_PROFILE,
+			wtof(httpd->cfg_res_noprof ? MSG_RES_NO_PROFILE_DENY
+			                           : MSG_RES_NO_PROFILE,
 			     route->resclass, route->resname, route->path);
 		}
 	}

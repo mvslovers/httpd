@@ -35,6 +35,7 @@ HTTPD136I REALM MVSC
 HTTPD132I SMF TYPE 128 LEVEL ALL
 HTTPD133I CONFIG FROM SYS2.PARMLIB(HTTPPRM0)
 HTTPD137I RESIDENT YES  MODULES HELD 1
+HTTPD138I RES_NOPROFILE ALLOW
 ```
 
 That answers "which member is this server running, and did my change take
@@ -430,6 +431,9 @@ serves a file or dispatches a CGI:
 > protected" produces the message, so the check cannot warn falsely — on a
 > system with no security product every resource reports as permitted and it
 > simply stays silent.
+>
+> **To make a missing profile refuse instead of permit, set
+> [`RES_NOPROFILE=DENY`](#refusing-a-route-whose-profile-is-missing-res_noprofile).**
 
 **A route that carries an auth policy is registered or the server does not
 start.** Dropping it is not a safe fallback: the route does not disappear, its
@@ -485,6 +489,53 @@ at all, and how an unauthenticated request is challenged.
 
 `AUTH=NONE` combined with `RES=` is contradictory (a public route has no ACEE to
 check) — the server warns and `NONE` wins.
+
+#### Refusing a route whose profile is missing (`RES_NOPROFILE`)
+
+| Keyword | Default | Description |
+|---------|---------|-------------|
+| `RES_NOPROFILE` | `ALLOW` | What a `RES=` route does when **no profile covers its resource**. `ALLOW` keeps the SAF reading: the access is permitted and only `AUTH=` stands (`HTTPD425W` at start). `DENY` refuses every request to such a route with `403` until the profile exists (`HTTPD426W` at start). Any other value is fatal: `HTTPD427E`, `HTTPD420E`, and the server does not start. |
+
+**The failure it removes.** With the default, a `RES=` route whose profile is
+forgotten, not yet loaded or misspelled is open to every user who can log in —
+the route was written to close a resource and the missing profile opens it. The
+console service (`FACILITY:MVSMF.CONSOLE`) is the case that matters: without its
+profile any user who logs in may issue operator commands. `DENY` turns that into
+a closed route and a message, so the mistake costs an outage of that route
+instead of an exposure.
+
+**One setting for the whole server, not one per route.** A switch on each route
+would have to be remembered on exactly the routes where a profile is forgotten,
+which is the mistake it is meant to catch. The setting applies to every `RES=`
+route that is not `AUTH=NONE`; the other routes are untouched.
+
+What `DENY` does:
+
+- At start, `HTTPD426W NO PROFILE FOR c:r -- path REFUSES ALL REQUESTS` replaces
+  `HTTPD425W` for each such route. The server still starts: a refusing route is
+  the safe state, and the profile can be defined while it runs.
+- Per request, the check is made against the profile as RACF/RAKF holds it *now*.
+  A request to a route whose profile is missing is answered `403` with the body
+  `403 Forbidden: no RACF profile protects this resource`. The class and the
+  resource name are not sent; they are in `HTTPD426W` and, with `DEBUG 1`, in
+  the trace. Once the profile is defined and loaded the route answers normally,
+  with no restart — a user the profile permits gets the real answer, one it does
+  not permit gets the plain `403 Forbidden`.
+- A profile that exists behaves as before: a user it permits passes, one it does
+  not permit is refused.
+- Nothing changes without the keyword. A configuration that does not carry
+  `RES_NOPROFILE` behaves as it did, and `D CONFIG` shows it as `HTTPD138I
+  RES_NOPROFILE ALLOW`.
+
+Turn it on once every `RES=` route has its profile defined and the start prints
+no `HTTPD425W`. Set it **before** the first start on a new system if the profile
+definitions are part of the installation. Do not turn it on while a route still
+depends on the permissive reading — for example a `RES=` kept for documentation
+with no profile behind it; drop that `RES=` first.
+
+```
+RES_NOPROFILE=DENY
+```
 
 #### When to use `AUTH=TOKEN`
 

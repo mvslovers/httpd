@@ -24,4 +24,20 @@
 */
 int httpracf(int rc);
 
+/* The verdict of the RES= route gate (#351).  httpracf() answers "may this
+** pass" and so cannot say WHY an rc 4 passed; a route that must not run on a
+** missing profile needs the difference, so the gate asks this instead. */
+#define HTTP_RACF_V_ALLOW   0   /* a profile permits, or none exists and   */
+                                /* the server was not told to refuse that  */
+#define HTTP_RACF_V_DENY    1   /* refused by a profile, or not a SAF rc   */
+#define HTTP_RACF_V_NOPROF  2   /* no profile, and RES_NOPROFILE=DENY      */
+
+/* Map a raw racf_auth() rc to HTTP_RACF_V_*.  refuse_noprof is the
+** RES_NOPROFILE=DENY setting; with it 0 the answer is exactly httpracf()'s
+** (rc 0 and 4 allow, everything else denies), so the default does not move.
+** A refusal (8 and up) and the -1 "unauthenticated" sentinel are DENY in
+** either setting: a stricter setting must never turn a denial into anything
+** else. */
+int httpracr(int rc, int refuse_noprof);
+
 #endif /* HTTPRACF_H */

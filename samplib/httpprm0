@@ -73,6 +73,13 @@
 # --- Debug ---
 # DEBUG=0
 #
+# --- RACF resource checks ---
+# A RES= route whose profile does not exist is open to every user who can log
+# in (SAF calls an unprotected resource allowed); HTTPD425W says so at start.
+# RES_NOPROFILE=DENY turns that into a 403 and HTTPD426W instead.  Turn it on
+# once every RES= route has its profile and the start prints no HTTPD425W.
+# RES_NOPROFILE=ALLOW
+
 # --- Modules ---
 # RESIDENT=YES (the default) loads every MOD= module once at startup and
 # holds it until shutdown, so no request fetches it from disk.  A module

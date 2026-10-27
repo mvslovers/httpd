@@ -270,6 +270,7 @@ d_config(char *buf)
     wtof(MSG_D_CFG_SOURCE, parmlib_name(name, sizeof(name)));
     wtof(MSG_D_CFG_RESIDENT, httpd->cfg_resident ? "YES" : "NO",
         (int)httpd->resident_held);
+    wtof(MSG_D_CFG_RESNOPROF, httpd->cfg_res_noprof ? "DENY" : "ALLOW");
 
     unlock(httpd, LOCK_SHR);
 

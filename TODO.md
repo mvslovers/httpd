@@ -38,7 +38,6 @@ mvslovers/mbt#163.*
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.5.0 |
 | — | #346 | follow-ups to the UFS read error path (#263) | not yet ranked |
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | not yet ranked |
-| — | #351 | `RES=` route — refuse the request when the profile is missing (opt-in) | not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
 | — | #376 | `samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels | comment-only; milestone 4.5.0, not yet ranked |
 | — | #377 | docs — `REGION` sizing for setups with many parallel module requests | milestone 4.5.0, not yet ranked |
