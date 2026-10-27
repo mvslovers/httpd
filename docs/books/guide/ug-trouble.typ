@@ -448,7 +448,7 @@ and Limits" in the _HTTPD Reference_ has the full list.
     [500], [The server cannot build the response, or a module asked for a
       status code that the server does not know. The server then writes
       #cmd("HTTPD909E") to the console.],
-    [501], [HEAD, POST, PUT or DELETE for a static file (@ug-trouble-method).],
+    [501], [POST, PUT or DELETE for a static file (@ug-trouble-method).],
     [503], [A module does not run (@ug-trouble-module).],
     [505], [The version of the request is not HTTP/1.0 and not HTTP/1.1.],
   )
@@ -593,14 +593,18 @@ cause is more likely the file system. @ug-trouble-static has the checks.
 #idx("501")
 #idx("405")
 #idx("HEAD")
-A static file answers GET. A HEAD, POST, PUT or DELETE for a static file gets
-501. The most common case is #cmd("curl -I"), which sends HEAD:
-
-#screen(raw(read("../ex/ug-static/head-request.txt")))
+A static file answers GET and HEAD. A POST, PUT or DELETE for a static file
+gets 501:
 
 #screen(raw(read("../ex/ug-static/post-to-file.txt")))
 
 The answer to the POST says #cmd("Connection: close"). Use GET to read a file.
+
+If #cmd("curl -I") gets 501, the server is HTTPD 4.4.0 or earlier. These
+releases do not answer a HEAD for a static file with the headers of a GET. The
+console message #cmd("HTTPD000I") at the start names the version
+(@ug-first-console). HTTPD 4.5.0 answers the HEAD (@ug-static-methods).
+
 A method that the server does not know gets 405:
 
 #screen(raw(read("../ex/ug-static/method-not-allowed.txt")))

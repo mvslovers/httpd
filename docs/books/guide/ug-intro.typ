@@ -37,7 +37,7 @@ HTTPD is not a general purpose web server. Some things it does not do:
 - It does not start a program for each request. A server module is a load
   module that HTTPD calls in its own task.
 - It does not take files. A POST, PUT or DELETE request for a static file is
-  refused, and so is a HEAD request (@ug-static-methods).
+  refused (@ug-static-methods).
 
 == The Parts <ug-intro-parts>
 

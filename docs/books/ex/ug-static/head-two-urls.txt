@@ -1,0 +1,57 @@
+$ curl -v -I http://localhost:8080/hello.txt http://localhost:8080/hello.txt
+* Host localhost:8080 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+*   Trying [::1]:8080...
+* Connected to localhost (::1) port 8080
+* using HTTP/1.x
+> HEAD /hello.txt HTTP/1.1
+> Host: localhost:8080
+> User-Agent: curl/8.14.1
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Date: Tue, 27 Oct 2026 17:11:59 GMT
+< Server: HTTPD Server
+< X-Powered-By: MVSLOVERS
+< Connection: keep-alive
+< Content-Type: text/plain
+< X-Content-Type-Options: nosniff
+< Content-Length: 61
+< 
+* Connection #0 to host localhost left intact
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 17:11:59 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 61
+
+* Re-using existing http: connection with host localhost
+> HEAD /hello.txt HTTP/1.1
+> Host: localhost:8080
+> User-Agent: curl/8.14.1
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Date: Tue, 27 Oct 2026 17:11:59 GMT
+< Server: HTTPD Server
+< X-Powered-By: MVSLOVERS
+< Connection: keep-alive
+< Content-Type: text/plain
+< X-Content-Type-Options: nosniff
+< Content-Length: 61
+< 
+* Connection #0 to host localhost left intact
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 17:11:59 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 61

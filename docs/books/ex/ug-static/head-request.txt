@@ -1,10 +1,9 @@
 $ curl -I http://localhost:8080/hello.txt
-HTTP/1.1 501 Not Implemented
-Date: Tue, 27 Oct 2026 05:41:42 GMT
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 17:11:59 GMT
 Server: HTTPD Server
 X-Powered-By: MVSLOVERS
 Connection: keep-alive
-Cache-Control: no-store
 Content-Type: text/plain
-Transfer-Encoding: chunked
-
+X-Content-Type-Options: nosniff
+Content-Length: 61
