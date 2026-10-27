@@ -486,6 +486,16 @@ rest of this range reports the start of the listener.
       messages that it held back in the meantime. A server that stops writes
       nothing.],
       a: [The server cuts the response and closes the connection.]),
+    ..r("HTTPD066I REQUEST TRACE ON, {records} RECORDS, {bytes} BYTES",
+      [The Parmlib keyword #cmd("TRACE=") asked for the request trace and the
+      server allocated its table. #var("records") is the number of requests the
+      table holds and #var("bytes") is the storage it uses. The table is read
+      with the display module HTTPDSRV, target #cmd("TRACE").]),
+    ..r("HTTPD067W NO STORAGE FOR REQUEST TRACE, TRACE OFF",
+      [#cmd("TRACE=") asked for the request trace, but the server could not get
+      the storage for the table.],
+      a: [The server runs without the trace. Use a smaller value or a larger
+      region.]),
     ..r("HTTPD070E UNKNOWN CODEPAGE \"{name}\", USING CP037",
       [The value of #cmd("CODEPAGE=") is not known. The known values are
       #cmd("CP037"), #cmd("IBM1047") and #cmd("LEGACY").],
@@ -846,6 +856,10 @@ server sets an error flag, writes #cmd("HTTPD419E") and refuses to start with
     ..r("HTTPD443W INVALID RESIDENT VALUE \"{value}\" (YES|NO)",
       [The value of #cmd("RESIDENT=") is not #cmd("YES") or #cmd("NO").],
       a: [The default #cmd("YES") stays.]),
+    ..r("HTTPD444W INVALID TRACE VALUE \"{value}\" (0 OR 16-1024), TRACE OFF",
+      [The value of #cmd("TRACE=") is not a number, or it is not 0 and not in
+      the range from 16 to 1024.],
+      a: [The request trace stays off.]),
   )
 ]
 

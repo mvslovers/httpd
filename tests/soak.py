@@ -25,6 +25,10 @@ ap.add_argument("--no-display", action="store_true", help="display modules not r
 ap.add_argument("--req-out", default=None, help="per-attempt records (default: OUT.req)")
 ap.add_argument("--probe-sec", type=float, default=5.0, help="host probe period, 0 = off")
 ap.add_argument("--cgroup", default=None, help="cgroup dir of the container under test (cpu.pressure, cpu.stat)")
+ap.add_argument("--trace-sec", type=float, default=0.0,
+                help="poll /.dsrv?target=TRACE (server needs TRACE=n) every N s, 0 = off; records go to OUT.trace")
+ap.add_argument("--trace-min", type=int, default=1000, help="TRACE poll: only requests of at least N ms (and running ones)")
+ap.add_argument("--trace-full-sec", type=float, default=150.0, help="TRACE poll: every N s read all records (min=0), 0 = never")
 ap.add_argument("--timeout", type=float, default=60.0, help="client timeout per attempt")
 a = ap.parse_args()
 
@@ -49,6 +53,7 @@ class Conn:
         self.c = None
         self.id = 0
         self.n = 0
+        self.lport = 0
 
     def drop(self):
         try:
@@ -121,7 +126,9 @@ def one(h, kind, keepalive, ctx):
                 tc = time.perf_counter()
                 h.c.connect()
                 rec["t_conn"] = round(time.perf_counter() - tc, 4)
+                h.lport = h.c.sock.getsockname()[1]
             rec["conn"] = h.id
+            rec["lport"] = h.lport
             rec["conn_n"] = h.n
             h.n += 1
             hdrs = dict(HDR)
@@ -296,8 +303,38 @@ def probe(stop):
         emit_req(rec)
 
 
+def trace_poll(stop):
+    # The server-side request trace (issue #350), read from outside. The reply is kept as
+    # received, with the local time it arrived, so soak-trace.py can place each record on the
+    # clock of this host (the server's own clock is not used).
+    if a.trace_sec <= 0:
+        return
+    tf = open(a.out + ".trace", "a", buffering=1)
+    last_full = time.time()
+    while not stop.wait(a.trace_sec):
+        full = a.trace_full_sec > 0 and time.time() - last_full >= a.trace_full_sec
+        if full:
+            last_full = time.time()
+        mn = 0 if full else a.trace_min
+        rec = dict(kind="poll", min=mn, t_req=round(time.time(), 3))
+        try:
+            c = http.client.HTTPConnection(u.hostname, u.port, timeout=60)
+            c.request("GET", f"/.dsrv?target=TRACE&min={mn}", headers=dict(HDR, Connection="close"))
+            r = c.getresponse()
+            body = r.read().decode("latin-1")
+            c.close()
+            rec["t_recv"] = round(time.time(), 3)
+            rec["status"] = r.status
+            rec["lines"] = body.splitlines()
+        except Exception as e:
+            rec["err"] = f"{type(e).__name__}: {e}"
+        tf.write(json.dumps(rec, separators=(",", ":")) + "\n")
+
+
 def main():
     pstop = threading.Event()
+    tt = threading.Thread(target=trace_poll, args=(pstop,), daemon=True)
+    tt.start()
     pt = threading.Thread(target=probe, args=(pstop,), daemon=True)
     pt.start()
     levels = [int(x) for x in a.levels.split(",")]

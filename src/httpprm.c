@@ -282,6 +282,7 @@ set_defaults(HTTPD *httpd)
     httpd->dbg_enabled      = 0;
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
+    httpd->cfg_trace             = 0;       /* request trace off (#350) */
     httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
     httpd->cfg_realm             = NULL;    /* settled after the parse (#193) */
 
@@ -581,6 +582,25 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
         else {
             wtof(MSG_RES_NOPROF_BAD, value);
             httpd->flag |= HTTPD_FLAG_CFGERR;
+        }
+    }
+    else if (strcmp(key, "TRACE") == 0) {
+        /* Records of the request trace (#350).  0 (the default) is off and
+           allocates nothing.  Anything that is not a plain number in range
+           leaves the trace off rather than guessing a size. */
+        int vlen = 0;
+        int digits = 1;
+        while (value[vlen] && value[vlen] != ' ') {
+            if (value[vlen] < '0' || value[vlen] > '9') digits = 0;
+            vlen++;
+        }
+        i = atoi(value);
+        if (digits && vlen > 0 && vlen < 6 &&
+            (i == 0 || (i >= TRC_SLOTS_MIN && i <= TRC_SLOTS_MAX)))
+            httpd->cfg_trace = (USHRT)i;
+        else {
+            wtof(MSG_TRACE_BAD_VALUE, value);
+            httpd->cfg_trace = 0;
         }
     }
     else if (strcmp(key, "CGI_CONTEXT_POINTERS") == 0) {

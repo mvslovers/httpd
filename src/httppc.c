@@ -39,9 +39,11 @@ httppc(HTTPC *httpc)
 
     if (httpc->state==CSTATE_IN) {
         http_in(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_REQ);
     }
     if (httpc->state==CSTATE_PARSE) {
         http_parse(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_PARSE);
     }
 
     /* the state should be GET, HEAD, PUT, or POST at this point */
@@ -59,6 +61,7 @@ httppc(HTTPC *httpc)
            Sec-Token / LtpaToken2 cookie, Bearer, or Basic (see
            resolve_credential) */
         resolve_credential(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_CRED);
 
         /* find the route (MOD= CGI or LOC= static prefix) owning this path */
         route = path ? http_find_route(httpd, path) : NULL;
@@ -84,6 +87,8 @@ httppc(HTTPC *httpc)
                 if (httpc->state == CSTATE_DONE) goto check_done;
             }
         }
+
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_ROUTE);
 
         /* CGI dispatch -- only routes that carry a program (pgm != NULL).
            A LOC= route has pgm == NULL and falls through to static serving. */

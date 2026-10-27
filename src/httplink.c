@@ -36,7 +36,9 @@ int httplink(HTTPC *httpc, const char *pgm)
     ppa    = (void*)__ppaget();
     wtof("httplink ppa=%08X", ppa);
 #endif
+    if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_LINK0);
     rc = __linkdsx(pgm, dcb, plist, &prc, &abcode);
+    if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_LINK1);
 
 #if 0
     wtof("httplink rc=%d, prc=%d", rc, prc);
