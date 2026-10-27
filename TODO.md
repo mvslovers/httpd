@@ -33,9 +33,9 @@ mvslovers/mbt#163.*
 
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
-| 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
+| — | ~~#258~~ | ~~`type:research` — cleanup-only recovery WTOs flood the console~~ | **Done in this repo** — the three `abendrpt(ESTAE_CREATE, …)` calls pass `ABRPT_QUIET_TERM` (libc370 2.26.0, #712/#714); the pin moves to 2.26.0; milestone 4.5.0 |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
-| — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | parked, milestone 4.6.0: the network-outage path does not reproduce; a stale cached password does (`test/live/submit-password.py`). Waits on a new occurrence with console log and dump saved before the restart |
+| — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | parked, milestone 4.6.0: the network-outage path does not reproduce; a stale cached password reproduces the symptom (`test/live/submit-password.py`) but no password was changed at the reporting site, so it does not explain the incident. Waits on a new occurrence with console log and dump saved before the restart |
 | — | #413 | hardening — a cached credential keeps a changed RACF password until max-age | **a decision** between re-verify, downstream-refusal marking and documentation only; milestone 4.6.0 |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.6.0 |
@@ -49,10 +49,10 @@ mvslovers/mbt#163.*
 | — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.5.0, not yet ranked |
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.5.0, not yet ranked |
 | — | #394 | diagnostic and display code — unchecked sizes and unescaped output | milestone 4.5.0, not yet ranked |
-| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked |
+| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
 | — | #399 | `HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection | milestone 4.5.0, not yet ranked |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.5.0, not yet ranked |
-| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | milestone 4.5.0, not yet ranked |
+| — | #401 | SSI — `printenv` exposes the server environment, output not escaped, long lines split | items 1 to 3 are in PR #418 (strike this row when it merges); items 4 to 6 (dropped output, invalid directives, code page of values) stay open, and the `getenv()` fallback of `echo` is #421; milestone 4.5.0, not yet ranked |
 | — | #176 | security, the heaviest by a wide margin | **RAKF** — see *Deferred* |
 
 **v4.1.0 shipped on 2026-09-14**, carrying #259 and #269 (PR #267). No source
@@ -318,33 +318,15 @@ there, and libc370#553 for naming the code in HTTPD908E (completion code only:
 LINK's error exit has no reason code, #250). Ranks 5 and 6 keep their numbers
 until the next re-rank.
 
-### 5 · #258 — thirteen console lines that tell the operator nothing
+### ~~5 · #258 — thirteen console lines that tell the operator nothing~~
 
-*the only open item that waits on a decision, and the fix is not in this repo*
-
-`C HTTPD` produced thirteen `libc370` recovery WTOs between `IEE301I` and
-`IEF450I … ABEND S222`. Both message sites are libc370's `SDWACLUP` guards
-(`@@abrpt.c` `recovery()`, `@@@try.c` `failed()`), the guards themselves are
-correct, and the burst grows with the worker pool and with `try()` nesting —
-mvsMF adds a layer of its own. It lands on any termination-time entry, an S878
-memterm included, not only on a cancel.
-
-The issue deliberately leaves the count unexplained: six of the thirteen come
-from the `try()` exit, and `try()` deletes its ESTAE before returning while an
-idle worker waits *outside* it, so the obvious per-task reading does not hold.
-That is question one, and it decides whether the burst is bounded by the task
-count or by something larger.
-
-Two things rank it below the measurement work rather than above it. The obvious
-fix — emit once — **cannot be built at the message site**: the path is
-deliberately CRT-free and a `static` counter is key-0 module storage (#197). And
-the two sites are asymmetric: `abendrpt()` already carries a caller option word,
-`try()` carries none, so "make it optional" solves one message and not the other.
-
-It is ranked at all because the decision is cheap and the measurement is one
-`/.dmtt` look — whether a `MCSFLAG=HRDCPY` WTO still reaches the Master Trace
-Table, which is the whole value of the middle option. Its deliverable is an
-implementing issue in libc370 (see *Cross-repo*), not a PR here.
+**Done.** libc370 2.26.0 added `ABRPT_QUIET_TERM` to `abendrpt()` (#712) and
+made `try()` and `__linkds()` quiet on their own (#714). The three
+`abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM)` calls in `httpd.c`
+set it, and `mbt.toml` pins libc370 `2.26.0` (a pin below that does not build,
+the flag is not declared). Measured on MVS/CE with eight partly read requests in
+flight and `C HTTPD`: 17 libc370 lines with 2.25.1, 9 with 2.26.0 and no flag,
+none with the flag. Not measured: an mvsMF-nested load, an S878 memterm.
 
 ---
 

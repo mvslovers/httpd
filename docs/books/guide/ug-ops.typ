@@ -449,7 +449,7 @@ A known first word with an unknown second word gives only the error:
 
 #screen(raw(read("../ex/ug-ops/set-unknown.txt")))
 
-#cmd("DISPLAY") or #cmd("SET") alone gets no answer except the echo. #cmd("SET STATS") without a level gives #cmd("HTTPD127W"). Check that the echo
+#cmd("DISPLAY") or #cmd("SET") alone gets no answer except the echo. #cmd("SET STATS") without a level gives #cmd("HTTPD127W"), and #cmd("SET MA") or #cmd("SET MI") without a number gives #cmd("HTTPD149I"). Check that the echo
 #cmd("HTTPD100I") shows the command that you meant to send, and then that the
 answer is what you expect. A command that reaches the server and is not
 understood is not an abend, it is a mistyped command.

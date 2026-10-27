@@ -28,6 +28,12 @@ kind = "application"
 # changes how MVCK/MVCP/MVCS assemble.  Both are drop-ins, and 1.6.3 is what
 # the release is built and tested with.
 #
+# libc370 2.26.0: abendrpt() takes ABRPT_QUIET_TERM (mvslovers/libc370#712), and
+# __linkds() and __linkdsx() use it themselves (#714).  The three
+# abendrpt(ESTAE_CREATE, ...) calls in httpd.c set it, so cancelling a busy
+# server no longer writes one "cleanup only" console line per task (#258).  A
+# pin below 2.26.0 does not build: the flag is not declared.
+#
 # libc370 2.25.1: send() passes at most 256 bytes to the emulator and returns
 # that short count (mvslovers/libc370#160, 2.24.0); send_raw() and send_all()
 # already loop until the whole buffer is out, so nothing changes but the number
@@ -92,7 +98,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.3"
-libc370 = "2.25.1"
+libc370 = "2.26.0"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
@@ -271,6 +277,13 @@ host = false                 # httpd.h -> MVS-only (test-mvs)
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                 # httpd.h + libufs -> MVS-only (test-mvs)
 
+# SSI output of httpfile.c (#401): printenv shows the request only, printenv
+# and echo escape their values, long lines and split directives.  Needs
+# httpd.h and the real HTTPFILE -> MVS-only.
+[test.TSTSSIF]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false          # httpd.h + libufs -> MVS-only (test-mvs)
+
 # String-safety helpers httpesc() (HTML escape) + httpsrdr() (safe redirect).
 # Both are free of httpd.h, so this test is DUAL: it runs natively via
 # test-host AND on MVS via test-mvs.  The helper sources are listed explicitly
@@ -296,6 +309,14 @@ sources = ["test/tstdmchk.c", "src/dmchunk.c"]
 [test.TSTDECX]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstdecx.c", "src/httpdecx.c"]
+
+# Pure SSI helpers (#401): where a long line is held back so a split directive
+# is still found, and the HTML escaping of printenv/echo output.  Free of
+# httpd.h -> DUAL; httpssi.c calls httpesc(), so both sources are listed for
+# the host link.
+[test.TSTSSI]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstssi.c", "src/httpssi.c", "src/httpesc.c"]
 
 # httpbody() request-body length classifier (S7 Content-Length enforcement).
 # Free of httpd.h -> DUAL (host + MVS); helper source listed for the host link.
@@ -329,6 +350,14 @@ sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 [test.TSTRACF]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstracf.c", "src/httpracf.c"]
+
+# httpnobd() "does this response carry a message body" decision (issue #399):
+# a response to HEAD, 1xx, 204 and 304 never does, so httpprtv() must not
+# frame it as chunked.  Free of httpd.h -> DUAL (host + MVS); helper source
+# listed for the host link.
+[test.TSTNOBD]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstnobd.c", "src/httpnobd.c"]
 
 # httpstat() status code -> status line table (issue #181).  A code the table
 # does not know is answered with 500, so a gap is silent on the wire -- the

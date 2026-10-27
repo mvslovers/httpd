@@ -293,11 +293,12 @@ source that was built.
 /F HTTPD,S MI n
 ```
 
-The number is decimal and is required. Without a number, and with a negative
-number, the command answers #cmd("HTTPD149I") and changes nothing. Otherwise
-a value of 0 is 1, and a value above 100 is 100. A word that is not a number
-is 1. The command sets the new limit and
-wakes the dispatcher, which creates or ends workers to fit. The answer is the
+The number is decimal and is required. Without a number, and with an operand
+that begins with a minus sign, the command answers
+#cmd("HTTPD149I USAGE: SET MAXTASK|MINTASK N (S MA N, S MI N), N = 1 TO 100")
+and changes nothing. The dispatcher is not woken. Otherwise a value of 0 is 1,
+and a value above 100 is 100. A word that is not a number is 1. The command
+sets the new limit and wakes the dispatcher, which creates or ends workers to fit. The answer is the
 dispatcher block of #cmd("DISPLAY THREADS") (messages #cmd("HTTPD107I") to
 #cmd("HTTPD111I")), followed by a line of dashes. The block shows the limits
 that are in effect now.

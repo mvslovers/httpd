@@ -140,6 +140,10 @@ okay:
         httpc->subtype=CTYPE_TEXT;
     }
 
+    /* HEAD gets the headers GET would send and nothing after them; the
+       caller moves the client on to CSTATE_DONE (#399) */
+    if (httpc->state == CSTATE_HEAD) goto quit;
+
 known:
     switch(httpc->subtype) {
     case CTYPE_BINARY:

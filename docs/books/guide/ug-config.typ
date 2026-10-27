@@ -233,6 +233,8 @@ The rules of the command differ from the rules of the member:
 
 - The console accepts 1 to 100, not 255. A larger value is set to 100. In the
   capture below, 99999 gives a #cmd("MAXTASK") of 100.
+- The console needs a number. Without one, and with a negative number, HTTPD
+  answers #cmd("HTTPD149I") and changes nothing.
 - A #cmd("MINTASK") above the #cmd("MAXTASK") raises the #cmd("MAXTASK"). A
   #cmd("MAXTASK") below the #cmd("MINTASK") lowers the #cmd("MINTASK").
 - The change belongs to the running worker manager only. HTTPD does not write
