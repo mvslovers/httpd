@@ -15,8 +15,8 @@ is to hold nothing worth going stale.
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
 closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
 The open issues are in milestone 4.5.0, except #176, #322 and #323, which are in 4.6.0. #326,
-#367 and #373 are closed and have no row. #382 and #383 are closed and struck; #376 stays struck.
-#377 and #370 are listed and not ranked against the rest, and so are #391 to #395 and #399 to
+#367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
+#370 is listed and not ranked against the rest, and so are #391 to #395 and #399 to
 #401, which the manuals work (#382) filed. #405, the follow-up to the manuals, is the change that
 carries this edit and has no row. #379 is closed (PR #380: `main` is
 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
@@ -42,7 +42,7 @@ mvslovers/mbt#163.*
 | — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | measured on MVS/CE (`tests/soak.py`, `tests/soak-stalls.py`): none at 1 and 3 clients, 0.2-1.4 % of requests over 5 s at 6-9 clients while the guest CPU is saturated, no link to keep-alive or to host CPU pressure; the board dropped the quiet-host run (the shared host is never quiet); **a server-side trace** (worker assignment, TCP/IP, dispatcher) is the next step; not yet ranked |
 | — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
 | — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
-| — | #377 | docs — `REGION` sizing for setups with many parallel module requests | the passage is in the Reference ("The region") and in the installation guide; the issue is still open, so whoever closes it checks the Done-when list; milestone 4.5.0, not yet ranked |
+| — | ~~#377~~ | ~~docs — `REGION` sizing for setups with many parallel module requests~~ | **Done** — the passage is in the Reference ("The region") and in the installation guide (PR #389, follow-up PR #402); milestone 4.5.0 |
 | — | ~~#382~~ | ~~docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release~~ | **Done** — the books landed with PR #390; what the acceptance left over is #395 and #405 |
 | — | ~~#383~~ | ~~build — require ufsd 1.5.2 (libufs), libc370 stays at 2.25.1~~ | **Done** — `mbt test --mvs` stays part of the 4.5.0 release acceptance |
 | — | #391 | `SET MA` / `SET MI` without a number passes NULL to `strtoul` | found in the manuals work; milestone 4.5.0, not yet ranked |
