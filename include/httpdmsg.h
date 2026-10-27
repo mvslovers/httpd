@@ -434,6 +434,9 @@
 /** HTTPD038E the Parmlib member opened but could not be read to the end */
 #define MSG_CFG_READ_ERROR	"HTTPD038E READ ERROR ON DD:%s -- CONFIGURATION INCOMPLETE"
 
+/** HTTPD039W a write to the debug DD failed; tracing is off for the rest of the run */
+#define MSG_DBG_WRITE_FAILED	"HTTPD039W WRITE ERROR ON DD:HTTPDBG -- DEBUG OUTPUT SWITCHED OFF"
+
 /** HTTPD020E the debug DD is present but unusable */
 #define MSG_CFG_DBG_FAILED	"HTTPD020E FOPEN FOR DD:HTTPDBG FAILED, ERRNO=%d"
 

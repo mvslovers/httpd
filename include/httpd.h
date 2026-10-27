@@ -675,6 +675,8 @@ extern int http_new_session(HTTPC *)                                       asm("
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern CRED *httptkcr(const char *b64, unsigned maxage)					asm("HTTPTKCR");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
+extern int dbgfail(HTTPD *httpd, FILE *fp)								asm("DBGFAIL");
+extern void dbgopen(HTTPD *httpd)									asm("DBGOPEN");
 extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
 extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");

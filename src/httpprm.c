@@ -220,14 +220,7 @@ http_config(HTTPD *httpd, const char *member)
     /* Stats counters initialized to zero by calloc */
 
     /* open debug file if DEBUG=1 */
-    if (httpd->dbg_enabled && !httpd->dbg) {
-        httpd->dbg = fopen("DD:HTTPDBG", "w");
-        if (!httpd->dbg) {
-            wtof(MSG_CFG_DBG_FAILED, errno);
-            wtof(MSG_CFG_DBG_STDERR);
-            httpd->dbg = stderr;
-        }
-    }
+    dbgopen(httpd);
 
     /* bind HTTP listener socket.  do_bind() writes HTTPD054I on success. */
     rc = do_bind(httpd);

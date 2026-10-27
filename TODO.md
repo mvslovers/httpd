@@ -31,7 +31,6 @@ mvslovers/mbt#163.*
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
 | 5 | #258 | `type:research` — cleanup-only recovery WTOs flood the console | **a decision** (libc370 API shape) + one MTT check |
-| 6 | #264 | `type:bug` — a dead `HTTPDBG` is silent since 1.0.4 | **a decision**: report once and stop, or make the decorative `rc` honest |
 | — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | not yet ranked |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.5.0; not yet ranked |
@@ -148,10 +147,13 @@ a module's `stdout`/`stderr` — and **none of them on the request path**.
 libc370's fail-fast cannot reach an HTTP response. What is left is diagnostic
 output only, which is #264.
 
-**#264 is now the only open half, and its scope is exact:** those nine sites.
-The open question is the shape of the fix, not where it goes — report once by
-WTO and disable tracing deliberately, or simply stop `dbgs()`/`dbgf()` and the
-rest from returning a decorative `int rc = 0` that no write ever touches.
+**#264 is decided and done for the seven `dbg*.c` writers:** the first failed
+write to `DD:HTTPDBG` issues `HTTPD039W` once and switches tracing off, the
+server runs on (`dbgfail()`, tested by `TSTDBG`). The return codes of the
+writers stay `0` — the board chose "report and stop", not "make `rc` honest".
+What is **not** covered is the other two of the nine sites, the `stdout`/`stderr`
+streams `cgistart.c` gives a module (`DD:HTTPDOUT`/`DD:HTTPDERR`): they are a
+module's own output, not the trace, and were outside #264's done-when.
 
 ### Right after the tag — mbt 3 does it now, except for a patch
 

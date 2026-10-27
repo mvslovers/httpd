@@ -8,13 +8,14 @@ dbgtime(const char *sep)
 {
     CLIBGRT         *grt    = __grtget();
     HTTPD           *httpd  = grt->grtapp1;
+    FILE            *fp     = httpd->dbg;
     int             rc      = 0;
     struct tm       *tm;
     U64             tod;
     struct timeval  tv;
     char            buf[40];
 
-    if (!httpd->dbg) goto quit;
+    if (!fp) goto quit;
     if (!sep) sep = ": ";
 
     /* get STCK value */
@@ -38,7 +39,8 @@ dbgtime(const char *sep)
     if (!tm) goto quit;
 
     strftime(buf, sizeof(buf), "%Y%m%d.%H%M%S", tm);
-    fprintf(httpd->dbg, "%s.%06lu%s", buf, tv.tv_usec, sep);
+    fprintf(fp, "%s.%06lu%s", buf, tv.tv_usec, sep);
+    dbgfail(httpd, fp);
 
 quit:
     return rc;

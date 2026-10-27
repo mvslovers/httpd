@@ -582,7 +582,7 @@ GMT, as HTTP requires.
 
 | Keyword | Default | Description |
 |---------|---------|-------------|
-| `DEBUG` | 0 | Debug level. `0` = off, `1` = basic debug output to `HTTPDBG` DD. |
+| `DEBUG` | 0 | Debug level. `0` = off, `1` = basic debug output to `HTTPDBG` DD. If a write to that DD fails, `HTTPD039W` is issued once and debug output stays off until the next start. |
 
 ## Server Modules
 
