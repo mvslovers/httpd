@@ -309,6 +309,8 @@ Read the lines in this way.
     [#cmd("HTTPD137I")], [Whether the modules are held in storage, and how many
       different modules are held. The four modules in the screen above are MVSMF, HTTPDSRV,
       HTTPDM and HTTPDMTT; they have seven routes.],
+    [#cmd("HTTPD138I")], [The value of #cmd("RES_NOPROFILE"), #cmd("ALLOW") or
+      #cmd("DENY") (@ug-security-noprofile).],
   )
 ]
 

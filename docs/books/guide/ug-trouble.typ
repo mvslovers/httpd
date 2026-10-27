@@ -86,7 +86,8 @@ That Ends" in "Messages", the Reference lists all of them.
       could not read it to the end. Check the data set of the DD #cmd("HTTPPRM")
       and start again.],
     [#cmd("HTTPD411E"), #cmd("HTTPD419E"), #cmd("HTTPD420E"),
-      #cmd("HTTPD048E")], [8], [A route has no valid policy
+      #cmd("HTTPD048E"), #cmd("HTTPD427E")], [8], [A route has no valid policy,
+      or the value of #cmd("RES_NOPROFILE") is not valid
       (@ug-trouble-policy).],
     [#cmd("HTTPD033E"), #cmd("HTTPD064E")], [8], [The socket thread could not
       be created, or it is not running.],
@@ -147,12 +148,14 @@ ranges.
 #idx("HTTPD419E")
 #idx("HTTPD420E")
 #idx("HTTPD048E")
+#idx("HTTPD427E")
 #idx("AUTH=", "wrong value")
+#idx("RES_NOPROFILE", "wrong value")
 *Symptom.* The server writes #cmd("HTTPD420E ... HTTPD WILL NOT START") and
 ends.
 
 A route that has no #cmd("AUTH=") is public. A route that loses its policy by
-a mistake would become public, so the server refuses to start instead. Two
+a mistake would become public, so the server refuses to start instead. Three
 mistakes cause it. The first is a mode that is not one of the
 four. This member has a typing error in the mode:
 
@@ -178,6 +181,21 @@ make every route without #cmd("AUTH=") public, so the server stops:
 Remove the #cmd("LOGIN") line and write #cmd("AUTH=") on each route. @ug-routes
 shows the four modes. A #cmd("LOGIN") line with no operand, or with
 #cmd("NONE"), gives only the warning #cmd("HTTPD048W") (@ug-trouble-warn).
+
+The third mistake is a value of #cmd("RES_NOPROFILE") that is neither
+#cmd("ALLOW") nor #cmd("DENY"). The keyword exists to close a gate. If the
+server read a misspelled value as #cmd("ALLOW"), the gate would stay open
+without a word, so it stops. The lines of the member that matter:
+
+#screen(raw(read("../ex/ug-config/refuse-bad-noprofile-prm.txt")))
+
+The start ends with this console, the JES lines left out:
+
+#screen(raw(read("../ex/ug-config/refuse-bad-noprofile.txt")))
+
+#cmd("HTTPD427E") shows the value, cut after 16 characters. The text of
+#cmd("HTTPD420E") is the same for every cause, so the cause is in the message
+before it. Write #cmd("ALLOW") or #cmd("DENY") and start again.
 
 === The Procedure Has the Wrong DD Names <ug-trouble-dd>
 
@@ -267,6 +285,9 @@ common ones.
       public route (#cmd("HTTPD414W")). The server ignores the option.],
     [#cmd("HTTPD425W")], [The resource of #cmd("RES=") has no profile. The route
       is served with no gate (@ug-trouble-login).],
+    [#cmd("HTTPD426W")], [The same, with #cmd("RES_NOPROFILE=DENY") in the
+      member. The route answers every request with 403 until the profile
+      exists (@ug-trouble-403).],
     [#cmd("HTTPD440W"), #cmd("HTTPD441W"), #cmd("HTTPD442W")], [The module of a
       route could not be held at the start. The route works. The module is
       fetched for each request (@ug-trouble-module).],
@@ -336,7 +357,8 @@ The first route (#cmd("MOD=NOSUCH")) is the one of @ug-trouble-module. Then
 follow #cmd("HTTPD414W") (a resource on a public route is ignored),
 #cmd("HTTPD412W") (the resource has no colon), #cmd("HTTPD413W") (an option that
 does not exist) and #cmd("HTTPD425W") (the profile does not exist, so the route
-is not gated). The server registered all four routes in the end, and it did not
+is not gated; with #cmd("RES_NOPROFILE=DENY") it is #cmd("HTTPD426W") and the
+route refuses every request). The server registered all four routes in the end, and it did not
 stop.
 
 === Sessions That Are Too Short <ug-trouble-sess>
@@ -535,6 +557,14 @@ that has no profile (see the capture in @ug-trouble-skip). A typing error in
 the class or in the resource name looks the same. Treat #cmd("HTTPD425W") as an
 error of your configuration. "What the Server Asks of the Security Product"
 in the _HTTPD Reference_ describes the check.
+
+With #cmd("RES_NOPROFILE=DENY") in the member, the route is not silent. The
+start writes #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL
+REQUESTS"), and every logged-in user gets 403 with the body
+#cmd("403 Forbidden: no RACF profile protects this resource"). That body is the
+difference from the 403 above: it says that no profile exists, not that the
+profile does not permit the user. Define the profile and run #cmd("RAKFPROF").
+The server needs no restart (@ug-security-noprofile).
 
 For the console route of mvsMF there is a second answer. mvsMF 1.4.0 and later
 check READ on the same profile themselves. HTTPD answers 403 first to a user

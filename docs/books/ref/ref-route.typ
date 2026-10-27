@@ -270,6 +270,7 @@ and the body #cmd("403 Forbidden"). Otherwise HTTPD goes on with the request.
 #idx("RACF", "resource check")
 #idx("HTTPD412W")
 #idx("HTTPD425W")
+#idx("HTTPD426W")
 #idx("HTTPD418E")
 #tab(caption: [The value of RES=])[
   #table(columns: (1.5in, 1fr),
@@ -297,7 +298,10 @@ and the body #cmd("403 Forbidden"). Otherwise HTTPD goes on with the request.
       checks every route with a resource once at the start, and writes
       #cmd("HTTPD425W") for each one that has no profile. The message names the
       class, the resource and the pattern of the route. HTTPD does not check
-      routes with the mode #cmd("NONE").],
+      routes with the mode #cmd("NONE"). The keyword #cmd("RES_NOPROFILE=DENY")
+      changes the first part: a request to a route whose resource has no
+      profile then gets status 403, and the start writes #cmd("HTTPD426W")
+      instead of #cmd("HTTPD425W") (@ref-prm-auth).],
     [Denied], [Status 403.],
   )
 ]

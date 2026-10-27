@@ -450,6 +450,7 @@ identity of the task for its accesses.
 #idx("SAF")
 #idx("RES=", "profile check")
 #idx("HTTPD425W")
+#idx("HTTPD426W")
 The profiles belong to the site. HTTPD names none of them. The route decides
 which resource a request is checked against, with the keyword #cmd("RES=")
 (@ref-route). The server makes these calls.
@@ -471,14 +472,18 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       @ref-route has the policies.],
     [Check of a resource for a route with #cmd("RES=class:resource")], [The
       server asks for the access READ. The return codes 0 and 4 allow the
-      request. Return code 4 means that no profile covers the resource.
-      @ref-route describes what happens on a refusal.],
+      request. Return code 4 means that no profile covers the resource. With
+      #cmd("RES_NOPROFILE=DENY") the return code 4 refuses the request
+      (@ref-prm-auth). @ref-route describes what happens on a refusal.],
     [Probe at the start], [For each route with #cmd("RES=") and an #cmd("AUTH=")
       other than #cmd("NONE"), the server asks once whether a profile covers the
       resource. It asks as its own identity. Only the return code 4 gives
       #cmd("HTTPD425W NO PROFILE FOR class:resource -- path NOT GATED"). The
-      route still works, and every request that reaches the check passes. A
-      typing error in the class or in the resource name looks like this.],
+      route still works, and every request that reaches the check passes. With
+      #cmd("RES_NOPROFILE=DENY") the message is
+      #cmd("HTTPD426W NO PROFILE FOR class:resource -- path REFUSES ALL REQUESTS"),
+      and every request that reaches the check gets status 403. A typing error
+      in the class or in the resource name looks like this.],
     [Authorization by SVC 244], [The security product allows or refuses the SVC
       for the account of the task. The server does not check the profile
       itself.],
@@ -491,7 +496,8 @@ for an unprotected resource is a property of RAKF. Under RACF with PROTECTALL,
 an unprotected resource gives 8 for an ordinary user and 0 for a SPECIAL user,
 and a system with no security product gives 0. On those systems the probe stays
 silent without a profile as well, so a silent probe does not prove that a
-profile exists.
+profile exists. #cmd("RES_NOPROFILE=DENY") acts on the return code 4 only. It
+does not change what a system answers with 0 or with 8.
 
 The _HTTPD User's Guide_ shows how to define the profiles with RAKF, in
 "Authentication and Security".

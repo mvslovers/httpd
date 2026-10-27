@@ -523,6 +523,12 @@ to look for. The first two matter for the safety of the system.
   permits everybody under RAKF, and #cmd("HTTPD425W") says so at the start.
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
+- *A route whose profile is missing.* From 4.5.0 the keyword
+  #cmd("RES_NOPROFILE=DENY") makes a route with #cmd("RES=") refuse every
+  request while its profile does not exist, instead of letting every user who
+  is logged in pass. The sample member has it as a comment line, and without it
+  nothing changes. Turn it on when the start prints no #cmd("HTTPD425W")
+  (@ug-security-noprofile).
 - *Resident modules.* From 4.4.0 the keyword #cmd("RESIDENT") has the default
   #cmd("YES"): HTTPD loads each module of a route once at the start and holds
   it until the end. A new level of a module then takes effect at the next
