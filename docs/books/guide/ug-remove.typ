@@ -53,9 +53,10 @@ four upgrades carries four of these marks. A removal that names only the
 current release and its predecessor leaves the older marks in the inventory for
 good. The SYSMOD of 4.5.0 carries #cmd("DELETE(THTP440)"), so a system that
 took 4.5.0 as its first install holds #cmd("THTP440") as a mark as well, with
-#cmd("DELBY = THTP450") in the CDS and in the ACDS. The job in this chapter therefore names every FMID that HTTPD has ever
-spent, from #cmd("THTP400") to #cmd("THTP440"). You need not know which
-releases your system has seen.
+#cmd("DELBY = THTP450") in the CDS and in the ACDS. The job in this chapter
+therefore names every FMID that HTTPD has ever spent, from #cmd("THTP400") to
+#cmd("THTP440") (to #cmd("THTP450") in the form of @ug-remove-45). You need not
+know which releases your system has seen.
 
 == Step 1: Stop the Server <ug-remove-stop>
 

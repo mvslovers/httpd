@@ -11,12 +11,12 @@ next release (@ug-upgrade) and a defined way to take it out (@ug-remove).
 
 The captures in this chapter come from release 4.4.0 on a TK5 system, with
 two exceptions that the text names: the RAKF captures come from MVS/CE. The
-install of a package build of 4.5.0 was run on a TK5 system as well. Every step of
-the install job ended with return code 0000, #cmd("HTTPD.LINKLIB") and
-#cmd("HTTPD.AHTTPLOD") each held the five load modules, and the SMP record
-showed the FMID #cmd("THTP450"). The file
-names in your package carry the number of your release. The steps do not
-change from one release to the next.
+first install of a package build of 4.5.0 was run on a TK5 system as well.
+Every step of the install job ended with return code 0000,
+#cmd("HTTPD.LINKLIB") and #cmd("HTTPD.AHTTPLOD") each held the five load
+modules, and the SMP record showed the FMID #cmd("THTP450"). The file names in
+your package carry the number of your release. The steps do not change from one
+release to the next.
 
 Report a problem as an issue at https://github.com/mvslovers/httpd/issues.
 Add the two build stamps that HTTPD writes at the start (#cmd("HTTPD000I") and
