@@ -41,7 +41,7 @@ One placeholder is used throughout:
 
 | | |
 |---|---|
-| `<version>` | the release, e.g. `4.4.0` — it appears in every shipped file name |
+| `<version>` | the release, e.g. `4.5.0` — it appears in every shipped file name |
 
 It is already filled in inside the shipped jobs; you only need it to recognise
 which file is which.
@@ -52,22 +52,22 @@ which release a name belongs to. Up to and including 4.0.2 they were versioned
 — `HTTPD.V4R0M2.LINKLIB` — and two releases could sit side by side; 4.1.0 ends
 that.
 
-**Upgrading from 4.3.0 needs nothing uninstalled first.** This release's
-SYSMOD carries `DELETE(THTP430)`, so SMP deletes the 4.3.0 modules from
+**Upgrading from 4.4.0 needs nothing uninstalled first.** This release's
+SYSMOD carries `DELETE(THTP440)`, so SMP deletes the 4.4.0 modules from
 `HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
 ownership of each module moves with them. You stop the server (step 5), skip
 step 4 because the libraries are already there, and submit the install job.
 
 **Coming from an older release, go through each release in turn.** This
-release deletes `THTP430` and nothing else. On a 4.2.0 system the modules still
-belong to `THTP420`, and a SYSMOD that does not own a module cannot replace it:
+release deletes `THTP440` and nothing else. On a 4.3.0 system the modules still
+belong to `THTP430`, and a SYSMOD that does not own a module cannot replace it:
 SMP selects none of them, copies nothing, and every step still ends `RC 00`. So
-4.2.0 upgrades to 4.3.0 first, with the 4.3.0 package, and then to this
-release; a 4.1.0 system goes through 4.2.0 and 4.3.0 in the same way. A 4.0.x
-system starts with 4.1.0, the release that crosses from `THTP400` and the one
-move to the unversioned dataset names —
-[section 12a](#12a-upgrading-from-40x) has that order, done with the **4.1.0**
-package — then 4.2.0, then 4.3.0, then this release.
+4.3.0 upgrades to 4.4.0 first, with the 4.4.0 package, and then to this
+release; a 4.2.0 system goes through 4.3.0 and 4.4.0, and a 4.1.0 system through
+4.2.0, 4.3.0 and 4.4.0, in the same way. A 4.0.x system starts with 4.1.0, the
+release that crosses from `THTP400` and the one move to the unversioned dataset
+names — [section 12a](#12a-upgrading-from-40x) has that order, done with the
+**4.1.0** package — then 4.2.0, 4.3.0 and 4.4.0, then this release.
 
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
@@ -531,7 +531,7 @@ Expect `COND CODE 0000`.
 >
 > **Coming from 4.0.x**, install 4.1.0 first, following
 > [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
-> upgrade to 4.2.0, 4.3.0 and this release, skipping it each time.
+> upgrade to 4.2.0, 4.3.0, 4.4.0 and this release, skipping it each time.
 
 ### A library that SMP does not own
 
@@ -695,9 +695,9 @@ The SYSMOD travels inline in the job — there is no third file to upload.
 output:
 
 ```
-HMA3930    SYSMOD THTP440 SUCCESSFULLY RECEIVED
+HMA3930    SYSMOD THTP450 SUCCESSFULLY RECEIVED
 HMA2240    SUCCESSFULLY DELETED LMOD HTTPD ON LINKLIB LIBRARY
-HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP440 - RETURN CODE=00
+HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP450 - RETURN CODE=00
 ```
 
 There is one `HMA2380` line **per module** — five of them, each on a single
@@ -1556,7 +1556,7 @@ What this release put on the system:
 
 | | |
 |---|---|
-| FMID | `THTP440` |
+| FMID | `THTP450` |
 | Load modules | `HTTPD`, `HTTPDSRV`, `HTTPDM`, `HTTPDMTT`, `ABEND0C1` |
 | Target library | `HTTPD.LINKLIB` |
 | Distribution library | `HTTPD.AHTTPLOD` |
@@ -1568,8 +1568,10 @@ What this release put on the system:
 > system, or to clean up after a test install. The 4.0.x guide sent upgrades
 > here; following that now would uninstall a working server for no reason.
 
-> **Did you install a development build of `main`?** Its FMID is `THTP450`, which
-> the job in step 2 does not name. Read
+> **Did you install a development build of `main`?** Its FMID is the one of the
+> release that `main` is heading for. A build of 4.5.0-dev carried `THTP450`,
+> which the job in step 2 names; a development build of a later release carries
+> an id that the job does not name. Read
 > [the section on development builds](#you-installed-a-development-build-with-a-later-fmid)
 > first.
 
@@ -1595,23 +1597,23 @@ follows the job.
 //UCLIN   EXEC SMPAPP
 //SMPCNTL  DD  *
  UCLIN CDS .
-  DEL SYSMOD(THTP440) MOD(HTTPD) .
+  DEL SYSMOD(THTP450) MOD(HTTPD) .
  ENDUCL .
  RESETRC .
  UCLIN CDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDSRV) .
+  DEL SYSMOD(THTP450) MOD(HTTPDSRV) .
  ENDUCL .
  RESETRC .
  UCLIN CDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDM) .
+  DEL SYSMOD(THTP450) MOD(HTTPDM) .
  ENDUCL .
  RESETRC .
  UCLIN CDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDMTT) .
+  DEL SYSMOD(THTP450) MOD(HTTPDMTT) .
  ENDUCL .
  RESETRC .
  UCLIN CDS .
-  DEL SYSMOD(THTP440) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP450) MOD(ABEND0C1) .
  ENDUCL .
  RESETRC .
  UCLIN CDS .
@@ -1655,6 +1657,10 @@ follows the job.
  ENDUCL .
  RESETRC .
  UCLIN CDS .
+  DEL SYSMOD(THTP450) .
+ ENDUCL .
+ RESETRC .
+ UCLIN CDS .
   DEL SYSMOD(THTP440) .
  ENDUCL .
  RESETRC .
@@ -1675,23 +1681,23 @@ follows the job.
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP440) MOD(HTTPD) .
+  DEL SYSMOD(THTP450) MOD(HTTPD) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDSRV) .
+  DEL SYSMOD(THTP450) MOD(HTTPDSRV) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDM) .
+  DEL SYSMOD(THTP450) MOD(HTTPDM) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP440) MOD(HTTPDMTT) .
+  DEL SYSMOD(THTP450) MOD(HTTPDMTT) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
-  DEL SYSMOD(THTP440) MOD(ABEND0C1) .
+  DEL SYSMOD(THTP450) MOD(ABEND0C1) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
@@ -1712,6 +1718,10 @@ follows the job.
  RESETRC .
  UCLIN ACDS .
   DEL MOD(ABEND0C1) .
+ ENDUCL .
+ RESETRC .
+ UCLIN ACDS .
+  DEL SYSMOD(THTP450) .
  ENDUCL .
  RESETRC .
  UCLIN ACDS .
@@ -1738,11 +1748,13 @@ follows the job.
 //LIST    EXEC SMPAPP
 //SMPCNTL  DD  *
  RESETRC .
+ LIST CDS  SYSMOD(THTP450) .
  LIST CDS  SYSMOD(THTP440) .
  LIST CDS  SYSMOD(THTP430) .
  LIST CDS  SYSMOD(THTP420) .
  LIST CDS  SYSMOD(THTP410) .
  LIST CDS  SYSMOD(THTP400) .
+ LIST ACDS SYSMOD(THTP450) .
  LIST ACDS SYSMOD(THTP440) .
  LIST ACDS SYSMOD(THTP430) .
  LIST ACDS SYSMOD(THTP420) .
@@ -1752,8 +1764,8 @@ follows the job.
 //
 ```
 
-**Why every `DEL` has a block of its own.** The job holds 35 `DEL` statements,
-20 against the CDS and 15 against the ACDS. Each one stands in its own
+**Why every `DEL` has a block of its own.** The job holds 37 `DEL` statements,
+21 against the CDS and 16 against the ACDS. Each one stands in its own
 `UCLIN`/`ENDUCL` pair, and a `RESETRC .` follows every `ENDUCL .`. Three
 facts of SMP 4 make that necessary (measured on TK5 with SMP 4,
 `HMASMP LVL 04.48`):
@@ -1781,22 +1793,27 @@ paragraph were measured with the 33-statement form of this job, which named
 `THTP420` but never saw `THTP410` or `THTP400`. There two blocks per zone
 failed, four of the 33, and the `UCLIN` step ended RC 08. The other 29
 reported `HMA2550 UPDATE COMPLETE`. The `LIST` step ended RC 04. The job
-printed above has 35 statements: it adds the id `THTP440` to each zone and
-names it in the five `SYSMOD(...) MOD(...)` blocks. On a system that never held
-`THTP440` those blocks find no entry and each ends RC 08 with `HMA2532`, as
-every `DEL` for a missing entry does; that was not run. Neither number says
-whether the removal worked; the stanzas of the `LIST` in step 3 do. Running the
-33-statement job a second time, when no id was left, gave RC 08 again with no
-`HMA2550` and no `HMA2293`, and the same `LIST`.
+printed above has 37 statements: it adds the ids `THTP440` and `THTP450` to each
+zone and names `THTP450` in the five `SYSMOD(...) MOD(...)` blocks. On a system
+that never held `THTP450` those blocks find no entry and each ends RC 08 with
+`HMA2532`, as every `DEL` for a missing entry does; that was not run. Neither
+number says whether the removal worked; the stanzas of the `LIST` in step 3
+do. Running the 33-statement job a second time, when no id was left, gave RC 08
+again with no `HMA2550` and no `HMA2293`, and the same `LIST`.
 
 **The modules go as well.** After the job, `LIST CDS MOD(...)`,
 `LIST CDS LMOD(...)` and `LIST ACDS MOD(...)` for the five module names answer
 RC 04, not found. Before it they list all five, and the CDS load module
 entries show `SYSTEM LIBRARY = LINKLIB`.
 
-**What was not measured.** The 35-statement job as printed was not run. A
-system where single `MOD` or `LMOD` entries are missing while the newest id is
-present was not run either. Measured is only that such a
+**What was not measured.** The 37-statement job as printed was run on systems
+that held `THTP450` as a development build (see
+[the section on development builds](#you-installed-a-development-build-with-a-later-fmid)),
+not on a system that holds the released `THTP450`. The same holds for a system
+that never held `THTP450`, such as one at 4.4.0: that the five
+`DEL SYSMOD(THTP450) MOD(...)` blocks end RC 08 with `HMA2532` there was not
+run. A system where single `MOD` or `LMOD` entries are missing while the newest
+id is present was not run either. Measured is only that such a
 line, alone in its step, reports `HMA2532` and `HMA2560` with RC 08. That
 `RESETRC .` lifts the `HMA2293` cascade after it, too, is concluded from the
 cases above, not measured.
@@ -1815,7 +1832,7 @@ both zones:
 THE FOLLOWING SELECTED ENTRIES WERE NOT FOUND OR WERE NOT ELIGIBLE
 FOR PROCESSING
  TYPE        NAME
- SYSMOD      THTP440
+ SYSMOD      THTP450
 ```
 
 with `HIGHEST RETURN CODE IS 04`. **RC 04 and an empty list means the FMID is
@@ -1831,18 +1848,19 @@ step's highest return code above the 04 you were expecting. A stanza naming
 ### The tombstones — one `DEL SYSMOD` each, and there may be several
 
 A system that was upgraded also carries the **tombstone** of every level it
-came through: `THTP430` listed as `TYPE = FUNCTION` with `DELBY = THTP440` and
+came through: `THTP440` listed as `TYPE = FUNCTION` with `DELBY = THTP450` and
 nothing else. `LIST` answers **RC 00** for those, not RC 04, so the
 "RC 04 + empty list = free" rule above reads them as occupied — which is
 correct, the ids are spent and can never be reused.
 
 **Tombstones accumulate, one per upgrade.** A system that went 4.0.x → 4.1.0 →
-4.2.0 → 4.3.0 → 4.4.0 carries four: `THTP400 DELBY=THTP410`,
-`THTP410 DELBY=THTP420`, `THTP420 DELBY=THTP430` and `THTP430 DELBY=THTP440`. A job
-that names only the release you are removing and its immediate predecessor
-leaves the older one standing for good. That is why the job above names
-**every id HTTPD has ever spent** — `THTP440`, `THTP430`, `THTP420`, `THTP410`, `THTP400` — rather
-than the ones this system happens to have seen.
+4.2.0 → 4.3.0 → 4.4.0 → 4.5.0 carries five: `THTP400 DELBY=THTP410`,
+`THTP410 DELBY=THTP420`, `THTP420 DELBY=THTP430`, `THTP430 DELBY=THTP440` and
+`THTP440 DELBY=THTP450`. A job that names only the release you are removing
+and its immediate predecessor leaves the older one standing for good. That is
+why the job above names **every id HTTPD has ever spent** — `THTP450`,
+`THTP440`, `THTP430`, `THTP420`, `THTP410`, `THTP400` — rather than the ones
+this system happens to have seen.
 
 `DEL SYSMOD` does work on a tombstone: on a system holding `THTP430` and the
 tombstone `THTP420`, the job above removed both ids from both zones, measured on
@@ -1882,18 +1900,30 @@ Those are yours to delete — unmount the disk before you scratch it.
 > The `RESTORE`/`REJECT` behaviour above was measured on 2026-08-14 against an
 > accepted FMID from a package built by this same generator, on an MVS/CE system
 > running SMP 4 level 04.48. It is a property of SMP 4 and of accepting a
-> function SYSMOD, not of any one product. The `UCLIN` job above was run end to
-> end on TK5 with SMP 4 (`HMASMP LVL 04.48`) on a system holding `THTP430` and
-> the tombstone `THTP420`; it was not run on a system holding all four ids, or
-> on one with single `MOD` or `LMOD` entries missing. Read the `LIST` output,
-> not the `UCLIN` return codes.
+> function SYSMOD, not of any one product. The `UCLIN` job above, in its
+> 33-statement form, was run end to end on TK5 with SMP 4 (`HMASMP LVL 04.48`)
+> on a system holding `THTP430` and the tombstone `THTP420`; the 37-statement
+> form was run on systems holding a development build under `THTP450`. It was
+> not run on a system holding all six ids, or on one with single `MOD` or `LMOD`
+> entries missing. Read the `LIST` output, not the `UCLIN` return codes.
 
 ### You installed a development build with a later FMID
 
 A development build of `main` is packaged under the FMID of the release that
-`main` is heading for. A build of 4.5.0-dev carries `THTP450`, although 4.5.0 is
-not released. If you installed such a package by SMP, the system holds an id
-that the job in step 2 does not name.
+`main` is heading for. Before 4.5.0 was released, a build of 4.5.0-dev carried
+`THTP450`, the id of this release, which the job in step 2 names. A development
+build of a later release carries a later id, which the job does not name. If you
+installed such a package by SMP, the system holds an id that the job in step 2
+does not remove.
+
+**How to read the ids in this section.** The measurements below were made
+before 4.5.0 was released. They used the job as printed for 4.4.0, whose newest
+id is `THTP440`, on systems that held the development build `THTP450`.
+
+- For a 4.5.0-dev build under `THTP450`, the three changes listed below are in
+  the job of step 2 already. Run it as printed.
+- For a development build of a later release, read `THTP450` below as the id of
+  that build and `THTP440` as `THTP450`. This reading was not measured.
 
 **What the job of step 2 does on such a system.** Measured with SMP 4
 (`HMASMP LVL 04.48`) on two systems. The TK5 system held 4.3.0 and 4.4.0,
@@ -1953,8 +1983,8 @@ development build. The cause is the tombstone: after the development build
 `LIST CDS SYSMOD(THTP440)` answers `TYPE = FUNCTION` and `DELBY = THTP450`.
 
 A package that was built with a throwaway id of its own (`[smp] fmid` in
-`mbt.toml`) is the same case with another name. That was not measured. Wherever
-this section says `THTP450`, read your id.
+`mbt.toml`) is the same case with another name. That was not measured. Read your
+id wherever this section reads the id of the development build.
 
 Ask SMP which id the system carries, with this job under the SMP procedure of
 your system (`SMPAPP` on TK5):
@@ -1985,25 +2015,30 @@ HTTPD     LASTUPD         = THTP450  TYPE=ADD
           LMOD            = HTTPD
 ```
 
-`FMID = THTP450` means that you are in the right section, and so does any other
-id except `THTP400`, `THTP410`, `THTP420`, `THTP430` and `THTP440`: those five
-are releases, the job of step 2 removes them, and this section is not yours.
-Only `THTP450` has been measured.
+`FMID = THTP450` is this release or a development build that carries its id,
+and the job of step 2 as printed names it. An id later than `THTP450` means that
+you are in the right section. `THTP400`, `THTP410`, `THTP420`, `THTP430` and
+`THTP440` are releases that the job of step 2 removes, and this section is not
+yours either. Measured is `THTP450` as a development build; an id later than
+`THTP450` was not run.
 
 Run the steps above with three changes to the job of step 2, in both zones:
 
 1. Add a block for `THTP450`: `UCLIN CDS .` (`UCLIN ACDS .` in the ACDS),
    `DEL SYSMOD(THTP450) .`, `ENDUCL .` and `RESETRC .`. Put it ahead of the
    block `DEL SYSMOD(THTP440) .`, in each zone, which is where it stood in the
-   job that was run. Each zone has one more block, so the job has 37 `DEL`
-   statements, 21 against the CDS and 16 against the ACDS.
+   job that was run. Each zone has one more block, so the job as printed for
+   4.4.0 grew from 35 to 37 `DEL` statements, 21 against the CDS and 16 against
+   the ACDS, which is the job printed in step 2. For a later release the job
+   printed there grows from 37 to 39, 22 against the CDS and 17 against the
+   ACDS.
 2. In the five `DEL SYSMOD(THTP440) MOD(...)` blocks, name `THTP450` in place of
    `THTP440`. The modules of such a system belong to the newest id. The block
    `DEL SYSMOD(THTP440) .` stays.
 3. Add `LIST CDS SYSMOD(THTP450) .` and `LIST ACDS SYSMOD(THTP450) .` to the
    `LIST` step, each ahead of the `THTP440` statement of its zone. It has twelve
-   statements then, and every one of them must show its id as not found, as in
-   step 3.
+   statements then (fourteen for a later release), and every one of them must
+   show its id as not found, as in step 3.
 
 **What the changed job does.** Measured on the TK5 system and the MVS/CE system
 described above and in four further runs. Every statement that
@@ -2085,18 +2120,26 @@ were installed from the SMP package and not deployed with `mbt deploy`.
 - Steps 4 and 5 after a development build (the path that only removes HTTPD).
 - The release install over a system that only the job of step 2 cleaned, with
   `THTP450` still in the inventory.
+- The 4.5.0 package installed after the job of step 2 has removed a development
+  build of 4.5.0-dev, which carries the same `THTP450`. Measured is the 4.4.0
+  package after a 4.5.0-dev build.
+- The 4.5.0 package installed over a 4.5.0-dev build without the job of step 2
+  in between. Run the job first.
+- The job of step 2 on a system that never held `THTP450`, such as one at 4.4.0.
+  The five `DEL SYSMOD(THTP450) MOD(...)` blocks are expected to end RC 08 with
+  `HMA2532`. That was not run.
 
 ---
 
 ## 12a. Upgrading from 4.0.x
 
 > **Do this with the 4.1.0 package, not this release's.** This release deletes
-> `THTP430` only, so on a 4.0.x system — where the modules belong to `THTP400` —
+> `THTP440` only, so on a 4.0.x system — where the modules belong to `THTP400` —
 > its install selects nothing and copies nothing while every step ends `RC 00`.
 > Download 4.1.0 from the releases page, follow the steps below with it, and
-> confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0 and this release the
-> ordinary way, one after the other: stop, install, start, with no allocation
-> step.
+> confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0, 4.4.0 and this
+> release the ordinary way, one after the other: stop, install, start, with no
+> allocation step.
 
 Those releases put their datasets in `HTTPD.V4R0M0.*`, `HTTPD.V4R0M1.*` or
 `HTTPD.V4R0M2.*`, so nothing of 4.1.0 lands on top of them. That makes

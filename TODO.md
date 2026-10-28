@@ -11,17 +11,13 @@ stops. `CLAUDE.md` forbids a task list in itself because a copy of a tracker is
 wrong the first time someone closes something, and the only defence that works
 is to hold nothing worth going stale.
 
-*Last reconciled against the tracker: 2026-10-27, against `origin/main` 35349ad, after v4.4.0
-(published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
-closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
-The open issues are in milestone 4.5.0, except #176, #271, #322, #323, #392, #393, #400, #413 and #421, which are in 4.6.0. #401 and #440 are closed and struck (PR #418, PR #446). #319 (PR #387) and #395 (PR #417, PR #420) are closed and struck. #326,
-#367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
-#370 is listed and not ranked against the rest, and so are #391 to #395, #400 and
-#401, which the manuals work (#382) filed; #394 is closed and struck (PR #419). #399 is closed and struck (PR #427, live test
-PR #432). #426 is closed and struck (PR #428). #405, the follow-up to the manuals, is the change that
-carries this edit and has no row. #379 is closed (PR #380: `main` is
-4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch) and has
-no row. The ranked order is unchanged.
+*Last reconciled against the tracker: 2026-10-28, against `origin/main` 75f2f80, while 4.5.0 is
+prepared (#454: the installation guide for FMID `THTP450`, which is the change that carries this
+edit and has no row). Two issues are open in milestone 4.5.0: #452 (docs, its PR #453 is merged)
+and #454. Every other open issue is in 4.6.0: #176, #271, #322, #323, #350, #370, #392, #393, #400,
+#413 and #421; #350 and #370 moved there from 4.5.0. Everything struck below is closed in 4.5.0.
+`main` is 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch.
+The ranked order is unchanged.
 The notes of the earlier reconciles, back to 2026-08-24, are in the history of this file
 (`git log -p TODO.md`). Two standing facts they carried: libc370 2.5.0's stdio lock skip leaves
 `DEBUG=1` writes to `httpd->dbg` from module context unserialized, which is libc370#470 and needs
@@ -40,8 +36,8 @@ mvslovers/mbt#163.*
 | — | #413 | hardening — a cached credential keeps a changed RACF password until max-age | **a decision** between re-verify, downstream-refusal marking and documentation only; milestone 4.6.0 |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
 | — | #323 | `type:research` — would serialising identity-switching requests be an acceptable interim for #176 | a written recommendation, time-boxed; milestone 4.6.0 |
-| — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | measured on MVS/CE (`tests/soak.py`, `tests/soak-stalls.py`): none at 1 and 3 clients, 0.2-1.4 % of requests over 5 s at 6-9 clients while the guest CPU is saturated, no link to keep-alive or to host CPU pressure; the board dropped the quiet-host run (the shared host is never quiet); **a server-side trace** (`TRACE=n`, `/.dsrv?target=TRACE`, `tests/soak-trace.py`; `internals/request-trace.md`) is in the open PR for this step, the measurement with it goes on the issue; not yet ranked |
-| — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system; the acceptance is a 4.5.0 item, not yet ranked |
+| — | #350 | unexplained request stalls of 25-150 s under soak load, in both `RESIDENT` modes | measured on MVS/CE (`tests/soak.py`, `tests/soak-stalls.py`): none at 1 and 3 clients, 0.2-1.4 % of requests over 5 s at 6-9 clients while the guest CPU is saturated, no link to keep-alive or to host CPU pressure; the board dropped the quiet-host run (the shared host is never quiet); the server-side trace (`TRACE=n`, `/.dsrv?target=TRACE`, `tests/soak-trace.py`; `internals/request-trace.md`) is in 4.5.0 (PR #424) and attributes each stall to a worker and a phase; the cause is not found, so there is no fix; milestone 4.6.0, not yet ranked |
+| — | #370 | acceptance of `RESIDENT=YES` on TK5 Update 6 | a TK5 Update 6 system, expected at the end of the year; `RESIDENT=YES` was accepted for 4.4.0 on MVS/CE and TK5 Update 5, and 4.5.0 is cut before Update 6; milestone 4.6.0, not yet ranked |
 | — | ~~#376~~ | ~~`samplib/httpprm0` comment says the REST API module checks nothing itself, true only for older module levels~~ | **Done** — the comment now states the behaviour per mvsMF level; milestone 4.5.0 |
 | — | ~~#377~~ | ~~docs — `REGION` sizing for setups with many parallel module requests~~ | **Done** — the passage is in the Reference ("The region") and in the installation guide (PR #389, follow-up PR #402); milestone 4.5.0 |
 | — | ~~#382~~ | ~~docs — ML07 HTTPD User's Guide and Reference, Read the Docs, PDFs on the release~~ | **Done** — the books landed with PR #390; what the acceptance left over is #395 and #405 |
