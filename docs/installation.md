@@ -2032,6 +2032,10 @@ of section 4, which fails on libraries that exist. The inventory is clean, but
 development build (measured on TK5 with `IEHLIST LISTPDS`: `ABEND0C1`, `HTTPD`,
 `HTTPDM`, `HTTPDMTT` and `HTTPDSRV` in each).
 
+If you only remove HTTPD, go on with steps 4 and 5. Step 4 scratches those two
+libraries and not `HTTPD.DEV.LINKLIB`, which is yours to scratch. Steps 4 and 5
+were not run after a development build.
+
 **Installing the release afterwards.** Measured with the HTTPD 4.4.0 package on
 TK5 and MVS/CE, on the systems the changed job had cleaned, without the
 allocation job. The package is the one of the 4.4.0 release. Every step of the install job ends `CC 0000`, `APPLY`
@@ -2078,6 +2082,7 @@ were installed from the SMP package and not deployed with `mbt deploy`.
   the install.
 - A development build installed directly over a system that holds 4.3.0 or
   older, and a system with a history older than 4.3.0 (`THTP410`, `THTP400`).
+- Steps 4 and 5 after a development build (the path that only removes HTTPD).
 - The release install over a system that only the job of step 2 cleaned, with
   `THTP450` still in the inventory.
 

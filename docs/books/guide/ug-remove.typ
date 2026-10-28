@@ -404,7 +404,9 @@ still listed the five modules #cmd("ABEND0C1"), #cmd("HTTPD"), #cmd("HTTPDM"),
 #cmd("HTTPDMTT") and #cmd("HTTPDSRV") after the job. If you install a release
 next, do not scratch the libraries and do not run the allocation job. Run the
 install job of the release package. If you only remove HTTPD, go on with
-@ug-remove-scratch.
+@ug-remove-scratch. That step scratches those two libraries and not
+#cmd("HTTPD.DEV.LINKLIB"), which is yours to scratch, and it was not run after
+a development build.
 
 *Installing a release afterwards.* Measured with the 4.4.0 package on both
 systems, after the changed job and without the allocation job. Every step of
@@ -440,6 +442,7 @@ the development builds of the runs were installed from the SMP package.
 jobs (@ug-remove-stop), so the server ran while SMP replaced the modules, and
 it was restarted after the install. A development build installed directly
 over a system that holds 4.3.0 or older, and a system with a history older than
-4.3.0, were not run. The release install over a system that only the unchanged
+4.3.0, were not run, and neither were the steps that scratch the libraries
+and finish the removal after a development build. The release install over a system that only the unchanged
 job of @ug-remove-uclin has cleaned, with #cmd("THTP450") still in the
 inventory, was not run either; the control run above is the nearest case.]
