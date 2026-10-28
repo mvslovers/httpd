@@ -656,8 +656,8 @@ is a leftover of an old release. It gives #cmd("HTTPD024W") and
     [#cmd("HTTPDIN")], [Dummy.],
     [#cmd("HTTPPRM")], [The Parmlib member: #cmd("DSN=&D(&M)"),
       #cmd("DISP=SHR"), #cmd("FREE=CLOSE").],
-    [#cmd("HASPCKPT"), #cmd("HASPACE1")], [The JES2 checkpoint and the spool.
-      Site values: see below.],
+    [#cmd("HASPCKPT"), #cmd("HASPACE1")], [Comment lines. The JES2 checkpoint
+      and the spool. Optional: see below.],
   )
 ]
 
@@ -668,14 +668,29 @@ and #cmd("HTTPD019W") report that #cmd("HTTPDOUT"), #cmd("HTTPDERR") or
 #cmd("HTTPDIN") is missing, and they also stop the start. "Messages" in the
 _HTTPD Reference_ lists them.
 
-*HASPCKPT and HASPACE1.* HTTPD itself never opens them. They are there for the
+*HASPCKPT and HASPACE1.* HTTPD itself never opens them. They are for the
 server modules. A module runs in the task of HTTPD and has no allocations of
-its own, and the jobs API of mvsMF opens both data sets by their DD names. The
-values in the shipped procedure (#cmd("UNIT=3350") with
-#cmd("VOL=SER=MVS000") and #cmd("VOL=SER=SPOOL1")) are site values. Compare
-them with the JES2 procedure of your system before the first start, and change
-them to what JES2 uses. Remove the two statements only if no module of the
-server reaches JES2.
+its own, and the jobs API of mvsMF reads the JES2 checkpoint and spool in that
+task. The shipped procedure has both statements as comment lines, and you
+need them in two cases only:
+
+- You run mvsMF 1.3.0 or earlier. It opens the two data sets by their DD names.
+  Without the statements, a job list answers 500, and a request for one job by
+  name and id answers 404 "job not found", a spool read included, although the
+  job exists. The console shows
+  #cmd("MVSMF201E UNABLE TO OPEN THE JES2 CHECKPOINT AND SPOOL DATA SETS").
+- The JES2 of your system builds its data set names with a prefix other than
+  #cmd("SYS1") (its #cmd("$DSNPRFX") value). From mvsMF 1.4.0 on, the jobs API
+  allocates #cmd("SYS1.HASPCKPT") and #cmd("SYS1.HASPACE") itself when the
+  procedure has no DD, and it looks only for these names.
+
+In both cases, remove the two comment marks. The values in the shipped lines
+(#cmd("UNIT=3350") with #cmd("VOL=SER=MVS000") and #cmd("VOL=SER=SPOOL1")) are
+site values. Compare them with the JES2 procedure of your system before the
+first start, and change them to what JES2 uses. With mvsMF 1.4.0 or later on a
+system with the prefix #cmd("SYS1"), leave the lines as they are. A DD in the
+procedure wins over the allocation, so active lines do no harm either.
+"The JES2 data sets" in the _HTTPD Reference_ has the details.
 
 *Missing HTTPPRM.* If the DD #cmd("HTTPPRM") does not exist, the server writes
 
