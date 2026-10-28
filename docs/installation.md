@@ -1568,6 +1568,11 @@ What this release put on the system:
 > system, or to clean up after a test install. The 4.0.x guide sent upgrades
 > here; following that now would uninstall a working server for no reason.
 
+> **Did you install a development build of `main`?** Its FMID is `THTP450`, which
+> the job in step 2 does not name. Read
+> [the section on development builds](#you-installed-a-development-build-with-a-later-fmid)
+> first.
+
 **Leftovers from 4.0.x.** If this system was upgraded from 4.0.x rather than
 installed fresh, the old versioned libraries are still catalogued and are no
 longer referenced by anything — `HTTPD.V4R0M2.*` for 4.0.2, `V4R0M1` for 4.0.1,
@@ -1882,6 +1887,61 @@ Those are yours to delete — unmount the disk before you scratch it.
 > the tombstone `THTP420`; it was not run on a system holding all four ids, or
 > on one with single `MOD` or `LMOD` entries missing. Read the `LIST` output,
 > not the `UCLIN` return codes.
+
+### You installed a development build with a later FMID
+
+A development build of `main` is packaged under the FMID of the release that
+`main` is heading for. A build of 4.5.0-dev carries `THTP450`, although 4.5.0 is
+not released. If you installed such a package by SMP, the system holds an id
+that the job in step 2 does not name. The `DEL` statements for the modules name
+the id that owns them, and that is `THTP450`, so the job cannot free them.
+<!-- MEASURE: what the job of step 2 does on such a system: return codes, which
+     DEL fail, what LIST shows afterwards -->
+
+A package that was built with a throwaway id of its own (`[smp] fmid` in
+`mbt.toml`) is the same case with another name. Wherever this section says
+`THTP450`, read your id.
+
+Ask SMP which id the system carries:
+
+```
+ LIST CDS MOD(HTTPD) .
+```
+
+`FMID = THTP450` (or any other id that is not in the job of step 2) means that
+you are in the right section.
+
+Run the steps above with three changes to the job of step 2, in both zones:
+
+1. Add a block for `THTP450`: `UCLIN CDS .` (`UCLIN ACDS .` in the ACDS),
+   `DEL SYSMOD(THTP450) .`, `ENDUCL .` and `RESETRC .`. Each zone has one more
+   block, so the job has 37 `DEL` statements, 21 against the CDS and 16 against
+   the ACDS.
+2. In the five `DEL SYSMOD(THTP440) MOD(...)` blocks, name `THTP450` in place of
+   `THTP440`. The modules of such a system belong to the newest id. The block
+   `DEL SYSMOD(THTP440) .` stays.
+3. Add `LIST CDS SYSMOD(THTP450) .` and `LIST ACDS SYSMOD(THTP450) .` to the
+   `LIST` step. It has twelve statements then, and every one of them must show
+   its id as not found, as in step 3.
+
+<!-- MEASURE: the modified job: UCLIN return codes and messages per zone, the
+     LIST, LIST CDS/ACDS MOD(...) afterwards -->
+
+Do not scratch the libraries (step 4) if you install a release next. Run the
+install job of the release package as in section 6, and not the allocation job
+of section 4, which fails on libraries that exist. The inventory is clean, but
+`UCLIN` has not touched the libraries: until the release is installed,
+`HTTPD.LINKLIB` still holds the modules of the development build. After the
+install, `LIST CDS MOD(HTTPD) .` must show the `FMID` of the release and not
+`THTP450`, and the banner must name the release.
+
+<!-- MEASURE: the release install over the cleaned system: HMA2380 for each of
+     the five modules, member lists, LIST MOD(HTTPD), the banner. Control run:
+     the release installed over the development build without this section -->
+
+**What has not been measured.** <!-- MEASURE: replace with the open points
+after the runs: a system with an older history, a second development build over
+the first -->
 
 ---
 
