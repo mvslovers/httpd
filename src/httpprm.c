@@ -10,6 +10,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"       /* operator message catalog                    */
 #include "httprlm.h"        /* realm default + REALM gate (#191, #193)     */
+#include "httpracf.h"      /* httpracv() -- RES_NOPROFILE value (#351)    */
 #include "httpxlat.h"
 #include <unistd.h>          /* sleep()                                      */
 #include <mvs/enq.h>        /* ENQ()       -- port single-instance (#223)   */
@@ -220,14 +221,7 @@ http_config(HTTPD *httpd, const char *member)
     /* Stats counters initialized to zero by calloc */
 
     /* open debug file if DEBUG=1 */
-    if (httpd->dbg_enabled && !httpd->dbg) {
-        httpd->dbg = fopen("DD:HTTPDBG", "w");
-        if (!httpd->dbg) {
-            wtof(MSG_CFG_DBG_FAILED, errno);
-            wtof(MSG_CFG_DBG_STDERR);
-            httpd->dbg = stderr;
-        }
-    }
+    dbgopen(httpd);
 
     /* bind HTTP listener socket.  do_bind() writes HTTPD054I on success. */
     rc = do_bind(httpd);
@@ -274,6 +268,7 @@ set_defaults(HTTPD *httpd)
     httpd->smf_type         = SMF_TYPE_HTTPD_DEFAULT;
     httpd->cfg_cgictx       = HTTPD_CGICTX_MAX;
     httpd->cfg_resident     = 1;    /* hold every MOD= module (#198) */
+    httpd->cfg_res_noprof   = 0;    /* RES_NOPROFILE=ALLOW (#351) */
     httpd->client           = HTTPD_CLIENT_INMSG | HTTPD_CLIENT_INDUMP
                             | HTTPD_CLIENT_STATS;
     httpd->ufs_enabled      = 1;
@@ -287,6 +282,7 @@ set_defaults(HTTPD *httpd)
     httpd->dbg_enabled      = 0;
     httpd->cfg_keepalive_timeout = 5;
     httpd->cfg_keepalive_max     = 100;
+    httpd->cfg_trace             = 0;       /* request trace off (#350) */
     httpd->cfg_session_timeout   = 30;      /* credential idle TTL (min), 0=off */
     httpd->cfg_realm             = NULL;    /* settled after the parse (#193) */
 
@@ -573,6 +569,39 @@ parse_keyvalue(HTTPD *httpd, const char *key, const char *value)
             httpd->cfg_resident = 0;
         else
             wtof(MSG_RES_BAD_VALUE, value);
+    }
+    else if (strcmp(key, "RES_NOPROFILE") == 0) {
+        /* ALLOW (the default) keeps SAF's reading of a resource no profile
+           covers: allowed (rc 4), with HTTPD425W at start.  DENY makes a RES=
+           route refuse such a request with 403 (#351).  A value that is
+           neither is fatal rather than ignored: ignoring it leaves the gate
+           open, which is the thing the keyword was written to prevent. */
+        int v = httpracv(value);
+        if (v >= 0)
+            httpd->cfg_res_noprof = (UCHAR)v;
+        else {
+            wtof(MSG_RES_NOPROF_BAD, value);
+            httpd->flag |= HTTPD_FLAG_CFGERR;
+        }
+    }
+    else if (strcmp(key, "TRACE") == 0) {
+        /* Records of the request trace (#350).  0 (the default) is off and
+           allocates nothing.  Anything that is not a plain number in range
+           leaves the trace off rather than guessing a size. */
+        int vlen = 0;
+        int digits = 1;
+        while (value[vlen] && value[vlen] != ' ') {
+            if (value[vlen] < '0' || value[vlen] > '9') digits = 0;
+            vlen++;
+        }
+        i = atoi(value);
+        if (digits && vlen > 0 && vlen < 6 &&
+            (i == 0 || (i >= TRC_SLOTS_MIN && i <= TRC_SLOTS_MAX)))
+            httpd->cfg_trace = (USHRT)i;
+        else {
+            wtof(MSG_TRACE_BAD_VALUE, value);
+            httpd->cfg_trace = 0;
+        }
     }
     else if (strcmp(key, "CGI_CONTEXT_POINTERS") == 0) {
         i = atoi(value);

@@ -1,0 +1,8 @@
+                                                J E S 2   J O B   L O G
+ 7.07.25 JOB   nn  $HASP373 HTTPDUCL STARTED - INIT  1 - CLASS A - SYS TK5R
+ 7.07.25 JOB   nn  IEF403I HTTPDUCL - STARTED - TIME=07.07.25
+ 7.07.58 JOB   nn  IEFACTRT - Stepname  Procstep  Program   Retcode
+ 7.07.58 JOB   nn  HTTPDUCL   UCLIN     HMASMP    HMASMP    RC= 0008
+ 7.07.58 JOB   nn  HTTPDUCL   LIST      HMASMP    HMASMP    RC= 0004
+ 7.07.58 JOB   nn  IEF404I HTTPDUCL - ENDED - TIME=07.07.58
+ 7.07.58 JOB   nn  $HASP395 HTTPDUCL ENDED

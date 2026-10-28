@@ -3,6 +3,10 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "httpgive.h"
+#include "httpshft.h"
+#include "httpssi.h"
+#include <time.h>      /* time() */
 
 typedef enum sstate     SSTATE;
 enum sstate {
@@ -13,17 +17,19 @@ enum sstate {
 };
 
 /* forward reference static function prototypes */
-static int ufs_read_failed(HTTPC *httpc);
-static int ssi_file_read(HTTPC *httpc);
+static int file_send(HTTPC *httpc, int binary, const char *path);
+static int send_body(HTTPC *httpc, int len);
+static int ufs_read_failed(HTTPC *httpc, const char *path);
+static int ssi_file_read(HTTPC *httpc, const char *path);
 static int ssi_process(HTTPC *httpc, char *ssi);
 static int ssi_echo(HTTPC *httpc, char *next);
 static int ssi_include(HTTPC *httpc, char *next);
 static int ssi_printenv(HTTPC *httpc);
-static int ssi_system_env(HTTPC *httpc);
 
 /* output handlers */
 static int ssi_printf(HTTPC *httpc,  const char *fmt, ... );
 static int ssi_printv(HTTPC *httpc, const char *fmt, va_list args);
+static int ssi_text(HTTPC *httpc, const char *text);
 static int ssi_send_buffer(HTTPC *httpc);
 static int ssi_buffer(HTTPC *httpc, const char *buf, int len);
 
@@ -40,12 +46,36 @@ static int ssi_buffer(HTTPC *httpc, const char *buf, int len);
 int
 http_send_file(HTTPC *httpc, int binary)
 {
+    return file_send(httpc, binary, NULL);
+}
+
+/* send_body() - send len bytes from buf[pos].  A zero from http_send() is a
+ * closed window: wait it out within the no-progress budget instead of
+ * returning to a pass loop that would only try again at once (#440).
+ * Returns the bytes sent, or -1 once the client is given up on. */
+static int
+send_body(HTTPC *httpc, int len)
+{
+    int     stall   = 0;
+    int     rc;
+
+    while ((rc = http_send(httpc, &httpc->buf[httpc->pos], len)) == 0) {
+        if (http_send_pause(httpc, &stall) < 0) return -1;
+    }
+    return rc;
+}
+
+/* path names the file being read for HTTPD045E; NULL is the requested
+ * page, a path is a file pulled in by <!--#include --> */
+static int
+file_send(HTTPC *httpc, int binary, const char *path)
+{
     int     rc  = 0;
     int     len = 0;
     int     avail;
 
 	if (httpc->ssi) {
-		ssi_file_read(httpc);
+		ssi_file_read(httpc, path);
 		if (httpc->substate == SSTATE_ERROR) return rc;
 		goto sendit;
 	}
@@ -67,7 +97,7 @@ http_send_file(HTTPC *httpc, int binary)
             /* ufs_fread() returns what it got before the error, or 0
              * with neither EOF nor progress: either is a failed read,
              * whatever len says */
-            if (httpc->ufp && ufs_read_failed(httpc)) return rc;
+            if (httpc->ufp && ufs_read_failed(httpc, path)) return rc;
 
             if (len>0) {
                 /* we read some data */
@@ -105,7 +135,7 @@ sendit:
         /* we have unsent data in buffer */
         len = httpc->len - httpc->pos;
         if (len > 0) {
-            len = http_send(httpc, &httpc->buf[httpc->pos], len);
+            len = send_body(httpc, len);
             if (len>0) {
                 httpc->pos += len;
             }
@@ -113,23 +143,11 @@ sendit:
     }
 
     if (httpc->pos>0) {
-        len = httpc->len - httpc->pos;
-        if (len>0) {
-            /* shift data left */
-            memcpy(httpc->buf, &httpc->buf[httpc->pos], len);
-            /* clear remaining buffer */
-            avail = CBUFSIZE - httpc->len;
-            memset(&httpc->buf[len], 0, avail);
-            /* update data position and length */
-            httpc->pos -= len;
-            httpc->len -= len;
-        }
-        else {
-            /* reset buffer */
-            memset(httpc->buf, 0, CBUFSIZE);
-            httpc->pos = 0;
-            httpc->len = 0;
-        }
+        /* what went out is dropped from the front; a partial send leaves
+           the rest at the start of the buffer (#440) */
+        len = httpshft(httpc->buf, CBUFSIZE, httpc->pos, httpc->len);
+        httpc->len = len;
+        httpc->pos = 0;
     }
 
     if (httpc->substate==SSTATE_EOF) {
@@ -151,15 +169,29 @@ sendit:
  * serve_client() reported the stall as HTTPD901E, a client fault, 1000
  * passes later (#263).  Returns 1 when the file has failed. */
 static int
-ufs_read_failed(HTTPC *httpc)
+ufs_read_failed(HTTPC *httpc, const char *path)
 {
+    HTTPD   *httpd  = httpc->httpd;
     int     err     = ufs_ferror(httpc->ufp);
-    UCHAR   *path;
+    unsigned held   = 0;
+    int     report;
+    int     lockrc;
 
     if (!err) return 0;
 
-    path = http_get_env(httpc, "REQUEST_PATH");
-    wtof(MSG_UFS_READ_ERROR, err, path ? (char *)path : "");
+    if (!path) path = (const char *)http_get_env(httpc, "REQUEST_PATH");
+
+    /* One line per READERR_INTERVAL: a file on a failing volume that is
+     * requested again and again must not flood the console.  The counters
+     * sit in the HTTPD block, not in a static (the module may be key 0),
+     * and are guarded like the give-up counters in httpsend.c. */
+    lockrc = lock(&httpd->readerr_last, LOCK_EXC);
+    report = httpgive(&httpd->readerr_last, &httpd->readerr_held,
+                      (unsigned)time(NULL), READERR_INTERVAL, &held);
+    if (lockrc == 0) unlock(&httpd->readerr_last, LOCK_EXC);
+
+    if (report)
+        wtof(MSG_UFS_READ_ERROR, err, path ? path : "", held);
 
     httpc->chunked   = 0;
     httpc->keepalive = 0;
@@ -171,18 +203,25 @@ ufs_read_failed(HTTPC *httpc)
 }
 
 static int
-ssi_file_read(HTTPC *httpc) 
+ssi_file_read(HTTPC *httpc, const char *path)
 {
     int     len 	= 0;
     int		ssilen  = 0;
     int		ssicnt	= 0;
     int		newline = 1;
     int     avail	= CBUFSIZE - httpc->len;
+    int		keep	= 0;	/* bytes at the start of tmp held from the last piece */
+    int		eol		= 0;	/* the piece ended the line */
+    int		more	= 0;	/* the last piece did not end the line */
+    int		lastrem	= 0;	/* text left after the last directive of that piece */
+    size_t	hold;
 	char	*pbuf 	= NULL;
+	char	*cur	= NULL;
 	char	*ssi	= NULL;
 	char	*end	= NULL;
 	char	*p;
-	char	tmp[256];
+	char	c;
+	char	tmp[512];
 
 	// wtof("%s: enter", __func__);
 	
@@ -199,38 +238,76 @@ ssi_file_read(HTTPC *httpc)
 	if (avail <= (int)(sizeof(tmp) * 2)) goto quit;
 
 	// wtof("%s: fgets()", __func__);
-	
-	/* read one line from the file */
+
+readmore:
+	/* the next piece of a line needs the same room as the first one. If
+	 * there is none, what is held goes out as text and the rest of the
+	 * line is read on the next call: a directive split there is not
+	 * recognised, but nothing is lost */
+	if (more) {
+		avail = CBUFSIZE - httpc->len;
+		if (avail <= (int)(sizeof(tmp) * 2)) {
+			ssi_send_buffer(httpc);
+			avail = CBUFSIZE - httpc->len;
+		}
+		if (avail <= (int)(sizeof(tmp) * 2)) {
+			if (keep > 0) ssi_buffer(httpc, tmp, keep);
+			goto quit;
+		}
+	}
+
+	/* read the line, or the next piece of a line longer than tmp: a piece
+	 * that does not end in a newline is followed by more of the same line */
 	if (httpc->fp) {
 		/* use CLIB version of fgets() */
-		pbuf = fgets(tmp, sizeof(tmp)-1, httpc->fp);
+		pbuf = fgets(&tmp[keep], sizeof(tmp)-keep, httpc->fp);
 	}
 	else if (httpc->ufp) {
 		/* use UFS version of fgets() */
-		pbuf = ufs_fgets(tmp, sizeof(tmp)-1, httpc->ufp);
+		pbuf = ufs_fgets(&tmp[keep], sizeof(tmp)-keep, httpc->ufp);
 	}
 			
-	if (!pbuf) goto checkeof;
+	if (!pbuf) {
+		/* what was held back is not a directive: it goes out as text,
+		 * and a line that ran into the end of the file gets its newline */
+		if (keep > 0) {
+			ssi_buffer(httpc, tmp, keep);
+			lastrem = keep;
+		}
+		if (more && lastrem > 0 && newline) ssi_buffer(httpc, "\n", 1);
+		goto checkeof;
+	}
 
 	tmp[sizeof(tmp)-1] = 0;	/* just in case */
 
 	/* strip the newline from the tmp buffer */
 	p = strrchr(tmp, '\n');
+	eol = (p != NULL);
 	if (p) *p = 0;
 
 	len = strlen(tmp);
 	if (len==0) {
-		ssi_buffer(httpc, "\n", 1);
+		/* an empty line, or the newline that ends a long one -- which, as
+		 * for a line that ends in a directive, is not written when the
+		 * piece before it ended with one */
+		if (newline && (!more || lastrem > 0)) ssi_buffer(httpc, "\n", 1);
 		goto quit;
 	}
 
-again:
-	// wtodumpf(tmp, len, "%s: again", __func__);
+	/* a piece that does not end the line may end in the middle of a
+	 * directive: keep that part back and join it with the next piece */
+	hold = len;
+	if (!eol) hold = httpssih(tmp, len, SSI_HOLDMAX);
+	c = tmp[hold];
+	tmp[hold] = 0;
+	cur = tmp;
+	len = (int)hold;
 
+again:
 	/* look for start of Server Side Include */
 	ssilen = 0;
 	end = NULL;
-	ssi = strstr(tmp, "<!--#");
+	ssi = strstr(cur, "<!--#");
 	if (ssi) end = strstr(ssi+5, " -->");
 	if (end) {
 		end += 4;
@@ -238,16 +315,16 @@ again:
 	}
 
 	if (ssilen > 0) {
-		char	c;
+		char	sc;
 		
 		/* copy anything before the Server Side Include */
-		len = ssi - tmp;
+		len = ssi - cur;
 		// wtof("%s: is SSI ssilen=%d, len=%d", __func__, ssilen, len);
 		if (len > 0) {
-			ssi_buffer(httpc, tmp, len);
+			ssi_buffer(httpc, cur, len);
 		}
 				
-		c = ssi[ssilen];
+		sc = ssi[ssilen];
 		ssi[ssilen] = 0;
 		// wtodumpf(ssi, ssilen, "%s: ssi", __func__);
 		/* at this point ssi *should* look like:
@@ -259,25 +336,34 @@ again:
 		len = ssi_process(httpc, ssi);
 		if (!ssicnt) newline = len;
 		ssicnt++;
-		ssi[ssilen] = c;
+		ssi[ssilen] = sc;
 
 		/* see if we have any other Server Side Includes */
-		end = &ssi[ssilen];
-		strcpy(tmp, end);
-		len = strlen(tmp);
-		if (!len) goto quit;
+		cur = &ssi[ssilen];
+		len = strlen(cur);
+		if (!len) goto piecedone;
 
 		// wtof("%s: goto again", __func__);
 		goto again;
 	}
 
 	/* Not a Server Side Include */
-	// wtof("%s: not SSI \"%s\"", __func__, tmp);
-	if (newline) strcat(tmp, "\n");
-	if (strlen(tmp)) {
-		ssi_printf(httpc, "%s", tmp);
+	// wtof("%s: not SSI \"%s\"", __func__, cur);
+	if (len > 0) ssi_buffer(httpc, cur, len);
+
+piecedone:
+	lastrem = len;
+	tmp[hold] = c;
+	if (eol) {
+		if (len > 0 && newline) ssi_buffer(httpc, "\n", 1);
+		goto quit;
 	}
-	goto quit;
+
+	/* the line goes on: move the held part to the front and read more */
+	more = 1;
+	keep = (int)strlen(&tmp[hold]);
+	memmove(tmp, &tmp[hold], keep + 1);
+	goto readmore;
 
 checkeof:
 	/* check for end-of-file */
@@ -288,7 +374,7 @@ checkeof:
 		}
 	}
 	else if (httpc->ufp) {
-		if (ufs_read_failed(httpc)) goto quit;
+		if (ufs_read_failed(httpc, path)) goto quit;
 		if (ufs_feof(httpc->ufp)) {
 			httpc->substate = SSTATE_EOF;
 		}
@@ -359,7 +445,6 @@ static int
 ssi_send_buffer(HTTPC *httpc)
 {
 	int		len		= 0;
-	int		avail;
 	
 	// wtof("%s: enter pos=%d len=%d", __func__, httpc->pos, httpc->len);
 
@@ -371,7 +456,7 @@ ssi_send_buffer(HTTPC *httpc)
         /* we have unsent data in buffer */
         len = httpc->len - httpc->pos;
         if (len > 0) {
-            len = http_send(httpc, &httpc->buf[httpc->pos], len);
+            len = send_body(httpc, len);
             if (len>0) {
                 httpc->pos += len;
             }
@@ -379,23 +464,11 @@ ssi_send_buffer(HTTPC *httpc)
     }
 
     if (httpc->pos>0) {
-        len = httpc->len - httpc->pos;
-        if (len>0) {
-            /* shift data left */
-            memcpy(httpc->buf, &httpc->buf[httpc->pos], len);
-            /* clear remaining buffer */
-            avail = CBUFSIZE - httpc->len;
-            memset(&httpc->buf[len], 0, avail);
-            /* update data position and length */
-            httpc->pos -= len;
-            httpc->len -= len;
-        }
-        else {
-            /* reset buffer */
-            memset(httpc->buf, 0, CBUFSIZE);
-            httpc->pos = 0;
-            httpc->len = 0;
-        }
+        /* what went out is dropped from the front; a partial send leaves
+           the rest at the start of the buffer (#440) */
+        len = httpshft(httpc->buf, CBUFSIZE, httpc->pos, httpc->len);
+        httpc->len = len;
+        httpc->pos = 0;
     }
 
 	// wtof("%s: exit httpc->len=%d", __func__, httpc->len);
@@ -435,7 +508,7 @@ ssi_echo(HTTPC *httpc, char *next)
 	if (!p) p = getenv(var);
 	if (p) {
 		// wtof("%s: result \"%s\"", __func__, p);
-		ssi_printf(httpc, "%s", p);
+		ssi_text(httpc, p);
 		goto quit;
 	}
 
@@ -450,59 +523,29 @@ quit:
 	return 0;
 }
 
+/* <!--#printenv --> lists the variables of this request, nothing of the
+ * server's own environment. Names and values come from the client, so
+ * both are written as HTML text. */
 static int 
 ssi_printenv(HTTPC *httpc)
 {
-    HTTPV       *v      = NULL;
     unsigned    count   = array_count(&httpc->env);
-    unsigned    n;
     
     ssi_printf(httpc, "\n<h3>Server Variables</h3>\n");
     ssi_printf(httpc, "\n<table>\n");
     ssi_printf(httpc, " <tr><th>Variable</th><th>Value</th></tr>\n");
-    for(n=0; n<count; n++) {
-        v = httpc->env[n];
+    for(unsigned n=0; n<count; n++) {
+        const HTTPV *v = httpc->env[n];
 
-        ssi_printf(httpc, " <tr><td>%s</td><td>%s</td></tr>\n", v->name, v->value);
+        ssi_printf(httpc, " <tr><td>");
+        ssi_text(httpc, v->name);
+        ssi_printf(httpc, "</td><td>");
+        ssi_text(httpc, v->value);
+        ssi_printf(httpc, "</td></tr>\n");
     }
     ssi_printf(httpc, "</table>\n");
 
-	ssi_system_env(httpc);
-	
 	return 0;
-}
-
-static int
-ssi_system_env(HTTPC *httpc)
-{
-    CLIBGRT     *grt    = __grtget();
-    int			lockrc	= -1;
-    unsigned	n;
-    unsigned	count;
-	__ENVVAR    *v;
-
-	if (!grt) goto quit;
-	
-    lockrc = lock(&grt->grtenv,LOCK_SHR);
-
-    ssi_printf(httpc, "\n<h3>System Variables</h3>\n");
-    ssi_printf(httpc, "<table>\n");
-    ssi_printf(httpc, " <tr><th>Variable</th><th>Value</th></tr>\n");
-
-	count = array_count(&grt->grtenv);
-	for(n=0; n < count; n++) {
-		v = grt->grtenv[n];
-		if (!v) continue;
-		
-        ssi_printf(httpc, " <tr><td>%s</td><td>%s</td></tr>\n", v->name, v->value);
-	}
-
-    ssi_printf(httpc, "</table>\n");
-
-quit:
-    if (lockrc==0) unlock(&grt->grtenv,0);
-    return 0;
-
 }
 
 static int
@@ -521,6 +564,10 @@ ssi_include(HTTPC *httpc, char *next)
     UCHAR		ssi			= httpc->ssi;
     int			failed		= 0;
     char		uri[UFS_PATH_MAX];
+
+	/* an earlier include on this line already failed the response: it is
+	 * unframed now, so nothing more may be written into it */
+	if (httpc->substate == SSTATE_ERROR) return 0;
 
 	// wtof("%s: enter next=\"%s\"", __func__, next);
 
@@ -581,7 +628,7 @@ ssi_include(HTTPC *httpc, char *next)
 	
 	/* processing the file */
 	while(httpc->state != CSTATE_DONE) {
-		http_send_file(httpc, 0);
+		file_send(httpc, 0, uri);
 	}
 	failed = (httpc->substate == SSTATE_ERROR);
 	
@@ -656,6 +703,22 @@ ssi_printv(HTTPC *httpc, const char *fmt, va_list args)
     }
 
     return rc;
+}
+
+/* write a value as HTML text: it may come from the client */
+static int
+ssi_text(HTTPC *httpc, const char *text)
+{
+	char	buf[128];
+	size_t	len;
+
+	if (!text) return 0;
+	while (*text) {
+		len = httpssie(buf, sizeof(buf), &text);
+		if (!len) break;
+		ssi_buffer(httpc, buf, (int)len);
+	}
+	return 0;
 }
 
 static int

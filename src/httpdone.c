@@ -10,6 +10,8 @@ httpdone(HTTPC *httpc)
 {
     int rc = 0;
 
+    if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_DONE);
+
     if (httpc->fp) {
         /* close file handle */
         fclose(httpc->fp);

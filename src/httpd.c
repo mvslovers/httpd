@@ -189,10 +189,16 @@ stc_identity_restore(HTTPD *httpd)
 ** Stage 2 of auth_gate() permits every request to such a route: SAF answers
 ** rc 4 ("resource not protected"), httpracf() counts that as allowed, and
 ** #136 settled deliberately on keeping it that way.  But rc 4 is also exactly
-** what a typo in the class or in the resource name looks like, and the one
+** what a typo in the resource name looks like (and, with RAKF 1.2.x, in the
+** class), and the one
 ** keyword whose whole job is authorization should not fail quietly in the
 ** permissive direction (#137).  The decision itself is unchanged here -- this
 ** only makes the misconfiguration visible while it can still be fixed.
+**
+** With RES_NOPROFILE=DENY (#351) the same condition is not allowed but
+** refused: auth_gate() answers 403 for the route until the profile exists, and
+** the line says so (HTTPD426W instead of HTTPD425W).  The probe itself is the
+** same RACHECK either way.
 **
 ** DEBUG 1 already traces the same condition (httpxauth.c), but per request and
 ** only for someone who knew to look.  This line is unconditional and lands in
@@ -245,7 +251,8 @@ res_probe(HTTPD *httpd)
 
 		if (racf_auth(NULL, route->resclass, route->resname, route->resattr)
 		    == HTTP_RACF_NOTPROT) {
-			wtof(MSG_RES_NO_PROFILE,
+			wtof(httpd->cfg_res_noprof ? MSG_RES_NO_PROFILE_DENY
+			                           : MSG_RES_NO_PROFILE,
 			     route->resclass, route->resname, route->path);
 		}
 	}
@@ -390,7 +397,7 @@ initialize(int argc, char **argv)
     const char			*stcgroup	= HTTPD_STC_GROUP;
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
 	/* look for "CONFIG=", "STCUSER=" and "STCGROUP=" parms.
 	**
@@ -529,6 +536,10 @@ initialize(int argc, char **argv)
     if (httpd->cfg_mintask > httpd->cfg_maxtask) {
 		httpd->cfg_maxtask = httpd->cfg_mintask;
 	}
+
+    /* request trace (#350): allocated before any worker can run, so the hooks
+       never see it appear; stays NULL when TRACE= is not set */
+    httptrc_start(httpd);
 
     /* create 1 dispatcher and max 9 worker threads (576K total storage stack) */
     /* Note: the thread manager will only start 3 threads initially */
@@ -755,6 +766,9 @@ terminate(void)
         httpd->cgictx = NULL;
     }
 
+    /* every worker and every http_close() is done: no hook can run again */
+    httptrc_stop(httpd);
+
     /* httpd->ufs removed — per-client sessions freed in httpclos.c */
 
     if (httpd->ufssys) {
@@ -940,7 +954,7 @@ socket_thread(void *arg1, void *arg2)
          task ? task->stacksize : 0);
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
     if (task) httpd->sockstate = HTTP_THRD_RUNNING;
 
@@ -1079,6 +1093,7 @@ socket_thread(void *arg1, void *arg2)
                        returns 0 there, but is covered by the state check above
                        -- the narrow remaining window is benign, reclaimed at
                        address-space end.) */
+                    if (HTTP_TRACING(httpc)) httptrc_open(httpc);
                     if (cthread_queue_add(mgr, httpc)) {
                         http_close(httpc);
                     }
@@ -1119,12 +1134,18 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
        break out, loudly, instead of taking the address space down. */
     int     spin    = 0;
     short   last    = httpc->state;
+    unsigned lastsent = httpc->sent;
+
+    if (HTTP_TRACING(httpc)) httptrc_run(httpc, work);
 
     while (httpc->state != CSTATE_CLOSE) {
         http_process_client(httpc);
         if (work->state == CTHDWORK_STATE_SHUTDOWN) break;
 
-        if (httpc->state == last) {
+        /* A byte sent is progress too: a download stays in one state for
+           as many passes as it has buffers, and a slow client that is
+           still reading must not use up the passes (#440). */
+        if (httpc->state == last && httpc->sent == lastsent) {
             /* No progress.  In worker mode this client has exactly one owner
                -- this loop; it came off the work queue and nothing else
                processes it.  So if the no-progress pass was httppc()'s
@@ -1159,6 +1180,7 @@ serve_client(HTTPC *httpc, CTHDWORK *work)
         else {
             spin = 0;
             last = httpc->state;
+            lastsent = httpc->sent;
         }
     }
     return 0;
@@ -1179,7 +1201,7 @@ worker_thread(void *udata, CTHDWORK *work)
     http_enter("worker_thread()\n");
 
     /* if something goes all wrong, capture it! */
-    abendrpt(ESTAE_CREATE, DUMP_DEFAULT);
+    abendrpt(ESTAE_CREATE, DUMP_DEFAULT | ABRPT_QUIET_TERM);
 
     sprintf(name, "WORKER(%06X)", (unsigned)work);
     wtof(MSG_THREAD_START, name, (unsigned)tcb, (unsigned)task, task ? task->stacksize : 0);

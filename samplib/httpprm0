@@ -73,6 +73,13 @@
 # --- Debug ---
 # DEBUG=0
 #
+# --- RACF resource checks ---
+# A RES= route whose profile does not exist is open to every user who can log
+# in (SAF calls an unprotected resource allowed); HTTPD425W says so at start.
+# RES_NOPROFILE=DENY turns that into a 403 and HTTPD426W instead.  Turn it on
+# once every RES= route has its profile and the start prints no HTTPD425W.
+# RES_NOPROFILE=ALLOW
+
 # --- Modules ---
 # RESIDENT=YES (the default) loads every MOD= module once at startup and
 # holds it until shutdown, so no request fetches it from disk.  A module
@@ -93,11 +100,19 @@
 # the gate must not challenge them.  Neither is anonymous: /zosmf/info
 # answers 401 to a request without a login.
 # The console service (/zosmf/restconsoles/*) issues operator commands for any
-# caller that can log in, and mvsMF itself checks nothing, so it gets a route
-# of its own with a profile check.  It MUST precede /zosmf/*: listed after it,
-# the catch-all matches first and the profile is never consulted -- silently.
-# Define FACILITY MVSMF.CONSOLE in RAKF (docs/installation.md, step 8); with no
-# profile the check permits everyone and HTTPD425W says so at startup.
+# caller that can log in, so it gets a route of its own with a profile check.
+# What mvsMF does on its own depends on its level:
+#   up to 1.3.0    it checks nothing; this route is the only gate
+#   1.4.0 and up   it checks READ on the same FACILITY MVSMF.CONSOLE itself and
+#                  refuses every user (500) until the profile is defined; this
+#                  route is a first layer in front of it (403 from HTTPD)
+# Keep AUTH=TOKEN and RES= on this route at every level.  It MUST precede
+# /zosmf/*: listed after it, the catch-all matches first and the profile is
+# never consulted -- silently.
+# Define FACILITY MVSMF.CONSOLE in RAKF (docs/installation.md, step 8).  With no
+# profile HTTPD's check permits everyone and HTTPD425W says so at startup: up to
+# mvsMF 1.3.0 that means the console is open, from 1.4.0 mvsMF still refuses
+# everyone, so the warning is only about this route.
 # TOKEN on the catch-all, not a blank: a route without AUTH= is PUBLIC, and
 # leaving the whole API ungated would hand every dataset and job endpoint to
 # anyone who can reach the port.  TOKEN answers a bare 401 without a

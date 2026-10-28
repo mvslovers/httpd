@@ -2,6 +2,7 @@
 #include "httpd.h"
 #include "httpdmsg.h"
 #include <mvs/mtt.h>
+#include "mttline.h"
 
 /* C stack for this load module; the @@crt0 default demands 256 KB of
 ** contiguous subpool 0 per request.  Must live in the module's own TU,
@@ -43,11 +44,13 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
     CMTT        *cmtt   = NULL;
     MTENTRY     **mtentry;
     unsigned    n, count;
+    UCHAR       line[256];
 
     if ((rc = http_resp(httpc,200) < 0)) goto quit;
     if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
     if ((rc = http_printf(httpc, "Content-Type: %s\r\n", data ? "text/plain" : "text/html") < 0)) goto quit;
-    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    rc = data ? http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") : 0;
+    if (rc < 0) goto quit;
     if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if (!data) {
@@ -86,13 +89,31 @@ display_mtt(HTTPD *httpd, HTTPC *httpc, int data)
     
     count = array_count(&mtentry);
     for(n=0; n < count; n++) {
-        MTENTRY *mt = mtentry[n];
-        
+        MTENTRY     *mt     = mtentry[n];
+        const UCHAR *p;
+        size_t      left;
+        size_t      took;
+
         if (!mt) continue;
-        
-        /* one call per trace entry; stop walking the table once the
-           client is gone (#203) -- quit still frees the CMTT copy */
-        if (http_printf(httpc, "%s\n", mt->mtentdat) < 0) goto quit;
+
+        /* The table holds the console output of every job: escape it for
+           the HTML page (#426), as it is for text/plain (data=1).  The entry
+           is bounded by its length, not by a NUL, and is written in pieces
+           that never split an entity. */
+        p       = (const UCHAR *)mt->mtentdat;
+        left    = mt->mtentlen > 0 ? (size_t)mt->mtentlen : 0;
+
+        took = mttline(line, sizeof(line), p, left, !data);
+        while (took != 0) {
+            /* stop walking the table once the client is gone (#203) --
+               quit still frees the CMTT copy */
+            if (http_printf(httpc, "%s", line) < 0) goto quit;
+            p       += took;
+            left    -= took;
+            took    = mttline(line, sizeof(line), p, left, !data);
+        }
+
+        if (http_printf(httpc, "\n") < 0) goto quit;
     }
 
     if (!data) {

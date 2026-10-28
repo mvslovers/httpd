@@ -1,0 +1,12 @@
+$ curl -s -u IBMUSER:****** "http://localhost:8080/.dsrv?target=TRACE" | grep "^seq=3 " | tr " " "\n" | xargs -n 3 printf "%-16s %-16s %s\n"
+seq=3            c=1C0FC8         w=17F9C0
+tcb=9BB378       ip=192.0.2.17    port=36640
+n=0              resp=401         ago=1142
+live=0           last=end         st=RESET
+age=28           run=2            line1=3
+req=6            parse=7          cred=7
+route=7          lnk0=8           lnk1=27
+snd1=18          sndl=21          done=27
+end=28           close=-          polls=0
+txn=12           txst=0           txms=0
+sent=292         path=/zosmf/info

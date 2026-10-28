@@ -23,6 +23,18 @@ console messages and, for an install problem, the job output.
 **Questions and general support** are on Discord:
 <https://discord.gg/gaUAFKGCR>
 
+## The manuals
+
+This guide is the README of the installation package. It installs, upgrades and
+removes HTTPD. For everything else there are two manuals: the _HTTPD User's
+Guide_ (ML07-0001) and the _HTTPD Reference_ (ML07-0002). They are attached to
+each release from 4.5.0 on as `ml07-0001-<edition>.pdf` and
+`ml07-0002-<edition>.pdf`, and their sources are in `docs/books` in the
+repository. The configuration keywords, the messages, the writing of server
+modules, the SMF records and the migration from HTTPD 3.x, which used to be
+separate pages under `docs/`, are in these manuals; the pages that remain here
+only say where.
+
 ---
 
 One placeholder is used throughout:
@@ -178,29 +190,41 @@ HTTPD serves static content from the **UFSD filesystem and nowhere else** — th
 DD-based document root of 3.3.x is gone (4.0.0). `DOCROOT` names a UFS path, so
 without the UFSD started task there is nothing to serve statically.
 
-Nothing about the *install* needs it: the SYSMOD declares no prerequisite,
-`libufs` is linked statically into the load modules, and a UFS that does not
-initialise is a warning, not a failure:
+Nothing about the *install* needs it: the SYSMOD declares no prerequisite and
+`libufs` is linked statically into the load modules. HTTPD does not contact
+UFSD when it starts and does not check that UFSD runs: it only creates the
+control block of its file system. It asks UFSD for a session when it first
+opens a file on a connection and keeps that session until the connection
+closes. When it gets none, the request is answered `404`, and the next request
+on the connection asks again.
+
+The server starts, listens, and every `MOD=` route is dispatched as usual. What
+fails is whatever needs the file system: static file requests, and the calls a
+module makes into it (the USS file services of mvsMF, for one). A module that
+does not use the file system is not affected. A CGI-only HTTPD is an ordinary
+deployment.
+
+**`HTTPD044W` does not say that UFSD is down.** The message
 
 ```
 HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM
 ```
 
-The server starts, listens, and every `MOD=` route — mvsMF, the display modules
-— works normally. Only static file requests fail. A CGI-only HTTPD is an
-ordinary deployment.
+appears only when HTTPD cannot create that control block, which is a failed
+storage request. A start without UFSD prints no message about it. If every
+request for a file gets `404`, check that UFSD runs and that the image is
+mounted at the `DOCROOT` (step 9).
 
-HTTPD 4.4.0 is built against `libufs` 1.5.1 (UFSD 1.5.1). Running it against a
+HTTPD 4.5.0 is built against `libufs` 1.5.2 (UFSD 1.5.2). Running it against a
 UFSD older than 1.5.0 has not been tested; from 1.5.0 on, `ufs_ferror()` reports
 a read error reliably, which the response to a failed file read relies on. This
 is a note, not a prerequisite: the SYSMOD declares none.
 
-Note that `HTTPD001I` still reads `READY - SERVING /www` afterwards: it names
-the **configured** document root, not a working filesystem. `HTTPD044W` is the
-line that tells you the filesystem is not there, and it is written earlier in
-the start. On a deployment that will never have UFSD, `UFS=0` in the
-configuration member skips the initialisation altogether and the warning with
-it.
+Note that `HTTPD001I` reads `READY - SERVING /www` with or without UFSD: it
+names the **configured** document root, not a working filesystem, so it is no
+proof that files are served. On a deployment that will never have UFSD, `UFS=0`
+in the configuration member skips the creation of the control block; the server
+then serves no file at all.
 
 With UFSD there, the archive has a document root ready for it —
 `httpd-webroot.img`, a formatted filesystem holding the welcome page, which
@@ -235,11 +259,20 @@ gated by HTTPD as well. First match wins, so the order matters. mvsMF's own
 installation guide has its side of this.
 
 The third line is the **console service**. It issues operator commands, and
-mvsMF itself checks no authority: any user who can log in could stop a started
-task or vary a device. So the console gets a route of its own that also needs
-READ on the RAKF resource `FACILITY MVSMF.CONSOLE` — define it in step 8. It has
-to stand **before** `/zosmf/*`: listed after the catch-all it is never reached,
-and nothing warns you.
+any user who can log in could stop a started task or vary a device. So the
+console gets a route of its own that also needs READ on the RAKF resource
+`FACILITY MVSMF.CONSOLE` — define it in step 8. What mvsMF does on its own
+depends on its level:
+
+| mvsMF | Check inside mvsMF | Without the profile |
+|---|---|---|
+| up to 1.3.0 | none: the route is the only gate | every user who can log in may issue operator commands |
+| 1.4.0 and up | READ on `FACILITY MVSMF.CONSOLE`, under the user's own identity | mvsMF refuses every user (`500`, category 4) until the profile is defined |
+
+HTTPD's check comes first at every level and answers `403` to a user without
+READ. Keep the route and its `RES=` at every level. The route has to stand
+**before** `/zosmf/*`: listed after the catch-all it is never reached, and
+nothing warns you.
 
 If mvsMF is not installed, HTTPD starts and those routes register normally — the
 program is not looked for until a request first matches. The failure then shows
@@ -398,7 +431,7 @@ Whether you have to allocate them first depends on the upload path: **FTPD**
 and **IND$FILE** create the dataset from the attributes you supply, mvsMF and
 most other FTP servers need it to exist. Where a method says *pre-allocate*,
 allocate both as `DSORG=PS, RECFM=FB, LRECL=80, BLKSIZE=3120` — 50 tracks
-primary for the load XMIT (roughly 650 KB), 5 for the sample library, secondary
+primary for the load XMIT (roughly 800 KB), 5 for the sample library, secondary
 about 10% of each. Method b) below shows this with zowe; TSO or ISPF 3.2 does
 the same job.
 
@@ -449,7 +482,7 @@ zowe zos-files upload file-to-data-set httpd-<version>-samplib.xmit \
 
 `--size` sets the primary allocation and gives you a secondary of about 10% of
 it. The values above are for a 3390 and leave room to spare — the load XMIT is
-roughly 650 KB, the sample library well under 20 KB. On a smaller device, or if
+roughly 800 KB, the sample library about 22 KB. On a smaller device, or if
 you hit an `SB37`, raise them.
 
 ### c) Another FTP server (pre-allocate)
@@ -506,7 +539,10 @@ The job allocates `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` new, and it cannot do
 that over a name that is already catalogued. A system can have such a library
 without an SMP installation behind it:
 
-- TK5 ships HTTPD 3.3 in `HTTPD.LINKLIB`, started by the procedure `HTTPD33`.
+- TK5 ships HTTPD 3.3 in `HTTPD.LINKLIB`. (The TK5 container image of the
+  project is not such a system: it has HTTPD installed by SMP, 4.3.0 in the
+  current image, and has already moved TK5's library to
+  `HTTPD.V3R3M0.LINKLIB`. There the upgrade rules above apply.)
 - On MVS/CE somebody may have filled `HTTPD.LINKLIB` by hand, with the `HTTPD`
   module and whatever was copied in beside it (an mvsMF module, for one).
 
@@ -535,7 +571,7 @@ alone, and a delete through the catalog would remove the old library, not the
 stray one.
 
 1. **Stop the server that uses the library**, whatever its procedure is
-   called (`/P HTTPD33` on TK5). A library in use cannot be renamed: the rename
+   called. A library in use cannot be renamed: the rename
    job starts and then waits, without ending, until the server is gone.
 2. **List the members** (ISPF 3.4) and write
    down everything that is not one of HTTPD's own modules. You deal with it in
@@ -660,15 +696,18 @@ output:
 
 ```
 HMA3930    SYSMOD THTP440 SUCCESSFULLY RECEIVED
-HMA2240    SUCCESSFULLY DELETED LMOD=HTTPD
-HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB
-           - RETURN CODE=00
+HMA2240    SUCCESSFULLY DELETED LMOD HTTPD ON LINKLIB LIBRARY
+HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP440 - RETURN CODE=00
 ```
 
-There is one `HMA2380` line **per module** — five of them. A run that copies
-fewer has lost one, and the `APPLY` still ends successfully, so count them. The
-`HMA2240` lines appear only when a previous release was there to delete; on a
-first install there are none.
+There is one `HMA2380` line **per module** — five of them, each on a single
+line. A run that copies fewer has lost one, and the `APPLY` still ends
+successfully, so count them. The `HMA2240` lines (also one per module) appear
+only when a previous release was there to delete; on a first install there are
+none. The `ACCEPT` step writes lines of the same two kinds against the
+distribution library, `AHTTPLOD`: `HMA2380 COPY SUCCESSFUL - MOD=HTTPD -
+LMOD=HTTPD - LIBRARY=AHTTPLOD - …`, and on an upgrade `HMA2240 SUCCESSFULLY
+DELETED MODULE HTTPD ON AHTTPLOD LIBRARY`.
 
 > **On an upgrade the `APPLY` ends `COND CODE 0004`, and that is correct.** The
 > deleted level has no `SMPSCDS` backup entry and never will, so SMP reports
@@ -679,9 +718,11 @@ first install there are none.
 **Then list the target library, and treat that as the actual result.** It is
 the only check that distinguishes a real install from a silent one: SMP reports
 the library by **ddname**, and a ddname says nothing about which dataset was
-behind it, while a SYSMOD that does not own a module reports `NOT SEL` in one
-column of the element summary, copies nothing, and leaves every condition code
-reading success. ISPF 3.4 does, or:
+behind it, while a SYSMOD that does not own a module copies nothing and leaves
+every condition code reading success. The sign of that case is the missing
+`HMA2380` lines, not a `NOT SEL` in the element summary: on an upgrade a good
+`APPLY` prints `NOT SEL` too, on a second line under each module, beside the
+level it deleted. ISPF 3.4 lists the library, or:
 
 ```jcl
 //LIST    EXEC PGM=IEHLIST
@@ -777,6 +818,33 @@ If the logon fails the server **continues** on the inherited identity and says
 so with `HTTPD004W`, so a profile typo is not an outage — but it is also not
 what you asked for. Watch for that message where you expect `HTTPD004I`.
 
+### The region — `REGION=`
+
+The shipped procedure runs the server with `REGION=8M`. A mixed load of 6
+parallel requests across all module types ran clean in it.
+
+**Raise it before you raise `MAXTASK`, and when you expect many REXX or Lua
+requests at the same time.** Every request that runs a server module takes one
+contiguous block of storage for the C stack of that module: 262,328 bytes for a
+module that sets no stack size of its own, which is the case for HTTPREXX and
+HTTPLUA, and about 64 KB for mvsMF. Up to `MAXTASK` of them run at once, each
+on a worker thread with a stack of 64 KB of its own. Against the 4.4.0 release
+candidate, 60 REXX requests with 9 at a time failed in some runs with
+`REGION=8M`, and in none with `REGION=16M` or with `RESIDENT=NO` (one run each).
+
+To raise it, change the `REGION=` of the `EXEC` statement in your copy of the
+procedure:
+
+```
+//HTTPD    EXEC PGM=HTTPD,REGION=16M,TIME=1440,
+```
+
+If 16M is not enough, lower `MAXTASK`. The numbers, the table of what each part
+costs and the full recommendation are in the _HTTPD Reference_ (ML07-0002), chapter "The
+Started Task and the Package", section "The region".
+The symptom of a region that is too small is under *Troubleshooting* at the end
+of this guide.
+
 ### The DD statements — do not add SYSPRINT, SYSTERM or SYSIN
 
 HTTPD writes its own STDOUT/STDERR and reads STDIN through private DDs
@@ -809,7 +877,7 @@ MOD=MVSMF /zosmf/*    AUTH=TOKEN
 
 - `PORT` is 8080 by default. Nothing on a stock MVS 3.8j contends for it.
 - `DOCROOT` is a **UFS path**, and it must exist in a mounted UFSD filesystem.
-  Without UFSD, leave it and expect `HTTPD044W` (step 2).
+  Without UFSD, leave it and expect `404` for every file (step 2).
 - `REALM` defaults to the system's SMF ID — unambiguous, but meaningless to a
   user. It is what a browser shows in its Basic credential dialog.
 - The `MOD=MVSMF` lines are the ones to review first. Comment them out if you
@@ -910,10 +978,14 @@ client can log in.
    ENVIR=CREATE FAILED … RC=28`). That is not fatal, and that is the danger:
    HTTPD runs on as `STC`/`STCGROUP`, with far more access than intended.
 
-   **The group that counts is the one on the `USERS` line.** RACINIT accepts
-   the group passed from the procedure, but data set access follows the group
-   on the user's `USERS` line. Grant access to that group, and keep it equal to
-   `STCGRP` so that the two do not drift apart.
+   **Keep `STCGRP` equal to the group on the `USERS` line, and grant access to
+   that group.** What happens when the two differ depends on the RAKF level.
+   On RAKF 1.2.x (TK5) the requested group wins: the logon takes the group
+   HTTPD passes from the procedure without checking that the user is connected
+   to it, so the account runs in the `STCGRP` group even if the `USERS` line
+   names another. On RAKF 2.0.0 (MVS/CE) a requested group the user is not
+   connected to is ignored, and the account gets the groups of its `USERS`
+   lines. With the two equal, both levels give the same account.
 
    Leave Operations at `N`: with `Y` the account gets operations authority, that
    is data set access without a profile.
@@ -943,8 +1015,17 @@ client can log in.
 
    The shipped `HTTPPRM0` has one such route, the mvsMF console service, so
    `HTTPD425W NO PROFILE FOR FACILITY:MVSMF.CONSOLE -- /zosmf/restconsoles/*
-   NOT GATED` is what an installation without the profile prints — and until
-   the profile exists every user who can log in may issue operator commands.
+   NOT GATED` is what an installation without the profile prints. The warning
+   is about HTTPD's own route. With mvsMF up to 1.3.0 it means the console is
+   open: until the profile exists every user who can log in may issue operator
+   commands. From mvsMF 1.4.0 the module checks READ on the same profile
+   itself and refuses every user (`500`, category 4) until it is defined, so
+   the console stays closed to everyone.
+   Once the profiles are defined and the start prints no `HTTPD425W`, add
+   `RES_NOPROFILE=DENY` to `HTTPPRM0`: a `RES=` route whose profile is later
+   forgotten or not yet loaded then answers `403` and the start prints
+   `HTTPD426W`, instead of opening the route to everyone who can log in. Leave
+   it off while a route still relies on the permissive reading.
    **Do not edit `PROFILES` by hand; RAKF's maintainer recommends the commands.**
    On MVS/CE (RAKF 2.0.0) define the profile with `RDEFINE` and `PERMIT`.
    `RDEFINE` writes the universal line of a profile, `PERMIT` adds a line for a
@@ -1053,8 +1134,9 @@ client can log in.
    login: HTTPD caches the credential, and a cached login is not checked
    against RACF again until it ends. It ends after `SESSION_TIMEOUT` minutes
    without a request (30 by default) or `SESSION_MAXAGE` minutes after the
-   login (480 by default), whichever comes first; see
-   [Session lifetime](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#session-lifetime-session_timeout-session_maxage).
+   login (480 by default), whichever comes first; see the _HTTPD User's Guide_
+   (ML07-0001), chapter "Authentication and Security", section "How Long a
+   Login Lasts".
    A client that keeps sending requests keeps the login alive until
    `SESSION_MAXAGE`, and changing the password and reloading the table does
    not end it, so the placeholder keeps working. After a `200`, change the
@@ -1240,8 +1322,7 @@ directory.
 | What you see | What it means |
 |---|---|
 | `UFSD062E SUPERBLOCK VALIDATION FAILED FOR …` | the dataset's `BLKSIZE` is not the image's 4096 — or the transfer was not binary |
-| `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running (step 2) |
-| `404` on `/` | mounted somewhere other than `DOCROOT` — also `/WWW` against `DOCROOT=/www`: `MOUNT LIST` shows the mount point as UFSD holds it |
+| `404` on `/` | UFSD is not running (no message at the start says so — step 2), or the image is mounted somewhere other than `DOCROOT` — also `/WWW` against `DOCROOT=/www`: `MOUNT LIST` shows the mount point as UFSD holds it |
 | a page of mojibake | the transfer translated the bytes; upload again in binary |
 
 ### Replacing the content later
@@ -1310,7 +1391,7 @@ A healthy start ends in `HTTPD001I … READY`:
 
 ```
 HTTPD000I HTTPD <version> (A69A370) STARTING
-HTTPD005I LIBC370 2.25.1 (FCDE4E8)
+HTTPD005I LIBC370 2.26.0 (3AA3B28)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
@@ -1332,8 +1413,8 @@ first shows the version of the release you installed and the commit it was built
 from; the second shows the libc370 it was linked against, and that changes from
 release to release. Compare them with the release page, not with this one.
 
-That transcript is a system with UFSD running. Without it, `HTTPD044W` appears
-between `HTTPD004I` and `HTTPD054I` — and the last line still reads
+That transcript is a system with UFSD running. Without it the start prints the
+same lines: HTTPD does not contact UFSD at start, and the last line still reads
 `SERVING /www`, because it names the configured document root rather than a
 working filesystem (step 2).
 
@@ -1390,6 +1471,25 @@ Operator commands:
 
 Commands abbreviate to the capitalised prefix, which is why `DISPLAY Threads`
 and `DISPLAY TIme` need one and two letters respectively.
+
+### Cancelling
+
+`/P HTTPD` is the way to stop. `/C HTTPD` ends the address space at once with
+the system abend S222, and the shutdown does not run:
+
+```
+C HTTPD
+IEE301I HTTPD    CANCEL COMMAND ACCEPTED
+IEF450I HTTPD HTTPD - ABEND S222 U0000 - TIME=12.07.14
+$HASP395 HTTPD    ENDED
+```
+
+There is no `HTTPD098I`, `HTTPD416I` or `HTTPD099I`. Since 4.5.0 (libc370
+2.26.0) the server writes no `libc370 recovery:` or `libc370 @@@try.c failed()`
+line on a cancel; 4.3.0 and 4.4.0 did, several lines, more when requests were
+in progress. A module linked with an older libc370 can still write
+`libc370 @@@try.c failed(): recovery cleanup-only, retry suppressed` (MVSMF
+1.3.0 does, one line). Start again as in the next section.
 
 ### Restarting
 
@@ -1892,7 +1992,7 @@ nothing above touches it.
 | Allocation job fails, or ends `COND CODE 0000` with `IEF287I … NOT CATLGD 2`, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it. If this is a TK5 or hand-filled system and HTTPD was never installed from SMP, the library is one SMP does not own: [rename it first](#a-library-that-smp-does-not-own) |
 | `RECV1`/`RECV2` fails on MVS/CE, no volume to allocate on | Add `VOLUME('PUB000')` (or a volume of yours) to both `RECEIVE` commands — step 6 |
 | `RECV1`/`RECV2` fails, target exists | A previous release's `HTTPD.HTTPLOAD`/`HTTPD.SAMPLIB`, or something else allocated it. RECEIVE refuses to merge; scratch it and re-run |
-| `APPLY` RC 00, no `HMA2380` at all, library empty | The modules still belong to another FMID (`MOD … NOT SEL` in the element summary). The SYSMOD's `++VER` is missing the `DELETE` for whatever owns them — this is a packaging fault, not an operator one; report it |
+| `APPLY` RC 00, no `HMA2380` at all, library empty | The modules still belong to an FMID that this SYSMOD does not delete. Usually a release was skipped: see "Coming from an older release" above. `LIST CDS MOD(HTTPD)` names the owner in `FMID`/`RMID`. `NOT SEL` in the element summary is no sign either way, because a good upgrade prints it too. If the owner is the previous release, the SYSMOD's `++VER` is missing its `DELETE` — a packaging fault, not an operator one; report it |
 | `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The `ACCEPT` is gated `(4,LT,…)` and still runs |
 | `APPLYCHK` ends non-zero, `APPLY` skipped | Read the SMP output — the check exists to stop before anything is written. A missing DD is the usual cause |
 | `APPLY` RC 00 but fewer than five `HMA2380` lines | A module was lost. Count them, then look in the library itself |
@@ -1906,16 +2006,18 @@ nothing above touches it.
 | `HTTPD030E BIND() FAILED …` and the step ends | Every retry failed. The port is held by something else, or by the stack for longer than `BIND_TRIES` × `BIND_SLEEP` seconds — [Restarting](#restarting) |
 | `HTTPD004W RACINIT ENVIR=CREATE FAILED` | The `STCUSER`/`STCGRP` userid is not defined to RAKF — step 8. Not fatal, and that is the danger: the identity switch runs before the listener opens, so the server still comes up (`HTTPD054I`, `HTTPD001I`) on the inherited `STC`/`STCGROUP` identity, which holds ALTER on data sets on the stock profiles. A module that sets no identity of its own runs with it. Keep clients away, or `/P HTTPD`, until a start prints `HTTPD004I` instead |
 | `S RAKFUSER` ends `RAKFUIDS2 INPUT DATA INVALID OR OUT OF SEQ.`, `ABEND U0200` (TK5) | A `USERS` line has no password in columns 19-26, or a field sits in the wrong column — step 8 |
-| `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | UFSD is not running. Module routes are unaffected; only static files fail — step 2. `HTTPD001I` still names the configured `DOCROOT`, so it is not the line to read here |
-| `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path` | UFSD could not read a file it had opened; `RC=52` is an I/O error. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
-| `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a chunked (HTTP/1.1) response, so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
+| `HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM` | HTTPD could not create the control block of its file system (a failed storage request). It does **not** mean that UFSD is down: without UFSD there is no message at the start, and every file request gets `404` — step 2. Static files fail; a module that does not use the file system is not affected |
+| `HTTPD045E UFS READ ERROR RC=n, RESPONSE ABORTED: path, s SUPPRESSED` | UFSD could not read a file it had opened; `RC=52` is an I/O error. `path` is the page, or the included file when the error was inside a server-side include. At most one line is written per 60 seconds; `s` counts the errors held back in between. Look at UFSD's own messages and at the volume behind the webroot. The client gets no error status, because `200` was already sent: the body stops short and the connection is closed. A client on HTTP/1.0 that was sent an HTML page cannot tell that from the end of the file, so this line is the only sign. See [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
+| `HTTPD065W CLIENT a.b.c.d ABANDONED, NO SEND PROGRESS FOR 10 SEC, n BYTES SENT, s SUPPRESSED` | A client took no data at all for 10 seconds while HTTPD was sending it a response (a chunked HTTP/1.1 response, or the body of a static file), so the response was cut off and the connection closed. Not a fault of the server: usually a client that stopped reading or a peer that went away. If many different addresses appear together, look at TCP/IP on the MVS side. At most one line is written per 60 seconds; `s` counts the clients abandoned in between and not reported. See *Abandoned clients and the flood guard* in [messages.md](https://github.com/mvslovers/httpd/blob/main/docs/messages.md) |
 | One request out of many takes 25 to 150 seconds under sustained load, the rest answer in about a second, and no console message appears | A known issue in this release, independent of `RESIDENT=`: single requests were seen to stall for 25 to 150 seconds in soak runs of 20,000 to 30,000 requests, with the median at 0.2 s and the 95th percentile near 1 s. The cause is not known and it has not been reproduced on demand. A request that a client abandoned at 60 s and sent again was answered the second time. Nothing to configure; use a client timeout and a retry. Tracked in [#350](https://github.com/mvslovers/httpd/issues/350) |
-| `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it. `106-0F` is not a storage shortage (that is `106-0C`): IBM describes it as an uncorrectable I/O error, or an error in the load module that made the channel program fail. Look at the library and the member, not at the region. A failed fetch costs the module's storage until the server stops; `RESIDENT=YES` (the default) avoids the per-request fetch, see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) and [configuration.md](https://github.com/mvslovers/httpd/blob/main/docs/configuration.md#resident-modules-resident) |
+| `HTTPD908E EXTERNAL PROGRAM MVSMF …` on every `/zosmf/` request | mvsMF is not in the STC's STEPLIB — step 2. `was not found` is the LINK completion code `S806`: the member is in neither `STEPLIB` nor the link list. `could not be loaded` is any other LINK failure; the real code is in the `IEA703I` line beside it. `106-0F` is not a storage shortage (that is `106-0C`): IBM describes it as an uncorrectable I/O error, or an error in the load module that made the channel program fail. Look at the library and the member, not at the region. A failed fetch costs the module's storage until the server stops; `RESIDENT=YES` (the default) avoids the per-request fetch, see [server-modules.md](https://github.com/mvslovers/httpd/blob/main/docs/server-modules.md) and the _HTTPD User's Guide_ (ML07-0001), chapter "Routes and Server Modules", section "Modules Held in Storage: RESIDENT" |
+| `@@CRT0 - No storage for C stack` on the console, `HTTPD908E EXTERNAL PROGRAM … failed with U0801 ABEND`, the client gets `503`; only under load, several module requests at the same time | The region has no free block of 262,328 contiguous bytes (about 64 KB for mvsMF) for the stack of one more module request. Raise `REGION` in the procedure (16M held in the one measured run) before you raise `MAXTASK`; if 16M is not enough, lower `MAXTASK`. `HTTPD904E` and `HTTPD999E` in the same window say the same of the server's own storage. Step 7, *The region*, and the _HTTPD Reference_ (ML07-0002), chapter "The Started Task and the Package", section "The region" |
 | `HTTPD420E ROUTE AUTHORIZATION POLICY INCOMPLETE`, `CC 0008` | A route's `AUTH=` value is not `NONE`/`FORM`/`BASIC`/`TOKEN`, or a `LOGIN=` line survives in the member — step 7 |
 | `HTTPD064E SOCKET THREAD IS NOT RUNNING`, `CC 0008`, no `HTTPD001I` | The thread that takes in connections ended or never began to accept. The server stops rather than say `READY` over a listener nobody serves. Start it again; if it repeats, report it with the console log from `HTTPD000I` on |
 | `HTTPD038E READ ERROR ON DD:HTTPPRM`, `CC 0008` | The member was found but could not be read to the end — a media or DCB problem, not a configuration one. Check the PARMLIB dataset and whether the `HTTPPRM` DD overrides DCB attributes that disagree with it |
-| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means every user who can log in may issue operator commands |
+| `HTTPD425W NO PROFILE FOR …` | A `RES=` names a resource no RAKF profile covers, so that route is gated by `AUTH=` alone — step 8. For `FACILITY:MVSMF.CONSOLE` that means, with mvsMF up to 1.3.0, that every user who can log in may issue operator commands. From mvsMF 1.4.0 the module refuses every user itself until the profile is defined, so the warning concerns HTTPD's route only |
 | `403` on `/zosmf/restconsoles/…`, plain-text body | The user has no READ on `FACILITY MVSMF.CONSOLE` — step 8. A `403` is HTTPD's gate, not mvsMF's |
+| `500` on `/zosmf/restconsoles/…`, z/OSMF error report with category 4 | mvsMF 1.4.0 and up: the check inside mvsMF refused the user. HTTPD's `403` comes first, so this shows when HTTPD let the request through: the profile is not defined (`HTTPD425W` at start) — step 8 — or the route stands after `/zosmf/*` and HTTPD's check is never made |
 | `/zosmf/restconsoles/…` answers `200` to a user the profile excludes | The usual causes: the route stands after `/zosmf/*` (check the order of the `HTTPD036I` lines at startup), or the profile is not loaded yet — reload it, step 8 |
 | A route answers `200` to anyone | It carries no `AUTH=`, or no route claims the path at all. Both are public by design — step 7. `/.dsrv?target=MOD` prints the policy each route actually got |
 | `401` on a route showing `AUTH=NONE` | Not HTTPD's gate. mvsMF runs its own auth track on `/zosmf/*` — establish which layer answered before debugging HTTPD's |

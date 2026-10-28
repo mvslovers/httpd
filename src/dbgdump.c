@@ -2,6 +2,7 @@
 **
 */
 #include "httpd.h"
+#include "dbgtitle.h"
 
 __asm__("\n&FUNC    SETC 'dump'");
 static void
@@ -65,17 +66,19 @@ dbgdump(void *buf, int len, const char *fmt, ...)
 {
     CLIBGRT     *grt    = __grtget();
     HTTPD       *httpd  = grt->grtapp1;
+    FILE        *fp     = httpd->dbg;
     int         rc  = 0;
     va_list     list;
     char        title[80];
 
-    if (httpd->dbg) {
+    if (fp) {
         dbgtime(NULL);
         va_start(list, fmt);
-        vsprintf(title, fmt, list);
+        dbgtitle(title, sizeof(title), fmt, list);
         va_end(list);
 
-        dump(httpd->dbg, title, buf, len, 16);
+        dump(fp, title, buf, len, 16);
+        dbgfail(httpd, fp);
     }
 
     return rc;

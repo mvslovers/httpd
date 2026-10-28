@@ -48,6 +48,8 @@
 #include "httpxlat.h"               /* ASCII/EBCDIC translation     */
 #include "httpbody.h"               /* request body classification  */
 #include "httpstat.h"               /* status code -> status line   */
+#include "httpnobd.h"               /* response has no body?        */
+#include "httptrc.h"                /* request trace (#350)         */
 #include "httprlm.h"                /* HTTP_REALM_CFG_MAX (#193)    */
 
 /* httpluax.h removed — HTTPLUA is now a separate project (mvslovers/httplua) */
@@ -123,11 +125,18 @@ struct httpd {
     char        rname[12];          /* 38 resource name             */
     HTTPROUTE   **route;            /* 44 route table               */
 	time64_t 	uptime;				/* 48 Server startup time		*/
-    void        *unused_50;         /* 50 (was: FTPD *ftpd)         */
+    HTTPTRC     *trace;             /* 50 request trace (#350), NULL*/
+                                    /* ... when TRACE= is not set;  */
+                                    /* ... was FTPD *ftpd           */
     UFSSYS      *ufssys;            /* 54 Unix like file system     */
-    void        *unused_58;         /* 58 (was: LUAX *luax)         */
+    unsigned    readerr_last;       /* 58 time() of the last HTTPD045E, */
+                                    /* ... 0 = none yet (#346); was */
+                                    /* ... LUAX *luax.  Locked as   */
+                                    /* ... lock(&readerr_last)      */
     const char  *version;			/* 5C HTTPD Version				*/
-    void        *unused_60;         /* 60 (was: lua_State *config)  */
+    unsigned    readerr_held;       /* 60 read errors counted since */
+                                    /* ... that message (#346); was */
+                                    /* ... lua_State *config        */
     UCHAR		cfg_maxtask;		/* 64 config max task			*/
     UCHAR		cfg_mintask;		/* 65 config min task			*/
     UCHAR		cfg_client_timeout;	/* 66 client timeout seconds	*/
@@ -163,14 +172,18 @@ struct httpd {
     UFS			*ufs;				/* 90 Unix "like" File System   */
     USHRT       cfg_session_maxage; /* 94 credential hard max-age   */
                                     /* ... (min), 0=off (#118)      */
-    UCHAR       unused_96[2];       /* 96 (was: HTTPT *httpt)       */
+    USHRT       cfg_trace;          /* 96 TRACE= records, 0 = off   */
+                                    /* ... (#350); was HTTPT *httpt */
     CTHDTASK    *self;              /* 98 HTTPD main thread         */
     void        **cgictx;           /* 9C array of CGI context ptrs */
 #define HTTPD_CGICTX_MIN    0       /* ... minimum number of cgictx */
 #define HTTPD_CGICTX_MAX    255     /* ... maximum number of cgictx */
     char        docroot[128];       /* A0 UFS document root prefix  */
     UCHAR       listen_queue;       /* 120 listen backlog           */
-    UCHAR       unused_121[3];      /* 121 alignment padding        */
+    UCHAR       cfg_res_noprof;     /* 121 RES_NOPROFILE=DENY: a RES=*/
+                                    /* ... route refuses while its  */
+                                    /* ... profile is missing (#351) */
+    UCHAR       unused_122[2];      /* 122 alignment padding        */
     char        codepage[16];       /* 124 codepage name            */
     UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */
@@ -218,6 +231,7 @@ enum cstate {
 /* the give-up of a stalled client is reported to the operator at most once
    per interval (issue #347); the rest are counted in the next message */
 #define SEND_GIVEUP_INTERVAL 60     /* seconds between HTTPD065W    */
+#define READERR_INTERVAL     60     /* seconds between HTTPD045E    */
 
 enum rdw {
     RDW_NONE=0,                     /* no RDW (default)             */
@@ -597,7 +611,9 @@ extern int http_report(HTTPC*)                                          asm("HTT
 extern int http_reset(HTTPC*)                                           asm("HTTPRESE");
 extern int http_close(HTTPC*)                                           asm("HTTPCLOS");
 extern int http_send(HTTPC*,const UCHAR *,int)                          asm("HTTPSEND");
+extern int http_send_pause(HTTPC*,int*)                                 asm("HTTPSNDW");
 extern UCHAR *http_decode(UCHAR*)                                       asm("HTTPDECO");
+extern UCHAR *http_decode_path(UCHAR*)                                  asm("HTTPDECP");
 extern int http_del_env(HTTPC *, const UCHAR *name)                     asm("HTTPDENV");
 extern unsigned http_find_env(HTTPC *, const UCHAR *name)               asm("HTTPFENV");
 extern int http_set_env(HTTPC *, const UCHAR *, const UCHAR *)          asm("HTTPSENV");
@@ -675,6 +691,8 @@ extern int http_new_session(HTTPC *)                                       asm("
 extern double httpsecs(double *psecs)									asm("HTTPSECS");
 extern CRED *httptkcr(const char *b64, unsigned maxage)					asm("HTTPTKCR");
 extern int httpcred(HTTPC *httpc)										asm("HTTPCRED");
+extern int dbgfail(HTTPD *httpd, FILE *fp)								asm("DBGFAIL");
+extern void dbgopen(HTTPD *httpd)									asm("DBGOPEN");
 extern int http_prm_read(HTTPD *httpd)									asm("HTTPPRMR");
 extern int http_config(HTTPD *httpd, const char *member)				asm("HTTPCONF");
 extern void httpsmf(HTTPC *httpc)										asm("HTTPSMF");
@@ -683,6 +701,23 @@ extern HTTPD *cgihttpd(void)											asm("CGIHTTPD");
 extern HTTPC *cgihttpc(void)											asm("CGIHTTPC");
 extern int http_getc(HTTPC *httpc)                                      asm("HTTPGETC");
 extern int http_gets(HTTPC *httpc, UCHAR *buf, unsigned max)            asm("HTTPGETS");
+
+/* request trace (#350): HTTPD->trace is NULL unless TRACE=n is set, and every
+   hook is guarded by HTTP_TRACING so the off state costs two loads and a
+   branch; a handle without HTTPD (the unit tests) is never traced */
+#define HTTP_TRACING(httpc) ((httpc)->httpd && (httpc)->httpd->trace)
+extern unsigned httptrc_now(void)                                      asm("HTRCNOW");
+extern void httptrc_start(HTTPD *httpd)                                asm("HTRCSTRT");
+extern void httptrc_stop(HTTPD *httpd)                                 asm("HTRCSTOP");
+extern HTTPTRR *httptrc_rec(HTTPC *httpc)                              asm("HTRCREC");
+extern void httptrc_open(HTTPC *httpc)                                 asm("HTRCOPEN");
+extern void httptrc_run(HTTPC *httpc, void *work)                      asm("HTRCRUN");
+extern void httptrc_mark(HTTPC *httpc, int mark)                       asm("HTRCMARK");
+extern void httptrc_poll(HTTPC *httpc)                                 asm("HTRCPOLL");
+extern void httptrc_tx(HTTPTRR *r, unsigned t0, unsigned t1, int rc)   asm("HTRCTX");
+extern void httptrc_stall(HTTPTRR *r)                                  asm("HTRCSTAL");
+extern void httptrc_next(HTTPC *httpc, int keep)                       asm("HTRCNEXT");
+extern void httptrc_close(HTTPC *httpc)                                asm("HTRCCLOS");
 
 
 #ifndef HTTP_PRIVATE

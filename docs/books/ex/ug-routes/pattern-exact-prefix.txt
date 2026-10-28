@@ -1,0 +1,11 @@
+$ curl -i http://localhost:8080/pub/notice.txt
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:53:48 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+X-Content-Type-Options: nosniff
+Content-Length: 23
+
+This notice is public.

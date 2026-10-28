@@ -29,12 +29,17 @@
 #      records the byte offset of CONSOLE_LOG immediately before provoking and
 #      asserts ONLY over bytes appended after that point. Do not remove this.
 #
-#   2. FAULT MARKER. Proof-of-fault is HTTPD062E *or* MVSMF99E. httpd emits
-#      HTTPD062E for a CORE abend caught by the worker's try(serve_client)
-#      (httpd.c:682) — this is what /abend produces. An mvsMF CGI abend is
-#      caught by mvsMF's inner ESTAE instead and logs MVSMF99E, so the worker
-#      try() returns 0 and HTTPD062E never fires. Accepting either keeps the
-#      test valid whether ABEND_PATH is core (/abend) or a CGI endpoint.
+#   2. FAULT MARKER. Proof-of-fault is HTTPD908E, HTTPD062E or MVSMF99E:
+#        HTTPD908E  an external module (CGI) failed and httpd answered 503.
+#                   This is what the ABEND0C1 module produces: it tests the
+#                   MODULE path, not the worker path.
+#        HTTPD062E  a CORE abend caught by the worker's ESTAE around
+#                   try(serve_client) (httpd.c). Nothing in the default
+#                   build provokes it (the built-in /abend hook is gone, #394).
+#        MVSMF99E   an mvsMF handler abend caught by mvsMF's inner ESTAE; the
+#                   outer try() returns 0, so neither of the above fires.
+#      Accepting all three keeps the test valid whichever endpoint ABEND_PATH
+#      names. A marker count of 0 makes the run INCONCLUSIVE, never a PASS.
 #
 #   3. ABNORMAL ADDRESS-SPACE END. A clean in-flight run (no S33E/__CRTGET/SVC
 #      dump) is NOT enough. After the 2026-07-23 recovery-exit relink the
@@ -49,11 +54,14 @@
 #      match only over-reports FAIL; the end-capture markers are scoped TIGHT to
 #      $JOBNAME so a miss downgrades to INCONCLUSIVE. Both err toward safe.
 #
-#   4. HTTPD060I / HTTPD002I ARE DIAGNOSTIC, NOT A GATE. Worker- and server-
-#      shutdown WTOs corroborate an orderly drain but never decide the verdict:
-#      the authoritative signal is the address-space end (note 3). The SA03 run
-#      produced zero HTTPD060I, so a PASS with zero of them emits a CAUTION, not
-#      a FAIL. Do not turn these into a hard requirement.
+#   4. HTTPD060I / HTTPD099I ARE DIAGNOSTIC, NOT A GATE. The thread-stop WTOs
+#      (MSG_THREAD_STOP, "HTTPD060I SHUTDOWN <name> ...") and the final
+#      "HTTPD099I HTTPD SHUTDOWN COMPLETE" (MSG_SHUTDOWN_DONE) corroborate an
+#      orderly drain but never decide the verdict: the authoritative signal is
+#      the address-space end (note 3). The SA03 run produced zero HTTPD060I, so
+#      a PASS with zero of them emits a CAUTION, not a FAIL. Do not turn these
+#      into a hard requirement. Both texts are upper case in include/httpdmsg.h;
+#      HTTPD002I is the APF message, not a shutdown message.
 #
 #   5. PROVOCATION MODE decides WHICH shutdown path you test. Default
 #      PROVOKE=abend faults handlers -- that is the recovery-drain path
@@ -66,9 +74,9 @@
 #      abend run does NOT establish the #179 fix; use longpoll for that.
 #
 #   6. RAKF COUNTS ARE DIAGNOSTIC, NEVER A GATE. #27 reported a RAKF0005 /
-#      RAKF000A pair naming HTTPX in FACILITY *after* "HTTPD002I Server is
-#      SHUTDOWN". Since this test already drives P HTTPD, it reports those counts
-#      for free. They must NOT become a FAIL condition: RAKF0004 (failed logon)
+#      RAKF000A pair naming HTTPX in FACILITY *after* the server-shutdown
+#      message of that build ("Server is SHUTDOWN"). Since this test already
+#      drives P HTTPD, it reports those counts for free. They must NOT become a FAIL condition: RAKF0004 (failed logon)
 #      is routine in this window and unrelated, RAKF0005 can be raised by any
 #      resource on a shared system, and #27 was never reproduced on a current
 #      build. A blanket RAKF assertion would misfire and mask real results.
@@ -78,11 +86,14 @@
 # ---------------------------------------------------------------------------
 #   HTTPD_HOST     host serving the HTTPD listener        (default: MBT_MVS_HOST or 127.0.0.1)
 #   HTTPD_PORT     HTTPD listener port to attack + poll   (default: 8080)
-#   ABEND_PATH     path whose handler faults              (default: /abend)
+#   ABEND_PATH     path whose handler faults              (default: /.abend)
+#                  needs the Parmlib route  MOD=ABEND0C1 /.abend  AUTH=BASIC
+#                  (samplib/httpprm0, commented out) and HTTPD_AUTH
 #   ABEND_HITS     how many times to hit it (poison pool) (default: 12)
-#   FAULT_MARK     regex proving a handler faulted        (default: HTTPD062E|MVSMF99E)
+#   FAULT_MARK     regex proving a handler faulted        (default: HTTPD908E|HTTPD062E|MVSMF99E)
 #   HTTPD_AUTH     optional "user:pass" if LOGIN gates GET (default: unset)
-#   WAIT_SECS      max seconds to wait for the AS to end   (default: 120)
+#   WAIT_SECS      max seconds to wait for the listener to stop, and again
+#                  for the AS end record to reach CONSOLE_LOG (default: 120)
 #   JOBNAME        MVS jobname of the HTTPD started task   (default: HTTPD)
 #
 #   PROVOKE        pre-stop scenario: abend | longpoll     (default: abend)
@@ -126,9 +137,9 @@ fi
 
 HTTPD_HOST=${HTTPD_HOST:-${MBT_MVS_HOST:-127.0.0.1}}
 HTTPD_PORT=${HTTPD_PORT:-8080}
-ABEND_PATH=${ABEND_PATH:-/abend}
+ABEND_PATH=${ABEND_PATH:-/.abend}
 ABEND_HITS=${ABEND_HITS:-12}
-FAULT_MARK=${FAULT_MARK:-HTTPD062E|MVSMF99E}
+FAULT_MARK=${FAULT_MARK:-HTTPD908E|HTTPD062E|MVSMF99E}
 WAIT_SECS=${WAIT_SECS:-120}
 STOP_ADAPTER=${STOP_ADAPTER:-manual}
 JOBNAME=${JOBNAME:-HTTPD}
@@ -241,11 +252,32 @@ done
 [ "$ended" -eq 1 ] && echo "   listener closed after ~${w}s" || echo "   listener still up after ${WAIT_SECS}s"
 echo
 
+# --- 4b. wait for the AS end record to reach CONSOLE_LOG --------------------
+# A console log that arrives through a relay lags the listener closing, so the
+# window read below could miss the "$HASP395 ... ENDED" / IEF404I records and end
+# INCONCLUSIVE. Wait for either, bounded by WAIT_SECS. Only when the listener
+# closed: a server that is still up has not ended and will not log an end record.
+if [ "$ended" -eq 1 ]; then
+    echo "-- waiting up to ${WAIT_SECS}s for the AS end record in $CONSOLE_LOG --"
+    end_re="[\$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED|IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED"
+    e=0
+    end_logged=0
+    while :; do
+        if tail -c +"$((log_offset + 1))" "$CONSOLE_LOG" 2>/dev/null | grep -Eq "$end_re"; then
+            end_logged=1; break
+        fi
+        [ "$e" -ge "$WAIT_SECS" ] && break
+        e=$((e + 3)); sleep 3
+    done
+    [ "$end_logged" -eq 1 ] && echo "   end record logged after ~${e}s" || echo "   no end record after ${WAIT_SECS}s"
+    echo
+fi
+
 # --- 5. assert over the console-log slice captured for THIS run — note #1 ---
 window=$(mktemp 2>/dev/null || echo "/tmp/httpd122.$$")
 tail -c +"$((log_offset + 1))" "$CONSOLE_LOG" > "$window" 2>/dev/null || cp "$CONSOLE_LOG" "$window"
 
-# proof the provocation actually faulted a worker — HTTPD062E (core) or MVSMF99E (CGI)
+# proof the provocation actually faulted a worker — HTTPD908E (module, ABEND0C1), HTTPD062E (core) or MVSMF99E (mvsMF)
 faultmarks=$(grep -Ec "$FAULT_MARK" "$window" 2>/dev/null || true)
 # in-flight crash signatures from #122
 s33e=$(grep -c "S33E" "$window" 2>/dev/null || true)
@@ -262,8 +294,9 @@ hasp310=$(grep -Ec "[$]HASP310.*TERMINATED AT END OF MEMORY" "$window" 2>/dev/nu
 # not a false PASS. Note 3.
 hasp395=$(grep -Ec "[$]HASP395[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
 ief404=$(grep -Ec "IEF404I[[:space:]]+${JOBNAME}[[:space:]].*ENDED" "$window" 2>/dev/null || true)
-# clean-shutdown WTOs (httpd.c:335 / :701) — DIAGNOSTIC ONLY, never a gate. Note 4.
-clean=$(grep -Ec "HTTPD002I Server is SHUTDOWN|HTTPD060I SHUTDOWN worker" "$window" 2>/dev/null || true)
+# clean-shutdown WTOs (MSG_THREAD_STOP / MSG_SHUTDOWN_DONE in include/httpdmsg.h) —
+# DIAGNOSTIC ONLY, never a gate. Note 4.
+clean=$(grep -Ec "HTTPD060I SHUTDOWN |HTTPD099I HTTPD SHUTDOWN COMPLETE" "$window" 2>/dev/null || true)
 # RAKF security violations (#27) — DIAGNOSTIC ONLY, never a gate. Note 6.
 # rakf5    : any RAKF0005 in the window (context; may be unrelated on a shared system)
 # rakfhttpx: the specific #27 signature — a RAKF000A detail line naming HTTPX in FACILITY
@@ -361,7 +394,7 @@ $ABEND_PATH reproduces #122's post-fault worker state before trusting this green
 EOF
 if [ "$clean" -eq 0 ]; then
     cat <<EOF
-CAUTION: not one HTTPD002I/HTTPD060I orderly-shutdown WTO appeared, yet the
+CAUTION: not one HTTPD060I/HTTPD099I orderly-shutdown WTO appeared, yet the
 address space ended normally. These corroborate a clean drain but do not gate
 the result (the authoritative gate is the address-space end above). Zero of
 them alongside a normal end is unusual — confirm the workers drained rather

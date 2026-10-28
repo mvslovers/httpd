@@ -43,10 +43,6 @@ httpget(HTTPC *httpc)
         goto quit;
     }
 
-    if (http_cmp(path, "/abend")==0) {
-        __asm__("DC\tH'0'");
-    }
-
     /* try to open path from UFS */
     mime = http_mime(path);
     open_path = path;
@@ -143,6 +139,10 @@ okay:
     else {
         httpc->subtype=CTYPE_TEXT;
     }
+
+    /* HEAD gets the headers GET would send and nothing after them; the
+       caller moves the client on to CSTATE_DONE (#399) */
+    if (httpc->state == CSTATE_HEAD) goto quit;
 
 known:
     switch(httpc->subtype) {

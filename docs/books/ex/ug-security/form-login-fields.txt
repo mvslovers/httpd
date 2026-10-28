@@ -1,0 +1,7 @@
+$ curl http://localhost:8080/login | grep -E "<title>|<form|<input|<button"
+  <title>Login Required</title>
+   <form class="modal-content animate" action="/login" method="post">
+      <input type="text" placeholder="Enter Userid" name="userid" maxlength="8" required>
+      <input type="password" placeholder="Enter Password" name="password" maxlength="8" required>
+    <input type="hidden" name="uri" value="/">
+     <button type="submit">Login</button>

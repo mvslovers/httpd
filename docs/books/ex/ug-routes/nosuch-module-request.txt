@@ -1,0 +1,10 @@
+$ curl -i http://localhost:8080/nosuch/x
+HTTP/1.1 503 Service Unavailable
+Date: Tue, 27 Oct 2026 05:50:25 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+External program NOSUCH was not found

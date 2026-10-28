@@ -53,8 +53,8 @@
  * where they are and both halves are filed under "configuration" below.  If
  * you are looking an id up, search the file -- do not trust the range.
  *
- * The catalog is documented for operators in docs/messages.md; keep the two
- * in step.
+ * The catalog is documented for operators in the appendix "Messages" of the
+ * HTTPD Reference (docs/books/ref/apx-messages.typ); keep the two in step.
  *
  * ---------------------------------------------------------------------
  * What the catalog found (issue #184)
@@ -195,8 +195,11 @@
 
 /** HTTPD045E a UFS read failed while a file was being sent: the filesystem,
  *  not the client, is at fault.  %d is the UFSD return code, %.40s the request
- *  path.  The response was abandoned and the connection closed (#263). */
-#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s"
+ *  path: the requested page, or the file named by the <!--#include --> that
+ *  failed (#346).  The response was abandoned and the connection closed
+ *  (#263).  Written at most once per READERR_INTERVAL; the last argument is
+ *  how many read errors the interval held back (#346). */
+#define MSG_UFS_READ_ERROR	"HTTPD045E UFS READ ERROR RC=%d, RESPONSE ABORTED: %.40s, %u SUPPRESSED"
 
 /** HTTPD047E without the key no credential can be sealed; login is dead */
 #define MSG_CREDKEY_FAILED	"HTTPD047E UNABLE TO INITIALIZE SERVER CREDENTIAL KEY, RC=%d"
@@ -243,6 +246,12 @@
  *  SEND_GIVEUP_INTERVAL; the last argument is how many give-ups the interval
  *  held back (#347). */
 #define MSG_SEND_GIVEUP		"HTTPD065W CLIENT %u.%u.%u.%u ABANDONED, NO SEND PROGRESS FOR %d SEC, %u BYTES SENT, %u SUPPRESSED"
+
+/** HTTPD066I TRACE=n is set and the request trace table is allocated */
+#define MSG_TRACE_ACTIVE	"HTTPD066I REQUEST TRACE ON, %u RECORDS, %u BYTES"
+
+/** HTTPD067W TRACE=n is set but the table could not be allocated */
+#define MSG_TRACE_NO_STORAGE	"HTTPD067W NO STORAGE FOR REQUEST TRACE, TRACE OFF"
 
 /** HTTPD070E the configured codepage is unknown; CP037 is used instead */
 #define MSG_CODEPAGE_UNKNOWN	"HTTPD070E UNKNOWN CODEPAGE \"%s\", USING CP037"
@@ -376,6 +385,9 @@
  *  MOD= modules startup could hold (#198) */
 #define MSG_D_CFG_RESIDENT	"HTTPD137I RESIDENT %s  MODULES HELD %d"
 
+/** HTTPD138I DISPLAY CONFIG, the RES_NOPROFILE keyword (#351) */
+#define MSG_D_CFG_RESNOPROF	"HTTPD138I RES_NOPROFILE %s"
+
 /** HTTPD136I DISPLAY CONFIG, Basic realm / server name (#193): the REALM
  *  keyword's value, or the system's SMF ID when the Parmlib names none */
 #define MSG_D_CFG_REALM		"HTTPD136I REALM %s"
@@ -415,6 +427,9 @@
 /** HTTPD148I DISPLAY MEMORY without an address */
 #define MSG_D_MEM_USAGE		"HTTPD148I USAGE: DISPLAY MEMORY XXXXXX[,NNN] (D M XXXXXX)"
 
+/** HTTPD149I SET MAXTASK / SET MINTASK without a number, or with a negative one */
+#define MSG_S_TASK_USAGE	"HTTPD149I USAGE: SET MAXTASK|MINTASK N (S MA N, S MI N), N = 1 TO 100"
+
 /** HTTPD150I MODIFY help header */
 #define MSG_HELP_HEADER		"HTTPD150I MODIFY COMMANDS ARE:"
 
@@ -433,6 +448,9 @@
 
 /** HTTPD038E the Parmlib member opened but could not be read to the end */
 #define MSG_CFG_READ_ERROR	"HTTPD038E READ ERROR ON DD:%s -- CONFIGURATION INCOMPLETE"
+
+/** HTTPD039W a write to the debug DD failed; tracing is off for the rest of the run */
+#define MSG_DBG_WRITE_FAILED	"HTTPD039W WRITE ERROR ON DD:HTTPDBG -- DEBUG OUTPUT SWITCHED OFF"
 
 /** HTTPD020E the debug DD is present but unusable */
 #define MSG_CFG_DBG_FAILED	"HTTPD020E FOPEN FOR DD:HTTPDBG FAILED, ERRNO=%d"
@@ -597,6 +615,17 @@
  *  class, resource, route path. */
 #define MSG_RES_NO_PROFILE	"HTTPD425W NO PROFILE FOR %.8s:%.32s -- %.24s NOT GATED"
 
+/** HTTPD426W as HTTPD425W, with RES_NOPROFILE=DENY (#351): the route refuses
+ *  every request with 403 until the profile exists.  Args: class, resource,
+ *  route path. */
+#define MSG_RES_NO_PROFILE_DENY	"HTTPD426W NO PROFILE FOR %.8s:%.32s -- %.24s REFUSES ALL REQUESTS"
+
+/** HTTPD427E RES_NOPROFILE is neither ALLOW nor DENY.  Fatal, followed by
+ *  HTTPD420E: the keyword exists to close a gate, and falling back to ALLOW
+ *  on a misspelling would leave it open without a word -- the failure #243
+ *  removed for AUTH=. */
+#define MSG_RES_NOPROF_BAD	"HTTPD427E INVALID RES_NOPROFILE VALUE \"%.16s\" (ALLOW|DENY)"
+
 /*
  * HTTPD43x -- SMF.  Split off HTTPD415W, which "LOC= requires a path"
  * also used, and off HTTPD028W, which carried both SMF operand errors.
@@ -635,6 +664,9 @@
 
 /** HTTPD443W RESIDENT= is neither YES nor NO; the default stays */
 #define MSG_RES_BAD_VALUE	"HTTPD443W INVALID RESIDENT VALUE \"%s\" (YES|NO)"
+
+/** HTTPD444W TRACE= is neither 0 nor a record count in range; the trace stays off */
+#define MSG_TRACE_BAD_VALUE	"HTTPD444W INVALID TRACE VALUE \"%s\" (0 OR 16-1024), TRACE OFF"
 
 /* =====================================================================
 ** HTTPD9xx -- diagnostics, abend recovery, storage

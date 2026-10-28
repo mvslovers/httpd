@@ -3,11 +3,13 @@
 */
 #include "httpd.h"
 #include "httpdmsg.h"
+#include "httpracf.h"
 
 static void resolve_credential(HTTPC *httpc);
 static void auth_gate(HTTPC *httpc, HTTPROUTE *route);
 static int  auth_required_response(HTTPC *httpc, UCHAR mode);
 static int  forbidden_response(HTTPC *httpc);
+static int  noprofile_response(HTTPC *httpc);
 static int  is_asset_exempt(const char *path);
 
 /* http_process_client() */
@@ -37,9 +39,11 @@ httppc(HTTPC *httpc)
 
     if (httpc->state==CSTATE_IN) {
         http_in(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_REQ);
     }
     if (httpc->state==CSTATE_PARSE) {
         http_parse(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_PARSE);
     }
 
     /* the state should be GET, HEAD, PUT, or POST at this point */
@@ -57,6 +61,7 @@ httppc(HTTPC *httpc)
            Sec-Token / LtpaToken2 cookie, Bearer, or Basic (see
            resolve_credential) */
         resolve_credential(httpc);
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_CRED);
 
         /* find the route (MOD= CGI or LOC= static prefix) owning this path */
         route = path ? http_find_route(httpd, path) : NULL;
@@ -82,6 +87,8 @@ httppc(HTTPC *httpc)
                 if (httpc->state == CSTATE_DONE) goto check_done;
             }
         }
+
+        if (HTTP_TRACING(httpc)) httptrc_mark(httpc, TM_ROUTE);
 
         /* CGI dispatch -- only routes that carry a program (pgm != NULL).
            A LOC= route has pgm == NULL and falls through to static serving. */
@@ -267,7 +274,7 @@ is_asset_exempt(const char *path)
 **   Stage 1 (authenticate): does the route require an identity?  If so and the
 **     client is not authenticated -> 401 (challenge per the route's AUTH mode).
 **   Stage 2 (authorize): if the route sets RES=class:resource, RACHECK it under
-**     the client's ACEE (http_check_auth) -> 403 on deny.
+**     the client's ACEE (racf_auth, see Stage 2) -> 403 on deny.
 ** On 401/403 the response is emitted and httpc->state is set to CSTATE_DONE;
 ** the caller detects that and stops.
 **
@@ -307,16 +314,33 @@ auth_gate(HTTPC *httpc, HTTPROUTE *route)
 	/* Stage 2: authorize the resource under the client's ACEE.  Skipped for
 	   AUTH=NONE (a public route has no identity to check -> NONE wins).
 
-	   != 0 is the whole denial test: http_check_auth() already normalizes the
-	   second SAF "allowed" code (rc 4, resource not protected) to 0, and it
-	   answers -1 for an unauthenticated request.  Do NOT relax this to <= 4 --
-	   that reads -1 as allowed.  See httpxauth.c for why the normalization
-	   lives there and not here. */
+	   The rc is read raw (not through http_check_auth(), which folds SAF's
+	   "no profile" rc 4 into 0 for the modules that call it) because the
+	   gate must be able to tell rc 4 from rc 0: with RES_NOPROFILE=DENY a
+	   missing profile refuses (#351).  httpracr() holds the table; with the
+	   default it allows 0 and 4 and denies the rest, as the gate always has,
+	   and -1 (no ACEE) is a denial.  Do NOT replace it with a <= 4 test --
+	   that reads -1 as allowed. */
 	if (route && route->resclass && route->resname && authed &&
 	    mode != HTTP_AUTH_NONE) {
-		if (http_check_auth(httpc, route->resclass, route->resname,
-		                    route->resattr) != 0) {
+		ACEE	*acee    = httpc->cred->acee;
+		int		noprof   = httpc->httpd->cfg_res_noprof;
+		int		rc       = acee ? racf_auth(acee, route->resclass,
+		                                    route->resname, route->resattr)
+		                        : -1;
+		int		verdict  = httpracr(rc, noprof);
+
+		if (verdict == HTTP_RACF_V_NOPROF) {
+			http_dbgf("auth_gate(%s:%s) rc=4: no profile, RES_NOPROFILE=DENY,"
+			          " refused\n", route->resclass, route->resname);
+			noprofile_response(httpc);
+		}
+		else if (verdict != HTTP_RACF_V_ALLOW) {
 			forbidden_response(httpc);
+		}
+		else if (rc == HTTP_RACF_NOTPROT) {
+			http_dbgf("auth_gate(%s:%s) rc=4: resource not protected,"
+			          " access allowed\n", route->resclass, route->resname);
 		}
 	}
 }
@@ -392,6 +416,25 @@ forbidden_response(HTTPC *httpc)
 	http_printf(httpc, "Content-Type: text/plain\r\n");
 	http_printf(httpc, "\r\n");
 	http_printf(httpc, "403 Forbidden\n");
+	httpc->state = CSTATE_DONE;
+	return 0;
+}
+
+/*
+** noprofile_response() - the route's RES= resource has no profile and the
+** server runs with RES_NOPROFILE=DENY (#351).  403 like any other refusal
+** (the client is known, the answer is "not for you"), with a body that names
+** the cause for whoever operates the server -- and nothing else: the class and
+** resource name stay in HTTPD426W and the DEBUG trace, not on the wire.
+*/
+static int
+noprofile_response(HTTPC *httpc)
+{
+	http_resp(httpc, 403);
+	http_printf(httpc, "Cache-Control: no-store\r\n");
+	http_printf(httpc, "Content-Type: text/plain\r\n");
+	http_printf(httpc, "\r\n");
+	http_printf(httpc, "403 Forbidden: no RACF profile protects this resource\n");
 	httpc->state = CSTATE_DONE;
 	return 0;
 }

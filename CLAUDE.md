@@ -19,7 +19,7 @@ The server's primary role is hosting CGI modules (especially mvsMF) that provide
 |---|---|
 | change response framing, keep-alive, or look for where something lives | `internals/architecture.md` (4.0.0 decisions, HTTP/1.1 design, source file map) |
 | inspect a live server with `/.dsrv`, `/.dm`, `/.dmtt` | `internals/display-modules.md`, and `~/repos/mvs/.workspace/context/httpd-debug.md` |
-| write or change a server module | `docs/server-modules.md`, `internals/development.md` |
+| write or change a server module | the "Server Module Interface" chapter of the Reference (`docs/books/ref/ref-api.typ`), `internals/development.md` |
 | cut a release or touch `[smp]` | `~/repos/mvs/.workspace/context/smp.md` (the httpd FMID row and burned ids) |
 
 ## Open Items
@@ -230,7 +230,7 @@ Missing `DD:HTTPPRM` → server starts with defaults (port 8080, no routes).
 - HTTPX vector table: **append-only**. Never change existing offsets.
 - **Every WTO literal lives in `include/httpdmsg.h`**, once, upper case, behind
   an `MSG_*` macro — never inline at the call site. The header states the rules;
-  `docs/messages.md` is its operator-facing form, and the two must stay in step.
+  the appendix "Messages" of the Reference (`docs/books/ref/apx-messages.typ`) is its operator-facing form, and the two must stay in step.
   Values keep their original case (`http_upcase()` folds the ones that arrive
   lower case at runtime). Message IDs are `HTTPDnnnX`, severity I/W/E.
 - A WTO is for **what an operator can act on**. Anything the client caused

@@ -1,0 +1,11 @@
+$ curl -i -X PUT -d x http://localhost:8080/hello
+HTTP/1.1 405 Method Not Allowed
+Date: Tue, 27 Oct 2026 05:57:59 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: close
+Allow: GET, POST
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+405 Method Not Allowed

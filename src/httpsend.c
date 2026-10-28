@@ -10,17 +10,20 @@
 
 /* send_raw() - send raw bytes to socket without chunk framing */
 static int
-send_raw(HTTPC *httpc, const UCHAR *buf, int len)
+send_raw(HTTPC *httpc, const UCHAR *buf, int len, HTTPTRR *tr)
 {
     int rc;
     int pos = 0;
+    unsigned t0 = 0;
 
     for(pos=0; pos < len; pos+=rc) {
         if (pos < 0) {
             wtof(MSG_SEND_UNDERFLOW, pos);
             break;
         }
+        if (tr) t0 = httptrc_now();
         rc = send(httpc->socket, &buf[pos], len-pos, 0);
+        if (tr) httptrc_tx(tr, t0, httptrc_now(), rc);
         if (rc>0) {
             httpc->sent += rc;
         }
@@ -78,6 +81,35 @@ send_giveup(HTTPC *httpc)
              httpc->sent, held);
 }
 
+/* send_wait() - one pause of the no-progress budget, after send_raw() has
+** reported 0 (EWOULDBLOCK, the client's window is closed).  *stall counts the
+** pauses since the last byte went out.
+**
+** Returns 0 to try again, -1 when the client is given up on.  Every -1 leaves
+** the client at CSTATE_DONE.
+*/
+static int
+send_wait(HTTPC *httpc, int *stall, HTTPTRR *tr)
+{
+    if (httpc->state >= CSTATE_DONE) return -1;
+    /* a stopping server must not sit out the stall budget:
+       shutdown waits for the workers, so every worker wait
+       has to honor quiesce (#122, #205) */
+    if (httpc->httpd->flag
+        & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
+        httpc->state = CSTATE_DONE;
+        return -1;
+    }
+    if (++*stall > SEND_STALL_MAX) {
+        httpc->state = CSTATE_DONE;
+        send_giveup(httpc);
+        return -1;
+    }
+    if (tr) httptrc_stall(tr);
+    usleep(SEND_STALL_PAUSE);
+    return 0;
+}
+
 /* send_raw_all() - send the whole buffer or fail.
 **
 ** A chunk is only parseable if the byte count its header announced is
@@ -91,14 +123,14 @@ send_giveup(HTTPC *httpc)
 ** positive return, so that state is what stops it.
 */
 static int
-send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
+send_raw_all(HTTPC *httpc, const UCHAR *buf, int len, HTTPTRR *tr)
 {
     int rc;
     int pos;
     int stall = 0;
 
     for (pos = 0; pos < len; pos += rc) {
-        rc = send_raw(httpc, &buf[pos], len - pos);
+        rc = send_raw(httpc, &buf[pos], len - pos, tr);
         if (rc < 0) {
             /* set here rather than relying on the caller: the
                MSG_SEND_UNDERFLOW guard also returns negative, and the
@@ -109,21 +141,7 @@ send_raw_all(HTTPC *httpc, const UCHAR *buf, int len)
         if (rc == 0) {
             /* no progress: EWOULDBLOCK, the only case send_raw()
                still reports as 0 */
-            if (httpc->state >= CSTATE_DONE) return -1;
-            /* a stopping server must not sit out the stall budget:
-               shutdown waits for the workers, so every worker wait
-               has to honor quiesce (#122, #205) */
-            if (httpc->httpd->flag
-                & (HTTPD_FLAG_QUIESCE | HTTPD_FLAG_SHUTDOWN)) {
-                httpc->state = CSTATE_DONE;
-                return -1;
-            }
-            if (++stall > SEND_STALL_MAX) {
-                httpc->state = CSTATE_DONE;
-                send_giveup(httpc);
-                return -1;
-            }
-            usleep(SEND_STALL_PAUSE);
+            if (send_wait(httpc, &stall, tr) < 0) return -1;
         }
         else {
             stall = 0;
@@ -137,6 +155,7 @@ extern int
 httpsend(HTTPC *httpc, const UCHAR *buf, int len)
 {
     int rc;
+    HTTPTRR *tr = HTTP_TRACING(httpc) ? httptrc_rec(httpc) : NULL;
 
     if (httpc->chunked) {
         /* RFC 7230 chunked transfer encoding */
@@ -161,9 +180,9 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
            client a truncated response had ended normally -- and close
            the connection rather than carry a torn chunk into the next
            request on it. */
-        if (send_raw_all(httpc, hdr, hdrlen) < 0
-         || send_raw_all(httpc, buf, len) < 0
-         || send_raw_all(httpc, crlf, 2) < 0) {
+        if (send_raw_all(httpc, hdr, hdrlen, tr) < 0
+         || send_raw_all(httpc, buf, len, tr) < 0
+         || send_raw_all(httpc, crlf, 2, tr) < 0) {
             httpc->chunked = 0;
             httpc->keepalive = 0;
             return -1;
@@ -173,7 +192,31 @@ httpsend(HTTPC *httpc, const UCHAR *buf, int len)
     }
 
     /* non-chunked: send raw */
-    rc = send_raw(httpc, buf, len);
+    rc = send_raw(httpc, buf, len, tr);
 
     return rc;
+}
+
+/* http_send_pause() - the wait between two tries of a caller whose
+** http_send() returned 0, the closed window of a non-chunked response.  Takes
+** the same no-progress budget as send_raw_all() and send_all(): *stall counts
+** the pauses since the last byte went out, and when it runs out the client is
+** given up on (HTTPD065W) and the worker is free (#440).  A caller that only
+** went round again on the zero would use up the 1000 passes of serve_client()
+** in a moment and report the stall as HTTPD901E.
+**
+** Returns 0 to try again, -1 with the client at CSTATE_DONE.  A response cut
+** off like this cannot carry another request, so the connection is not kept.
+*/
+extern int
+http_send_pause(HTTPC *httpc, int *stall)
+{
+    HTTPTRR *tr = HTTP_TRACING(httpc) ? httptrc_rec(httpc) : NULL;
+
+    if (send_wait(httpc, stall, tr) < 0) {
+        httpc->keepalive = 0;
+        return -1;
+    }
+
+    return 0;
 }

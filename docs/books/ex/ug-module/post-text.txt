@@ -1,0 +1,10 @@
+$ curl -i -H "Content-Type: text/plain" --data-raw "plain body" http://localhost:8080/hello
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 05:57:59 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: close
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+You sent: plain body

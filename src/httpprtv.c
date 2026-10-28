@@ -65,6 +65,13 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
     if (httpc->state >= CSTATE_DONE)
         return -1;
 
+    /* A response to HEAD ends at the blank line after the headers (RFC 7230
+       3.3.3).  The state is still CSTATE_HEAD while the handler writes, so
+       the body text an error path prints after the headers is dropped here
+       instead of going out behind a header block that promised none (#399). */
+    if (httpc->state == CSTATE_HEAD && httpc->rdw && httpc->resp > 0)
+        return 0;
+
     len = vsnprintf(buf, sizeof(buf), fmt, args);
     if (len >= (int)sizeof(buf))
         len = sizeof(buf) - 1;
@@ -85,10 +92,8 @@ httpprtv(HTTPC *httpc, const char *fmt, va_list args)
                chunked: injecting Transfer-Encoding: chunked makes httpdone()
                append a "0\r\n\r\n" terminator, which is an illegal body and
                is rejected by strict HTTP parsers (e.g. llhttp / Node.js).
-               NOTE: a response to HEAD is body-less too — add it here if HEAD
-               ever returns a real status (it currently returns 501). */
-            int bodyless = httpc->resp == 204 || httpc->resp == 304
-                         || (httpc->resp >= 100 && httpc->resp < 200);
+               A response to HEAD is body-less too (#399). */
+            int bodyless = httpnobd(httpc->state == CSTATE_HEAD, httpc->resp);
 
             httpc->rdw = 1; /* headers ended — don't re-trigger */
 

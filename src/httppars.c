@@ -74,8 +74,9 @@ httppars(HTTPC *httpc)
         }
     }
 
-    /* decode the uri and create REQUEST_PATH */
-    buf = http_decode(httpc->buf);
+    /* decode the uri and create REQUEST_PATH.  The path has its own decoder:
+       a "+" in it is a plus, not the space it means in a query value. */
+    buf = http_decode_path(httpc->buf);
     
     // wtof("%s: REQUEST_PATH=\"%s\"", __func__, buf);
     
@@ -99,23 +100,25 @@ httppars(HTTPC *httpc)
     snprintf(tmp, sizeof(tmp), "HTTPD/%s", httpc->httpd->version);
     if (http_set_env(httpc, "SERVER_SOFTWARE", tmp)) goto failed;
 
-    /* select next state based on request method */
+    /* select next state based on request method.  A method is case
+       sensitive (RFC 9110 9.1): "get" is not "GET", and falls through to the
+       405 below. */
     p = http_get_env(httpc, "REQUEST_METHOD");
     if (!p) goto failed;
 
-    if (http_cmp(p, "DELETE")==0) {
+    if (strcmp(p, "DELETE")==0) {
         httpc->state = CSTATE_DELETE;
         goto nodata;
     }
-    if (http_cmp(p, "GET")==0) {
+    if (strcmp(p, "GET")==0) {
         httpc->state = CSTATE_GET;
         goto nodata;
     }
-    if (http_cmp(p, "HEAD")==0) {
+    if (strcmp(p, "HEAD")==0) {
         httpc->state = CSTATE_HEAD;
         goto nodata;
     }
-    if (http_cmp(p, "PUT")==0) {
+    if (strcmp(p, "PUT")==0) {
         httpc->state = CSTATE_PUT;
         /* Technically there is more data but we don't process that 
          * data in the HTTPD server. Instead we allow CGI programs
@@ -124,7 +127,7 @@ httppars(HTTPC *httpc)
          */
         goto nodata;
     }
-    if (http_cmp(p, "POST")==0) {
+    if (strcmp(p, "POST")==0) {
         httpc->state = CSTATE_POST;
         goto postdata;
     }
@@ -165,7 +168,20 @@ postdata:
 
         switch (httpbody(cl, te, CBUFSIZE-1, &clen)) {
         case HTTP_BODY_TOO_LARGE:
-            /* body larger than we buffer: reject, leave it unread, close */
+            /* A module route reads its own body off the socket (the same way
+               it reads a PUT body), so a body larger than this buffer is not
+               ours to refuse: leave it unread.  The auth gate still runs
+               before the module does, and keep-alive is off (nodata), so an
+               unauthenticated client gets its 401 and the connection closes. */
+            {
+                const char *rpath = http_get_env(httpc, "REQUEST_PATH");
+                const HTTPROUTE *route = rpath ?
+                    http_find_route(httpc->httpd, rpath) : NULL;
+
+                if (route && route->pgm) goto nodata;
+            }
+
+            /* any other route: reject, leave it unread, close */
             httpc->keepalive = 0;
             http_resp(httpc, 413);
             http_printf(httpc, "Cache-Control: no-store\r\n");

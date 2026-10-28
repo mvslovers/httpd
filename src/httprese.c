@@ -13,6 +13,10 @@ httprese(HTTPC *httpc)
 
     http_enter("httprese()\n");
 
+    /* closes the record of the request that just ended and, on a kept-alive
+       connection, opens the next one (#350) */
+    if (HTTP_TRACING(httpc)) httptrc_next(httpc, httpc->keepalive);
+
     if (httpc->env) {
         /* free variables */
         count = array_count(&httpc->env);

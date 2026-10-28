@@ -21,6 +21,7 @@ static int display_fs(HTTPD *httpd, HTTPC *httpc);
 static int display_mgr(HTTPD *httpd, HTTPC *httpc);
 static int display_task(HTTPD *httpd, HTTPC *httpc);
 static int display_help(HTTPD *httpd, HTTPC *httpc);
+static int display_trace(HTTPD *httpd, HTTPC *httpc);
 static int display_workers(HTTPD *httpd, HTTPC *httpc);
 
 static int display_ufs(HTTPD *httpd, HTTPC *httpc, UFS *ufs);
@@ -126,6 +127,11 @@ int main(int argc, char **argv)
     }
 #endif
 
+    if (http_cmpn(target, "TRACE", len)==0) {
+        display_trace(httpd, httpc);
+        goto quit;
+    }
+
     if (http_cmpn(target, "WORKERS", len)==0) {
         display_workers(httpd, httpc);
         goto quit;
@@ -145,7 +151,7 @@ send_resp(HTTPD *httpd, HTTPC *httpc, int resp)
     if ((rc = http_resp(httpc, resp) < 0)) goto quit;
     if ((rc = http_printf(httpc, "Cache-Control: no-store\r\n") < 0)) goto quit;
     if ((rc = http_printf(httpc, "Content-Type: %s\r\n", "text/html") < 0)) goto quit;
-    if ((rc = http_printf(httpc, "Access-Control-Allow-Origin: *\r\n") < 0)) goto quit;
+    if ((rc = http_printf(httpc, "X-Content-Type-Options: nosniff\r\n") < 0)) goto quit;
     if ((rc = http_printf(httpc, "\r\n") < 0)) goto quit;
 
     if ((rc = http_printf(httpc, "<!DOCTYPE html>\n") < 0)) goto quit;
@@ -174,6 +180,58 @@ send_resp(HTTPD *httpd, HTTPC *httpc, int resp)
  
 quit:
     return rc;
+}
+
+/* The request trace (#350) as text/plain, one record per line.  A record that
+** is rewritten while it is copied is skipped (its seq changes).  A record just
+** claimed by trc_open() is filled after its state turns LIVE, so one line may
+** show a half-initialised new request under the old seq; fine for a display. */
+static int
+display_trace(HTTPD *httpd, HTTPC *httpc)
+{
+    HTTPTRC     *t      = httpd->trace;
+    const char  *smin   = http_get_env(httpc, "QUERY_MIN");
+    unsigned    min     = smin ? (unsigned)atoi(smin) : 0;
+    unsigned    now;
+    unsigned    n;
+    char        line[448];
+    HTTPTRR     copy;
+
+    http_resp(httpc, 200);
+    http_printf(httpc, "Cache-Control: no-store\r\n");
+    http_printf(httpc, "Content-Type: text/plain\r\n");
+    http_printf(httpc, "\r\n");
+
+    if (!t) {
+        http_printf(httpc, "#HTTPTRC off\n");
+        return 0;
+    }
+
+    now = httptrc_now();
+    http_printf(httpc, "#HTTPTRC v1 now=%u wall=%u unit=1.024ms slots=%u "
+        "seq=%u lost=%u miss=%u workers=%u\n",
+        now, (unsigned)time(NULL), t->slots, t->seq, t->lost, t->miss,
+        httpd->mgr ? (unsigned)array_count(&httpd->mgr->worker) : 0);
+
+    for (n = 0; n < t->slots; n++) {
+        HTTPTRR     *r = &t->rec[n];
+        unsigned    seq = r->seq;
+        unsigned    s = r->state;
+
+        if (s == TRS_FREE) continue;
+        memcpy(&copy, r, sizeof(copy));
+        if (copy.seq != seq || r->seq != seq) continue;
+
+        if (s != TRS_LIVE && min) {
+            unsigned end = copy.t[copy.last];
+            if (trc_ms(end - copy.t[TM_OPEN]) < min) continue;
+        }
+
+        trc_line(line, sizeof(line), &copy, now);
+        http_printf(httpc, "%s\n", line);
+    }
+
+    return 0;
 }
 
 static int 
@@ -400,10 +458,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_50</td>"
-        "<td>(reserved)</td>"
+        "<td>httpd->trace</td>"
+        "<td>Request trace (NULL = off)</td>"
         "<td>%p</td></tr>\n",
-        O(unused_50), httpd->unused_50);
+        O(trace), httpd->trace);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -414,10 +472,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_58</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_58), httpd->unused_58);
+        "<td>httpd->readerr_last</td>"
+        "<td>Time of Last UFS Read Error Message (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_last), httpd->readerr_last);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -428,10 +486,10 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
     
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_60</td>"
-        "<td>(reserved)</td>"
-        "<td>%p</td></tr>\n",
-        O(unused_60), httpd->unused_60);
+        "<td>httpd->readerr_held</td>"
+        "<td>UFS Read Errors Not Yet Reported (#346)</td>"
+        "<td>%u</td></tr>\n",
+        O(readerr_held), httpd->readerr_held);
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
@@ -623,11 +681,17 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_121</td>"
+        "<td>httpd->cfg_res_noprof</td>"
+        "<td>Config RES= Route Without Profile</td>"
+        "<td>%s</td></tr>\n",
+        O(cfg_res_noprof), httpd->cfg_res_noprof ? "DENY" : "ALLOW");
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_122</td>"
         "<td>(reserved, alignment padding)</td>"
-        "<td>%02X %02X %02X</td></tr>\n",
-        O(unused_121), httpd->unused_121[0], httpd->unused_121[1],
-        httpd->unused_121[2]);
+        "<td>%02X %02X</td></tr>\n",
+        O(unused_122), httpd->unused_122[0], httpd->unused_122[1]);
 
     /* An empty codepage is the default, not "none": set_defaults() leaves it
     ** empty and http_xlate_init() reads that as CP037.  Say so -- a bare ""
@@ -2603,61 +2667,58 @@ display_help(HTTPD *httpd, HTTPC *httpc)
     int         rc;
     const char  *path   = NULL;
     const char  *host   = NULL;
+    char        epath[256];
+    char        ehost[128];
     
     if (!path)  path = http_get_env(httpc, "REQUEST_PATH");
     if (!path)  path = "unknown";
     
     if (!host)  host = http_get_env(httpc, "HTTP_HOST");
     if (!host)  host = "unknown";
+
+    /* both come from the request; the page is HTML */
+    http_html_escape((UCHAR *)epath, sizeof(epath), (const UCHAR *)path);
+    http_html_escape((UCHAR *)ehost, sizeof(ehost), (const UCHAR *)host);
     
     if ((rc = send_resp(httpd, httpc, 200) < 0)) goto quit;
 
     http_printf(httpc, "<h2>HTTPDSRV Help</h2>\n");
-    http_printf(httpc, "<h3>Usage: http:/%s%s?target=name[&m=nnnnnnnn]</h3>\n", host, path);
+    http_printf(httpc, "<h3>Usage: http://%s%s?target=name[&amp;m=nnnnnnnn]</h3>\n", ehost, epath);
     http_printf(httpc, "<p>This module uses the QUERY variable "
         "\"target\" value to control which HTTPD storage area to display.<p>\n");
 
     http_printf(httpc, "<dl>\n");
 
-    http_printf(httpc, "<dt>?target=HTTPD</td>\n");
+    http_printf(httpc, "<dt>?target=HTTPD</dt>\n");
     http_printf(httpc, "<dd>Display the HTTPD storage areas. "
         "This is the default if ?target is omitted.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=FILE&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=FILE&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the File Handle at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "<dt>?target=FS</dt>\n");
     http_printf(httpc, "<dd>Display the HTTPD ... Unix \"like\" File System Handle.</dd><br/>\n");
 
+    http_printf(httpc, "<dt>?target=TRACE[&min=ms]</dt>\n");
+    http_printf(httpc, "<dd>The request trace (Parmlib TRACE=n) as plain text, one line "
+        "per request: worker, a time per phase in ms from the accept, and counters. "
+        "min=ms leaves out finished requests that took less.</dd><br/>\n");
+
     http_printf(httpc, "<dt>?target=HELP</dt>\n");
     http_printf(httpc, "<dd>Display this help text.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=MGR&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the Thread Manager Handle at the memory address.</dd><br/>\n");
+    http_printf(httpc, "<dt>?target=MGR</dt>\n");
+    http_printf(httpc, "<dd>Display the Thread Manager of this server. "
+        "It takes no address.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=MOD&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=MOD&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the route array (MOD= programs and LOC= static "
         "prefixes) at the memory address. Was ?target=CGI.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=TASK&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=TASK&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Task Handle at the memory address.</dd><br/>\n");
 
-    http_printf(httpc, "<dt>?target=UFSDISKS&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Disk Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSIO&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Input / Output Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSPAGERS&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Pagers Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSSB&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Super Block at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=UFSVDISK&m=nnnnnnnn</dt>\n");
-    http_printf(httpc, "<dd>Display the UFS Virtual Disk Array at the memory address.</dd><br/>\n");
-
-    http_printf(httpc, "<dt>?target=WORKERS&m=nnnnnnnn</dt>\n");
+    http_printf(httpc, "<dt>?target=WORKERS&amp;m=nnnnnnnn</dt>\n");
     http_printf(httpc, "<dd>Display the Thread Manager Workers Array at the memory address.</dd><br/>\n");
 
     http_printf(httpc, "</dl>\n");
