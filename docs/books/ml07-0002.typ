@@ -15,8 +15,9 @@
     MVS 3.8j (httpd 4.5.0), and to all subsequent releases and modifications
     until otherwise indicated in new editions.
 
-    *Draft.* HTTPD 4.5 is still in development, and so is this book:
-    chapters still to be written say so.
+    *Draft.* This is a draft edition, as the last digit of the number says.
+    The console and client sessions in it were captured from a development
+    build of HTTPD 4.5.0, which shows the version #raw("4.5.0-DEV").
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.
