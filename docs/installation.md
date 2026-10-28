@@ -1895,10 +1895,11 @@ A development build of `main` is packaged under the FMID of the release that
 not released. If you installed such a package by SMP, the system holds an id
 that the job in step 2 does not name.
 
-**What the job of step 2 does on such a system.** Measured on TK5 and on MVS/CE
-with SMP 4 (`HMASMP LVL 04.48`), with a development build installed over a
-system that held 4.4.0 and over a fresh system. The job ends `CC 0008`, and it
-removes the modules but not the development build:
+**What the job of step 2 does on such a system.** Measured with SMP 4
+(`HMASMP LVL 04.48`) on two systems. The TK5 system held 4.3.0 and 4.4.0,
+installed by SMP, before the development build was installed over them. The
+MVS/CE system was fresh and held no earlier HTTPD. On both, the job ends
+`CC 0008`, and it removes the modules but not the development build:
 
 - The five `DEL SYSMOD(THTP440) MOD(...)` blocks of each zone fail with
   `HMA3572` and `HMA2560`, RC 08. On such a system `THTP440` is only a
@@ -1910,8 +1911,9 @@ removes the modules but not the development build:
   ```
 
 - The `DEL MOD` and `DEL LMOD` blocks end `HMA2550 UPDATE COMPLETE`. The
-  module entries are gone from both zones, and so is `THTP440` with every older
-  id the system held.
+  module entries are gone from both zones. So are the ids the job names that
+  the system held: `THTP440`, `THTP430` and `THTP420` on the TK5 system,
+  `THTP440` on the MVS/CE system.
 - `THTP450` stays in both zones. Its `MOD` list still names the five modules,
   whose entries no longer exist.
 - The libraries are not touched.
@@ -1932,7 +1934,8 @@ THTP450   TYPE            = FUNCTION
           MOD             = ABEND0C1  HTTPD     HTTPDM    HTTPDMTT  HTTPDSRV
 ```
 
-The ACDS stanza of `THTP450` has the status `REC APP ACC RGN`.
+The ACDS stanza of `THTP450` has the status `REC APP ACC RGN`. This is the
+TK5 system.
 
 **Why the leftover matters.** With the development build in place, the install
 job of the HTTPD 4.4.0 package receives the SYSMOD (`RECV` ends RC 00), but `APPLYCHK` and `ACCEPT` both end
@@ -1950,14 +1953,25 @@ development build. The cause is the tombstone: after the development build
 `LIST CDS SYSMOD(THTP440)` answers `TYPE = FUNCTION` and `DELBY = THTP450`.
 
 A package that was built with a throwaway id of its own (`[smp] fmid` in
-`mbt.toml`) is the same case with another name. Wherever this section says
-`THTP450`, read your id.
+`mbt.toml`) is the same case with another name. That was not measured. Wherever
+this section says `THTP450`, read your id.
 
-Ask SMP which id the system carries:
+Ask SMP which id the system carries, with this job under the SMP procedure of
+your system (`SMPAPP` on TK5):
 
 ```
+//HTTPDLST JOB (SYS),'HTTPD LIST',
+//             CLASS=A,MSGCLASS=H,MSGLEVEL=(1,1),
+//             REGION=4096K
+//LISTM   EXEC SMPAPP
+//SMPCNTL  DD  *
  LIST CDS MOD(HTTPD) .
+/*
+//
 ```
+
+The measured job held this statement among others. This is the answer of the
+TK5 system, without the page headers of the listing:
 
 ```
 SMPCDS  MODULE ENTRIES
@@ -1971,33 +1985,38 @@ HTTPD     LASTUPD         = THTP450  TYPE=ADD
           LMOD            = HTTPD
 ```
 
-`FMID = THTP450` (or any other id that is not in the job of step 2) means that
-you are in the right section.
+`FMID = THTP450` means that you are in the right section, and so does any other
+id except `THTP400`, `THTP410`, `THTP420`, `THTP430` and `THTP440`: those five
+are releases, the job of step 2 removes them, and this section is not yours.
+Only `THTP450` has been measured.
 
 Run the steps above with three changes to the job of step 2, in both zones:
 
 1. Add a block for `THTP450`: `UCLIN CDS .` (`UCLIN ACDS .` in the ACDS),
-   `DEL SYSMOD(THTP450) .`, `ENDUCL .` and `RESETRC .`. Each zone has one more
-   block, so the job has 37 `DEL` statements, 21 against the CDS and 16 against
-   the ACDS.
+   `DEL SYSMOD(THTP450) .`, `ENDUCL .` and `RESETRC .`. Put it ahead of the
+   block `DEL SYSMOD(THTP440) .`, in each zone, which is where it stood in the
+   job that was run. Each zone has one more block, so the job has 37 `DEL`
+   statements, 21 against the CDS and 16 against the ACDS.
 2. In the five `DEL SYSMOD(THTP440) MOD(...)` blocks, name `THTP450` in place of
    `THTP440`. The modules of such a system belong to the newest id. The block
    `DEL SYSMOD(THTP440) .` stays.
 3. Add `LIST CDS SYSMOD(THTP450) .` and `LIST ACDS SYSMOD(THTP450) .` to the
-   `LIST` step. It has twelve statements then, and every one of them must show
-   its id as not found, as in step 3.
+   `LIST` step, each ahead of the `THTP440` statement of its zone. It has twelve
+   statements then, and every one of them must show its id as not found, as in
+   step 3.
 
-**What the changed job does.** Measured on TK5 and on MVS/CE, on systems that
-held the development build over 4.4.0 and on fresh ones. Every statement that
+**What the changed job does.** Measured on the TK5 system and the MVS/CE system
+described above and in four further runs. Every statement that
 names `THTP450` ends `HMA2550 UPDATE COMPLETE`, in both zones: the ten
 `DEL SYSMOD(THTP450) MOD(...)` blocks and the two `DEL SYSMOD(THTP450)`.
 The `UCLIN` step still ends `CC 0008` whenever the job names an id the system
 does not hold: `HMA2532` and RC 08 come from each `DEL SYSMOD` of an id the
 system never held, as step 2 describes. How many there are depends on the tombstones
 the system carries. Measured: four statements (`THTP410` and `THTP400` in each
-zone) on TK5 after 4.3.0, 4.4.0 and the development build; six (`THTP420`
+zone) on TK5 after 4.3.0, 4.4.0 and the development build (installed twice); six (`THTP420`
 added) on MVS/CE with 4.4.0 installed before the development build; eight
-(`THTP430` added) on fresh systems. Because of the `RESETRC .` the job
+(`THTP430` added) on fresh systems, MVS/CE and TK5 with an emptied inventory.
+Because of the `RESETRC .` the job
 runs to its end in every case, and `HMA2293` did not appear. Do not wait for
 `CC 0000`. The `LIST` is the result.
 
@@ -2015,7 +2034,7 @@ development build (measured on TK5 with `IEHLIST LISTPDS`: `ABEND0C1`, `HTTPD`,
 
 **Installing the release afterwards.** Measured with the HTTPD 4.4.0 package on
 TK5 and MVS/CE, on the systems the changed job had cleaned, without the
-allocation job. Every step of the install job ends `CC 0000`, `APPLY`
+allocation job. The package is the one of the 4.4.0 release. Every step of the install job ends `CC 0000`, `APPLY`
 included. `APPLY` reports ten `HMA2380` lines, one for each of the five modules
 in `HTTPD.LINKLIB` and in `HTTPD.AHTTPLOD`:
 
@@ -2041,6 +2060,16 @@ HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
 HTTPD001I HTTPD 4.4.0 READY - SERVING /www
 ```
+
+**A banner that says `-DEV` after this means that the server was loaded from
+another library.** `mbt deploy` writes a development build to
+`HTTPD.DEV.LINKLIB` by default, and a procedure whose `STEPLIB` names that
+library ahead of `HTTPD.LINKLIB` loads the module from there. Neither an SMP
+`DELETE` nor the release install touches `HTTPD.DEV.LINKLIB`. Read the `STEPLIB`
+of your started task procedure. If `HTTPD.DEV.LINKLIB` is named there, take it
+out, or scratch the library if you do not need it any more, and start HTTPD
+again. This was not measured with HTTPD: the development builds of the runs
+were installed from the SMP package and not deployed with `mbt deploy`.
 
 **What has not been measured.**
 
