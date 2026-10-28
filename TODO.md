@@ -14,7 +14,7 @@ is to hold nothing worth going stale.
 *Last reconciled against the tracker: 2026-10-27, against `origin/main` 35349ad, after v4.4.0
 (published 2026-10-27, tag `v4.4.0` on 93cd307 on the `release-4.4.x` branch; milestone 4.4.0
 closed) and after the manuals landed (PR #390). Nothing in this file waits on 4.4.0 any more.
-The open issues are in milestone 4.5.0, except #176, #271, #322, #323, #392, #393, #400, #413 and #421, which are in 4.6.0. #401 and #440 are closed and struck (PR #418, PR #446). #326,
+The open issues are in milestone 4.5.0, except #176, #271, #322, #323, #392, #393, #400, #413 and #421, which are in 4.6.0. #401 and #440 are closed and struck (PR #418, PR #446). #319 (PR #387) and #395 (PR #417, PR #420) are closed and struck. #326,
 #367 and #373 are closed and have no row. #377, #382 and #383 are closed and struck; #376 stays struck.
 #370 is listed and not ranked against the rest, and so are #391 to #395, #400 and
 #401, which the manuals work (#382) filed; #394 is closed and struck (PR #419). #399 is closed and struck (PR #427, live test
@@ -35,7 +35,7 @@ mvslovers/mbt#163.*
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
 | — | ~~#258~~ | ~~`type:research` — cleanup-only recovery WTOs flood the console~~ | **Done in this repo** — the three `abendrpt(ESTAE_CREATE, …)` calls pass `ABRPT_QUIET_TERM` (libc370 2.26.0, #712/#714); the pin moves to 2.26.0; milestone 4.5.0 |
-| — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | PR #387 (sample PROC comments the DDs out, guides say when to uncomment); measured without the DDs on mvsMF 1.4.0-dev and accepted; mvsMF 1.4.0 is released (2026-10-27), **the merge waits only for the board**; milestone 4.5.0 |
+| — | ~~#319~~ | ~~install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`)~~ | **Done** — the sample PROC comments the DDs out, the guides say when to uncomment; measured without the DDs on mvsMF 1.4.0-dev and accepted (PR #387); milestone 4.5.0 |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | parked, milestone 4.6.0: the network-outage path does not reproduce; a stale cached password reproduces the symptom (`test/live/submit-password.py`) but no password was changed at the reporting site, so it does not explain the incident. Waits on a new occurrence with console log and dump saved before the restart |
 | — | #413 | hardening — a cached credential keeps a changed RACF password until max-age | **a decision** between re-verify, downstream-refusal marking and documentation only; milestone 4.6.0 |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |
@@ -50,7 +50,7 @@ mvslovers/mbt#163.*
 | — | #392 | comment and declaration errors in `httpcgi.h` and `samplib/httpd` | milestone 4.6.0, not yet ranked |
 | — | #393 | message catalog — texts and comments that disagree with the code | milestone 4.6.0, not yet ranked |
 | — | ~~#394~~ | ~~diagnostic and display code — unchecked sizes and unescaped output~~ | **Done** — the title buffers are bounded, `/.dm` escapes its title and chunk rule, `GET /abend` is gone, URL decoding no longer cuts the path, a large `POST` to a module route is left unread for the module (PR #419, docs in the Reference); what it left over is #426 (struck below) and #431; milestone 4.5.0 |
-| — | #395 | `docs/installation.md` (the package README) — statements that do not match the release | milestone 4.5.0, not yet ranked; the corrections are merged (#417, with a follow-up on the UFSD session wording); what stays open is the check of the XMIT sizes and the 4.4.0-framed examples against the release artefact |
+| — | ~~#395~~ | ~~`docs/installation.md` (the package README) — statements that do not match the release~~ | **Done** — corrected against the 4.5.0 release (PR #417, follow-up PR #420); milestone 4.5.0 |
 | — | ~~#399~~ | ~~`HEAD` on a static file — the 501 answer carries a chunked body on a keep-alive connection~~ | **Done** — `HEAD` now answers with the headers a `GET` would send and no body (PR #427); the live check that the connection stays usable is PR #432; milestone 4.5.0 |
 | — | #400 | request handling edge cases — POST content type, form-login routes, request line without a URI | decide per item whether the code or the text changes; milestone 4.6.0, not yet ranked |
 | — | ~~#401~~ | ~~SSI — `printenv` exposes the server environment, output not escaped, long lines split~~ | **Done** — closed with PR #418; milestone 4.5.0 |
