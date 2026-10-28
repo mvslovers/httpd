@@ -400,11 +400,15 @@ crossing, check these points:
   names it. Do not scratch it with them.
 - *The procedure.* Compare it with the sample (@ug-upgrade-review).
 
-#note[*A defect* (httpd#256): the procedure of 4.0.0 had no #cmd("HASPCKPT") and
-#cmd("HASPACE1") statements. The jobs API of mvsMF opens the two data sets by
-their DD names in the task of the server, and without them it answers every
-job list and spool read with an error. The sample procedure of 4.0.1 has the
-statements back. A procedure that you copied from 4.0.0 needs them added.]
+*The JES2 DDs.* The procedure of 4.0.0 had no #cmd("HASPCKPT") and
+#cmd("HASPACE1") statements. mvsMF 1.3.0 and earlier open the two data sets by
+their DD names in the task of the server, and without the statements they
+answer a job list with status 500 and a request for one job with status 404.
+The sample procedure of 4.0.1 has the statements back. From 4.5.0 on, the
+sample procedure has them as comment lines, because mvsMF 1.4.0 and later do
+not need them. A procedure that you copied from 4.0.0 needs them active when you
+run mvsMF 1.3.0 or earlier or a JES2 with a prefix other than #cmd("SYS1")
+(@ug-install).
 
 *A clean cut instead.* If you have all the packages, but would rather not
 install five releases in turn, you can remove HTTPD with @ug-remove and then
@@ -480,10 +484,12 @@ writes #cmd("HTTPD440W") for a module that is not found, and a request to the
 route gets status 503 with #cmd("HTTPD908E") on the console. Delete the line.
 
 *The DD names.* Keep the statements #cmd("HASPCKPT") and #cmd("HASPACE1") in
-the procedure as long as mvsMF runs. A module runs in the task of the server,
-and the jobs API of mvsMF opens the two data sets by DD name. Whether a later
-release of mvsMF needs them is a question for its guide, and this book does not
-say. The sample procedure has them, and leaving them in is safe.
+the procedure when you run mvsMF 1.3.0 or earlier. A module runs in the task of
+the server, and these releases of mvsMF open the two data sets by DD name. From
+mvsMF 1.4.0 on, the statements are optional: the jobs API allocates
+#cmd("SYS1.HASPCKPT") and #cmd("SYS1.HASPACE") itself when the procedure has no
+DD. They stay needed on a JES2 whose prefix is not #cmd("SYS1"). Leaving them
+in is safe.
 
 *What is new.* HTTP/1.1 with persistent connections and chunked transfer, a
 strict parser, and routing by the extension of a file with #cmd("MOD=") (@ug-routes).
@@ -535,10 +541,13 @@ to look for. The first two matter for the safety of the system.
   restart. This matters when you install a new mvsMF. With #cmd("RESIDENT=NO")
   every request fetches the module. A module that is neither reentrant nor
   serially reusable is not held, and the start says so with #cmd("HTTPD441W").
-- *The procedure.* It names the library in the #cmd("STEPLIB"), the Parmlib
-  member in the #cmd("HTTPPRM") statement, and from 4.0.1 on the two JES2 data
-  sets. Check that #cmd("UNIT") and #cmd("VOL=SER") of the two JES2 statements
-  match your own JES2 procedure.
+- *The procedure.* It names the library in the #cmd("STEPLIB") and the Parmlib
+  member in the #cmd("HTTPPRM") statement. From 4.0.1 on it had the two JES2
+  data sets, and from 4.5.0 on it has them as comment lines. Your own active
+  statements keep working, so you need not change them. If you run mvsMF 1.4.0
+  or later on a JES2 with the prefix #cmd("SYS1"), you may comment them out. If
+  you keep them, check that #cmd("UNIT") and #cmd("VOL=SER") match your own JES2
+  procedure.
 
 "The HTTPPRM Keywords" in the _HTTPD Reference_ has a section on the keywords
 that are no longer valid. A member from an earlier release starts, except for a
@@ -581,8 +590,11 @@ upgrade.
       of a move from 4.0.x on another volume. HTTPD falls back to the SVC of
       RAKF. Without RAKF it ends with #cmd("HTTPD012E") ("Authority" in
       @ug-install).],
-    [Job lists and spool reads of mvsMF answer with an error.], [The
-      procedure lacks #cmd("HASPCKPT") and #cmd("HASPACE1").],
+    [A job list of mvsMF answers 500. A request for one job or its spool
+      answers 404 "job not found" although the job exists.], [mvsMF 1.3.0 or
+      earlier, or a JES2 with a prefix other than #cmd("SYS1"), and the
+      procedure lacks #cmd("HASPCKPT") and #cmd("HASPACE1"). Add the two
+      statements (@ug-install).],
   )
 ]
 

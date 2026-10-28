@@ -1004,7 +1004,8 @@ procedure lacks a DD that a module needs, the module fails.
 
 The procedure that comes with HTTPD has these DDs. It also has the DDs
 #cmd("SYSUDUMP"), #cmd("SNAP") and #cmd("HTTPSTAT"), all with
-#cmd("SYSOUT=*").
+#cmd("SYSOUT=*"). The DDs #cmd("HASPCKPT") and #cmd("HASPACE1") are in it as
+comment lines.
 
 #tab(caption: [The DDs of the HTTPD procedure])[#table(
   columns: (1.2in, 1fr),
@@ -1015,14 +1016,29 @@ The procedure that comes with HTTPD has these DDs. It also has the DDs
   [#cmd("HTTPDIN")], [#cmd("stdin") of a module. It is DUMMY.],
   [#cmd("HTTPDBG")], [The debug file (see @ref-api-dbg).],
   [#cmd("HTTPPRM")], [The Parmlib member (#cmd("FREE=CLOSE")).],
-  [#cmd("HASPCKPT"), #cmd("HASPACE1")], [The JES2 checkpoint data set and the spool volume. HTTPD never opens them. See below.],
+  [#cmd("HASPCKPT"), #cmd("HASPACE1")], [Optional, comment lines in the sample. The JES2 checkpoint data set and the spool volume. HTTPD never opens them. See below.],
 )]
 
-The two JES2 DDs are for the modules. A module that calls the C library
-routine #cmd("jesopen()") needs both. The jobs interface of mvsMF is such a
-module. If they are missing, every job list, every lookup of a job and every
-read of spool output answers 500, and two lines go to the console. A job that is submitted does not need them, because the
-submit goes through the internal reader, which the module allocates itself.
+The two JES2 DDs are for the modules that read JES2. A module that calls the C
+library routine #cmd("jesopen()") opens the checkpoint and the spool. The jobs
+interface of mvsMF is such a module. A DD in the procedure wins. When the
+procedure has no DD, the routine of LIBC/370 2.24.0 and later allocates
+#cmd("SYS1.HASPCKPT") and #cmd("SYS1.HASPACE") itself. The DDs are therefore
+optional for a module built with such a level, which includes mvsMF 1.4.0 and
+later. They stay mandatory in two cases:
+
+- The module is built with an older level of the C library. The jobs interface
+  of mvsMF 1.3.0 and earlier is such a module. Without the DDs, every job list answers 500
+  and every lookup of a job by name and id answers 404, a spool read
+  included, and two lines go to the console.
+- The JES2 of the system builds its data set names with a prefix other than
+  #cmd("SYS1"). The allocation looks only for the #cmd("SYS1") names.
+
+A job that is submitted does not need the DDs, because the submit goes through
+the internal reader, which the module allocates itself. The messages and the
+answers are in @ref-stc-jes.
+
+To use the DDs, uncomment them in the sample member:
 
 #screen(```
 //HASPCKPT DD DSN=SYS1.HASPCKPT,DISP=SHR,UNIT=3350,VOL=SER=MVS000
@@ -1031,8 +1047,8 @@ submit goes through the internal reader, which the module allocates itself.
 
 The unit and the volume serial must be those of the JES2 procedure of the
 site. The values above are those of the sample procedure.
-Before you remove a DD from the procedure, find out which modules of other
-products use it.
+Before you remove a DD that is active in a procedure, find out which modules of
+other products use it.
 
 == Resident Modules <ref-api-resident>
 

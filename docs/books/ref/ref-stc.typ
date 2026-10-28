@@ -38,9 +38,10 @@ This is the member without its comment lines.
 //HTTPDBG  DD  SYSOUT=*
 //HTTPSTAT DD  SYSOUT=*
 //HTTPPRM  DD  DSN=&D(&M),DISP=SHR,FREE=CLOSE
-//HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
-//HASPACE1 DD  DISP=SHR,DSN=SYS1.HASPACE,UNIT=3350,VOL=SER=SPOOL1
 ```
+
+The member also has the statements #cmd("HASPCKPT") and #cmd("HASPACE1"), as
+comment lines (@ref-stc-jes).
 
 The package build writes the name of the library that SMP installs into, here
 #cmd("HTTPD.LINKLIB"), into the #cmd("STEPLIB") statement of the member.
@@ -220,10 +221,12 @@ The next table shows what each DD of the procedure is for.
     [#cmd("HTTPSTAT")], [#cmd("SYSOUT=*")], [Not opened by HTTPD.],
     [#cmd("HTTPPRM")], [#cmd("DSN=&D(&M),") #cmd("DISP=SHR,FREE=CLOSE")], [The
       Parmlib member (@ref-stc-prm).],
-    [#cmd("HASPCKPT")], [#cmd("DISP=SHR,DSN=SYS1.HASPCKPT,") #cmd("UNIT=3350,VOL=SER=MVS000")],
-      [The checkpoint data set of JES2, for server modules (@ref-stc-jes).],
-    [#cmd("HASPACE1")], [#cmd("DISP=SHR,DSN=SYS1.HASPACE,") #cmd("UNIT=3350,VOL=SER=SPOOL1")],
-      [The spool data set of JES2, for server modules (@ref-stc-jes).],
+    [#cmd("HASPCKPT")], [A comment line: #cmd("DISP=SHR,DSN=SYS1.HASPCKPT,") #cmd("UNIT=3350,VOL=SER=MVS000")],
+      [The checkpoint data set of JES2, for server modules. Optional
+      (@ref-stc-jes).],
+    [#cmd("HASPACE1")], [A comment line: #cmd("DISP=SHR,DSN=SYS1.HASPACE,") #cmd("UNIT=3350,VOL=SER=SPOOL1")],
+      [The spool data set of JES2, for server modules. Optional
+      (@ref-stc-jes).],
   )
 ]
 
@@ -279,17 +282,59 @@ not start. The messages with the letter W stop the start as well.
 HTTPD does not open #cmd("HASPCKPT") or #cmd("HASPACE1") itself. A server module
 runs in the task of the server, because HTTPD starts it with the LINK macro. The
 module has no allocations of its own and opens a DD name in the allocations of
-the started task. The jobs API of mvsMF opens the two data sets by DD name
-through the function #cmd("jesopen()"). This is the reason for the two DDs. The
-comment in the procedure states:
+the started task. The jobs API of mvsMF reads the checkpoint and the spool of
+JES2 through the function #cmd("jesopen()") of the C library.
 
-- Without the two DDs, every job list, job lookup and read of spool output
-  answers with status 500 and writes two console lines. Submitting a job is not
-  affected, because the submit allocates its own internal reader.
-- #cmd("UNIT") and #cmd("VOL=SER") must match the JES2 procedure of the system.
-  Check them there before the first start.
-- The DDs are #cmd("DISP=SHR"), because JES2 owns the data sets.
-- Remove them only if no module in the server reaches JES2.
+#idx("jesopen")
+The two DDs are optional. The sample member has both as comment lines. What
+#cmd("jesopen()") does depends on the level of the C library that the module is
+built with:
+
+- With LIBC/370 2.24.0 and later, a DD in the procedure wins. When the
+  procedure has no #cmd("HASPCKPT"), the function allocates #cmd("SYS1.HASPCKPT")
+  itself, through the catalog or, when the data set is not cataloged, on the
+  online volume that holds it. When the procedure has no #cmd("HASPACE1"), it
+  allocates #cmd("SYS1.HASPACE") on the spool volume that the checkpoint names.
+  mvsMF 1.4.0 and later are built with such a level.
+- With an older level, the function opens only the DD names. The jobs API of
+  mvsMF 1.3.0 and earlier is built this way, and it needs both DDs.
+
+Uncomment both lines of the sample member in these two cases:
+
+- You run mvsMF 1.3.0 or earlier.
+- The JES2 of the system builds its data set names with a prefix other than
+  #cmd("SYS1") (its #cmd("$DSNPRFX") value). The allocation looks only for the
+  #cmd("SYS1") names. When it finds no checkpoint, the C library writes the
+  console lines
+  #cmd("SYS1.HASPCKPT is not cataloged and is on no online volume") and
+  #cmd("JES2 uses another dataset name prefix than SYS1, or there is no JES2 checkpoint").
+
+Leaving the DDs active in any other system does no harm, because a DD wins.
+When you uncomment them, #cmd("UNIT") and #cmd("VOL=SER") must match the JES2
+procedure of the system. Check them there before the first start. The DDs are
+#cmd("DISP=SHR"), because JES2 owns the data sets.
+
+When the data sets cannot be reached, the server still starts, and everything
+except the jobs API works. This holds in both cases above: mvsMF 1.3.0 or
+earlier without the DDs, and any mvsMF level on a system with another prefix
+than #cmd("SYS1") without the DDs. The effect differs by request:
+
+#tab(caption: [A request when the JES2 data sets cannot be opened])[
+  #table(columns: (1.6in, 1fr),
+    [Request], [Answer],
+    [The job list], [Status 500, with the message "Unable to open JES2
+      checkpoint and spool datasets".],
+    [Any request that names a job by name and id, a spool read included],
+      [Status 404, "job not found", although the job exists. The function that
+      looks the job up cannot tell an unreachable JES2 from an unknown job.],
+  )
+]
+
+Each of these requests writes the console line
+#cmd("MVSMF201E UNABLE TO OPEN THE JES2 CHECKPOINT AND SPOOL DATA SETS"), and the
+C library writes the line that names the data set that it could not open. Read
+the console, not the status code. Submitting a job is not affected, because the
+submit allocates its own internal reader.
 
 == The STEPLIB <ref-stc-steplib>
 
