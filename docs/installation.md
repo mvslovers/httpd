@@ -1893,10 +1893,61 @@ Those are yours to delete — unmount the disk before you scratch it.
 A development build of `main` is packaged under the FMID of the release that
 `main` is heading for. A build of 4.5.0-dev carries `THTP450`, although 4.5.0 is
 not released. If you installed such a package by SMP, the system holds an id
-that the job in step 2 does not name. The `DEL` statements for the modules name
-the id that owns them, and that is `THTP450`, so the job cannot free them.
-<!-- MEASURE: what the job of step 2 does on such a system: return codes, which
-     DEL fail, what LIST shows afterwards -->
+that the job in step 2 does not name.
+
+**What the job of step 2 does on such a system.** Measured on TK5 and on MVS/CE
+with SMP 4 (`HMASMP LVL 04.48`), with a development build installed over a
+system that held 4.4.0 and over a fresh system. The job ends `CC 0008`, and it
+removes the modules but not the development build:
+
+- The five `DEL SYSMOD(THTP440) MOD(...)` blocks of each zone fail with
+  `HMA3572` and `HMA2560`, RC 08. On such a system `THTP440` is only a
+  tombstone (`DELBY = THTP450`) and lists no modules:
+
+  ```
+  HMA3572 ** MOD HTTPD TO BE DELETED FROM ENTRY DOES NOT EXIST
+  HMA2560    UPDATE PROCESSING TERMINATED - UPDATE NOT COMPLETE
+  ```
+
+- The `DEL MOD` and `DEL LMOD` blocks end `HMA2550 UPDATE COMPLETE`. The
+  module entries are gone from both zones, and so is `THTP440` with every older
+  id the system held.
+- `THTP450` stays in both zones. Its `MOD` list still names the five modules,
+  whose entries no longer exist.
+- The libraries are not touched.
+
+`LIST CDS MOD(...)`, `LIST CDS LMOD(...)` and `LIST ACDS MOD(...)` now answer
+RC 04, not found, so the modules look free. Only the function itself shows
+what is left:
+
+```
+THTP450   TYPE            = FUNCTION
+          STATUS          = REC  APP  ACC
+          FMID            = THTP450
+          JCLIN           = YES
+          DATE/TIME REC   = 26.301  18:17:20
+                    APP   = 26.301  18:17:50
+                    ACC   = 26.301  18:18:04
+          DELETE VER(001) = THTP440
+          MOD             = ABEND0C1  HTTPD     HTTPDM    HTTPDMTT  HTTPDSRV
+```
+
+The ACDS stanza of `THTP450` has the status `REC APP ACC RGN`.
+
+**Why the leftover matters.** With the development build in place, the install
+job of the HTTPD 4.4.0 package receives the SYSMOD (`RECV` ends RC 00), but `APPLYCHK` and `ACCEPT` both end
+RC 12, and nothing is installed:
+
+```
+HMA3792 ** SYSMOD THTP440 SELECTED FOR APPLY IS DELETED
+HMA3703 ** APPLY PROCESSING TERMINATED BECAUSE FUNCTION SYSMOD THTP440 FAILED
+HMA2050    APPLY PROCESSING COMPLETED - HIGHEST RETURN CODE IS 12
+```
+
+`ACCEPT` reports the same `HMA3792` with `SELECTED FOR ACCEPT`. `THTP450` and
+its modules stay as they were, and a restart still prints the banner of the
+development build. The cause is the tombstone: after the development build
+`LIST CDS SYSMOD(THTP440)` answers `TYPE = FUNCTION` and `DELBY = THTP450`.
 
 A package that was built with a throwaway id of its own (`[smp] fmid` in
 `mbt.toml`) is the same case with another name. Wherever this section says
@@ -1906,6 +1957,18 @@ Ask SMP which id the system carries:
 
 ```
  LIST CDS MOD(HTTPD) .
+```
+
+```
+SMPCDS  MODULE ENTRIES
+
+  NAME
+
+HTTPD     LASTUPD         = THTP450  TYPE=ADD
+          LIBRARIES       = DISTLIB=AHTTPLOD
+          FMID            = THTP450
+          RMID            = THTP450
+          LMOD            = HTTPD
 ```
 
 `FMID = THTP450` (or any other id that is not in the job of step 2) means that
@@ -1924,24 +1987,70 @@ Run the steps above with three changes to the job of step 2, in both zones:
    `LIST` step. It has twelve statements then, and every one of them must show
    its id as not found, as in step 3.
 
-<!-- MEASURE: the modified job: UCLIN return codes and messages per zone, the
-     LIST, LIST CDS/ACDS MOD(...) afterwards -->
+**What the changed job does.** Measured on TK5 and on MVS/CE, on systems that
+held the development build over 4.4.0 and on fresh ones. Every statement that
+names `THTP450` ends `HMA2550 UPDATE COMPLETE`, in both zones: the ten
+`DEL SYSMOD(THTP450) MOD(...)` blocks and the two `DEL SYSMOD(THTP450)`.
+The `UCLIN` step still ends `CC 0008` whenever the job names an id the system
+does not hold: `HMA2532` and RC 08 come from each `DEL SYSMOD` of an id the
+system never held, as step 2 describes. How many there are depends on the tombstones
+the system carries. Measured: four statements (`THTP410` and `THTP400` in each
+zone) on TK5 after 4.3.0, 4.4.0 and the development build; six (`THTP420`
+added) on MVS/CE with 4.4.0 installed before the development build; eight
+(`THTP430` added) on fresh systems. Because of the `RESETRC .` the job
+runs to its end in every case, and `HMA2293` did not appear. Do not wait for
+`CC 0000`. The `LIST` is the result.
+
+After the job, the twelve `LIST ... SYSMOD(...)` statements and the eleven
+`LIST CDS MOD(...)`, `LIST CDS LMOD(HTTPD)` and `LIST ACDS MOD(...)` statements
+all answer `NOT FOUND`, RC 04, on every system measured. Both zones are empty.
 
 Do not scratch the libraries (step 4) if you install a release next. Run the
 install job of the release package as in section 6, and not the allocation job
 of section 4, which fails on libraries that exist. The inventory is clean, but
 `UCLIN` has not touched the libraries: until the release is installed,
-`HTTPD.LINKLIB` still holds the modules of the development build. After the
-install, `LIST CDS MOD(HTTPD) .` must show the `FMID` of the release and not
-`THTP450`, and the banner must name the release.
+`HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` still hold the five modules of the
+development build (measured on TK5 with `IEHLIST LISTPDS`: `ABEND0C1`, `HTTPD`,
+`HTTPDM`, `HTTPDMTT` and `HTTPDSRV` in each).
 
-<!-- MEASURE: the release install over the cleaned system: HMA2380 for each of
-     the five modules, member lists, LIST MOD(HTTPD), the banner. Control run:
-     the release installed over the development build without this section -->
+**Installing the release afterwards.** Measured with the HTTPD 4.4.0 package on
+TK5 and MVS/CE, on the systems the changed job had cleaned, without the
+allocation job. Every step of the install job ends `CC 0000`, `APPLY`
+included. `APPLY` reports ten `HMA2380` lines, one for each of the five modules
+in `HTTPD.LINKLIB` and in `HTTPD.AHTTPLOD`:
 
-**What has not been measured.** <!-- MEASURE: replace with the open points
-after the runs: a system with an older history, a second development build over
-the first -->
+```
+HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP440 - RETURN CODE=00
+HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=AHTTPLOD - SYSMOD=THTP440 - RETURN CODE=00
+```
+
+`LIST CDS MOD(HTTPD) .` and the other four now show `FMID = THTP440` and
+`RMID = THTP440`, and `THTP440` is `REC APP ACC` (`REC APP ACC RGN` in the
+ACDS). `THTP450` is not found.
+
+`LIST SYSMOD(THTP430)` now answers `TYPE = FUNCTION` and `DELBY = THTP440`, in
+both zones, also on a system that never held `THTP430`. That tombstone is the
+release's own and not a leftover of the development build.
+
+After `/S HTTPD`, the console lines show the release:
+
+```
+HTTPD000I HTTPD 4.4.0 (93CD307) STARTING
+HTTPD005I LIBC370 2.25.1 (FCDE4E8)
+HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
+HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
+HTTPD001I HTTPD 4.4.0 READY - SERVING /www
+```
+
+**What has not been measured.**
+
+- The runs did not stop HTTPD before the jobs (step 1 of this chapter). The
+  server was running while SMP replaced the modules, and it was restarted after
+  the install.
+- A development build installed directly over a system that holds 4.3.0 or
+  older, and a system with a history older than 4.3.0 (`THTP410`, `THTP400`).
+- The release install over a system that only the job of step 2 cleaned, with
+  `THTP450` still in the inventory.
 
 ---
 
