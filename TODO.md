@@ -35,7 +35,7 @@ mvslovers/mbt#163.*
 | | Issue | Kind | Waiting on |
 |---|---|---|---|
 | — | ~~#258~~ | ~~`type:research` — cleanup-only recovery WTOs flood the console~~ | **Done in this repo** — the three `abendrpt(ESTAE_CREATE, …)` calls pass `ABRPT_QUIET_TERM` (libc370 2.26.0, #712/#714); the pin moves to 2.26.0; milestone 4.5.0 |
-| — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | **the modules rebuilt** against 2.24.0 or later, then a measurement on a system with an uncataloged JES2; not yet ranked |
+| — | #319 | install — make the `HASPCKPT`/`HASPACE1` DDs optional (libc370 2.24.0 `jesopen()`) | PR #387 (sample PROC comments the DDs out, guides say when to uncomment); measured without the DDs on mvsMF 1.4.0-dev and accepted; mvsMF 1.4.0 is released (2026-10-27), **the merge waits only for the board**; milestone 4.5.0 |
 | — | #271 | `IEF722I INVALID PASSWORD` on mvsMF job submit until restart | parked, milestone 4.6.0: the network-outage path does not reproduce; a stale cached password reproduces the symptom (`test/live/submit-password.py`) but no password was changed at the reporting site, so it does not explain the incident. Waits on a new occurrence with console log and dump saved before the restart |
 | — | #413 | hardening — a cached credential keeps a changed RACF password until max-age | **a decision** between re-verify, downstream-refusal marking and documentation only; milestone 4.6.0 |
 | — | #322 | hygiene, explicitly not a bug — `PREALLOC`, step 1 of the closed #198 (step 2 landed as PR #305) | milestone 4.6.0; not yet ranked |

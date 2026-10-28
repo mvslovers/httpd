@@ -293,8 +293,8 @@ The same mechanism decides more than where the module is found. A module runs
 **in HTTPD's task**, so every ddname it opens has to be allocated by the STC
 procedure — a CGI has no allocations of its own.
 
-mvsMF's jobs API reads the JES2 checkpoint and spool directly, by DD name, and
-the shipped procedure allocates them:
+mvsMF's jobs API reads the JES2 checkpoint and spool. Up to mvsMF 1.3.0 it
+opens them by DD name, so the procedure has to allocate them:
 
 ```
 //HASPCKPT DD  DISP=SHR,DSN=SYS1.HASPCKPT,UNIT=3350,VOL=SER=MVS000
@@ -305,12 +305,14 @@ the shipped procedure allocates them:
 start — they are site values, not constants, and the ones above are only what
 the pattern has always carried.
 
-The two DDs are needed up to mvsMF 1.3.0. With mvsMF 1.4.0 and later they can
-go: its jobs API allocates the JES2 checkpoint and spool data sets itself when
-the procedure has no DD for them. The exception is a JES2 whose `$DSNPRFX` is
-not `SYS1` — there the DDs stay mandatory, because the allocation only looks for
-the `SYS1` names. The procedure shipped with this release still carries both
-DDs, and leaving them in is always safe.
+With mvsMF 1.4.0 and later the two DDs are optional: its jobs API allocates the
+JES2 checkpoint and spool data sets itself when the procedure has no DD for
+them, and a DD in the procedure still wins. The exception is a JES2 whose
+`$DSNPRFX` is not `SYS1` — there the DDs stay mandatory, because the allocation
+only looks for the `SYS1` names. The procedure shipped with this release
+(`samplib/httpd`) carries both DDs as comment lines. Uncomment them if you run
+mvsMF 1.3.0 or earlier or a `$DSNPRFX` other than `SYS1`; leaving them active
+elsewhere is harmless.
 
 Where the DDs are needed (mvsMF 1.3.0 or earlier, or a `$DSNPRFX` other than
 `SYS1`) and missing, the server starts normally and everything else works. The
@@ -319,8 +321,7 @@ jobs API does not — and it does not fail uniformly:
 | request | answer |
 |---|---|
 | job list (`GET /zosmf/restjobs/jobs`) | `500`, `REASON_INCORRECT_JES_VSAM_HANDLE` |
-| spool retrieval | `500`, same reason |
-| anything resolving one job by name and id | **`404` job not found** |
+| anything resolving one job by name and id, including spool retrieval | **`404` job not found** |
 
 The 404 is the one to know about. `find_job_by_name_and_id()` returns NULL
 whether JES2 is unreachable or the job genuinely is not there, and its callers
@@ -328,6 +329,7 @@ report the second. A client is told the job does not exist while it does — so
 read the console, not the status code:
 
 ```
+IEC130I HASPCKPT DD STATEMENT MISSING
 Unable to open checkpoint dataset DD:HASPCKPT
 MVSMF201E UNABLE TO OPEN THE JES2 CHECKPOINT AND SPOOL DATA SETS
 ```
