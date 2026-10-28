@@ -15,11 +15,16 @@
     MVS 3.8j (httpd 4.5.0), and to all subsequent releases and modifications
     until otherwise indicated in new editions.
 
-    *Draft.* HTTPD 4.5 is still in development, and so is this book. The
-    console and client sessions in it were captured from a development build
-    of HTTPD 4.5. The chapters on installing, upgrading and removing HTTPD
-    were measured on release 4.4.0 and are to be measured again on the
-    release 4.5.0.
+    *Draft.* This is a draft edition, as the last digit of the number says.
+    The console and client sessions in the chapters on configuring and
+    running HTTPD were captured from a development build of HTTPD 4.5.0, which
+    shows the version #raw("4.5.0-DEV"). The sessions in the chapters on
+    installing, upgrading and removing HTTPD were captured on release 4.4.0 on
+    a TK5 system, except the section of the removal chapter on a development
+    build, which comes from development builds of 4.5.0. The install job of a
+    package build of 4.5.0, the upgrade from 4.4.0 to 4.5.0 and the removal job
+    for 4.5.0 were run on a TK5 system as well, and the chapters name what they
+    measured.
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.

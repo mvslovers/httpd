@@ -1849,7 +1849,9 @@ step's highest return code above the 04 you were expecting. A stanza naming
 
 A system that was upgraded also carries the **tombstone** of every level it
 came through: `THTP440` listed as `TYPE = FUNCTION` with `DELBY = THTP450` and
-nothing else. `LIST` answers **RC 00** for those, not RC 04, so the
+nothing else. A system that took 4.5.0 as a first install carries one as well:
+the SYSMOD of 4.5.0 holds `DELETE(THTP440)`, so `THTP440` is a tombstone there
+too, in the CDS and in the ACDS. `LIST` answers **RC 00** for those, not RC 04, so the
 "RC 04 + empty list = free" rule above reads them as occupied — which is
 correct, the ids are spent and can never be reused.
 
@@ -1903,9 +1905,13 @@ Those are yours to delete — unmount the disk before you scratch it.
 > function SYSMOD, not of any one product. The `UCLIN` job above, in its
 > 33-statement form, was run end to end on TK5 with SMP 4 (`HMASMP LVL 04.48`)
 > on a system holding `THTP430` and the tombstone `THTP420`; the 37-statement
-> form was run on systems holding a development build under `THTP450`. It was
-> not run on a system holding all six ids, or on one with single `MOD` or `LMOD`
-> entries missing. Read the `LIST` output, not the `UCLIN` return codes.
+> form was run on a TK5 system holding `THTP450`, `THTP440`, `THTP430` and
+> `THTP420`, and on systems holding a development build under `THTP450`. On the
+> first system the `UCLIN` step ended RC 08 from four `HMA2532` (`THTP400` and
+> `THTP410`, in each zone), 33 statements ended `HMA2550`, there was no
+> `HMA2293`, and the `LIST` step ended RC 04 with all six ids not found in the
+> CDS and in the ACDS. A first install ran without an error afterwards. The job
+> was not run on one with single `MOD` or `LMOD` entries missing. Read the `LIST` output, not the `UCLIN` return codes.
 
 ### You installed a development build with a later FMID
 

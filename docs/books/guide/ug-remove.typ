@@ -19,7 +19,8 @@ measured on release 4.4.0 (the FMID #cmd("THTP440")) on a TK5 system. The FMID
 of a release is #cmd("THTP") and the three digits of its version. HTTPD 4.5.0 is
 #cmd("THTP450"), and it deletes #cmd("THTP440"); the rule is in the _HTTPD
 Reference_, in "The Started Task and the Package", section "The FMID". The job
-in this chapter is the 4.4.0 job. @ug-remove-45 tells what changes for 4.5.0.
+in this chapter is the 4.4.0 job. @ug-remove-45 tells what changes for 4.5.0,
+and what the 4.5.0 form of the job did on a TK5 system.
 If you installed a development build of HTTPD, read @ug-remove-dev too.]
 
 == What HTTPD Put on the System <ug-remove-what>
@@ -50,9 +51,12 @@ the deleted function in both zones as a mark. SMP lists the mark as
 #cmd("LIST") of such an id ends with return code 0, not 4. A system that took
 four upgrades carries four of these marks. A removal that names only the
 current release and its predecessor leaves the older marks in the inventory for
-good. The job in this chapter therefore names every FMID that HTTPD has ever
-spent, from #cmd("THTP400") to #cmd("THTP440"). You need not know which
-releases your system has seen.
+good. The SYSMOD of 4.5.0 carries #cmd("DELETE(THTP440)"), so a system that
+took 4.5.0 as its first install holds #cmd("THTP440") as a mark as well, with
+#cmd("DELBY = THTP450") in the CDS and in the ACDS. The job in this chapter
+therefore names every FMID that HTTPD has ever spent, from #cmd("THTP400") to
+#cmd("THTP440") (to #cmd("THTP450") in the form of @ug-remove-45). You need not
+know which releases your system has seen.
 
 == Step 1: Stop the Server <ug-remove-stop>
 
@@ -294,9 +298,17 @@ above is the 4.4.0 job. For 4.5.0, make these changes in both zones.
 - Add #cmd("LIST CDS SYSMOD(THTP450) .") and
   #cmd("LIST ACDS SYSMOD(THTP450) .") to the #cmd("LIST") step.
 
-The release 4.5.0 itself has not been installed and removed on a system. The
-next section is about the case where a system holds #cmd("THTP450") already,
-because a development build put it there.
+*What was measured.* The 4.5.0 form of the job has 37 #cmd("DEL") statements.
+It was run on a TK5 system that held #cmd("THTP450"), #cmd("THTP440"), #cmd("THTP430") and
+#cmd("THTP420"). The #cmd("UCLIN") step ended with return code 8, from four
+#cmd("HMA2532") for #cmd("THTP400") and #cmd("THTP410"), two for each. 33
+statements ended with #cmd("HMA2550"), and there was no #cmd("HMA2293"). The
+#cmd("LIST") step ended with return code 4, and all six ids were not found in
+the CDS and in the ACDS. After the scratch of the two libraries, the install of
+a package build of 4.5.0 (@ug-install) ran without an error.
+
+The next section is about the case where a system holds #cmd("THTP450")
+already, because a development build put it there.
 
 == A Development Build with a Later FMID <ug-remove-dev>
 
@@ -304,7 +316,7 @@ because a development build put it there.
 #idx("THTP450", "development build")
 A development build of the source tree is packaged under the FMID of the
 release that the tree is heading for. A build of 4.5.0-dev carries
-#cmd("THTP450"), although 4.5.0 is not released. If you installed such a package
+#cmd("THTP450"), the id of the release that the tree becomes. If you installed such a package
 with SMP, the system holds an id that the job of @ug-remove-uclin does not name.
 
 *What the job does on such a system.* The sessions of this section were

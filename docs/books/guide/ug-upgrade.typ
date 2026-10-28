@@ -27,9 +27,12 @@ new release, it deletes the load modules of the old one from
   FMID is deleted. SMP cannot restore the old modules.
 
 The captures in this chapter come from the upgrade from 4.3.0 to 4.4.0 on a
-TK5 system. The upgrade to 4.5.0 has the same shape, with the FMID
-#cmd("THTP450") in place of #cmd("THTP440"). The file names in your package
-carry the number of your release.
+TK5 system. The upgrade from 4.4.0 to 4.5.0 was run on a TK5 system as well.
+It has the same shape, with the FMID #cmd("THTP450") in place of
+#cmd("THTP440"): every step of the install job ended with return code 0000
+except the APPLY, which ended with return code 0004 and
+#cmd("HMA2461 SYSMOD THTP440 NOT FOUND ON SMPSCDS LIBRARY"). The file names in
+your package carry the number of your release.
 
 == One Release at a Time <ug-upgrade-hops>
 
@@ -360,7 +363,11 @@ predecessor from the version. A package build of 4.5.0 produced
 rows of the table in @ug-upgrade-hops come from the project file and from the
 measured installs of the releases. The step output in this chapter is from the
 upgrade 4.3.0 to 4.4.0, where #cmd("THTP440") deleted #cmd("THTP430"). The
-upgrade to 4.5.0 itself has not been run on a system for this book.
+upgrade from 4.4.0 to 4.5.0 was run as well: #cmd("THTP450") is a
+#cmd("FUNCTION") with the line #cmd("DELETE VER(001) = THTP440"),
+#cmd("THTP440") shows #cmd("DELBY = THTP450") and no modules, the mark
+#cmd("DELBY = THTP440") of #cmd("THTP430") stays, and #cmd("HTTPD.LINKLIB") and
+#cmd("HTTPD.AHTTPLOD") each hold the five members of the package.
 
 == Upgrading from HTTPD 4.0.x <ug-upgrade-40x>
 
