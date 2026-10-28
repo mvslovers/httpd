@@ -1028,15 +1028,15 @@ optional for a module built with such a level, which includes mvsMF 1.4.0 and
 later. They stay mandatory in two cases:
 
 - The module is built with an older level of the C library. The jobs interface
-  of mvsMF 1.3.0 and earlier is. Without the DDs, every job list answers 500
+  of mvsMF 1.3.0 and earlier is such a module. Without the DDs, every job list answers 500
   and every lookup of a job by name and id answers 404, a spool read
   included, and two lines go to the console.
 - The JES2 of the system builds its data set names with a prefix other than
   #cmd("SYS1"). The allocation looks only for the #cmd("SYS1") names.
 
 A job that is submitted does not need the DDs, because the submit goes through
-the internal reader, which the module allocates itself. "The JES2 data sets"
-in @ref-stc-jes has the messages and the answers.
+the internal reader, which the module allocates itself. The messages and the
+answers are in @ref-stc-jes.
 
 To use the DDs, uncomment them in the sample member:
 

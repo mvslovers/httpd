@@ -315,8 +315,9 @@ procedure of the system. Check them there before the first start. The DDs are
 #cmd("DISP=SHR"), because JES2 owns the data sets.
 
 When the data sets cannot be reached, the server still starts, and everything
-except the jobs API works. With mvsMF 1.3.0 or earlier, the effect differs by
-request:
+except the jobs API works. This holds in both cases above: mvsMF 1.3.0 or
+earlier without the DDs, and any mvsMF level on a system with another prefix
+than #cmd("SYS1") without the DDs. The effect differs by request:
 
 #tab(caption: [A request when the JES2 data sets cannot be opened])[
   #table(columns: (1.6in, 1fr),
