@@ -16,7 +16,8 @@ prepared (#454: the installation guide for FMID `THTP450`, which is the change t
 edit and has no row). Two issues are open in milestone 4.5.0: #452 (docs, its PR #453 is merged)
 and #454. Every other open issue is in 4.6.0: #176, #271, #322, #323, #350, #370, #392, #393, #400,
 #413 and #421; #350 and #370 moved there from 4.5.0. Everything struck below is closed in 4.5.0.
-`main` is 4.5.0-dev, FMID `THTP450` deleting `THTP440`, which 4.4.0 spent from its release branch.
+`main` was 4.5.0-dev; with the release of 4.5.0 (tag `v4.5.0`, cut from `release-4.5.x`, which spends
+`THTP450`) it is 4.6.0-dev, FMID `THTP460` deleting `THTP450`.
 The ranked order is unchanged.
 The notes of the earlier reconciles, back to 2026-08-24, are in the history of this file
 (`git log -p TODO.md`). Two standing facts they carried: libc370 2.5.0's stdio lock skip leaves

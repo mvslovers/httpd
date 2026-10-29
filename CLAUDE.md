@@ -10,7 +10,7 @@ HTTPD is an HTTP web server for MVS 3.8j, originally by Mike Rayborn (v3.3.x). V
 
 The server's primary role is hosting CGI modules (especially mvsMF) that provide REST APIs for MVS. It also serves static files from the UFS filesystem via UFSD.
 
-**Current version:** 4.5.0-dev (on `main`; `[project] version` in `mbt.toml`)
+**Current version:** 4.6.0-dev (on `main`; `[project] version` in `mbt.toml`)
 **Maintenance branch:** `v3.3.x` (from commit dd07c1b, for fixes to Mike Rayborn's version)
 
 ## Read when relevant
@@ -292,7 +292,7 @@ repo (`tests/test.sh` and friends) — integration, not a substitute for the abo
 ## SMP FMID
 
 `[smp] prefix = "THTP"` in mbt.toml: mbt 3 derives the FMID and the predecessor
-it deletes from the version (4.5.0-dev → `THTP450`, deleting `THTP440`). Rules,
+it deletes from the version (4.6.0-dev → `THTP460`, deleting `THTP450`). Rules,
 the burned list and the per-release install record are in the root's `smp.md`.
 Each release adds its id to the removal job in `docs/installation.md` section 12,
 which names every id ever spent. A test package needs a throwaway id **and**
