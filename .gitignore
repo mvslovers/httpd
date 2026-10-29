@@ -13,7 +13,7 @@
 compile_commands.json
 
 # Environment
-.env
+.env*
 
 
 # Build system (mbt)
