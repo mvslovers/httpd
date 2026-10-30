@@ -636,6 +636,7 @@ extern int http_cmpn(const UCHAR *, const UCHAR *, int)                 asm("HTT
 /* internal string-safety helpers (not CGI-facing, so no HTTPX vector) */
 extern UCHAR *http_html_escape(UCHAR *, size_t, const UCHAR *)          asm("HTTPESC");
 extern int http_safe_redirect(const UCHAR *)                           asm("HTTPSRDR");
+extern int http_stcuser(const char*)                                    asm("HTTPSTCU");
 /* upper case into a caller buffer, for the runtime-lower-case strings that
 ** reach a WTO (build stamp, libc370 version) -- see include/httpdmsg.h */
 extern const char *http_upcase(char *, unsigned, const char *)          asm("HTTPUPCS");
