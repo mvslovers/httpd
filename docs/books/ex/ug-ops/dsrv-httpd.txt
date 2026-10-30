@@ -6,24 +6,24 @@ Offset  Data Name  Description  Contents
 +000C  httpd->httpc  HTTP Client Array (0)  00000000
 +0010  httpd->addr  HTTP Address  0.0.0.0
 +0014  httpd->port  HTTP Port  8080
-+0018  httpd->listen  HTTP Listen Socket  1
++0018  httpd->listen  HTTP Listen Socket  2
 +001C  httpd->cfg_realm  Basic realm / server name  MVS.EXAMPLE
 +0020  httpd->dbg  HTTP Debug File Handle  00000000
 +0024  httpd->tzoffset  Time Zone Offset (seconds)  3600
-+0028  httpd->busy  HTTP Busy Client Array (1)  0010E3C4
++0028  httpd->busy  HTTP Busy Client Array (1)  001C8D54
 +002C  httpd->flag  Processing Flag  07 INIT LISTENER READY
 +002D  httpd->unused_2d  Reserved (was: global LOGIN policy, retired)  00
 +002E  httpd->client  Client Options  E0 TIMEOUT DUMP STATS
 +002F  httpd->sockstate  socket thread: 0 starting, 1 running, 2 gone  01
-+0030  httpd->socket_thread  Socket Thread Handle  00192FC8
++0030  httpd->socket_thread  Socket Thread Handle  001B6FC8
 +0034  httpd->mgr  Thread Manager Handle  000EDE18
 +0038  httpd->rname  Resource Name  "HTTPD.000F"
 +0044  httpd->route  Route Array (MOD= programs, LOC= static prefixes)  000ED6D4
-+0048  httpd->uptime  Server Up Time  Fri Oct 30 22:56:11 2026
++0048  httpd->uptime  Server Up Time  Sat Oct 31 00:17:40 2026
 +0050  httpd->trace  Request trace (NULL = off)  00000000
 +0054  httpd->ufssys  UFS System Handle  000EDBB8
 +0058  httpd->readerr_last  Time of Last UFS Read Error Message (#346)  0
-+005C  httpd->version  Version String  "4.6.0-dev"
++005C  httpd->version  Version String  "4.5.1-dev"
 +0060  httpd->readerr_held  UFS Read Errors Not Yet Reported (#346)  0
 +0064  httpd->cfg_maxtask  Config Max Task  9
 +0065  httpd->cfg_mintask  Config Min Task  3
@@ -31,7 +31,7 @@ Offset  Data Name  Description  Contents
 +0067  httpd->smf_level  SMF Recording Level  0 NONE
 +0068  httpd->smf_type  SMF Record Type  243
 +0069  httpd->cfg_resident  Config Hold MOD= Modules  YES
-+006A  httpd->resident_held  Modules Held Resident  2
++006A  httpd->resident_held  Modules Held Resident  4
 +006B  httpd->cfg_cgictx  Config CGI Context Pointers  255
 +006C  httpd->ufs_enabled  UFS Filesystem Enabled  1
 +006D  httpd->dbg_enabled  Debug Output Enabled  0
@@ -47,8 +47,8 @@ Offset  Data Name  Description  Contents
 +008C  httpd->giveup_held  Send Give-ups Not Yet Reported (#347)  0
 +0090  httpd->ufs  Unix "like" File System Handle  00000000
 +0094  httpd->cfg_session_maxage  Credential Hard Max-Age (minutes, 0=off)  480
-+0098  httpd->self  HTTPD Main Thread Handle  000EDB38
-+009C  httpd->cgictx  CGI Context Pointers Array  0010EB88
++0098  httpd->self  HTTPD Main Thread Handle  0010EFC8
++009C  httpd->cgictx  CGI Context Pointers Array  0010E988
 +00A0  httpd->docroot  UFS Document Root Prefix  "/www"
 +0120  httpd->listen_queue  Listen Backlog  5
 +0121  httpd->cfg_res_noprof  Config RES= Route Without Profile  ALLOW
@@ -58,7 +58,7 @@ Offset  Data Name  Description  Contents
 +0134  httpd->cfg_keepalive_timeout  Keep-Alive Idle Timeout (seconds)  5
 +0135  httpd->cfg_keepalive_max  Max Requests per Connection  100
 +0136  httpd->cfg_session_timeout  Credential Idle TTL (minutes, 0 = off)  30
-+0138  httpd->credkey  Credential Key Handle  001A4F98
-+013C  httpd->credarr  Credential Array Handle  000ED988
++0138  httpd->credkey  Credential Key Handle  001C8F98
++013C  httpd->credarr  Credential Array Handle  0010EF98
 +0140  httpd->cfg_realm_val  Basic Realm / Server Name Value  "MVS.EXAMPLE"
 
