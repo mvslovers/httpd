@@ -406,15 +406,15 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 		uri = "/";
 	}
 
-	/* the hard max-age applies to the form flow too (#118) -- without it a
-	   session past the limit is rejected by the resolver, sent back to the
-	   login form, and handed the same cached credential again: a login loop
-	   until the next reaper sweep */
 	if (httpd->sec_open) {   /* start probe: HTTPD042W */
 		rc = print_login(httpd, httpc, "Invalid userid or password");
 		goto quit;
 	}
 
+	/* the hard max-age applies to the form flow too (#118) -- without it a
+	   session past the limit is rejected by the resolver, sent back to the
+	   login form, and handed the same cached credential again: a login loop
+	   until the next reaper sweep */
 	cred = cred_login(httpc->addr, user, pass,
 	                  (unsigned)httpc->httpd->cfg_session_maxage * 60);
 #if 0
