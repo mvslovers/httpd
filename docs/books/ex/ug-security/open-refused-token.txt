@@ -1,0 +1,11 @@
+$ curl -i -u HERC01:****** -H "X-CSRF-ZOSMF-HEADER: true" http://localhost:8080/zosmf/restjobs/jobs
+HTTP/1.1 401 Unauthorized
+Date: Fri, 30 Oct 2026 21:58:30 GMT
+Server: HTTPD Server
+X-Powered-By: MVSLOVERS
+Connection: keep-alive
+Cache-Control: no-store
+Content-Type: text/plain
+Transfer-Encoding: chunked
+
+401 Unauthorized

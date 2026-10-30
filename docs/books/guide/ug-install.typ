@@ -210,6 +210,12 @@ profiles under the identity of the user who is logged in (@ug-security). The
 started task itself also needs a user ID in RAKF (@ug-install-rakfsetup). On a
 system without RAKF nobody can log in, and no setting turns that off.
 
+RAKF 1.2.x needs valid tables, and loads them at the IPL. Check the tables
+before the IPL (@ug-install-rakfsetup). If RAKF 1.2.x has no valid user table,
+it accepts every user ID. HTTPD 4.5.1 and later notice this at the start,
+write #cmd("HTTPD042W") and refuse all logins (@ug-security-open). Install
+HTTPD 4.5.1 or later where RAKF 1.2.x runs.
+
 === Authority <ug-install-auth>
 
 #idx("authorization")
@@ -796,12 +802,18 @@ Rules for the line:
   #cmd("S RAKFUSER") ends with #cmd("RAKFUIDS2 INPUT DATA INVALID OR OUT OF SEQ."),
   then #cmd("RAKFUIDSX ** PROGRAM TERMINATED **") and an abend U0200. The echo
   of the card always shows #cmd("********") in the password column, empty or
-  not, so the echo does not help. Nothing in the table is updated.
+  not, so the echo does not help. Nothing in the table is updated. When this
+  happens at the IPL, RAKF 1.2.x has no user table and accepts every user ID.
+  HTTPD 4.5.1 and later write #cmd("HTTPD042W") then and refuse all logins
+  (@ug-security-open). Look for #cmd("RAKFUIDS4  USER TABLE UPDATED") in the
+  log after the IPL.
 - Keep Operations at #cmd("N"). With #cmd("Y") the account has the
   operations authority, which is access to data sets without a profile.
-- Both tables must be in ascending order. A line out of order does not skip
-  that line: the table is not initialised at all, and no one gets
-  authorization.
+- Keep both tables in ascending order, as RAKF requires. A table that RAKF
+  rejects is not loaded (see the blank password above).
+- Do not use the user ID #cmd("HTTPPRB") or #cmd("STC") for a person. HTTPD
+  uses #cmd("HTTPPRB") for its own test logon at the start, and refuses a
+  login as #cmd("STC") (@ug-security-open).
 - Keep #cmd("STCGRP") equal to the group on the #cmd("USERS") line, so that
   the two do not drift apart. RAKF takes the group that you request at the
   logon and does not check that the user is connected to it.
@@ -1016,7 +1028,7 @@ Read the lines in order:
     Without this line the task runs as the inherited account.],
   [#cmd("RAKF0004")], [Only on TK5 with RAKF 1.2.x, and only in 4.5.1 and
     later: the server tests the security system once, with a logon that must
-    fail (see below).],
+    fail (see below and @ug-security-open).],
   [#cmd("HTTPD036I")], [One line for each #cmd("MOD=") route.],
   [#cmd("HTTPD054I")], [The server listens on the port.],
   [#cmd("HTTPD061I")], [One line for the socket thread and each worker.],
@@ -1043,10 +1055,12 @@ right. A system that checks refuses the logon. On RAKF 1.2.x the refusal
 writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
 console, between #cmd("HTTPD004I") and the first #cmd("HTTPD036I"), as the
 capture shows. The line is expected, and no user #cmd("HTTPPRB") needs to
-exist. If the server writes #cmd("HTTPD042W") instead, it refuses every login
-until the security software runs correctly and HTTPD has been restarted.
-Routes that need no login still answer. The warning was not produced for this
-book, and a start on MVS/CE (RAKF 2.0.0) was not measured either.
+exist. If the server writes #cmd("HTTPD042W") instead, the security software
+has accepted the test logon. On RAKF 1.2.x this happens when the user table is
+missing or was rejected at the IPL (@ug-security-open). The server then
+refuses every login until the security software runs correctly and HTTPD has
+been restarted. Routes that need no login still answer. A start on MVS/CE
+(RAKF 2.0.0) was not measured.
 
 A start that does not come up ends the task with a condition code other than
 0, and 8 for a refused configuration. A clean stop ends with 0. The messages in front of a refused start say why. The most common
@@ -1129,6 +1143,9 @@ The display modules are not reachable. Nothing names them until you add a
     [No #cmd("HTTPD004I"), or #cmd("HTTPD004W") instead], [The user of the
       task is not defined in RAKF, or the logon failed
       (@ug-install-rakfsetup).],
+    [#cmd("HTTPD042W") at the start, and every login gets 401], [RAKF 1.2.x
+      accepts any user ID, because its user table is missing or was rejected.
+      Correct the tables, IPL, and restart HTTPD (@ug-security-open).],
     [#cmd("HTTPD425W") or #cmd("HTTPD426W") at the start], [A route names a
       resource that has no profile (@ug-install-rakfsetup).],
     [#cmd("HTTPD044W") at the start], [UFSD is not running

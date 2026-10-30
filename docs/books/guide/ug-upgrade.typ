@@ -347,7 +347,9 @@ of the release branch with the version changed from #cmd("4.5.1-dev") to
 #cmd("4.5.1"), and a start of the published package was not measured
 for this book. The line #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB")
 comes from the test of the security system at the start. It is expected on TK5
-with RAKF 1.2.x, and "Starting HTTPD" in @ug-install explains it.
+with RAKF 1.2.x, and "Starting HTTPD" in @ug-install explains it. If the
+line #cmd("HTTPD042W") appears instead, the upgrade did not cause it: look at
+the tables of RAKF (@ug-security-open).
 
 == What the SMP Upgrade Deletes <ug-upgrade-deletes>
 
@@ -561,8 +563,7 @@ to look for. The first two matter for the safety of the system.
   #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
   console, and the line is expected. On #cmd("HTTPD042W") the server refuses
   every login until the security software runs correctly and HTTPD has been
-  restarted, while routes without a login still answer. The warning was not
-  produced for this book (@ug-install).
+  restarted, while routes without a login still answer (@ug-security-open).
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
 - *A route whose profile is missing.* From 4.5.0 the keyword
@@ -621,8 +622,9 @@ upgrade.
       RAKF 1.2.x since 4.5.1: the test of the security system. No user
       #cmd("HTTPPRB") needs to exist.],
     [#cmd("HTTPD042W") at the start, and every login is refused.], [The
-      server refuses every login until the security software runs correctly and
-      HTTPD has been restarted. This message was not produced for this book.],
+      security software accepts any user ID. On RAKF 1.2.x the user table is
+      missing or was rejected at the IPL. Correct the tables, IPL, and restart
+      HTTPD (@ug-security-open). Until then the server refuses every login.],
     [#cmd("HTTPD440W") at the start.], [A route names a module that HTTPD does
       not find in the #cmd("STEPLIB") or the link list. After a move from
       4.0.x, mvsMF is the likely one.],
