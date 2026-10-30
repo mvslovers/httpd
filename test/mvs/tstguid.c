@@ -25,6 +25,7 @@
 #include "httpd.h"
 #include <mvs/apf.h>    /* __autask() -- APF-authorise for racf_login() */
 #include <mbtcheck.h>
+#include "tstacct.h"
 
 /* fabricate an ACEE carrying a length-prefixed userid in aceeuser (byte 0 =
 ** length, bytes 1.. = userid), matching what racf_login() produces */
@@ -49,6 +50,9 @@ int main(void)
     unsigned char *ret;
     unsigned addr = 0xC0A8017B;   /* 192.168.1.123 */
     int      apf;
+    char     runas[9];
+    const struct tstacct *acct;
+    const unsigned char  *user, *pass;
 
     printf("=== HTTPD http_get_userid (issue #109) tests ===\n");
 
@@ -91,24 +95,33 @@ int main(void)
         return mbt_test_summary("TSTGUID");
     }
 
-    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1", 0);
+    acct = tstacct_find(runas);
+    if (!acct) {
+        printf("  SKIP: no test account known for the user this job runs under "
+               "(%s) -> RACF cred_login path skipped\n", runas);
+        return mbt_test_summary("TSTGUID");
+    }
+    user = (const unsigned char *)acct->user;
+    pass = (const unsigned char *)acct->pass;
+
+    cred = cred_login(addr, (unsigned char *)user, (unsigned char *)pass, 0);
     CHECK(cred != NULL, "cred_login #1 (fresh) succeeds");
     if (cred) {
         httpc->cred = cred;
         memset(buf, 0, sizeof(buf));
         ret = http_get_userid(httpc, buf, sizeof(buf));
-        CHECK(ret != NULL && strcmp((char *)buf, "IBMUSER") == 0,
-              "http_get_userid == IBMUSER (cred_login fresh read)");
+        CHECK(ret != NULL && strcmp((char *)buf, acct->user) == 0,
+              "http_get_userid == the account (cred_login fresh read)");
 
-        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"SYS1", 0);
+        cred2 = cred_login(addr, (unsigned char *)user, (unsigned char *)pass, 0);
         CHECK(cred2 != NULL, "cred_login #2 (cache hit) succeeds");
         CHECK(cred2 == cred, "cache hit returns the SAME cached CRED object");
         if (cred2) {
             httpc->cred = cred2;
             memset(buf, 0, sizeof(buf));
             ret = http_get_userid(httpc, buf, sizeof(buf));
-            CHECK(ret != NULL && strcmp((char *)buf, "IBMUSER") == 0,
-                  "http_get_userid == IBMUSER (CACHE-HIT read -- the #109 repro)");
+            CHECK(ret != NULL && strcmp((char *)buf, acct->user) == 0,
+                  "http_get_userid == the account (CACHE-HIT read -- the #109 repro)");
         }
     }
 

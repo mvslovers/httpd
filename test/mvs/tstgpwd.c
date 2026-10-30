@@ -31,6 +31,8 @@
 #include "httpd.h"
 #include <mvs/apf.h>    /* __autask() -- APF-authorise for racf_login() */
 #include <mbtcheck.h>
+#include <ctype.h>
+#include "tstacct.h"
 
 /* build an encrypted CREDID exactly as cred_login() does: plaintext update
 ** (writes verbatim, clears the flag) followed by encrypt (sets the flag). */
@@ -54,6 +56,10 @@ int main(void)
     unsigned addr = 0xC0A8017B;   /* 192.168.1.123 */
     int      rc;
     int      apf;
+    char     runas[9];
+    unsigned char lower[9];
+    const struct tstacct *acct;
+    unsigned n;
 
     printf("=== HTTPD http_get_password (issue #111) tests ===\n");
 
@@ -151,25 +157,36 @@ int main(void)
         return mbt_test_summary("TSTGPWD");
     }
 
-    /* pass a lower-case password: cred_login() upper-cases it before both
-       racf_login() and encryption, so http_get_password() must return "SYS1". */
-    cred = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1", 0);
+    acct = tstacct_find(runas);
+    if (!acct) {
+        printf("  SKIP: no test account known for the user this job runs under "
+               "(%s) -> RACF cred_login path skipped\n", runas);
+        return mbt_test_summary("TSTGPWD");
+    }
+
+    /* pass the password in lower case: cred_login() upper-cases it before both
+       racf_login() and encryption, so http_get_password() must return it in
+       upper case. */
+    for (n = 0; acct->pass[n]; n++) lower[n] = (unsigned char)tolower((unsigned char)acct->pass[n]);
+    lower[n] = 0;
+
+    cred = cred_login(addr, (unsigned char *)acct->user, lower, 0);
     CHECK(cred != NULL, "cred_login #1 (fresh) succeeds");
     if (cred) {
         httpc->cred = cred;
         memset(buf, 0, sizeof(buf));
         ret = http_get_password(httpc, buf, sizeof(buf));
-        CHECK(ret != NULL && strcmp((char *)buf, "SYS1") == 0,
-              "http_get_password == SYS1 (RACF-folded upper case, fresh read)");
+        CHECK(ret != NULL && strcmp((char *)buf, acct->pass) == 0,
+              "http_get_password == the account's password (RACF-folded upper case, fresh read)");
 
-        cred2 = cred_login(addr, (unsigned char *)"IBMUSER", (unsigned char *)"sys1", 0);
+        cred2 = cred_login(addr, (unsigned char *)acct->user, lower, 0);
         CHECK(cred2 == cred, "cred_login #2 returns the SAME cached CRED");
         if (cred2) {
             httpc->cred = cred2;
             memset(buf, 0, sizeof(buf));
             ret = http_get_password(httpc, buf, sizeof(buf));
-            CHECK(ret != NULL && strcmp((char *)buf, "SYS1") == 0,
-                  "http_get_password == SYS1 (cache-hit read)");
+            CHECK(ret != NULL && strcmp((char *)buf, acct->pass) == 0,
+                  "http_get_password == the account's password (cache-hit read)");
         }
     }
 
