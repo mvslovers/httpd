@@ -245,9 +245,11 @@ resolve_credential(HTTPC *httpc)
 				   REVALIDATION, and cred_login() applies it: past the limit it
 				   drops the cached credential and checks the password against
 				   RACF again (#118). */
-				httpc->cred = cred_login(httpc->addr,
-				                         (UCHAR *)creds, (UCHAR *)(colon + 1),
-				                         maxage_secs(httpc->httpd));
+				if (!httpc->httpd->sec_open) {   /* start probe: HTTPD042W */
+					httpc->cred = cred_login(httpc->addr,
+					                         (UCHAR *)creds, (UCHAR *)(colon + 1),
+					                         maxage_secs(httpc->httpd));
+				}
 			}
 			memset(creds, 0, sizeof(creds));   /* scrub the password */
 		}

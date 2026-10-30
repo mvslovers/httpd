@@ -265,6 +265,12 @@ extern unsigned cred_reap(unsigned ttl_secs, unsigned maxage_secs)							asm("CR
  * this stays one function rather than a copy that can drift. */
 extern int credexp(long elapsed_secs, unsigned ttl_secs)									asm("CREDEXP");
 
+/* credunam() - pure identity check: does the ACEE a login returned (name =
+ * aceeusri, namelen = aceeusrl) belong to the userid that was asked for?
+ * Case-insensitive, both cut at 8 characters, trailing blanks ignored.  An
+ * empty name never matches. */
+extern int credunam(const char *want, const unsigned char *name, unsigned namelen)			asm("CREDUNAM");
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* The following function prototypes are used internally.                             */
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
