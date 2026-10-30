@@ -163,18 +163,6 @@ quit:
 }
 
 /*
-** http_stcuser() - is user the started-task account of the RAKF 1.2 family?
-** STC is never a client account; the check refuses it whatever the security
-** system would answer.  The comparison is credunam()'s (case, padding,
-** 8 characters).
-*/
-int
-http_stcuser(const char *user)
-{
-	return credunam(user, (const unsigned char *)"STC", 3);
-}
-
-/*
 ** maxage_secs() - the configured hard credential max-age in seconds, 0 when
 ** it is switched off (#118).  Parmlib carries it in minutes.
 */
