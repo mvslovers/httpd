@@ -19,13 +19,16 @@
     The console and client sessions in the chapters on configuring and
     running HTTPD were captured from a development build of HTTPD 4.5.0, which
     shows the version #raw("4.5.0-DEV"). The sessions in the chapters on
-    installing, upgrading and removing HTTPD were captured on release 4.4.0 on
-    a TK5 system, except the section of the removal chapter on a development
-    build, which comes from development builds of 4.5.0. The install job of a
-    package build of 4.5.0, the upgrade from 4.4.0 to 4.5.0 and the removal job
-    for 4.5.0 were run on a TK5 system as well. The removal job for 4.5.1 was
-    run on an MVS/CE system that held the released 4.5.0, and not on a system
-    that held 4.5.1. The chapters name what they measured.
+    installing and upgrading HTTPD were captured on a TK5 system with a package
+    build of HTTPD 4.5.1 that was made from the source of the release branch:
+    the install on a system without HTTPD and the upgrade from 4.5.0 to 4.5.1.
+    A start of the published package of 4.5.1 and a start on MVS/CE were not
+    measured. The sessions in the chapter on removing HTTPD were captured on
+    release 4.4.0 on a TK5 system, except the section on a development build,
+    which comes from development builds of 4.5.0. The removal job for 4.5.0
+    was run on a TK5 system as well. The removal job for 4.5.1 was run on an
+    MVS/CE system that held the released 4.5.0, and not on a system that held
+    4.5.1. The chapters name what they measured.
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.

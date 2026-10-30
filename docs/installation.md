@@ -41,7 +41,7 @@ One placeholder is used throughout:
 
 | | |
 |---|---|
-| `<version>` | the release, e.g. `4.5.0` — it appears in every shipped file name |
+| `<version>` | the release, e.g. `4.5.1` — it appears in every shipped file name |
 
 It is already filled in inside the shipped jobs; you only need it to recognise
 which file is which.
@@ -52,22 +52,25 @@ which release a name belongs to. Up to and including 4.0.2 they were versioned
 — `HTTPD.V4R0M2.LINKLIB` — and two releases could sit side by side; 4.1.0 ends
 that.
 
-**Upgrading from 4.4.0 needs nothing uninstalled first.** This release's
-SYSMOD carries `DELETE(THTP440)`, so SMP deletes the 4.4.0 modules from
+**Upgrading from 4.5.0 needs nothing uninstalled first.** This release's
+SYSMOD (FMID `THTP451`) carries `DELETE(THTP450)`, so SMP deletes the 4.5.0
+modules from
 `HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
 ownership of each module moves with them. You stop the server (step 5), skip
 step 4 because the libraries are already there, and submit the install job.
 
 **Coming from an older release, go through each release in turn.** This
-release deletes `THTP440` and nothing else. On a 4.3.0 system the modules still
-belong to `THTP430`, and a SYSMOD that does not own a module cannot replace it:
+release deletes `THTP450` and nothing else. On a 4.4.0 system the modules still
+belong to `THTP440`, and a SYSMOD that does not own a module cannot replace it:
 SMP selects none of them, copies nothing, and every step still ends `RC 00`. So
-4.3.0 upgrades to 4.4.0 first, with the 4.4.0 package, and then to this
-release; a 4.2.0 system goes through 4.3.0 and 4.4.0, and a 4.1.0 system through
-4.2.0, 4.3.0 and 4.4.0, in the same way. A 4.0.x system starts with 4.1.0, the
+4.4.0 upgrades to 4.5.0 first, with the 4.5.0 package, and then to this
+release; a 4.3.0 system goes through 4.4.0 and 4.5.0, a 4.2.0 system through
+4.3.0, 4.4.0 and 4.5.0, and a 4.1.0 system through 4.2.0, 4.3.0, 4.4.0 and
+4.5.0, in the same way. The skip from 4.4.0 straight to 4.5.1 was not run for
+this guide; the rule above is SMP's. A 4.0.x system starts with 4.1.0, the
 release that crosses from `THTP400` and the one move to the unversioned dataset
 names — [section 12a](#12a-upgrading-from-40x) has that order, done with the
-**4.1.0** package — then 4.2.0, 4.3.0 and 4.4.0, then this release.
+**4.1.0** package — then 4.2.0, 4.3.0, 4.4.0 and 4.5.0, then this release.
 
 The webroot disk is never touched by any of this: it holds your content, not
 ours. See step 9.
@@ -215,7 +218,7 @@ storage request. A start without UFSD prints no message about it. If every
 request for a file gets `404`, check that UFSD runs and that the image is
 mounted at the `DOCROOT` (step 9).
 
-HTTPD 4.5.0 is built against `libufs` 1.5.2 (UFSD 1.5.2). Running it against a
+HTTPD 4.5.1 is built against `libufs` 1.5.2 (UFSD 1.5.2). Running it against a
 UFSD older than 1.5.0 has not been tested; from 1.5.0 on, `ufs_ferror()` reports
 a read error reliably, which the response to a failed file read relies on. This
 is a note, not a prerequisite: the SYSMOD declares none.
@@ -531,7 +534,7 @@ Expect `COND CODE 0000`.
 >
 > **Coming from 4.0.x**, install 4.1.0 first, following
 > [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
-> upgrade to 4.2.0, 4.3.0, 4.4.0 and this release, skipping it each time.
+> upgrade to 4.2.0, 4.3.0, 4.4.0, 4.5.0 and this release, skipping it each time.
 
 ### A library that SMP does not own
 
@@ -695,9 +698,9 @@ The SYSMOD travels inline in the job — there is no third file to upload.
 output:
 
 ```
-HMA3930    SYSMOD THTP450 SUCCESSFULLY RECEIVED
+HMA3930    SYSMOD THTP451 SUCCESSFULLY RECEIVED
 HMA2240    SUCCESSFULLY DELETED LMOD HTTPD ON LINKLIB LIBRARY
-HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP450 - RETURN CODE=00
+HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP451 - RETURN CODE=00
 ```
 
 There is one `HMA2380` line **per module** — five of them, each on a single
@@ -1394,6 +1397,7 @@ HTTPD000I HTTPD <version> (A69A370) STARTING
 HTTPD005I LIBC370 2.26.0 (3AA3B28)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
+RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB       TK5 only, see below
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/services/authenticate
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/restconsoles/*
@@ -1417,6 +1421,18 @@ That transcript is a system with UFSD running. Without it the start prints the
 same lines: HTTPD does not contact UFSD at start, and the last line still reads
 `SERVING /www`, because it names the configured document root rather than a
 working filesystem (step 2).
+
+**The `RAKF0004` line is expected since 4.5.1.** At the start the server tests
+the security system once: it logs on the user `HTTPPRB` with a password that
+cannot be right, and a system that checks refuses it. On TK5 with RAKF 1.2.x
+the refusal writes `RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB`
+to the console, between `HTTPD004I` and the first `HTTPD036I`. No user
+`HTTPPRB` has to exist, and nothing has to be done about the line. If the
+security system accepts the logon instead, the server writes `HTTPD042W
+SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED` and refuses every login
+from then on; routes that need no login still answer. That warning was not
+produced when this guide was written, and a start on MVS/CE (RAKF 2.0.0) was
+not measured.
 
 The two build stamps identify exactly what is running: `HTTPD000I` gives the
 version and the commit it was built from, `HTTPD005I` the libc370 it was linked
@@ -2210,10 +2226,10 @@ were installed from the SMP package and not deployed with `mbt deploy`.
 ## 12a. Upgrading from 4.0.x
 
 > **Do this with the 4.1.0 package, not this release's.** This release deletes
-> `THTP440` only, so on a 4.0.x system — where the modules belong to `THTP400` —
+> `THTP450` only, so on a 4.0.x system — where the modules belong to `THTP400` —
 > its install selects nothing and copies nothing while every step ends `RC 00`.
 > Download 4.1.0 from the releases page, follow the steps below with it, and
-> confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0, 4.4.0 and this
+> confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0, 4.4.0, 4.5.0 and this
 > release the ordinary way, one after the other: stop, install, start, with no
 > allocation step.
 
