@@ -445,9 +445,10 @@ route. Otherwise read the start messages.
   and no #cmd("HTTPD042W").
 
 RAKF has to be active before HTTPD asks it anything. On TK5 the member
-#cmd("SYS1.PARMLIB(RAKFINIT)") with #cmd("RAKFINIT=YES") starts RAKF at the
-IPL. This is an operating hint and not something that HTTPD checks. If RAKF
-was not active when HTTPD started, the logon of the started task fails with
+#cmd("SYS1.PARMLIB(RAKFINIT)") holds the word #cmd("YES"), and RAKF then
+becomes active at the IPL without a question at the console. This is an
+operating hint and not something that HTTPD checks. If RAKF was not active
+when HTTPD started, the logon of the started task fails with
 #cmd("HTTPD004W RACINIT ENVIR=CREATE FAILED ... RC=32") (@ug-trouble-stc).
 
 === Two More Rules
@@ -457,9 +458,7 @@ was not active when HTTPD started, the logon of the started task fails with
   of that name it would be one failed password attempt each time.
 - *The user ID #cmd("STC") is no login.* HTTPD refuses a login with this user
   ID in every case, because it is the account of the started tasks on RAKF
-  1.2.x. A login is also refused if the ACEE that the product returns names
-  another user than the one the client sent. The client sees the 401 or the
-  login page, and no message is written.
+  1.2.x. The client sees the 401 or the login page, and no message is written.
 
 The test needs the same supervisor state as the logon of the started task. If
 the server could not enter it (#cmd("HTTPD003W")), it makes no test and
