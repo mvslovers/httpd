@@ -774,6 +774,10 @@ extra = ["build/webroot/httpd-webroot.img"]
 # needs an explicit fmid = "THTP421" with delete = ["THTP420"], and that id
 # LISTed free on the stands first like any other.
 prefix = "THTP"  # FMID and delete follow from the version
+# 4.5.1 is a patch release: the derivation has no id of its own for it and
+# would reuse THTP450, so both are explicit.
+fmid = "THTP451"
+delete = ["THTP450"]
 
 # Empty despite the [dependencies] entry on ufsd, which is a *build* time one:
 # libufs is linked statically, so nothing of ufsd has to be installed for the
