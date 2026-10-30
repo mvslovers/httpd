@@ -164,9 +164,9 @@ quit:
 
 /*
 ** http_stcuser() - is user the started-task account of the RAKF 1.2 family?
-** STC is not an account a client logs on as: a security system that checks
-** answers a password logon for it with a refusal, so refusing it here changes
-** nothing there.  The comparison is credunam()'s (case, padding, 8 characters).
+** STC is never a client account; the check refuses it whatever the security
+** system would answer.  The comparison is credunam()'s (case, padding,
+** 8 characters).
 */
 int
 http_stcuser(const char *user)
