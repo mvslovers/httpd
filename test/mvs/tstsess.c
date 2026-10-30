@@ -34,8 +34,14 @@
 #include "httpd.h"
 #include <mvs/apf.h>    /* __autask() -- APF-authorise for racf_login() */
 #include <mbtcheck.h>
+#include "tstacct.h"
 
 #undef array_count
+
+/* the account the test logs on with, set from tstacct.h once main() knows the
+   system it runs on */
+static unsigned char acct_user[9];
+static unsigned char acct_pass[9];
 
 /* sessions in the store that carry this CREDID */
 static unsigned
@@ -61,12 +67,10 @@ sessions_of(CRED ***array, CREDID *id)
 static int
 login(HTTPC *httpc, unsigned addr, CREDTOK *tok)
 {
-    unsigned char ibmuser[] = "IBMUSER";
-    unsigned char sys1[]    = "SYS1";
     int rc;
 
     httpc->addr = addr;
-    httpc->cred = cred_login(addr, ibmuser, sys1, 0);
+    httpc->cred = cred_login(addr, acct_user, acct_pass, 0);
     if (!httpc->cred) return LOGIN_NOCRED;
     rc = http_new_session(httpc);
     if (rc != 0) return rc;
@@ -112,9 +116,11 @@ int main(void)
     CREDTOK   tokx;
     CREDTOK   tok[CRED_SESSION_MAX];
     unsigned char buf[16];
-    unsigned char ibmuser[] = "IBMUSER";
-    unsigned char sys1[]    = "SYS1";
+    unsigned char *ibmuser  = acct_user;
+    unsigned char *sys1     = acct_pass;
     unsigned char oldpw[]   = "OLDPW";
+    char      runas[9];
+    const struct tstacct *acct;
     unsigned  addr  = 0xC0A8017B;   /* 192.168.1.123 */
     unsigned  addr2 = 0xC0A8017C;   /* another client, same user */
     unsigned  n, alive;
@@ -160,6 +166,15 @@ int main(void)
         return mbt_test_summary("TSTSESS");
     }
 
+    acct = tstacct_find(runas);
+    if (!acct) {
+        printf("  SKIP: no test account known for the user this job runs under "
+               "(%s) -> RACF session paths skipped\n", runas);
+        return mbt_test_summary("TSTSESS");
+    }
+    strcpy((char *)acct_user, acct->user);
+    strcpy((char *)acct_pass, acct->pass);
+
     /* --- the Basic cache is unchanged by design --------------------------- */
     shared = cred_login(addr, ibmuser,
                         sys1, 0);
@@ -186,7 +201,7 @@ int main(void)
 
     memset(buf, 0, sizeof(buf));
     CHECK(http_get_password(b, buf, sizeof(buf)) &&
-          strcmp((char *)buf, "SYS1") == 0,
+          strcmp((char *)buf, acct->pass) == 0,
           "http_get_password() works on a session (#164)");
     memset(buf, 0, sizeof(buf));
 
