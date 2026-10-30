@@ -31,8 +31,9 @@ The captures in this chapter come from the upgrade from 4.5.0 to 4.5.1 on a
 TK5 system. Every step of the install job ended with return code 0000 except
 the APPLY, which ended with return code 0004 and
 #cmd("HMA2461 SYSMOD THTP450 NOT FOUND ON SMPSCDS LIBRARY"). The package of
-4.5.1 was built from the source of the release branch, so the build stamp in
-the start-up banner is not the one of the published package
+4.5.1 was built from the source of the release branch, with the version in the
+project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1"). The build stamp
+in the start-up banner is therefore not the one of the published package
 (@ug-upgrade-verify). The file names in your package carry the number of your
 release.
 
@@ -342,7 +343,8 @@ the server, as in @ug-first.
 
 Two things in the capture are new in 4.5.1. The stamp in #cmd("HTTPD000I") is
 shown as #cmd("nnnnnnn"): the package of the capture was built from the source
-of the release branch, and a start of the published package was not measured
+of the release branch with the version changed from #cmd("4.5.1-dev") to
+#cmd("4.5.1"), and a start of the published package was not measured
 for this book. The line #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB")
 comes from the test of the security system at the start. It is expected on TK5
 with RAKF 1.2.x, and "Starting HTTPD" in @ug-install explains it.

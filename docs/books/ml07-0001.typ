@@ -20,7 +20,9 @@
     running HTTPD were captured from a development build of HTTPD 4.5.0, which
     shows the version #raw("4.5.0-DEV"). The sessions in the chapters on
     installing and upgrading HTTPD were captured on a TK5 system with a package
-    build of HTTPD 4.5.1 that was made from the source of the release branch:
+    build of HTTPD 4.5.1 that was made from the source of the release branch,
+    with the version in the project file changed from #raw("4.5.1-dev") to
+    #raw("4.5.1"):
     the install on a system without HTTPD and the upgrade from 4.5.0 to 4.5.1.
     A start of the published package of 4.5.1 and a start on MVS/CE were not
     measured. The sessions in the chapter on removing HTTPD were captured on

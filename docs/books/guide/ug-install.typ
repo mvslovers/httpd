@@ -11,9 +11,10 @@ next release (@ug-upgrade) and a defined way to take it out (@ug-remove).
 
 The captures in this chapter come from a first install of release 4.5.1 on a
 TK5 system, with one exception that the text names: the RAKF captures come
-from MVS/CE. The package was built from the source of the release branch, so the
-build stamp in the start-up banner is not the one of the published package
-(@ug-install-start). Every step of the install job ended with return code
+from MVS/CE. The package was built from the source of the release branch, with the
+version in the project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1").
+The build stamp in the start-up banner is therefore not the one of the
+published package (@ug-install-start). Every step of the install job ended with return code
 0000, #cmd("HTTPD.LINKLIB") and #cmd("HTTPD.AHTTPLOD") each held the five load
 modules, and the SMP record showed the FMID #cmd("THTP451"). The file names in
 your package carry the number of your release. The steps do not change from one
@@ -1028,7 +1029,8 @@ four active routes, so a start with it shows the lines for the routes that
 you have.
 
 *The build stamp.* The capture comes from a package that was built from the
-source of the release branch on a developer machine. Its stamp is replaced by
+source of the release branch on a developer machine, with the version in the
+project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1"). Its stamp is replaced by
 #cmd("nnnnnnn") in the capture, and the capture leaves out the line
 #cmd("HTTPD006W BUILT FROM A MODIFIED WORKING TREE"), which a build from a
 modified working tree writes after #cmd("HTTPD005I"). A start of the published
