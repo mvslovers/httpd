@@ -100,6 +100,27 @@ close_stale_port(int port)
 ** before any path can reach the restore, so the NULL it relies on is
 ** established exactly as reliably as the static's initializer was. */
 
+/* Does the security system take any userid?  Log on with a userid and password
+** that cannot exist.  A system that checks answers no (RAKF 2.x: RC 28); old
+** RAKF without its USERS/PROFILES tables answers every request with a fixed
+** STC/STCGROUP ACEE and RC 0.  Then no login can be trusted, and the flag in
+** the HTTPD block makes every login path refuse (HTTPD042W).
+**
+** Runs inside stc_identity()'s supervisor window: RACINIT needs key 0.  The
+** flag is in the HTTPD block, not in module storage (see the note above). */
+static void
+sec_probe(HTTPD *httpd)
+{
+	int		racf_rc	= 0;
+	ACEE	*acee	= racf_login("HTTPPRB", "NOT.A.PW", NULL, &racf_rc);
+
+	if (acee) {
+		racf_logout(&acee);
+		httpd->sec_open = 1;
+		wtof(MSG_SEC_OPEN);
+	}
+}
+
 /* Replace the default STC security environment with a dedicated, low
 ** privilege identity.  Called once, from initialize(), before anything opens
 ** a data set.  See the block comment at the call site for why this exists.
@@ -150,6 +171,8 @@ stc_identity(HTTPD *httpd, const char *user, const char *group)
 	else {
 		wtof(MSG_STCID_FAILED, user, group, racf_rc);
 	}
+
+	sec_probe(httpd);
 
 	__prob(savekey, NULL);
 }

@@ -108,6 +108,10 @@
 /** HTTPD004W logon failed; the server keeps the inherited STC identity */
 #define MSG_STCID_FAILED	"HTTPD004W RACINIT ENVIR=CREATE FAILED FOR %s/%s RC=%d"
 
+/** HTTPD042W a login with an impossible userid and password was accepted: the
+ *  security system takes any userid.  Every login is refused until restart. */
+#define MSG_SEC_OPEN		"HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED"
+
 /** HTTPD005I which C runtime this module actually linked against */
 #define MSG_LIBC_VERSION	"HTTPD005I %s"
 

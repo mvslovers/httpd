@@ -183,7 +183,9 @@ struct httpd {
     UCHAR       cfg_res_noprof;     /* 121 RES_NOPROFILE=DENY: a RES=*/
                                     /* ... route refuses while its  */
                                     /* ... profile is missing (#351) */
-    UCHAR       unused_122[2];      /* 122 alignment padding        */
+    UCHAR       sec_open;           /* 122 the security system takes*/
+                                    /* ... any userid: login refused*/
+    UCHAR       unused_123;         /* 123 alignment padding        */
     char        codepage[16];       /* 124 codepage name            */
     UCHAR       cfg_keepalive_timeout; /* 134 keepalive idle secs   */
     UCHAR       cfg_keepalive_max;  /* 135 max reqs per connection  */

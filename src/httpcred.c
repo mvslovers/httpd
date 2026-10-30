@@ -410,6 +410,11 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 	   session past the limit is rejected by the resolver, sent back to the
 	   login form, and handed the same cached credential again: a login loop
 	   until the next reaper sweep */
+	if (httpd->sec_open) {   /* start probe: HTTPD042W */
+		rc = print_login(httpd, httpc, "Invalid userid or password");
+		goto quit;
+	}
+
 	cred = cred_login(httpc->addr, user, pass,
 	                  (unsigned)httpc->httpd->cfg_session_maxage * 60);
 #if 0
