@@ -406,6 +406,11 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 		uri = "/";
 	}
 
+	if (httpd->sec_open || http_stcuser(user)) {
+		rc = print_login(httpd, httpc, "Invalid userid or password");
+		goto quit;
+	}
+
 	/* the hard max-age applies to the form flow too (#118) -- without it a
 	   session past the limit is rejected by the resolver, sent back to the
 	   login form, and handed the same cached credential again: a login loop

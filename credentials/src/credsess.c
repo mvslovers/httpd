@@ -99,8 +99,16 @@ cred_session(CRED ***array, CREDKEY *key, CRED *from, int *why)
 	   RAKF writes its own RAKF0004, and the password must not reach a console
 	   (#116). */
 	acee = racf_login((char *)user, (char *)pass, 0, &rc);
-	scrub(user, sizeof(user));
 	scrub(pass, sizeof(pass));
+	if (acee && !credunam((char *)user, (unsigned char *)acee->aceeusri, acee->aceeusrl)) {
+		/* not the user that was asked for: see cred_login() */
+		racf_logout(&acee);
+		scrub(user, sizeof(user));
+		mark_stale(array, from);
+		reason = CRED_SESS_REFUSED;
+		goto quit;
+	}
+	scrub(user, sizeof(user));
 	if (!acee) {
 		if (racf_refused(rc)) {
 			mark_stale(array, from);

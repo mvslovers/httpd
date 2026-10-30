@@ -140,6 +140,16 @@ cred_login(unsigned addr, unsigned char *userid, unsigned char *password,
 		goto cleanup;
 	}
 
+	/* the ACEE must name the user that was asked for.  A security system
+	   without its user table answers every request with one fixed ACEE;
+	   taking that for a login would make everybody the same user.  The
+	   ACEE is ours (racf_login() makes a new one per call), so it is
+	   released like any other refused one. */
+	if (!credunam(user, (unsigned char *)acee->aceeusri, acee->aceeusrl)) {
+		racf_logout(&acee);
+		goto cleanup;
+	}
+
 	/* RACF accepts what a stale entry refused: take the entry back */
 	if (held) {
 		racf_logout(&acee);
