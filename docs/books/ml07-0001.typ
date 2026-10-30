@@ -23,8 +23,9 @@
     a TK5 system, except the section of the removal chapter on a development
     build, which comes from development builds of 4.5.0. The install job of a
     package build of 4.5.0, the upgrade from 4.4.0 to 4.5.0 and the removal job
-    for 4.5.0 were run on a TK5 system as well, and the chapters name what they
-    measured.
+    for 4.5.0 were run on a TK5 system as well. The removal job for 4.5.1 was
+    run on an MVS/CE system that held the released 4.5.0, and not on a system
+    that held 4.5.1. The chapters name what they measured.
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.
