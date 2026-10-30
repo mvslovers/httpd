@@ -265,6 +265,18 @@ extern unsigned cred_reap(unsigned ttl_secs, unsigned maxage_secs)							asm("CR
  * this stays one function rather than a copy that can drift. */
 extern int credexp(long elapsed_secs, unsigned ttl_secs)									asm("CREDEXP");
 
+/* credunam() - pure identity check: does the ACEE a login returned (name =
+ * aceeusri, namelen = aceeusrl) belong to the userid that was asked for?
+ * Case-insensitive, both cut at 8 characters, trailing blanks ignored.  An
+ * empty name never matches. */
+extern int credunam(const char *want, const unsigned char *name, unsigned namelen)			asm("CREDUNAM");
+
+/* http_stcuser() - is user the started-task account (STC) of the RAKF 1.2
+ * family?  STC is never a client account; the check refuses it whatever the
+ * security system would answer.  The comparison is credunam()'s (case,
+ * padding, 8 characters). */
+extern int http_stcuser(const char *user)													asm("HTTPSTCU");
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* The following function prototypes are used internally.                             */
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */

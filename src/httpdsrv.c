@@ -688,10 +688,17 @@ display_httpd(HTTPD *httpd, HTTPC *httpc)
 
     http_printf(httpc,
         "<tr><td>+%04X</td>"
-        "<td>httpd->unused_122</td>"
+        "<td>httpd->sec_open</td>"
+        "<td>Security System Takes Any Userid</td>"
+        "<td>%s</td></tr>\n",
+        O(sec_open), httpd->sec_open ? "YES, LOGIN REFUSED" : "NO");
+
+    http_printf(httpc,
+        "<tr><td>+%04X</td>"
+        "<td>httpd->unused_123</td>"
         "<td>(reserved, alignment padding)</td>"
-        "<td>%02X %02X</td></tr>\n",
-        O(unused_122), httpd->unused_122[0], httpd->unused_122[1]);
+        "<td>%02X</td></tr>\n",
+        O(unused_123), httpd->unused_123);
 
     /* An empty codepage is the default, not "none": set_defaults() leaves it
     ** empty and http_xlate_init() reads that as CP037.  Say so -- a bare ""

@@ -356,6 +356,12 @@ sources = ["test/tstshft.c", "src/httpshft.c"]
 rent = false          # mbtcheck.h keeps file-static counters
 sources = ["test/tstexpir.c", "credentials/src/credexp.c"]
 
+# credunam() identity check on the ACEE a login returns.  Free of project
+# headers -> DUAL (host + MVS); helper source listed for the host link.
+[test.TSTUNAM]
+rent = false          # mbtcheck.h keeps file-static counters
+sources = ["test/tstunam.c", "credentials/src/credunam.c"]
+
 # httpracf() SAF authorization decision table (issue #135): rc 0 and 4 both
 # allow, -1 must not.  Free of httpd.h -> DUAL (host + MVS); helper source
 # listed for the host link.
