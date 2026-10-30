@@ -505,6 +505,15 @@ which resource a request is checked against, with the keyword #cmd("RES=")
     [Logon of the task, RACINIT without a password], [The user id of
       #cmd("STCUSER") must be defined. Without it the server writes
       #cmd("HTTPD004W") (@ref-stc-id).],
+    [Test logon at the start, RACINIT with the user id #cmd("HTTPPRB") and a
+      wrong password], [From HTTPD 4.5.1. The server makes this logon once,
+      after the logon of the task and in the same supervisor state. A product
+      that checks refuses it, and RAKF writes #cmd("RAKF0004"). If the
+      product returns an ACEE, it accepts any user id. The server then
+      writes #cmd("HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS
+      REFUSED") and refuses every logon of a client (below). There is no test
+      when #cmd("HTTPD003W") skipped the logon of the task, and none later. The
+      user id #cmd("HTTPPRB") is reserved.],
     [Logon of a client, RACINIT with user id and password], [A route with
       #cmd("AUTH=BASIC"), #cmd("AUTH=FORM") or #cmd("AUTH=TOKEN") checks the
       user id and the password of the client. A form login that works gives
@@ -513,7 +522,10 @@ which resource a request is checked against, with the keyword #cmd("RES=")
       a reason other than the password gives
       #cmd("HTTPD009W LOGIN SESSION NOT CREATED, RACINIT FAILED RC=n"). A wrong
       password is the client's doing and is not written to the console.
-      @ref-route has the policies.],
+      From HTTPD 4.5.1 the server refuses the logon, without a message, when
+      the test logon at the start showed that the product accepts any user id,
+      when the user id is #cmd("STC"), and when the ACEE that comes back names
+      another user than the client sent. @ref-route has the policies.],
     [Check of a resource for a route with #cmd("RES=class:resource")], [The
       server asks for the access READ. The return codes 0 and 4 allow the
       request. Return code 4 means that no profile covers the resource. With

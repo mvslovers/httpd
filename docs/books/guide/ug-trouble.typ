@@ -296,6 +296,9 @@ common ones.
     [#cmd("HTTPD003W"), #cmd("HTTPD004W")], [The server could not log on as
       #cmd("STCUSER"). It runs with the identity the task inherited
       (@ug-trouble-login).],
+    [#cmd("HTTPD042W")], [The security product accepts any user ID. The
+      server refuses all logins until it is started again
+      (@ug-trouble-open).],
     [#cmd("HTTPD444W")], [The value of #cmd("TRACE") is not 0 and not a number
       from 16 to 1024. The request trace stays off (@ug-config-trace).],
     [#cmd("HTTPD067W")], [The server could not get the storage for the request
@@ -645,6 +648,28 @@ could not enter supervisor state and so skipped the logon. "The Identity of the
 Task" in "The Started Task and the Package" in the _HTTPD Reference_ has the
 steps. On the healthy start the line is #cmd("HTTPD004I STC IDENTITY SET TO
 user/group VIA RACINIT"), as the captures in this chapter show.
+
+=== Every Login Is Refused, HTTPD042W <ug-trouble-open>
+
+#idx("HTTPD042W")#idx("HTTPPRB")#idx("RAKF0001")#idx("RAKF0004")
+*Symptom.* The console shows #cmd("HTTPD042W SECURITY SYSTEM ACCEPTS ANY
+USERID, ALL LOGINS REFUSED") at the start. Every login gets 401, also for
+users that are defined and use the right password. The server serves the paths
+that need no login. Before the message the console shows #cmd("RAKF0001") and
+#cmd("RAKF0002") for the logon of the task and for the user ID
+#cmd("HTTPPRB"), and #cmd("RAKF0003") and #cmd("RAKF0009") if the profile
+table is missing as well.
+
+*Cause.* RAKF 1.2.x has no valid user table, for example because the load of
+#cmd("SYS1.SECURE.CNTL(USERS)") was rejected at the IPL (#cmd("RAKFUIDS2"),
+#cmd("RAKFUIDSX")). RAKF then accepts every user ID. HTTPD 4.5.1 and later
+find this at the start and refuse all logins.
+
+*Cure.* Correct the tables before the next IPL and read the lines of the load
+in the log. Then restart HTTPD. A running server does not test again, and a
+server that has written #cmd("HTTPD042W") keeps refusing until it is started
+again. A good start has #cmd("RAKF0004") for the user ID #cmd("HTTPPRB") and
+no #cmd("HTTPD042W"). @ug-security-open has the details.
 
 === A Changed Password Does Not Take Effect <ug-trouble-stale>
 
