@@ -163,6 +163,18 @@ quit:
 }
 
 /*
+** http_stcuser() - is user the started-task account of the RAKF 1.2 family?
+** STC is not an account a client logs on as: a security system that checks
+** answers a password logon for it with a refusal, so refusing it here changes
+** nothing there.  The comparison is credunam()'s (case, padding, 8 characters).
+*/
+int
+http_stcuser(const char *user)
+{
+	return credunam(user, (const unsigned char *)"STC", 3);
+}
+
+/*
 ** maxage_secs() - the configured hard credential max-age in seconds, 0 when
 ** it is switched off (#118).  Parmlib carries it in minutes.
 */
@@ -245,7 +257,8 @@ resolve_credential(HTTPC *httpc)
 				   REVALIDATION, and cred_login() applies it: past the limit it
 				   drops the cached credential and checks the password against
 				   RACF again (#118). */
-				if (!httpc->httpd->sec_open) {   /* start probe: HTTPD042W */
+				if (!httpc->httpd->sec_open &&   /* start probe: HTTPD042W */
+				    !http_stcuser(creds)) {
 					httpc->cred = cred_login(httpc->addr,
 					                         (UCHAR *)creds, (UCHAR *)(colon + 1),
 					                         maxage_secs(httpc->httpd));

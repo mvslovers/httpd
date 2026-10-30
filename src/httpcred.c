@@ -406,7 +406,7 @@ process_post(HTTPD *httpd, HTTPC *httpc)
 		uri = "/";
 	}
 
-	if (httpd->sec_open) {   /* start probe: HTTPD042W */
+	if (httpd->sec_open || http_stcuser(user)) {
 		rc = print_login(httpd, httpc, "Invalid userid or password");
 		goto quit;
 	}

@@ -49,5 +49,17 @@ int main(void)
     /* a length byte above 8 must not read past the 8-byte field */
     CHECK(credunam("ALICE", NAME("ALICE   XYZ")) == 1, "length above 8 -> only 8 characters count");
 
+    /* http_stcuser() refuses the started-task account with the same
+       comparison: credunam(id, "STC", 3).  Match means the login is refused. */
+    CHECK(credunam("STC", NAME("STC")) == 1,           "id is STC -> match");
+    CHECK(credunam("stc", NAME("STC")) == 1,           "id is stc -> match");
+    CHECK(credunam("Stc     ", NAME("STC")) == 1,      "mixed case, blank padded -> match");
+    CHECK(credunam("STCGROUP", NAME("STC")) == 0,      "STCGROUP is not STC -> no match");
+    CHECK(credunam("STCX", NAME("STC")) == 0,          "longer id with the same prefix -> no match");
+    CHECK(credunam("ST", NAME("STC")) == 0,            "shorter id -> no match");
+    CHECK(credunam("HERC01", NAME("STC")) == 0,        "other id -> no match");
+    CHECK(credunam("", NAME("STC")) == 0,              "empty id -> no match");
+    CHECK(credunam(0, NAME("STC")) == 0,               "NULL id -> no match");
+
     return mbt_test_summary("TSTUNAM");
 }
