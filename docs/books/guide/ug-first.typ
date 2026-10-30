@@ -39,6 +39,10 @@ The lines have this meaning:
     that RAKF gives to every started task. It runs under the user ID and the
     group from the #cmd("STCUSER") and #cmd("STCGRP") values of the procedure
     (here #cmd("HTTPD") and #cmd("USER")).],
+  [#cmd("RAKF0004")], [A line from RAKF, not from HTTPD. The server logs on
+    once with a user ID that cannot exist, to test the security product, and
+    RAKF refuses it. A line #cmd("HTTPD042W") in its place is not a good start
+    (@ug-security-open).],
   [#cmd("HTTPD036I")], [One line for each #cmd("MOD=") route: the server
     module and the path it is registered for. A configuration without
     #cmd("MOD=") routes has none of these lines.],

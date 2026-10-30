@@ -66,6 +66,13 @@ appears only in some cases.
       ID and the group of the procedure parameters #cmd("STCUSER") and
       #cmd("STCGRP"). The two warnings say that the identity was not changed
       and the task keeps the one it was started with (@ug-security).],
+    [#cmd("RAKF0004")], [From HTTPD 4.5.1, one line after #cmd("HTTPD004I"):
+      #cmd("INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB"). It is RAKF
+      refusing the test logon that the server makes. It belongs to a healthy
+      start (@ug-security-open).],
+    [#cmd("HTTPD042W")], [Only if the security product accepts any user ID.
+      The server refuses all logins and needs a new start after the cause is
+      gone (@ug-security-open). A healthy start does not have it.],
     [#cmd("HTTPD020W")], [Only if the Parmlib member could not be opened
       (@ug-ops-refused-member).],
     [#cmd("HTTPD036I")], [One line for each route with a program (#cmd("MOD=")).
@@ -607,6 +614,13 @@ bytes sent and the number of active connections are the same as in #cmd("D S"),
 and the up time is the time of the start. The screen is cut after the counters:
 
 #screen(raw(read("../ex/ug-ops/dsrv-httpd.txt").split("\n").slice(0, 43).join("\n")))
+
+Further down the page, the row #cmd("httpd->sec_open") (offset +0122) says
+whether the security product accepted the test logon at the start. A healthy
+server shows #cmd("NO"). The value #cmd("YES, LOGIN REFUSED") goes with the
+message #cmd("HTTPD042W") (@ug-security-open). You can read the row in a
+browser only through a route that lets you reach HTTPDSRV without a login,
+because a refused login also keeps you out of the display modules.
 
 The block of the manager of the worker pool shows the limits that are in effect
 now and the number of requests that were handed out:

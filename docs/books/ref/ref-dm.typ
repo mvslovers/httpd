@@ -224,6 +224,10 @@ offset. The fields are these.
     [#cmd("listen_queue")], [The listen backlog.],
     [#cmd("cfg_res_noprof")], [The value of #cmd("RES_NOPROFILE"): the page shows
       #cmd("ALLOW") or #cmd("DENY").],
+    [#cmd("sec_open")], [From HTTPD 4.5.1. Whether the security product
+      accepted the test logon at the start (@ref-stc-rakf): the page shows
+      #cmd("NO"), or #cmd("YES, LOGIN REFUSED") when the server wrote
+      #cmd("HTTPD042W") and refuses all logins. The byte after it is padding.],
     [#cmd("codepage")], [The code page name from the #cmd("CODEPAGE") keyword.
       When the keyword is not set, the page shows "CP037 (default, no CODEPAGE
       keyword)".],
