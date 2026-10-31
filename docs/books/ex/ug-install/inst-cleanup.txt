@@ -1,4 +1,4 @@
-IDCAMS  SYSTEM SERVICES                                           TIME: 07:12:59        10/27/26     PAGE   1
+IDCAMS  SYSTEM SERVICES                                           TIME: 23:37:19        10/30/26     PAGE   1
  
   DELETE HTTPD.HTTPLOAD NONVSAM SCRATCH PURGE
 IDC0550I ENTRY (A) HTTPD.HTTPLOAD DELETED
