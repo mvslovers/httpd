@@ -347,7 +347,9 @@ of the release branch with the version changed from #cmd("4.5.1-dev") to
 #cmd("4.5.1"), and a start of the published package was not measured
 for this book. The line #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB")
 comes from the test of the security system at the start. It is expected on TK5
-with RAKF 1.2.x, and "Starting HTTPD" in @ug-install explains it.
+(RAKF 1.2.x) and MVS/CE (RAKF 2.0.0), and "Starting HTTPD" in @ug-install explains it. If the
+line #cmd("HTTPD042W") appears instead, the upgrade did not cause it: look at
+the tables of RAKF (@ug-security-open).
 
 == What the SMP Upgrade Deletes <ug-upgrade-deletes>
 
@@ -557,12 +559,11 @@ to look for. The first two matter for the safety of the system.
   now compares the user that the security system returns with the userid that
   was typed, and refuses the login on a mismatch. It refuses every login of the
   started-task account. At the start it tests the security system once with a
-  logon that must fail. On TK5 with RAKF 1.2.x this writes
+  logon that must fail. On TK5 and MVS/CE this writes
   #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
   console, and the line is expected. On #cmd("HTTPD042W") the server refuses
   every login until the security software runs correctly and HTTPD has been
-  restarted, while routes without a login still answer. The warning was not
-  produced for this book (@ug-install).
+  restarted, while routes without a login still answer (@ug-security-open).
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
 - *A route whose profile is missing.* From 4.5.0 the keyword
@@ -617,12 +618,13 @@ upgrade.
       policy: a retired #cmd("LOGIN") (#cmd("HTTPD048E")), an unknown
       #cmd("AUTH=") value or a route that cannot be registered. Read all
       the messages before it.],
-    [#cmd("RAKF0004 ... USER:HTTPPRB") at the start.], [Expected on TK5 with
-      RAKF 1.2.x since 4.5.1: the test of the security system. No user
+    [#cmd("RAKF0004 ... USER:HTTPPRB") at the start.], [Expected on TK5 and
+      MVS/CE since 4.5.1: the test of the security system. No user
       #cmd("HTTPPRB") needs to exist.],
     [#cmd("HTTPD042W") at the start, and every login is refused.], [The
-      server refuses every login until the security software runs correctly and
-      HTTPD has been restarted. This message was not produced for this book.],
+      security software accepts any user ID. On RAKF 1.2.x the user table is
+      missing or was rejected at the IPL. Correct the tables, IPL, and restart
+      HTTPD (@ug-security-open). Until then the server refuses every login.],
     [#cmd("HTTPD440W") at the start.], [A route names a module that HTTPD does
       not find in the #cmd("STEPLIB") or the link list. After a move from
       4.0.x, mvsMF is the likely one.],

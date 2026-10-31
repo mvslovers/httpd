@@ -51,7 +51,7 @@
 #idx("messages", "format")
 This appendix lists every numbered message of HTTPD in the order of the
 numbers. The header file of the product has one text for each message, and this
-appendix has one entry for each of those texts: 170 texts, which carry 162
+appendix has one entry for each of those texts: 178 texts, which carry 170
 distinct combinations of number and severity letter. Where two texts share a
 number, both are listed.
 
@@ -116,6 +116,9 @@ A message with a condition appears only under that condition.
   written only if the authorization worked.
 + #cmd("HTTPD004I"), the identity of the started task (or #cmd("HTTPD003W")
   or #cmd("HTTPD004W") if it could not be set).
++ #cmd("HTTPD042W"), only if the security product accepts any user ID. In a
+  healthy start RAKF writes #cmd("RAKF0004") for the user ID #cmd("HTTPPRB") at
+  this place.
 + The messages of the configuration (@apx-messages-cfg and
   @apx-messages-route): the warnings about the parameters, and one
   #cmd("HTTPD036I") or #cmd("HTTPD417I") for each route.
@@ -400,6 +403,24 @@ rest of this range reports the start of the listener.
       counts from 1 to 9. The server waits one second between the messages.]),
     ..r("HTTPD041I FORCE DETACHING SOCKET THREAD",
       [The socket thread did not end in time. The server detaches the task.]),
+    ..r("HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED",
+      [From HTTPD 4.5.1. At the start, after the identity of the started task
+      is set, the server logs on once with the user ID #cmd("HTTPPRB") and a
+      password that cannot be right. The security product returned an ACEE
+      for it, so it accepts any user ID. RAKF 1.2.x does this when its user
+      table is missing or invalid, and the console then also shows
+      #cmd("RAKF0001") and #cmd("RAKF0002"), and #cmd("RAKF0003") and
+      #cmd("RAKF0009") if the profile table is missing too. A product that
+      checks gives no ACEE, and RAKF writes #cmd("RAKF0004") for the user ID
+      #cmd("HTTPPRB") instead.],
+      a: [The start goes on. Every Basic, form and token login is refused,
+      with the same answer as for a wrong password, and the server writes no
+      message for it. Routes that need no login are served as before. The
+      server does not test again.],
+      o: [Correct the tables of the security product and restart HTTPD. See
+      'A Security System That Accepts Any User ID' in the _HTTPD User's
+      Guide_. The server does not run the test if #cmd("HTTPD003W") skipped the
+      logon of the task.]),
     ..r("HTTPD044W UNABLE TO INITIALIZE FILE SYSTEM",
       [The file system is enabled and the server could not create its handle to
       it. The server has no handle for UFSD.],
