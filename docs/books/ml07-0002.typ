@@ -12,12 +12,17 @@
     #text(font: head-font, weight: "bold", size: 11pt)[First Edition (October 2026)]
 
     This edition applies to Version 4 Release 5 of HTTPD, the HTTP server for
-    MVS 3.8j (httpd 4.5.0), and to all subsequent releases and modifications
+    MVS 3.8j (httpd 4.5.1), and to all subsequent releases and modifications
     until otherwise indicated in new editions.
 
     *Draft.* This is a draft edition, as the last digit of the number says.
-    The console and client sessions in it were captured from a development
-    build of HTTPD 4.5.0, which shows the version #raw("4.5.0-DEV").
+    The console sessions in it that show the version of the server were
+    captured on an MVS/CE system, a throwaway container, with a package build
+    of HTTPD 4.5.1 that was made from the source of the release branch, with
+    the version in the project file changed from #raw("4.5.1-dev") to
+    #raw("4.5.1"). The other console and client sessions may come from earlier
+    development builds of HTTPD 4.5.0 and 4.5.1, which show the version
+    #raw("4.5.0-DEV") or #raw("4.5.1-DEV").
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.
