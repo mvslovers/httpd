@@ -9,12 +9,14 @@ by SMP Release 4, the SMP that comes with MVS 3.8j, not SMP/E. SMP keeps a
 record of what was installed. So there is a defined way to replace it with the
 next release (@ug-upgrade) and a defined way to take it out (@ug-remove).
 
-The captures in this chapter come from release 4.4.0 on a TK5 system, with
-two exceptions that the text names: the RAKF captures come from MVS/CE. The
-first install of a package build of 4.5.0 was run on a TK5 system as well.
-Every step of the install job ended with return code 0000,
-#cmd("HTTPD.LINKLIB") and #cmd("HTTPD.AHTTPLOD") each held the five load
-modules, and the SMP record showed the FMID #cmd("THTP450"). The file names in
+The captures in this chapter come from a first install of release 4.5.1 on a
+TK5 system, with one exception that the text names: the RAKF captures come
+from MVS/CE. The package was built from the source of the release branch, with the
+version in the project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1").
+The build stamp in the start-up banner is therefore not the one of the
+published package (@ug-install-start). Every step of the install job ended with return code
+0000, #cmd("HTTPD.LINKLIB") and #cmd("HTTPD.AHTTPLOD") each held the five load
+modules, and the SMP record showed the FMID #cmd("THTP451"). The file names in
 your package carry the number of your release. The steps do not change from one
 release to the next.
 
@@ -47,27 +49,28 @@ what comes back and what can go wrong:
 + Start HTTPD (@ug-install-start).
 
 If this system already runs an older HTTPD, do not use this chapter. Use
-@ug-upgrade.
+@ug-upgrade. The FMID of this release, #cmd("THTP451"), deletes #cmd("THTP450")
+and nothing else (@ug-upgrade-hops).
 
 == What Is in the Package <ug-install-files>
 
 #idx("package", "contents")
-The package is the archive #cmd("httpd-4.4.0-dist.zip") (or
-#cmd("httpd-4.4.0-dist.tar.gz")). It has six files. In their names, 4.4.0 is
+The package is the archive #cmd("httpd-4.5.1-dist.zip") (or
+#cmd("httpd-4.5.1-dist.tar.gz")). It has six files. In their names, 4.5.1 is
 the release. The webroot image has no version in its name.
 
 #tab(caption: [The files of the installation package])[
   #table(columns: (2.7in, 1fr),
     [File], [What it is],
     [#cmd("README.md")], [The installation guide as a text file.],
-    [#cmd("httpd-4.4.0-load.xmit")], [The five load modules, in a form that
+    [#cmd("httpd-4.5.1-load.xmit")], [The five load modules, in a form that
       TSO RECEIVE reads. A little over 800,000 bytes.],
-    [#cmd("httpd-4.4.0-samplib.xmit")], [The sample library: the procedure of
+    [#cmd("httpd-4.5.1-samplib.xmit")], [The sample library: the procedure of
       the started task, a Parmlib member and the job that allocates the
-      webroot disk. About 21,000 bytes.],
-    [#cmd("httpd-4.4.0-alloc.jcl")], [Allocates the two libraries that SMP
+      webroot disk. About 22,000 bytes.],
+    [#cmd("httpd-4.5.1-alloc.jcl")], [Allocates the two libraries that SMP
       installs into. Run it once.],
-    [#cmd("httpd-4.4.0-inst.jcl")], [The install job: TSO RECEIVE of both
+    [#cmd("httpd-4.5.1-inst.jcl")], [The install job: TSO RECEIVE of both
       XMIT files, then SMP RECEIVE, APPLY and ACCEPT.],
     [#cmd("httpd-webroot.img")], [The webroot disk: a 1 MB file system image
       with the welcome page. It is not part of the SMP installation
@@ -174,7 +177,7 @@ skips the initialisation and the warning ("The HTTPPRM Keywords" in the
 _HTTPD Reference_).
 
 If you want static files, UFSD must run before HTTPD, as a started task of its
-own. HTTPD 4.5 is built against UFSD 1.5.2 (HTTPD 4.4.0 against 1.5.1). A UFSD older than 1.5.0 is
+own. HTTPD 4.5.1 is built against UFSD 1.5.2, as 4.5.0 was. A UFSD older than 1.5.0 is
 untested. The _UFSD User's Guide_ installs UFSD.
 
 === mvsMF Is Optional <ug-install-mvsmf>
@@ -287,7 +290,7 @@ Read the capture from the top. After #cmd("binary") the server answers
 #cmd("Representation type is Image"), which is the binary mode. Each
 #cmd("put") ends with #cmd("250 Transfer completed successfully"). The byte
 count must equal the size of the file on your disk. The listing at the end
-shows the result on the host: #cmd("FB"), 80, a block size of 3120, and 18
+shows the result on the host: #cmd("FB"), 80, a block size of 3120, and 19
 tracks for the load XMIT. If the record format or the length is something
 else, the transfer was not binary.
 
@@ -341,7 +344,7 @@ section explains why that is not good.
 
 #idx("allocation")
 Goal: the two libraries that SMP installs into exist and are cataloged. Run
-the allocation job #cmd("httpd-4.4.0-alloc.jcl") once, on a system that has no
+the allocation job #cmd("httpd-4.5.1-alloc.jcl") once, on a system that has no
 HTTPD yet. It allocates a program library with undefined records
 (#cmd("RECFM=U"), #cmd("BLKSIZE=15040")) for each of #cmd("HTTPD.LINKLIB") and
 #cmd("HTTPD.AHTTPLOD"). Each has 5 cylinders as primary space, 2 as secondary
@@ -357,10 +360,16 @@ then delete the data sets by hand. An accepted function cannot be rejected or
 restored.
 
 Edit #cmd("UNIT") and #cmd("VOL=SER") if #cmd("SYSDA") is not what you want.
-Pin the volume if you use the APF list (@ug-install-auth). Submit the job. A
-good run looks like this:
+Pin the volume if you use the APF list (@ug-install-auth). Submit the job. The
+console shows that the job started and that it ended:
 
 #screen(raw(read("../ex/ug-install/alloc-console.txt")))
+
+The last line, #cmd("IKJ144I"), comes from the job card, which has
+#cmd("NOTIFY=DUMMY"). The user DUMMY does not exist. The message does not
+change the result of the job. The step and its return code are in the job log:
+
+#screen(raw(read("../ex/ug-install/alloc-joblog.txt")))
 
 The step is #cmd("IEFBR14") and the return code is #cmd("0000"). The system
 messages of the job say where the data sets went:
@@ -394,7 +403,7 @@ abend that follows reads like a full volume.
 
 #idx("install job")
 Goal: the install job runs with the names of your two XMIT data sets. Open
-#cmd("httpd-4.4.0-inst.jcl"). The only lines that you have to change are the
+#cmd("httpd-4.5.1-inst.jcl"). The only lines that you have to change are the
 two #cmd("RECEIVE") statements, in the steps #cmd("RECV1") and
 #cmd("RECV2"). They name the data sets that you sent. The capture is the
 difference between the shipped job and the edited one:
@@ -460,13 +469,13 @@ Under a minute later the job is done.
 == Reading the Result <ug-install-result>
 
 #idx("return code")
-Goal: know whether the install job did its work. The console shows the step
-summary:
+Goal: know whether the install job did its work. The console shows that the
+job started and that it ended. It does not show the steps:
 
 #screen(raw(read("../ex/ug-install/inst-console.txt")))
 
-Every step ends with #cmd("RC= 0000"), and the line at the end says
-#cmd("MAX COND CODE 0000"). The job log has the same table with the times:
+The step table is in the job log, with the time of each step. Every step ends
+with #cmd("RC= 0000"):
 
 #screen(raw(read("../ex/ug-install/inst-joblog.txt")))
 
@@ -489,6 +498,9 @@ The first delete says #cmd("NOT DELETED") and ends with condition code 8,
 because #cmd("HTTPD.HTTPLOAD") does not exist yet. The statement
 #cmd("SET MAXCC=0") then makes the step end with 0. This is normal and not an
 error.
+The second delete found an old #cmd("HTTPD.SAMPLIB") on the system of the
+capture and deleted it (#cmd("IDC0550I")). Members that you edited in an old
+sample library are gone with it.
 
 *RECV1 and RECV2.* TSO RECEIVE unpacks an XMIT file into a data set:
 
@@ -503,7 +515,7 @@ sample library has the same shape:
 
 *RECV.* SMP reads the SYSMOD from the inline data set and stores it. The
 output repeats the statements and ends with a return code. In it you see the
-function #cmd("THTP440"), the statement #cmd("++VER(Z038) DELETE(THTP430)"),
+function #cmd("THTP451"), the statement #cmd("++VER(Z038) DELETE(THTP450)"),
 and one #cmd("++MOD") statement for each of the five modules.
 
 #screen(raw(read("../ex/ug-install/inst-smp-receive.txt")))
@@ -535,10 +547,12 @@ SUCCESSFULLY COMPLETED"):
 
 #screen(raw(read("../ex/ug-install/inst-cleanup.txt")))
 
-The system of these captures held the predecessor #cmd("THTP430") in its SMP
-records as a deleted level, from an earlier release. That is why the reports
-in the captures say #cmd("THTP430 DELETED"). On a system that never had HTTPD,
-the reports show only the new function. The return codes are the same.
+The system of these captures had never had #cmd("THTP450"). The reports say
+#cmd("THTP450 DELETED") all the same: SMP lists the FMID that the statement
+#cmd("++VER DELETE") names, whether or not the system holds it. When the
+install is done, both zones of SMP hold #cmd("THTP450") as a mark with the
+line #cmd("DELBY = THTP451") (@ug-install-verify). The return codes are the
+same as on a system that had it.
 
 == Verifying the Install <ug-install-verify>
 
@@ -564,7 +578,7 @@ the procedure #cmd("SMPAPP") with these control statements:
 //LISTCDS  EXEC SMPAPP
 //SMPCNTL  DD  *
  RESETRC .
- LIST CDS SYSMOD(THTP440) .
+ LIST CDS SYSMOD(THTP451) .
  LIST CDS LMOD(HTTPD) .
 /*
 ```)
@@ -576,12 +590,20 @@ The output:
 Read the capture for four facts. The status is #cmd("REC  APP  ACC"): the
 SYSMOD is received, applied and accepted. The line #cmd("DELETE VER(001)")
 names the predecessor that the SYSMOD replaces. The line #cmd("MOD =") lists
-the five modules. And #cmd("LASTUPD = THTP440") for the load module
+the five modules. And #cmd("LASTUPD = THTP451") for the load module
 #cmd("HTTPD"), with #cmd("SYSTEM LIBRARY = LINKLIB"), says that the module in
 the load library comes from this level.
 
 If the member list is short, or the status lacks #cmd("ACC"), the install did
 not do its work, whatever the return codes said.
+
+*The predecessor.* The SYSMOD names #cmd("THTP450") as the FMID it deletes, so
+SMP keeps a mark for it, also on a system that never had it. A list of
+#cmd("SYSMOD(THTP450)") shows the type #cmd("FUNCTION") and the line
+#cmd("DELBY = THTP451"), with no status and no modules. Ask for it in the CDS
+with #cmd("LIST CDS SYSMOD(THTP450)") and in the ACDS with
+#cmd("LIST ACDS SYSMOD(THTP450)"): both zones have the mark. The mark is not a
+sign of an old release on the system.
 
 == The Procedure and the Parmlib Member <ug-install-proc>
 
@@ -984,13 +1006,17 @@ or #cmd("S HTTPD,D='MY.PARMLIB'"). A healthy start looks like this:
 Read the lines in order:
 
 #deflist(width: 1.0in,
-  [#cmd("HTTPD000I")], [The start. The version and the build.],
+  [#cmd("HTTPD000I")], [The start. The version and the build stamp. The
+    capture shows #cmd("nnnnnnn") in place of the stamp (see below).],
   [#cmd("HTTPD005I")], [The C library that HTTPD is linked with. Send the
     two lines with a problem report.],
   [#cmd("HTTPD002I")], [How the task got its authorization
     (@ug-install-auth).],
   [#cmd("HTTPD004I")], [The identity of the task now: #cmd("HTTPD/USER").
     Without this line the task runs as the inherited account.],
+  [#cmd("RAKF0004")], [Only on TK5 with RAKF 1.2.x, and only in 4.5.1 and
+    later: the server tests the security system once, with a logon that must
+    fail (see below).],
   [#cmd("HTTPD036I")], [One line for each #cmd("MOD=") route.],
   [#cmd("HTTPD054I")], [The server listens on the port.],
   [#cmd("HTTPD061I")], [One line for the socket thread and each worker.],
@@ -1001,6 +1027,26 @@ Read the lines in order:
 The member used in the capture had three mvsMF routes. The shipped member has
 four active routes, so a start with it shows the lines for the routes that
 you have.
+
+*The build stamp.* The capture comes from a package that was built from the
+source of the release branch on a developer machine, with the version in the
+project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1"). Its stamp is replaced by
+#cmd("nnnnnnn") in the capture, and the capture leaves out the line
+#cmd("HTTPD006W BUILT FROM A MODIFIED WORKING TREE"), which a build from a
+modified working tree writes after #cmd("HTTPD005I"). A start of the published
+package of 4.5.1 was not measured for this book. The version in your own
+#cmd("HTTPD000I") must be 4.5.1.
+
+*The line from RAKF.* Since 4.5.1 the server tests the security system once at
+the start. It logs on the user #cmd("HTTPPRB") with a password that cannot be
+right. A system that checks refuses the logon. On RAKF 1.2.x the refusal
+writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
+console, between #cmd("HTTPD004I") and the first #cmd("HTTPD036I"), as the
+capture shows. The line is expected, and no user #cmd("HTTPPRB") needs to
+exist. If the server writes #cmd("HTTPD042W") instead, it refuses every login
+until the security software runs correctly and HTTPD has been restarted.
+Routes that need no login still answer. The warning was not produced for this
+book, and a start on MVS/CE (RAKF 2.0.0) was not measured either.
 
 A start that does not come up ends the task with a condition code other than
 0, and 8 for a refused configuration. A clean stop ends with 0. The messages in front of a refused start say why. The most common

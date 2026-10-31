@@ -1,9 +1,9 @@
-$ diff httpd-4.4.0-inst.jcl.orig httpd-4.4.0-inst.jcl
-58c58
+$ diff httpd-4.5.1-inst.jcl.orig httpd-4.5.1-inst.jcl
+57c57
 <   RECEIVE INDSN('CHANGE.ME.HTTPLOAD') -
 ---
 >   RECEIVE INDSN('HERC01.HTTPD.LOAD.XMIT') -
-67c67
+66c66
 <   RECEIVE INDSN('CHANGE.ME.SAMPLIB') -
 ---
 >   RECEIVE INDSN('HERC01.HTTPD.SAMP.XMIT') -
