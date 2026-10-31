@@ -17,11 +17,13 @@ would scratch the libraries that the new release installs into.
 #note[*Which release the sessions come from.* The sessions in this chapter were
 measured on release 4.4.0 (the FMID #cmd("THTP440")) on a TK5 system. The FMID
 of a release is #cmd("THTP") and the three digits of its version. HTTPD 4.5.0 is
-#cmd("THTP450"), and it deletes #cmd("THTP440"); the rule is in the _HTTPD
+#cmd("THTP450"), and it deletes #cmd("THTP440"). HTTPD 4.5.1 is
+#cmd("THTP451"), and it deletes #cmd("THTP450"); the rule is in the _HTTPD
 Reference_, in "The Started Task and the Package", section "The FMID". The job
 in this chapter is the 4.4.0 job. @ug-remove-45 tells what changes for 4.5.0,
-and what the 4.5.0 form of the job did on a TK5 system.
-If you installed a development build of HTTPD, read @ug-remove-dev too.]
+and what the 4.5.0 form of the job did on a TK5 system. @ug-remove-451 tells
+what changes for 4.5.1, and what the 4.5.1 form of the job did on an MVS/CE
+system that held 4.5.0 and on a TK5 system that held 4.5.1. If you installed a development build of HTTPD, read @ug-remove-dev too.]
 
 == What HTTPD Put on the System <ug-remove-what>
 
@@ -53,10 +55,12 @@ four upgrades carries four of these marks. A removal that names only the
 current release and its predecessor leaves the older marks in the inventory for
 good. The SYSMOD of 4.5.0 carries #cmd("DELETE(THTP440)"), so a system that
 took 4.5.0 as its first install holds #cmd("THTP440") as a mark as well, with
-#cmd("DELBY = THTP450") in the CDS and in the ACDS. The job in this chapter
-therefore names every FMID that HTTPD has ever spent, from #cmd("THTP400") to
-#cmd("THTP440") (to #cmd("THTP450") in the form of @ug-remove-45). You need not
-know which releases your system has seen.
+#cmd("DELBY = THTP450") in the CDS and in the ACDS. The same holds for
+#cmd("THTP450") on a system that took 4.5.1 as its first install, with
+#cmd("DELBY = THTP451"). The job in this chapter therefore names every FMID that
+HTTPD has ever spent, from #cmd("THTP400") to #cmd("THTP440") (to
+#cmd("THTP450") in the form of @ug-remove-45, to #cmd("THTP451") in the form of
+@ug-remove-451). You need not know which releases your system has seen.
 
 == Step 1: Stop the Server <ug-remove-stop>
 
@@ -307,8 +311,69 @@ statements ended with #cmd("HMA2550"), and there was no #cmd("HMA2293"). The
 the CDS and in the ACDS. After the scratch of the two libraries, the install of
 a package build of 4.5.0 (@ug-install) ran without an error.
 
-The next section is about the case where a system holds #cmd("THTP450")
-already, because a development build put it there.
+The next section is for HTTPD 4.5.1. The section after it is about the case
+where a system holds an FMID that the job does not name, because a development
+build put it there.
+
+== What Changes for HTTPD 4.5.1 <ug-remove-451>
+
+#idx("THTP451")
+HTTPD 4.5.1 has the FMID #cmd("THTP451") and deletes #cmd("THTP450"). The job of
+@ug-remove-45 is the 4.5.0 job. For 4.5.1, make these changes in both zones.
+
+- Add one block for #cmd("THTP451") to each zone, with the four lines of the
+  block for #cmd("THTP450"), and put it ahead of the block
+  #cmd("DEL SYSMOD(THTP450) .").
+- Add five #cmd("DEL SYSMOD(THTP451) MOD(...)") blocks, ahead of the five blocks
+  that name #cmd("THTP450"), and keep those five. The modules of a 4.5.1 system
+  belong to #cmd("THTP451"), and those of a 4.5.0 system to #cmd("THTP450"). The
+  job names both, so that you need not know which release the system holds.
+- Add #cmd("LIST CDS SYSMOD(THTP451) .") and
+  #cmd("LIST ACDS SYSMOD(THTP451) .") to the #cmd("LIST") step, each ahead of the
+  #cmd("THTP450") statement of its zone.
+
+The job has 49 #cmd("DEL") statements then, 27 against the CDS and 22 against
+the ACDS, and the #cmd("LIST") step has fourteen statements. The README of the
+installation package prints the job in full.
+
+*What was measured.* The 4.5.1 form of the job was run on an MVS/CE system with
+SMP 4 (#cmd("HMASMP LVL 04.48")). The system held the released #cmd("THTP450")
+with its five modules, and the marks of #cmd("THTP440") and #cmd("THTP430"). It
+had been brought there by installing the 4.4.0 package and then the 4.5.0
+package. It held no entry for #cmd("THTP451"), #cmd("THTP420"),
+#cmd("THTP410") or #cmd("THTP400"). The #cmd("UCLIN") step ended with return code
+8. 31 statements ended with #cmd("HMA2550"), and 18 ended with #cmd("HMA2532")
+and #cmd("HMA2560"), nine in each zone: the five
+#cmd("DEL SYSMOD(THTP451) MOD(...)") blocks, #cmd("DEL SYSMOD(THTP451)"), and
+the blocks for #cmd("THTP420"), #cmd("THTP410") and #cmd("THTP400"). There was no
+#cmd("HMA2293"). The #cmd("LIST") step ended with return code 4, and all 14
+statements answered "not found". #cmd("LIST CDS MOD(...)"),
+#cmd("LIST CDS LMOD(...)") and #cmd("LIST ACDS MOD(...)") for the five modules
+answered "not found" as well. On this system the #cmd("THTP450") blocks did the
+work and the #cmd("THTP451") blocks found nothing.
+
+*A system that holds THTP451.* The 4.5.1 form of the job was run on a TK5
+system that held #cmd("THTP451"), installed from the package of 4.5.1 as an
+upgrade from 4.5.0. The modules belong to #cmd("THTP451") and #cmd("THTP450") is
+a mark, so the five #cmd("DEL SYSMOD(THTP450) MOD(...)") blocks of each zone are
+the ones that find nothing, ten in all. They do not end with #cmd("HMA2532")
+like the blocks of the system above. SMP writes #cmd("HMA3572") for them, as it
+does for a mark that lists no module (@ug-remove-dev). The #cmd("UCLIN") step
+ended with return code 8 and the #cmd("LIST") step with return code 4. The job
+reported #cmd("HMA2550") 35 times, #cmd("HMA2532") 4 times and #cmd("HMA3572")
+10 times, and there was no #cmd("HMA2293"). All 14 #cmd("LIST") statements of
+the job and all 15 statements for the modules and load modules answered "not
+found", so the removal was complete. Scratching the libraries, allocating them
+again and installing the same package ended with return code 0000 in every step,
+with ten #cmd("HMA2380") lines and the banner of 4.5.1, and #cmd("THTP450") was a
+mark again.
+
+*What was not measured.* A system at 4.4.0 or older was not run. Its modules belong to an FMID that no
+#cmd("MOD") block names, and whether the #cmd("DEL MOD") and
+#cmd("DEL SYSMOD") statements remove them cleanly is not known.
+
+The next section is about the case where a system holds an FMID that the job
+does not name, because a development build put it there.
 
 == A Development Build with a Later FMID <ug-remove-dev>
 
@@ -318,6 +383,12 @@ A development build of the source tree is packaged under the FMID of the
 release that the tree is heading for. A build of 4.5.0-dev carries
 #cmd("THTP450"), the id of the release that the tree becomes. If you installed such a package
 with SMP, the system holds an id that the job of @ug-remove-uclin does not name.
+The job of @ug-remove-451 names #cmd("THTP450") and #cmd("THTP451"). The sessions
+of this section were measured with the changes of @ug-remove-45, which the job
+of @ug-remove-451 contains, on a development build under #cmd("THTP450"). A
+development build under #cmd("THTP451") is covered by the same blocks, and that
+was not run. The rest of the section is for the job of @ug-remove-uclin as
+printed, and for an id later than #cmd("THTP451").
 
 *What the job does on such a system.* The sessions of this section were
 measured with SMP 4 (#cmd("HMASMP LVL 04.48")) on two systems. The TK5 system

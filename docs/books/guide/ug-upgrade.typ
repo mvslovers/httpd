@@ -3,10 +3,11 @@
 = Upgrading HTTPD <ug-upgrade>
 
 #idx("upgrade")
-This chapter moves a system that runs an older HTTPD to HTTPD 4.5. It is
-written for a system that HTTPD 4.0.x, 4.1.x, 4.2.x, 4.3.x or 4.4.x
+This chapter moves a system that runs an older HTTPD to HTTPD 4.5.1. It is
+written for a system that HTTPD 4.0.x, 4.1.x, 4.2.x, 4.3.x, 4.4.x or 4.5.0
 installed by SMP, and it has a section for a system that still runs
-HTTPD 3.x. A system without HTTPD needs @ug-install, and a system that should
+HTTPD 3.x. The release that 4.5.1 replaces in one step is 4.5.0. A system at an
+older release goes to 4.5.0 first (@ug-upgrade-hops). A system without HTTPD needs @ug-install, and a system that should
 lose HTTPD needs @ug-remove.
 
 The upgrade is the same install job as in @ug-install, with a different
@@ -26,24 +27,28 @@ new release, it deletes the load modules of the old one from
 - It leaves no way back. The install job accepts the new level, and the old
   FMID is deleted. SMP cannot restore the old modules.
 
-The captures in this chapter come from the upgrade from 4.3.0 to 4.4.0 on a
-TK5 system. The upgrade from 4.4.0 to 4.5.0 was run on a TK5 system as well.
-It has the same shape, with the FMID #cmd("THTP450") in place of
-#cmd("THTP440"): every step of the install job ended with return code 0000
-except the APPLY, which ended with return code 0004 and
-#cmd("HMA2461 SYSMOD THTP440 NOT FOUND ON SMPSCDS LIBRARY"). The file names in
-your package carry the number of your release.
+The captures in this chapter come from the upgrade from 4.5.0 to 4.5.1 on a
+TK5 system. Every step of the install job ended with return code 0000 except
+the APPLY, which ended with return code 0004 and
+#cmd("HMA2461 SYSMOD THTP450 NOT FOUND ON SMPSCDS LIBRARY"). The package of
+4.5.1 was built from the source of the release branch, with the version in the
+project file changed from #cmd("4.5.1-dev") to #cmd("4.5.1"). The build stamp
+in the start-up banner is therefore not the one of the published package
+(@ug-upgrade-verify). The file names in your package carry the number of your
+release.
 
 == One Release at a Time <ug-upgrade-hops>
 
 #idx("FMID")
-#idx("THTP450")
+#idx("THTP451")
 Go from release to release. Do not skip one. The reason is in the way SMP
 decides who owns a module.
 
 The FMID of a release is #cmd("THTP") and the three digits of its version.
-The package build derives the FMID and the predecessor from the version
-number. A release deletes only the FMID of the release before it.
+For a minor release, the package build derives the FMID and the predecessor
+from the version number. 4.5.1 is a patch release, which the derivation has no
+id for, so the project file of 4.5.1 names both: #cmd("THTP451"), deleting
+#cmd("THTP450"). A release deletes only the FMID of the release before it.
 
 #tab(caption: [Releases, FMIDs and what each one deletes])[
   #table(columns: (1in, 1.2in, 1fr),
@@ -53,15 +58,21 @@ number. A release deletes only the FMID of the release before it.
     [4.3.0], [#cmd("THTP430")], [#cmd("THTP420")],
     [4.4.0], [#cmd("THTP440")], [#cmd("THTP430")],
     [4.5.0], [#cmd("THTP450")], [#cmd("THTP440")],
+    [4.5.1], [#cmd("THTP451")], [#cmd("THTP450")],
   )
 ]
 
-SMP keys the ownership of a module on its name. The SYSMOD of 4.5.0 can take
-over #cmd("HTTPD") from #cmd("THTP440") because it deletes #cmd("THTP440"). It
-cannot take it over from #cmd("THTP420"). If the system is at 4.2.0 and you
-install 4.5.0, the SYSMOD does not own the module, and the install copies
-nothing. Every step still ends with return code 0. The inventory then says that
-4.5.0 is installed, and the library holds the modules of 4.2.0.
+SMP keys the ownership of a module on its name. The SYSMOD of 4.5.1 can take
+over #cmd("HTTPD") from #cmd("THTP450") because it deletes #cmd("THTP450"). It
+cannot take it over from #cmd("THTP440") or from an older FMID. By the same
+rule, if the system is at 4.4.0 and you install 4.5.1, the SYSMOD does not own
+the module, and the install copies nothing. Every step still ends with return
+code 0. The inventory then says that 4.5.1 is installed, and the library holds
+the modules of 4.4.0. This rule is SMP's and holds for every pair of releases.
+The case of 4.4.0 and 4.5.1 was run on a TK5 system at 4.4.0: every step of the
+install job of 4.5.1 ended with return code 0000, the #cmd("APPLY") had no
+#cmd("HMA2380") line, and the banner of the started server still showed 4.4.0.
+The library kept the modules of 4.4.0.
 
 A skipped release has a sign in the output. The #cmd("APPLY") step has no
 #cmd("HMA2240") lines (a deleted load module) and no #cmd("HMA2380") lines (a
@@ -77,8 +88,8 @@ The accepted copy has its own zone, the ACDS, and the ACCEPT step deletes
 there on its own. An upgrade is complete when both zones have moved
 (@ug-upgrade-verify).
 
-A system at 4.0.x needs the packages of 4.1.0, 4.2.0, 4.3.0 and 4.4.0 before
-the package of 4.5.0. The hop from 4.0.x to 4.1.0 is different from the
+A system at 4.0.x needs the packages of 4.1.0, 4.2.0, 4.3.0, 4.4.0 and 4.5.0
+before the package of 4.5.1. The hop from 4.0.x to 4.1.0 is different from the
 others, and @ug-upgrade-40x describes it.
 
 == Before You Start <ug-upgrade-before>
@@ -96,9 +107,9 @@ release you install:
 //LISTCDS  EXEC SMPAPP
 //SMPCNTL  DD  *
  RESETRC .
- LIST CDS SYSMOD(THTP430) .
+ LIST CDS SYSMOD(THTP450) .
  LIST CDS LMOD(HTTPD) .
- LIST CDS SYSMOD(THTP440) .
+ LIST CDS SYSMOD(THTP451) .
 /*
 ```)
 
@@ -106,11 +117,11 @@ The output of this job, on the system before the upgrade:
 
 #screen(raw(read("../ex/ug-upgrade/before-smp-list.txt")))
 
-Read three facts. The line #cmd("LASTUPD = THTP430") under the load module
+Read three facts. The line #cmd("LASTUPD = THTP450") under the load module
 #cmd("HTTPD") is the present level: the module in the library comes from that
-FMID. The SYSMOD #cmd("THTP430") has the status #cmd("REC  APP  ACC") and the
-line #cmd("DELETE VER(001) = THTP420"), the one it replaced. And the new
-SYSMOD #cmd("THTP440") is not known: the answer is the list of selected
+FMID. The SYSMOD #cmd("THTP450") has the status #cmd("REC  APP  ACC") and the
+line #cmd("DELETE VER(001) = THTP440"), the one it replaced. And the new
+SYSMOD #cmd("THTP451") is not known: the answer is the list of selected
 entries that were not found or not eligible, and the step ends with return
 code 04. That is the answer you want before the upgrade.
 
@@ -196,16 +207,17 @@ Submit the job as in @ug-install. The job takes about a minute.
 == Reading the Result <ug-upgrade-result>
 
 #idx("return code")
-Goal: know whether the upgrade did its work. The console shows the summary:
+Goal: know whether the upgrade did its work. The console shows that the job
+started and that it ended. It does not show the steps:
 
 #screen(raw(read("../ex/ug-upgrade/inst-console.txt")))
 
-The step #cmd("APPLY") ends with 0004, and the line at the end says
-#cmd("MAX COND CODE 0004"). That is the normal result of an upgrade. The next
-paragraphs say why. Every other step ends with 0000. The job log has the same
-table with the time of each step:
+The step table is in the job log, with the time of each step:
 
 #screen(raw(read("../ex/ug-upgrade/inst-joblog.txt")))
+
+The step #cmd("APPLY") ends with 0004. That is the normal result of an
+upgrade. The next paragraphs say why. Every other step ends with 0000.
 
 *DELOLD.* The step makes the two RECEIVE targets absent. Both are data sets of
 the previous run, so the capture looks different from the installation:
@@ -233,14 +245,14 @@ name of your data set.
 #screen(raw(read("../ex/ug-upgrade/inst-smp-receive.txt")))
 
 The second line of the SYSMOD is the one that makes the upgrade:
-#cmd("++VER(Z038) DELETE(THTP430)"). It names the predecessor.
+#cmd("++VER(Z038) DELETE(THTP450)"). It names the predecessor.
 
 *APPLYCHK.* A dry run. It changes nothing. The summary names the predecessor
 as deleted:
 
 #screen(raw(read("../ex/ug-upgrade/inst-smp-applycheck.txt")))
 
-The return code is 00. The lines #cmd("THTP430 DELETED") show that SMP knows
+The return code is 00. The lines #cmd("THTP450 DELETED") show that SMP knows
 the predecessor and will delete it. The step has no #cmd("HMA2240") and no
 #cmd("HMA2380"), because a check does not do the work.
 
@@ -258,13 +270,13 @@ Read these lines in order:
 + #cmd("HMA2380 COPY SUCCESSFUL - MOD=... - LIBRARY=LINKLIB"), five times. SMP
   copies the new load modules in. This is the line that separates a real
   upgrade from a silent one. Count it.
-+ #cmd("HMA2270 APPLY PROCESSING SUCCESSFULLY COMPLETED FOR SYSMOD THTP440").
-+ #cmd("HMA2461 SYSMOD THTP430 NOT FOUND ON SMPSCDS LIBRARY"), and the return
++ #cmd("HMA2270 APPLY PROCESSING SUCCESSFULLY COMPLETED FOR SYSMOD THTP451").
++ #cmd("HMA2461 SYSMOD THTP450 NOT FOUND ON SMPSCDS LIBRARY"), and the return
   code 04. SMP looks for a backup entry of the deleted FMID, and a deleted FMID
   has none. The message comes after the success message and does not undo it.
 
-The page at the end, #cmd("DELETED FUNCTION REPORT"), shows #cmd("THTP440") as
-the function that deleted #cmd("THTP430"). The report is the second proof that
+The page at the end, #cmd("DELETED FUNCTION REPORT"), shows #cmd("THTP451") as
+the function that deleted #cmd("THTP450"). The report is the second proof that
 the predecessor is gone.
 
 The copy runs through the utility IEBCOPY. Its listing from the same step:
@@ -306,11 +318,11 @@ as before the upgrade. The output:
 
 #screen(raw(read("../ex/ug-upgrade/after-smp-list.txt")))
 
-Four facts changed. The old SYSMOD #cmd("THTP430") has lost its status, and it
-shows only the line #cmd("DELBY = THTP440"): the FMID that deleted it. The new
-SYSMOD #cmd("THTP440") has the status #cmd("REC  APP  ACC"), the line
-#cmd("DELETE VER(001) = THTP430") and the five modules. And the load module
-#cmd("HTTPD") has #cmd("LASTUPD = THTP440"). The old FMID stays in the
+Four facts changed. The old SYSMOD #cmd("THTP450") has lost its status, and it
+shows only the line #cmd("DELBY = THTP451"): the FMID that deleted it. The new
+SYSMOD #cmd("THTP451") has the status #cmd("REC  APP  ACC"), the line
+#cmd("DELETE VER(001) = THTP450") and the five modules. And the load module
+#cmd("HTTPD") has #cmd("LASTUPD = THTP451"). The old FMID stays in the
 inventory as a mark and is never used again.
 
 *The library.* The IEHLIST listing after the upgrade:
@@ -332,12 +344,15 @@ lines are the routes of the member. If the version is not the one you
 installed, look at the #cmd("STEPLIB") (@ug-upgrade-before). Send a request to
 the server, as in @ug-first.
 
-A start of HTTPD 4.5.1 or later has one more line than the capture: the line
-#cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") after
-#cmd("HTTPD004I"). It is the refusal of the test logon that the server makes
-(@ug-security-open). The line #cmd("HTTPD042W") instead means that the
-security product accepts any user ID, and the server refuses all logins. The
-upgrade did not cause it. Look at the tables of RAKF.
+Two things in the capture are new in 4.5.1. The stamp in #cmd("HTTPD000I") is
+shown as #cmd("nnnnnnn"): the package of the capture was built from the source
+of the release branch with the version changed from #cmd("4.5.1-dev") to
+#cmd("4.5.1"), and a start of the published package was not measured
+for this book. The line #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB")
+comes from the test of the security system at the start. It is expected on TK5
+(RAKF 1.2.x) and MVS/CE (RAKF 2.0.0), and "Starting HTTPD" in @ug-install explains it. If the
+line #cmd("HTTPD042W") appears instead, the upgrade did not cause it: look at
+the tables of RAKF (@ug-security-open).
 
 == What the SMP Upgrade Deletes <ug-upgrade-deletes>
 
@@ -350,7 +365,7 @@ The delete covers the load modules of the predecessor and nothing more.
   #cmd("HMA2240") and #cmd("HMA2380") lines of the APPLY).
 - *In the distribution library.* The same five, from #cmd("HTTPD.AHTTPLOD")
   (the same messages in the ACCEPT).
-- *In the inventory.* The predecessor #cmd("THTP430") becomes a mark with the
+- *In the inventory.* The predecessor #cmd("THTP450") becomes a mark with the
   line #cmd("DELBY"). The listing shows it for the CDS, and the summary of the
   ACCEPT shows the same for the ACDS. The load module entries move to the new
   FMID.
@@ -363,18 +378,20 @@ book does not show what SMP does with a foreign member in
 #cmd("HTTPD.LINKLIB"). The library belongs to SMP. Keep other modules, such as
 mvsMF, in a library of their own.
 
-*What was verified.* The FMID rule comes from the project file: the entry
+*What was verified.* The FMID rule comes from the project file. The entry
 #cmd("[smp] prefix = \"THTP\"") makes the build derive the FMID and the
-predecessor from the version. A package build of 4.5.0 produced
-#cmd("++FUNCTION(THTP450)") and #cmd("++VER(Z038) DELETE(THTP440)"). The other
+predecessor from the version, and the project file of 4.5.1 names
+#cmd("fmid = \"THTP451\"") and #cmd("delete = [\"THTP450\"]") itself, because
+4.5.1 is a patch release. A package build of 4.5.1 produced
+#cmd("++FUNCTION(THTP451)") and #cmd("++VER(Z038) DELETE(THTP450)"). The other
 rows of the table in @ug-upgrade-hops come from the project file and from the
 measured installs of the releases. The step output in this chapter is from the
-upgrade 4.3.0 to 4.4.0, where #cmd("THTP440") deleted #cmd("THTP430"). The
-upgrade from 4.4.0 to 4.5.0 was run as well: #cmd("THTP450") is a
-#cmd("FUNCTION") with the line #cmd("DELETE VER(001) = THTP440"),
-#cmd("THTP440") shows #cmd("DELBY = THTP450") and no modules, the mark
-#cmd("DELBY = THTP440") of #cmd("THTP430") stays, and #cmd("HTTPD.LINKLIB") and
-#cmd("HTTPD.AHTTPLOD") each hold the five members of the package.
+upgrade 4.5.0 to 4.5.1, where #cmd("THTP451") deleted #cmd("THTP450"):
+#cmd("THTP451") is a #cmd("FUNCTION") with the line
+#cmd("DELETE VER(001) = THTP450"), #cmd("THTP450") shows
+#cmd("DELBY = THTP451") and no modules, and #cmd("HTTPD.LINKLIB") and
+#cmd("HTTPD.AHTTPLOD") each hold the five members of the package. Earlier
+upgrades, from 4.3.0 to 4.4.0 and from 4.4.0 to 4.5.0, had the same shape.
 
 == Upgrading from HTTPD 4.0.x <ug-upgrade-40x>
 
@@ -394,7 +411,7 @@ hop that needs the allocation job. Every hop after it does not.
   @ug-upgrade-hop. The #cmd("APPLY") step deletes #cmd("THTP400") from the
   new, empty library without a complaint, copies the five modules in, and ends
   with 0004. The #cmd("ACCEPT") step ends with 0000.
-+ Install 4.2.0, 4.3.0, 4.4.0 and 4.5.0 in turn, each as in
++ Install 4.2.0, 4.3.0, 4.4.0, 4.5.0 and 4.5.1 in turn, each as in
   @ug-upgrade-hop. These hops skip the allocation job.
 
 The install of 4.1.0 leaves the old libraries as they were. After the
@@ -541,6 +558,15 @@ to look for. The first two matter for the safety of the system.
   the line #cmd("/zosmf/*") has no check on the console service. Add the route,
   and define the profile in RAKF (@ug-security). Without a profile the check
   permits everybody under RAKF, and #cmd("HTTPD425W") says so at the start.
+- *The login checks of 4.5.1.* Nothing in your files has to change. The server
+  now compares the user that the security system returns with the userid that
+  was typed, and refuses the login on a mismatch. It refuses every login of the
+  started-task account. At the start it tests the security system once with a
+  logon that must fail. On TK5 and MVS/CE this writes
+  #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
+  console, and the line is expected. On #cmd("HTTPD042W") the server refuses
+  every login until the security software runs correctly and HTTPD has been
+  restarted, while routes without a login still answer (@ug-security-open).
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
 - *A route whose profile is missing.* From 4.5.0 the keyword
@@ -581,8 +607,8 @@ upgrade.
       (#cmd("HMA2461")).],
     [Every step ends with 0000, but the #cmd("APPLY") has no #cmd("HMA2240") and
       no #cmd("HMA2380").], [A release was skipped. The SYSMOD does not own
-      the modules and copied nothing. List the level (@ug-upgrade-before) and
-      do not go on.],
+      the modules and copied nothing. The library still holds the old modules.
+      List the level (@ug-upgrade-before) and do not go on.],
     [The job waits, and the console shows #cmd("IEF861I") and #cmd("IEF099I").],
     [HTTPD still runs and has the library open. Stop it with #cmd("P HTTPD")
       and wait for #cmd("$HASP395 HTTPD ENDED").],
@@ -595,9 +621,13 @@ upgrade.
       policy: a retired #cmd("LOGIN") (#cmd("HTTPD048E")), an unknown
       #cmd("AUTH=") value or a route that cannot be registered. Read all
       the messages before it.],
-    [#cmd("HTTPD042W") at the start, and every login gets 401.], [RAKF 1.2.x
-      accepts any user ID, because its user table is missing or was rejected.
-      Correct the tables, IPL, and restart HTTPD (@ug-security-open).],
+    [#cmd("RAKF0004 ... USER:HTTPPRB") at the start.], [Expected on TK5 and
+      MVS/CE since 4.5.1: the test of the security system. No user
+      #cmd("HTTPPRB") needs to exist.],
+    [#cmd("HTTPD042W") at the start, and every login is refused.], [The
+      security software accepts any user ID. On RAKF 1.2.x the user table is
+      missing or was rejected at the IPL. Correct the tables, IPL, and restart
+      HTTPD (@ug-security-open). Until then the server refuses every login.],
     [#cmd("HTTPD440W") at the start.], [A route names a module that HTTPD does
       not find in the #cmd("STEPLIB") or the link list. After a move from
       4.0.x, mvsMF is the likely one.],
