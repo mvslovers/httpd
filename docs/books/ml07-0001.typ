@@ -5,7 +5,7 @@
   subtitle: "User's Guide",
   short-title: "HTTPD User's Guide",
   product: "HTTPD",
-  number: "ML07-0001-0",
+  number: "ML07-0001-1",
   date: "October 2026",
   authors: ("Mike Großmann",),
   edition: [
@@ -15,25 +15,23 @@
     MVS 3.8j (httpd 4.5.1), and to all subsequent releases and modifications
     until otherwise indicated in new editions.
 
-    *Draft.* This is a draft edition, as the last digit of the number says.
-    The console sessions in the chapters on configuring and running HTTPD
-    that show a start of the server or its version were captured on an MVS/CE
-    system, a throwaway container, with a package
-    build of HTTPD 4.5.1 that was made from the source of the release branch,
-    with the version in the project file changed from #raw("4.5.1-dev") to
-    #raw("4.5.1"). Two sessions come from development builds, which show the
+    The console sessions that show a start of the server or its version were
+    captured on an MVS/CE system, a throwaway container, and on a TK5 system,
+    from a build of the 4.5.1 source made before the release was published.
+    The build stamp in them is shown as #raw("nnnnnnn"). A start of the
+    published package of 4.5.1 was not captured for this edition. Two
+    sessions come from builds of the 4.5.0 and 4.5.1 source that show the
     version #raw("4.5.1-DEV") or #raw("4.5.0-DEV"): the start on a system
     without a user table in the chapter on security and the banner in the
     chapter on removing HTTPD. The other console and client sessions may come
-    from earlier development builds of HTTPD 4.5.0 and 4.5.1.
+    from earlier builds of 4.5.0 and 4.5.1.
     The sessions in the chapters on installing and upgrading HTTPD were
-    captured on a TK5 system with the same package build:
-    the install on a system without HTTPD and the upgrade from 4.5.0 to 4.5.1.
-    A first install of the package build on an MVS/CE system showed the
-    same start. A start of the published package of 4.5.1 was not measured.
+    captured on a TK5 system: the install on a system without HTTPD and the
+    upgrade from 4.5.0 to 4.5.1. A first install on an MVS/CE system showed
+    the same start.
     The sessions in the chapter on removing HTTPD were captured on
     release 4.4.0 on a TK5 system, except the section on a development build,
-    which comes from development builds of 4.5.0. The removal job for 4.5.0
+    which comes from builds of 4.5.0. The removal job for 4.5.0
     was run on a TK5 system as well. The removal job for 4.5.1 was run on an
     MVS/CE system that held the released 4.5.0 and on a TK5 system that held
     4.5.1. The chapters name what they measured.
