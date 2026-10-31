@@ -5,7 +5,7 @@
   subtitle: "Reference",
   short-title: "HTTPD Reference",
   product: "HTTPD",
-  number: "ML07-0002-0",
+  number: "ML07-0002-1",
   date: "October 2026",
   authors: ("Mike Großmann",),
   edition: [
@@ -15,14 +15,13 @@
     MVS 3.8j (httpd 4.5.1), and to all subsequent releases and modifications
     until otherwise indicated in new editions.
 
-    *Draft.* This is a draft edition, as the last digit of the number says.
     The console sessions in it that show the version of the server were
-    captured on an MVS/CE system, a throwaway container, with a package build
-    of HTTPD 4.5.1 that was made from the source of the release branch, with
-    the version in the project file changed from #raw("4.5.1-dev") to
-    #raw("4.5.1"). The other console and client sessions may come from earlier
-    development builds of HTTPD 4.5.0 and 4.5.1, which show the version
-    #raw("4.5.0-DEV") or #raw("4.5.1-DEV").
+    captured on an MVS/CE system, a throwaway container, from a build of the
+    4.5.1 source made before the release was published. The build stamp in
+    them is not the one of the published package, which was not captured for
+    this edition. The other console and client sessions may come from earlier
+    builds of 4.5.0 and 4.5.1, which show the version #raw("4.5.0-DEV") or
+    #raw("4.5.1-DEV").
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.
