@@ -24,7 +24,7 @@ HTTPD is installed with SMP from the release archive; [docs/installation.md](doc
 - MVS 3.8j on Hercules with SMP 4 usable (TK4-, TK5, MVS/CE).
 - RAKF, or an APF list entry for the load library. HTTPD does not start without one of the two.
 - [UFSD](https://github.com/mvslovers/ufsd), only if you want to serve static files.
-- [mvsMF](https://github.com/mvslovers/mvsmf), only if you want the REST API that the shipped configuration routes to.
+- A server module, only if you want the REST API that the shipped configuration routes to (see [Server Modules](#server-modules)).
 
 The archive holds the load modules, a sample library with the started task procedure (`HTTPD`) and the configuration pattern (`HTTPPRM0`), the install jobs and a webroot image.
 
@@ -57,7 +57,7 @@ The server is configured through a Parmlib member referenced by the `HTTPPRM` DD
 | `MOD` | — | Server module route, with its own `AUTH=` |
 | `LOC` | — | Static path prefix without a program, with its own `AUTH=` |
 
-Authentication is set per route with `AUTH=NONE|FORM|BASIC|TOKEN`. **A route without `AUTH=` is public.** The `LOGIN` keyword of earlier 4.x releases is retired.
+Authentication is set per route with `AUTH=NONE|FORM|BASIC|TOKEN`. **A route with neither `AUTH=` nor `RES=` is public.** A route with `RES=` and no `AUTH=` is challenged with `BASIC`. The `LOGIN` keyword of earlier 4.x releases is retired.
 
 For every keyword, see the _HTTPD Reference_, "The HTTPPRM Keywords" ([docs/configuration.md](docs/configuration.md) says where each topic is).
 
