@@ -1026,8 +1026,8 @@ Read the lines in order:
     (@ug-install-auth).],
   [#cmd("HTTPD004I")], [The identity of the task now: #cmd("HTTPD/USER").
     Without this line the task runs as the inherited account.],
-  [#cmd("RAKF0004")], [Only on TK5 with RAKF 1.2.x, and only in 4.5.1 and
-    later: the server tests the security system once, with a logon that must
+  [#cmd("RAKF0004")], [On TK5 (RAKF 1.2.x) and MVS/CE (RAKF 2.0.0), and only in
+    4.5.1 and later: the server tests the security system once, with a logon that must
     fail (see below and @ug-security-open).],
   [#cmd("HTTPD036I")], [One line for each #cmd("MOD=") route.],
   [#cmd("HTTPD054I")], [The server listens on the port.],
@@ -1051,16 +1051,15 @@ package of 4.5.1 was not measured for this book. The version in your own
 
 *The line from RAKF.* Since 4.5.1 the server tests the security system once at
 the start. It logs on the user #cmd("HTTPPRB") with a password that cannot be
-right. A system that checks refuses the logon. On RAKF 1.2.x the refusal
-writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
+right. A system that checks refuses the logon. On TK5 (RAKF 1.2.x) and MVS/CE (RAKF 2.0.0) the
+refusal writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
 console, between #cmd("HTTPD004I") and the first #cmd("HTTPD036I"), as the
 capture shows. The line is expected, and no user #cmd("HTTPPRB") needs to
 exist. If the server writes #cmd("HTTPD042W") instead, the security software
 has accepted the test logon. On RAKF 1.2.x this happens when the user table is
 missing or was rejected at the IPL (@ug-security-open). The server then
 refuses every login until the security software runs correctly and HTTPD has
-been restarted. Routes that need no login still answer. A start on MVS/CE
-(RAKF 2.0.0) was not measured.
+been restarted. Routes that need no login still answer.
 
 A start that does not come up ends the task with a condition code other than
 0, and 8 for a refused configuration. A clean stop ends with 0. The messages in front of a refused start say why. The most common
