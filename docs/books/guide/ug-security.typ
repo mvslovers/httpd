@@ -321,6 +321,10 @@ guide:
   is the more powerful one. Define the user ID and start again.
 - #cmd("HTTPD003W") says that the server could not enter supervisor state for
   the logon. It also keeps the identity that the task had.
+- #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") belongs to
+  a good start from HTTPD 4.5.1. It is the refusal of the test logon that the
+  server makes after #cmd("HTTPD004I") (@ug-security-open). A start without
+  it, or with #cmd("HTTPD042W") instead, is not a good start.
 
 The user ID of #cmd("STCUSER") needs READ access to the Parmlib member and to
 the document root. A server module that sets no identity of its own uses the
@@ -331,6 +335,137 @@ authorization. The authorization was taken under the old account and is given
 back under the same account. For this reason the user ID of #cmd("STCUSER")
 needs no access to the profile for SVC 244. 'The Started Task and the Package'
 in the _HTTPD Reference_ explains the order.
+
+== A Security System That Accepts Any User ID <ug-security-open>
+
+#idx("HTTPD042W")#idx("HTTPPRB")#idx("RAKF0001")#idx("RAKF0002")
+#idx("RAKF0003")#idx("RAKF0004")#idx("RAKF0009")
+#idx("security system", "accepts any user ID")
+HTTPD has no user database. A login is a question to the security product:
+is this user ID valid with this password? The answer is only worth something
+if the product says no to a user it does not know.
+
+*RAKF 1.2.x can say yes to everybody.* RAKF 1.2.x, the version on TK5, keeps
+its users in a table that it loads at the IPL from the member
+#cmd("SYS1.SECURE.CNTL(USERS)"). When the table is missing or invalid, RAKF
+1.2.x has nobody to compare with. It answers every logon with return code 0
+and hands back the account #cmd("STC") in the group #cmd("STCGROUP"), the
+account that it gives to every started task. RAKF 2.0.0 (MVS/CE) behaves
+differently: it refuses a user that it does not know.
+
+An invalid table is easy to make. On RAKF 1.2.x a line with a blank password
+is enough: the load stops with #cmd("RAKFUIDS2") and #cmd("RAKFUIDSX")
+(@ug-install-rakfsetup), and nothing of the table is loaded.
+
+#note[This was measured on TK5. TK4- was not measured. The statements in this
+section about RAKF 1.2.x are for TK5.]
+
+=== How HTTPD Reacts
+
+HTTPD 4.5.1 and later look for this state themselves. At the start, after the
+logon of the started task, the server makes one logon with the user ID
+#cmd("HTTPPRB") and a password that cannot be right. A security product that
+checks refuses it. RAKF writes #cmd("RAKF0004") for it, and that is the line
+you see in every healthy start (@ug-ops-start-healthy). A product that gives
+an ACEE back for it accepts any user ID. The server then writes
+
+#screen(```
+HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED
+```)
+
+and goes on with the start. The server runs, and it refuses every login:
+
+- A Basic request with a user ID and a password gets 401, as for a wrong
+  password.
+- A login with the form (@ug-security-auth) shows the login page again with
+  the text #cmd("Invalid userid or password").
+- A request for a route with #cmd("AUTH=TOKEN") gets 401.
+- A request that needs no login (@ug-security-exempt) is served as before.
+
+The refusal is the same for every user ID, also for the ones that you have
+defined. HTTPD writes no message for a refused login, and RAKF writes none
+either, because the server does not ask it. Only #cmd("HTTPD042W") tells you,
+once, at the start. The next capture shows a start in this state. The system
+had neither the user table nor the profile table of RAKF:
+
+#screen(raw(read("../ex/ug-security/open-start.txt")))
+
+A client that tries to log in sees only the 401:
+
+#screen(raw(read("../ex/ug-security/open-refused-token.txt")))
+
+=== How to Recognise It
+
+Look at the console at the start. These lines say that RAKF has no valid table:
+
+#tab(caption: [Signs of a RAKF without tables])[
+  #table(columns: (0.95in, 1fr),
+    [Message], [Meaning],
+    [#cmd("HTTPD042W")], [HTTPD found that the product accepts any user ID.
+      This is the sign that counts. The server writes it once, at the start.],
+    [#cmd("RAKF0001"), #cmd("RAKF0002")], [RAKF has no valid user table
+      (#cmd("USERID TABLE INVALID OR MISSING")) and lets the task in
+      (#cmd("STC ACCESS ALLOWED")). In the capture the pair appears twice: for
+      the logon of the started task, and for #cmd("HTTPPRB").],
+    [#cmd("RAKF0003"), #cmd("RAKF0009")], [RAKF has no valid profile table
+      (#cmd("RESOURCE TABLE INVALID/MISSING")). The second line names the
+      data set or the resource that was checked. You see the pair for each
+      check, also before #cmd("HTTPD000I").],
+  )
+]
+
+The two kinds of line do not always come together. A rejected user table gives
+#cmd("RAKF0001"), #cmd("RAKF0002") and #cmd("HTTPD042W") and no
+#cmd("RAKF0003"). In a healthy start there is exactly one RAKF line from the
+server, #cmd("RAKF0004") for #cmd("HTTPPRB"), and no #cmd("HTTPD042W").
+
+The display module HTTPDSRV shows the state in the row
+#cmd("httpd->sec_open") of the server block (@ug-ops-dm-dsrv). The row says
+#cmd("NO") in a healthy server and #cmd("YES, LOGIN REFUSED") in this state.
+You can read the row in a browser only if a route lets you reach HTTPDSRV
+without a login, because the display modules need a login like any other
+route. Otherwise read the start messages.
+
+=== What to Do
+
++ Correct the tables before the IPL. Check #cmd("SYS1.SECURE.CNTL(USERS)")
+  and #cmd("SYS1.SECURE.CNTL(PROFILES)") against @ug-install-rakfsetup. Check
+  the passwords, the columns and the order of the lines.
++ After the IPL, read the log for the lines of the table load. The lines
+  #cmd("RAKFPROF7  RAKF PROFILES UPDATED") and #cmd("RAKFUIDS4  USER TABLE UPDATED")
+  say that the tables are loaded. The lines
+  #cmd("RAKFUIDS2  INPUT DATA INVALID OR OUT OF SEQ.") and
+  #cmd("RAKFUIDSX  ** PROGRAM TERMINATED **") say that the user table was
+  rejected.
++ *Restart HTTPD* (@ug-ops-restart). The server makes its test once, at the
+  start, and does not look again. A server that wrote #cmd("HTTPD042W")
+  refuses logins until it is stopped and started, also after RAKF is
+  repaired.
++ Read the start again. A good start has #cmd("RAKF0004") for #cmd("HTTPPRB")
+  and no #cmd("HTTPD042W").
+
+RAKF has to be active before HTTPD asks it anything. On TK5 the member
+#cmd("SYS1.PARMLIB(RAKFINIT)") holds the word #cmd("YES"), and RAKF then
+becomes active at the IPL without a question at the console. This is an
+operating hint and not something that HTTPD checks. If RAKF was not active
+when HTTPD started, the logon of the started task fails with
+#cmd("HTTPD004W RACINIT ENVIR=CREATE FAILED ... RC=32") (@ug-trouble-stc).
+
+=== Two More Rules
+
+- *The user ID #cmd("HTTPPRB") is reserved.* Do not define a user with this
+  name. The server makes one failed logon with it at every start. For a user
+  of that name it would be one failed password attempt each time.
+- *The user ID #cmd("STC") is no login.* HTTPD refuses a login with this user
+  ID in every case, because it is the account of the started tasks on RAKF
+  1.2.x. The client sees the 401 or the login page, and no message is written.
+
+The test needs the same supervisor state as the logon of the started task. If
+the server could not enter it (#cmd("HTTPD003W")), it makes no test and
+writes no #cmd("HTTPD042W"). Cure #cmd("HTTPD003W") first (@ug-trouble-stc).
+
+HTTPD before 4.5.1 does not look for this state and has no
+#cmd("HTTPD042W"). Use HTTPD 4.5.1 or later where RAKF 1.2.x runs.
 
 == RES=: Checking a Profile <ug-security-res>
 
@@ -487,9 +622,12 @@ without a login. The answer must be 401, 302 or 403.
 == Console Messages for Logins <ug-security-console>
 
 #idx("HTTPD007I")#idx("HTTPD008I")#idx("HTTPD008W")#idx("HTTPD009W")
+#idx("HTTPD042W")
 #idx("console", "login messages")
 HTTPD writes the logins that matter to the operator and nothing about a failed
-password. That is the client's concern, and it appears in the response.
+password. That is the client's concern, and it appears in the response. One
+message is about the security product and not about a login:
+#cmd("HTTPD042W") at the start (@ug-security-open).
 
 #tab(caption: [The messages for logins])[
   #table(columns: (0.95in, 1fr),
@@ -502,6 +640,10 @@ password. That is the client's concern, and it appears in the response.
       browser sees the text #cmd("Logout failed.").],
     [#cmd("HTTPD009W")], [From HTTPD 4.5. A login could not create a session
       because RACF failed for another reason than the password.],
+    [#cmd("HTTPD042W")], [From HTTPD 4.5.1. At the start. The security
+      product accepted a logon with a user ID and a password that cannot be
+      right. HTTPD refuses all logins until it is started again
+      (@ug-security-open).],
   )
 ]
 
@@ -544,3 +686,7 @@ HTTPD is a small server. Know the limits before you open it to a network.
 - *HTTPD does not write failed logins to the console.* The client sees the
   401 or the form text. RAKF may write a message of its own, as the capture
   above shows.
+- *HTTPD relies on the security product to refuse.* HTTPD 4.5.1 and later test
+  this once at the start. If the product accepts any user ID, HTTPD refuses all
+  logins (@ug-security-open). The test does not run again while the server
+  runs.

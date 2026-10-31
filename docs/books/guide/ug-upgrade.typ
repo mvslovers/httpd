@@ -332,6 +332,13 @@ lines are the routes of the member. If the version is not the one you
 installed, look at the #cmd("STEPLIB") (@ug-upgrade-before). Send a request to
 the server, as in @ug-first.
 
+A start of HTTPD 4.5.1 or later has one more line than the capture: the line
+#cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") after
+#cmd("HTTPD004I"). It is the refusal of the test logon that the server makes
+(@ug-security-open). The line #cmd("HTTPD042W") instead means that the
+security product accepts any user ID, and the server refuses all logins. The
+upgrade did not cause it. Look at the tables of RAKF.
+
 == What the SMP Upgrade Deletes <ug-upgrade-deletes>
 
 #idx("predecessor")
@@ -588,6 +595,9 @@ upgrade.
       policy: a retired #cmd("LOGIN") (#cmd("HTTPD048E")), an unknown
       #cmd("AUTH=") value or a route that cannot be registered. Read all
       the messages before it.],
+    [#cmd("HTTPD042W") at the start, and every login gets 401.], [RAKF 1.2.x
+      accepts any user ID, because its user table is missing or was rejected.
+      Correct the tables, IPL, and restart HTTPD (@ug-security-open).],
     [#cmd("HTTPD440W") at the start.], [A route names a module that HTTPD does
       not find in the #cmd("STEPLIB") or the link list. After a move from
       4.0.x, mvsMF is the likely one.],
