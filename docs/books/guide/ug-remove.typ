@@ -23,7 +23,7 @@ Reference_, in "The Started Task and the Package", section "The FMID". The job
 in this chapter is the 4.4.0 job. @ug-remove-45 tells what changes for 4.5.0,
 and what the 4.5.0 form of the job did on a TK5 system. @ug-remove-451 tells
 what changes for 4.5.1, and what the 4.5.1 form of the job did on an MVS/CE
-system. If you installed a development build of HTTPD, read @ug-remove-dev too.]
+system that held 4.5.0 and on a TK5 system that held 4.5.1. If you installed a development build of HTTPD, read @ug-remove-dev too.]
 
 == What HTTPD Put on the System <ug-remove-what>
 
@@ -352,13 +352,23 @@ statements answered "not found". #cmd("LIST CDS MOD(...)"),
 answered "not found" as well. On this system the #cmd("THTP450") blocks did the
 work and the #cmd("THTP451") blocks found nothing.
 
-*What was not measured.* The job was not run on a system that holds
-#cmd("THTP451"), because no package of 4.5.1 had been installed when this was
-written. There the modules belong to #cmd("THTP451") and #cmd("THTP450") is a
-mark, so the five #cmd("DEL SYSMOD(THTP450) MOD(...)") blocks of each zone are
-the ones that find nothing. The same single-block behaviour was measured above
-for the #cmd("THTP451") blocks, but this case was not run. A system at 4.4.0 or
-older was not run either. Its modules belong to an FMID that no
+*A system that holds THTP451.* The 4.5.1 form of the job was run on a TK5
+system that held #cmd("THTP451"), installed from the package of 4.5.1 as an
+upgrade from 4.5.0. The modules belong to #cmd("THTP451") and #cmd("THTP450") is
+a mark, so the five #cmd("DEL SYSMOD(THTP450) MOD(...)") blocks of each zone are
+the ones that find nothing, ten in all. They do not end with #cmd("HMA2532")
+like the blocks of the system above. SMP writes #cmd("HMA3572") for them, as it
+does for a mark that lists no module (@ug-remove-dev). The #cmd("UCLIN") step
+ended with return code 8 and the #cmd("LIST") step with return code 4. The job
+reported #cmd("HMA2550") 35 times, #cmd("HMA2532") 4 times and #cmd("HMA3572")
+10 times, and there was no #cmd("HMA2293"). All 14 #cmd("LIST") statements of
+the job and all 15 statements for the modules and load modules answered "not
+found", so the removal was complete. Scratching the libraries, allocating them
+again and installing the same package ended with return code 0000 in every step,
+with ten #cmd("HMA2380") lines and the banner of 4.5.1, and #cmd("THTP450") was a
+mark again.
+
+*What was not measured.* A system at 4.4.0 or older was not run. Its modules belong to an FMID that no
 #cmd("MOD") block names, and whether the #cmd("DEL MOD") and
 #cmd("DEL SYSMOD") statements remove them cleanly is not known.
 

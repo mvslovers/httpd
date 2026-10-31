@@ -66,9 +66,10 @@ SMP selects none of them, copies nothing, and every step still ends `RC 00`. So
 4.4.0 upgrades to 4.5.0 first, with the 4.5.0 package, and then to this
 release; a 4.3.0 system goes through 4.4.0 and 4.5.0, a 4.2.0 system through
 4.3.0, 4.4.0 and 4.5.0, and a 4.1.0 system through 4.2.0, 4.3.0, 4.4.0 and
-4.5.0, in the same way. The skip from 4.4.0 straight to 4.5.1 was not run for
-this guide; the rule above is SMP's. A 4.0.x system starts with 4.1.0, the
-release that crosses from `THTP400` and the one move to the unversioned dataset
+4.5.0, in the same way. The skip from 4.4.0 straight to 4.5.1 was run: on a
+system at 4.4.0 the package of 4.5.1 ended `RC 00` in every step with no
+`HMA2380` line at all, and the banner still showed 4.4.0. A 4.0.x system
+starts with 4.1.0, the release that crosses from `THTP400` and the one move to the unversioned dataset
 names — [section 12a](#12a-upgrading-from-40x) has that order, done with the
 **4.1.0** package — then 4.2.0, 4.3.0, 4.4.0 and 4.5.0, then this release.
 
@@ -1397,7 +1398,7 @@ HTTPD000I HTTPD <version> (A69A370) STARTING
 HTTPD005I LIBC370 2.26.0 (3AA3B28)
 HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 HTTPD004I STC IDENTITY SET TO HTTPD/USER VIA RACINIT
-RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB       TK5 only, see below
+RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/info
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/services/authenticate
 HTTPD036I MODULE MVSMF REGISTERED FOR /zosmf/restconsoles/*
@@ -1425,13 +1426,14 @@ working filesystem (step 2).
 **The `RAKF0004` line is expected since 4.5.1.** At the start the server tests
 the security system once: it logs on the user `HTTPPRB` with a password that
 cannot be right, and a system that checks refuses it. On TK5 with RAKF 1.2.x
-the refusal writes `RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB`
-to the console, between `HTTPD004I` and the first `HTTPD036I`. No user
-`HTTPPRB` has to exist, and nothing has to be done about the line. If the
+and on MVS/CE with RAKF 2.0.0 the refusal writes
+`RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB` to the console,
+between `HTTPD004I` and the first `HTTPD036I`. No user `HTTPPRB` has to exist, and nothing has to be done about the line. If the
 server writes `HTTPD042W` instead, it refuses every login until the security
 software runs correctly and HTTPD has been restarted; routes that need no login
-still answer. That warning was not produced when this guide was written, and a
-start on MVS/CE (RAKF 2.0.0) was not measured.
+still answer. That warning was not produced when this guide was written. Both
+starts were measured on throwaway containers with a package build of 4.5.1, not
+on a real system.
 
 The two build stamps identify exactly what is running: `HTTPD000I` gives the
 version and the commit it was built from, `HTTPD005I` the libc370 it was linked
@@ -1882,12 +1884,21 @@ it gave RC 08 again with no `HMA2550` and no `HMA2293`, and the same `LIST`.
 RC 04, not found. Before it they list all five, and the CDS load module
 entries show `SYSTEM LIBRARY = LINKLIB`.
 
-**What was not measured.** The job as printed was not run on a system that
-holds `THTP451`: no package of 4.5.1 had been installed when this was written.
-On such a system the modules belong to `THTP451` and `THTP450` is a tombstone,
-so the five `DEL SYSMOD(THTP450) MOD(...)` blocks per zone fail with `HMA2532`
-instead of the `THTP451` ones; each block is absorbed the same way, but this
-exact case was not run. A system at 4.4.0 or older was not run either: its
+**A system that holds `THTP451`.** The job as printed was run on a TK5 system
+that held `THTP451`, installed from the package of 4.5.1 as an upgrade from
+4.5.0. The modules belong to `THTP451` and `THTP450` is a tombstone, so the
+five `DEL SYSMOD(THTP450) MOD(...)` blocks per zone fail, ten in all. They
+report `HMA3572`, not `HMA2532`: the tombstone exists, and it lists no module
+(`HMA3572 ** MOD ... TO BE DELETED FROM ENTRY DOES NOT EXIST`). The `UCLIN`
+step ended RC 08 and the `LIST` step RC 04. The job reported `HMA2550` 35
+times, `HMA2532` 4 times and `HMA3572` 10 times, and there was no `HMA2293`.
+Afterwards all 14 `LIST` answers of step 3 and all 15 answers of the `LIST`
+statements for the modules said not found, so the removal was complete.
+Scratching the libraries, allocating them again and installing the same package
+ended RC 0000 in every step, with ten `HMA2380` lines and the banner of 4.5.1,
+and `THTP450` was a tombstone again.
+
+**What was not measured.** A system at 4.4.0 or older was not run either: its
 modules belong to an id that no `MOD` block names, and whether `DEL MOD` and
 `DEL SYSMOD` alone remove them cleanly is not known. The `DEL SYSMOD(THTP450)
 MOD(...)` blocks were also run on systems that held `THTP450` as a development
@@ -1992,7 +2003,8 @@ Those are yours to delete — unmount the disk before you scratch it.
 > form was run on a TK5 system holding `THTP450`, `THTP440`, `THTP430` and
 > `THTP420`, and on systems holding a development build under `THTP450`; the
 > 49-statement form of step 2 was run on an MVS/CE system holding the released
-> `THTP450`, and step 2 has its figures. On the
+> `THTP450`, and step 2 has its figures. The same
+> 49-statement form was run on a TK5 system holding `THTP451` as well. On the
 > first system the `UCLIN` step ended RC 08 from four `HMA2532` (`THTP400` and
 > `THTP410`, in each zone), 33 statements ended `HMA2550`, there was no
 > `HMA2293`, and the `LIST` step ended RC 04 with all six ids not found in the
@@ -2329,7 +2341,7 @@ nothing above touches it.
 | Allocation job fails, or ends `COND CODE 0000` with `IEF287I … NOT CATLGD 2`, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it. If this is a TK5 or hand-filled system and HTTPD was never installed from SMP, the library is one SMP does not own: [rename it first](#a-library-that-smp-does-not-own) |
 | `RECV1`/`RECV2` fails on MVS/CE, no volume to allocate on | Add `VOLUME('PUB000')` (or a volume of yours) to both `RECEIVE` commands — step 6 |
 | `RECV1`/`RECV2` fails, target exists | A previous release's `HTTPD.HTTPLOAD`/`HTTPD.SAMPLIB`, or something else allocated it. RECEIVE refuses to merge; scratch it and re-run |
-| `APPLY` RC 00, no `HMA2380` at all, library empty | The modules still belong to an FMID that this SYSMOD does not delete. Usually a release was skipped: see "Coming from an older release" above. `LIST CDS MOD(HTTPD)` names the owner in `FMID`/`RMID`. `NOT SEL` in the element summary is no sign either way, because a good upgrade prints it too. If the owner is the previous release, the SYSMOD's `++VER` is missing its `DELETE` — a packaging fault, not an operator one; report it |
+| `APPLY` RC 00, no `HMA2380` at all, library unchanged | The modules still belong to an FMID that this SYSMOD does not delete. Usually a release was skipped: see "Coming from an older release" above. `LIST CDS MOD(HTTPD)` names the owner in `FMID`/`RMID`. `NOT SEL` in the element summary is no sign either way, because a good upgrade prints it too. If the owner is the previous release, the SYSMOD's `++VER` is missing its `DELETE` — a packaging fault, not an operator one; report it |
 | `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The `ACCEPT` is gated `(4,LT,…)` and still runs |
 | `APPLYCHK` ends non-zero, `APPLY` skipped | Read the SMP output — the check exists to stop before anything is written. A missing DD is the usual cause |
 | `APPLY` RC 00 but fewer than five `HMA2380` lines | A module was lost. Count them, then look in the library itself |

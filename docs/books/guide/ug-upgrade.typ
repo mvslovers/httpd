@@ -69,7 +69,10 @@ rule, if the system is at 4.4.0 and you install 4.5.1, the SYSMOD does not own
 the module, and the install copies nothing. Every step still ends with return
 code 0. The inventory then says that 4.5.1 is installed, and the library holds
 the modules of 4.4.0. This rule is SMP's and holds for every pair of releases.
-The case of 4.4.0 and 4.5.1 itself was not run for this book.
+The case of 4.4.0 and 4.5.1 was run on a TK5 system at 4.4.0: every step of the
+install job of 4.5.1 ended with return code 0000, the #cmd("APPLY") had no
+#cmd("HMA2380") line, and the banner of the started server still showed 4.4.0.
+The library kept the modules of 4.4.0.
 
 A skipped release has a sign in the output. The #cmd("APPLY") step has no
 #cmd("HMA2240") lines (a deleted load module) and no #cmd("HMA2380") lines (a
@@ -604,8 +607,8 @@ upgrade.
       (#cmd("HMA2461")).],
     [Every step ends with 0000, but the #cmd("APPLY") has no #cmd("HMA2240") and
       no #cmd("HMA2380").], [A release was skipped. The SYSMOD does not own
-      the modules and copied nothing. List the level (@ug-upgrade-before) and
-      do not go on.],
+      the modules and copied nothing. The library still holds the old modules.
+      List the level (@ug-upgrade-before) and do not go on.],
     [The job waits, and the console shows #cmd("IEF861I") and #cmd("IEF099I").],
     [HTTPD still runs and has the library open. Stop it with #cmd("P HTTPD")
       and wait for #cmd("$HASP395 HTTPD ENDED").],

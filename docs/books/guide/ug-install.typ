@@ -1055,7 +1055,8 @@ right. A system that checks refuses the logon. On TK5 (RAKF 1.2.x) and MVS/CE (R
 refusal writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
 console, between #cmd("HTTPD004I") and the first #cmd("HTTPD036I"), as the
 capture shows. The line is expected, and no user #cmd("HTTPPRB") needs to
-exist. If the server writes #cmd("HTTPD042W") instead, the security software
+exist. The capture comes from TK5. A first install of 4.5.1 on a throwaway
+MVS/CE system showed the same line in the same place. If the server writes #cmd("HTTPD042W") instead, the security software
 has accepted the test logon. On RAKF 1.2.x this happens when the user table is
 missing or was rejected at the IPL (@ug-security-open). The server then
 refuses every login until the security software runs correctly and HTTPD has
