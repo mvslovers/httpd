@@ -1428,11 +1428,10 @@ cannot be right, and a system that checks refuses it. On TK5 with RAKF 1.2.x
 the refusal writes `RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB`
 to the console, between `HTTPD004I` and the first `HTTPD036I`. No user
 `HTTPPRB` has to exist, and nothing has to be done about the line. If the
-security system accepts the logon instead, the server writes `HTTPD042W
-SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED` and refuses every login
-from then on; routes that need no login still answer. That warning was not
-produced when this guide was written, and a start on MVS/CE (RAKF 2.0.0) was
-not measured.
+server writes `HTTPD042W` instead, it refuses every login until the security
+software runs correctly and HTTPD has been restarted; routes that need no login
+still answer. That warning was not produced when this guide was written, and a
+start on MVS/CE (RAKF 2.0.0) was not measured.
 
 The two build stamps identify exactly what is running: `HTTPD000I` gives the
 version and the commit it was built from, `HTTPD005I` the libc370 it was linked

@@ -559,10 +559,10 @@ to look for. The first two matter for the safety of the system.
   started-task account. At the start it tests the security system once with a
   logon that must fail. On TK5 with RAKF 1.2.x this writes
   #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
-  console, and the line is expected. A system that accepts the test logon gets
-  #cmd("HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED"), and
-  the server refuses every login while routes without a login still answer. The
-  warning was not produced for this book (@ug-install).
+  console, and the line is expected. On #cmd("HTTPD042W") the server refuses
+  every login until the security software runs correctly and HTTPD has been
+  restarted, while routes without a login still answer. The warning was not
+  produced for this book (@ug-install).
 - *The AUTH values.* A route without #cmd("AUTH=") is public. Open the member
   and read every #cmd("MOD") and #cmd("LOC") line for it.
 - *A route whose profile is missing.* From 4.5.0 the keyword
@@ -621,9 +621,8 @@ upgrade.
       RAKF 1.2.x since 4.5.1: the test of the security system. No user
       #cmd("HTTPPRB") needs to exist.],
     [#cmd("HTTPD042W") at the start, and every login is refused.], [The
-      security system accepted the test logon, so it does not check userids. The
-      source names a security system without its user table as a cause: check
-      that the table is loaded. This message was not produced for this book.],
+      server refuses every login until the security software runs correctly and
+      HTTPD has been restarted. This message was not produced for this book.],
     [#cmd("HTTPD440W") at the start.], [A route names a module that HTTPD does
       not find in the #cmd("STEPLIB") or the link list. After a move from
       4.0.x, mvsMF is the likely one.],

@@ -1043,11 +1043,10 @@ right. A system that checks refuses the logon. On RAKF 1.2.x the refusal
 writes #cmd("RAKF0004 INVALID ATTEMPT TO ACCESS SYSTEM:  USER:HTTPPRB") to the
 console, between #cmd("HTTPD004I") and the first #cmd("HTTPD036I"), as the
 capture shows. The line is expected, and no user #cmd("HTTPPRB") needs to
-exist. If the security system accepts the logon instead, the server writes
-#cmd("HTTPD042W SECURITY SYSTEM ACCEPTS ANY USERID, ALL LOGINS REFUSED") and
-refuses every login from then on. Routes that need no login still answer.
-The source shows this; the warning was not produced for this book, and a start
-on MVS/CE (RAKF 2.0.0) was not measured either.
+exist. If the server writes #cmd("HTTPD042W") instead, it refuses every login
+until the security software runs correctly and HTTPD has been restarted.
+Routes that need no login still answer. The warning was not produced for this
+book, and a start on MVS/CE (RAKF 2.0.0) was not measured either.
 
 A start that does not come up ends the task with a condition code other than
 0, and 8 for a refused configuration. A clean stop ends with 0. The messages in front of a refused start say why. The most common
