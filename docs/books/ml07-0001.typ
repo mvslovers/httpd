@@ -16,16 +16,20 @@
     until otherwise indicated in new editions.
 
     *Draft.* This is a draft edition, as the last digit of the number says.
-    The console and client sessions in the chapters on configuring and
-    running HTTPD were captured from development builds of HTTPD 4.5.0 and
-    4.5.1, which show the version #raw("4.5.0-DEV") or #raw("4.5.1-DEV").
-    The sessions in the chapters on
-    installing and upgrading HTTPD were captured on a TK5 system with a package
+    The console sessions in the chapters on configuring and running HTTPD
+    that show a start of the server or its version were captured on an MVS/CE
+    system, a throwaway container, with a package
     build of HTTPD 4.5.1 that was made from the source of the release branch,
     with the version in the project file changed from #raw("4.5.1-dev") to
-    #raw("4.5.1"):
+    #raw("4.5.1"). Two sessions come from development builds, which show the
+    version #raw("4.5.1-DEV") or #raw("4.5.0-DEV"): the start on a system
+    without a user table in the chapter on security and the banner in the
+    chapter on removing HTTPD. The other console and client sessions may come
+    from earlier development builds of HTTPD 4.5.0 and 4.5.1.
+    The sessions in the chapters on installing and upgrading HTTPD were
+    captured on a TK5 system with the same package build:
     the install on a system without HTTPD and the upgrade from 4.5.0 to 4.5.1.
-    A first install of the same package build on an MVS/CE system showed the
+    A first install of the package build on an MVS/CE system showed the
     same start. A start of the published package of 4.5.1 was not measured.
     The sessions in the chapter on removing HTTPD were captured on
     release 4.4.0 on a TK5 system, except the section on a development build,
@@ -66,9 +70,9 @@ books.
 The console screens and the client sessions in this book are output that was
 recorded from a running HTTPD. None of them was typed by hand. Before they were
 printed, some values were replaced: passwords by asterisks, session tokens by
-#cmd("<token>"), the digits of job and task numbers by #cmd("n"), the names and
-addresses of the test systems by #cmd("localhost"), #cmd("mvs.example.org") and
-the address #cmd("192.0.2.17") of the documentation range, and the home
+#cmd("<token>"), the digits of job and task numbers by #cmd("n"), the build
+stamp after the version by #cmd("nnnnnnn"), the names and addresses of the test
+systems by #cmd("localhost"), #cmd("mvs.example.org") and the address #cmd("192.0.2.17") of the documentation range, and the home
 directory of the user by #cmd("$HOME"). The addresses in the examples are
 therefore not real addresses.
 

@@ -16,9 +16,13 @@
     until otherwise indicated in new editions.
 
     *Draft.* This is a draft edition, as the last digit of the number says.
-    The console and client sessions in it were captured from development
-    builds of HTTPD 4.5.0 and 4.5.1, which show the version #raw("4.5.0-DEV")
-    or #raw("4.5.1-DEV").
+    The console sessions in it that show the version of the server were
+    captured on an MVS/CE system, a throwaway container, with a package build
+    of HTTPD 4.5.1 that was made from the source of the release branch, with
+    the version in the project file changed from #raw("4.5.1-dev") to
+    #raw("4.5.1"). The other console and client sessions may come from earlier
+    development builds of HTTPD 4.5.0 and 4.5.1, which show the version
+    #raw("4.5.0-DEV") or #raw("4.5.1-DEV").
 
     Comments on this book may be addressed to the issue tracker of the
     mvslovers/httpd repository on GitHub.
