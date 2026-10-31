@@ -1,73 +1,32 @@
 # HTTPD
 
-**HTTPD** is a multi-threaded HTTP/1.1 server for IBM MVS 3.8j, running on Hercules-emulated mainframe systems.
+**HTTPD** is a multi-threaded HTTP/1.1 server for IBM MVS 3.8j, running on Hercules-emulated mainframe systems. It runs as a started task, hosts server modules that answer requests for a URL prefix or a file extension, and serves static files from a UFS filesystem provided by [UFSD](https://github.com/mvslovers/ufsd).
+
+The current release is **4.5.1** ([release page](https://github.com/mvslovers/httpd/releases/tag/v4.5.1)).
 
 Originally created by Michael Dean Rayborn (versions 1.x–3.3.x), the project has been taken over and substantially reworked by Mike Großmann starting with version 4.0.0. The original author is no longer involved in development or support. A maintenance branch (`v3.3.x`) preserves the legacy codebase for reference; all active development happens on `main`.
 
-Version 4.0.0 is a major release with two primary goals:
+## Documentation
 
-- **HTTP/1.1 compliance** — persistent connections (Keep-Alive), chunked transfer encoding, strict request parsing (h1spec 33/33 tests passing)
-- **Leaner footprint** — removal of the embedded FTP daemon, MQTT telemetry, Lua scripting engine, and the 4-tier in-memory statistics system
+The manuals are the place to look things up:
 
-## What's New in 4.0.0
+- _HTTPD User's Guide_ (ML07-0001): installing, configuring, operating and upgrading HTTPD, routes and authentication, serving files, writing a server module, troubleshooting.
+- _HTTPD Reference_ (ML07-0002): every Parmlib keyword, the route and authentication policy, the console commands, the started task, the server module interface, the display modules, the SMF records and the messages.
 
-**Added:**
+Read them on Read the Docs: <https://mvslovers.readthedocs.io/projects/httpd/>. The PDFs are attached to each release from 4.5.0 on as `ml07-0001-<edition>.pdf` and `ml07-0002-<edition>.pdf`; their sources are in [`docs/books`](docs/books).
 
-- Full HTTP/1.1 support with Keep-Alive and Chunked Transfer Encoding
-- Parmlib-based configuration (replaces Lua scripting)
-- SMF recording with configurable levels (NONE / ERROR / AUTH / ALL)
-- Server module system with URL prefix and file extension routing
-- Automatic chunked fallback for server modules that don't set Content-Length
-- Hardened HTTP request parsing — invalid headers, methods, URIs rejected per RFC 7230
-
-**Changed:**
-
-- Static file serving is now UFS-only, provided by [UFSD](https://github.com/mvslovers/ufsd)
-- The old in-memory statistics system has been replaced by SMF Type 243 records
-
-**Removed:**
-
-- Embedded FTP daemon — replaced by the standalone [FTPD](https://github.com/mvslovers/ftpd) project
-- MQTT telemetry
-- Lua configuration engine (replaced by Parmlib)
-- DD-based document root (UFS-only now)
-
-**Outlook:**
-
-- JES2 browser and dataset browser will be re-implemented as part of [mvsMF](https://github.com/mvslovers/mvsmf) in a future release
-- Lua and REXX scripting modules are being reworked in their own repositories and will be available as optional add-ons in a future release
+Installation, upgrade and removal step by step are in [docs/installation.md](docs/installation.md), the README of the installation package. Release notes are on the [releases page](https://github.com/mvslovers/httpd/releases).
 
 ## Installation
 
-> **Note:** Installation instructions will be finalized once the packaging system is complete. The following is a preliminary guide.
+HTTPD is installed with SMP from the release archive; [docs/installation.md](docs/installation.md) walks through it. What you need on the system:
 
-### Prerequisites
+- MVS 3.8j on Hercules with SMP 4 usable (TK4-, TK5, MVS/CE).
+- RAKF, or an APF list entry for the load library. HTTPD does not start without one of the two.
+- [UFSD](https://github.com/mvslovers/ufsd), only if you want to serve static files.
+- A server module, only if you want the REST API that the shipped configuration routes to (see [Server Modules](#server-modules)).
 
-Install in this order on a Hercules-emulated MVS 3.8j system ([TK4-](http://wotho.ethz.ch/tk4-/), [TK5](https://www.prince-webdesign.nl/tk5), or [MVS/CE](https://github.com/MVS-sysgen/MVS-CE)):
-
-1. [UFSD](https://github.com/mvslovers/ufsd) — UFS filesystem daemon (provides the filesystem HTTPD serves from)
-2. [FTPD](https://github.com/mvslovers/ftpd) — FTP daemon (needed to transfer files to the UFS filesystem)
-3. **HTTPD** — this project (includes [mvsMF](https://github.com/mvslovers/mvsmf))
-
-### JCL Procedure
-
-Copy the STC procedure from `samplib/httpd` to `SYS2.PROCLIB(HTTPD)`:
-
-```
-//HTTPD    EXEC PGM=HTTPD,REGION=8M,TIME=1440
-//STEPLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
-//HTTPPRM  DD  DSN=SYS2.PARMLIB(HTTPPRM0),DISP=SHR,FREE=CLOSE
-```
-
-### Parmlib
-
-Copy `samplib/httpprm0` to `SYS2.PARMLIB(HTTPPRM0)` and adjust as needed. A minimal configuration:
-
-```
-PORT=8080
-DOCROOT=/www
-MOD=MVSMF /zosmf/*
-```
+The archive holds the load modules, a sample library with the started task procedure (`HTTPD`) and the configuration pattern (`HTTPPRM0`), the install jobs and a webroot image.
 
 ### Starting and Stopping
 
@@ -94,33 +53,34 @@ The server is configured through a Parmlib member referenced by the `HTTPPRM` DD
 | `MAXTASK` | 9 | Maximum worker threads |
 | `KEEPALIVE_TIMEOUT` | 5 | Keep-alive idle timeout (seconds) |
 | `KEEPALIVE_MAX` | 100 | Max requests per connection |
-| `LOGIN` | NONE | Authentication mode (NONE / RACF) |
-| `SMF` | NONE | SMF recording level |
-| `MOD` | — | Server module registration |
+| `SMF` | NONE | SMF recording level (NONE / ERROR / AUTH / ALL) |
+| `MOD` | — | Server module route, with its own `AUTH=` |
+| `LOC` | — | Static path prefix without a program, with its own `AUTH=` |
 
-For the complete reference, see [docs/configuration.md](docs/configuration.md).
+Authentication is set per route with `AUTH=NONE|FORM|BASIC|TOKEN`. **A route with neither `AUTH=` nor `RES=` is public.** A route with `RES=` and no `AUTH=` is challenged with `BASIC`. The `LOGIN` keyword of earlier 4.x releases is retired.
+
+For every keyword, see the _HTTPD Reference_, "The HTTPPRM Keywords" ([docs/configuration.md](docs/configuration.md) says where each topic is).
 
 ## Server Modules
 
 HTTPD uses a server module system for extending the server with custom functionality. Unlike traditional CGI (which forks a new process per request and communicates via stdin/stdout), HTTPD modules are load modules that run inside the server's address space and are called directly through a function vector — similar to Apache's `mod_php` or `mod_rewrite`.
 
-In version 4.0.0, the primary module is [mvsMF](https://github.com/mvslovers/mvsmf), which provides a z/OSMF-compatible REST API for datasets, jobs, and USS files.
+The primary module is [mvsMF](https://github.com/mvslovers/mvsmf), which provides a z/OSMF-compatible REST API for datasets, jobs, and USS files.
 
 ```
-MOD=MVSMF /zosmf/*
+MOD=MVSMF /zosmf/*      AUTH=TOKEN
 ```
 
-Module routing supports URL prefix matching and automatic extension matching:
+Module routing supports URL prefix matching and extension matching:
 
 ```
 MOD=MVSMF /zosmf/*      URL prefix — all requests under /zosmf/
-MOD=LUA                  Extension — *.lua files served from DOCROOT
-MOD=REXX                 Extension — *.rexx files served from DOCROOT
+MOD=REXX                Extension — *.rexx files served from DOCROOT
 ```
 
-Scripting modules like LUA and REXX don't need an explicit pattern — HTTPD derives the file extension from the module name automatically.
+A route without a pattern gets one from the module name: `MOD=REXX` becomes `*.rexx`.
 
-Debug modules (HTTPDSRV, HTTPDMTT) are included in the server binary but not enabled by default. They are intended for development and troubleshooting only. See [docs/server-modules.md](docs/server-modules.md) for details on writing your own modules.
+Three display modules (HTTPDSRV, HTTPDM, HTTPDMTT) and a deliberate-abend diagnostic (ABEND0C1) ship with the load library but are not routed by default. They are development and troubleshooting tools; give each route an `AUTH=` of its own. See [docs/server-modules.md](docs/server-modules.md) for where to read about writing and using modules.
 
 ## Ecosystem
 
@@ -128,23 +88,29 @@ HTTPD is part of the [mvslovers](https://github.com/mvslovers) open-source ecosy
 
 | Project | Description |
 |---------|-------------|
-| [crent370](https://github.com/mvslovers/crent370) | C runtime library for MVS 3.8j |
+| [libc370](https://github.com/mvslovers/libc370) | C library for MVS 3.8j |
 | [ufsd](https://github.com/mvslovers/ufsd) | Cross-address-space UFS filesystem daemon |
+| [crypto370](https://github.com/mvslovers/crypto370) | SHA-256, Blowfish and base64 |
 | [mvsmf](https://github.com/mvslovers/mvsmf) | z/OSMF-compatible REST API |
-| [ftpd](https://github.com/mvslovers/ftpd) | Standalone FTP daemon (replaces embedded FTPD from 3.x) |
+| [httplua](https://github.com/mvslovers/httplua) | Lua CGI handler (server module) |
+| [httprexx](https://github.com/mvslovers/httprexx) | REXX Server Pages (server module) |
+| [ftpd](https://github.com/mvslovers/ftpd) | Standalone FTP daemon |
 
-## Manuals
+## History: 4.0.0
 
-The _HTTPD User's Guide_ (ML07-0001) and the _HTTPD Reference_ (ML07-0002) are
-attached to each release from 4.5.0 on as `ml07-0001-<edition>.pdf` and
-`ml07-0002-<edition>.pdf`. Their sources are in [`docs/books`](docs/books); the
-web form is published on Read the Docs. Installation, upgrade and removal
-step by step are in [docs/installation.md](docs/installation.md), the README of
-the installation package.
+Version 4.0.0 was a major release with two goals: HTTP/1.1 (persistent connections, chunked transfer encoding, strict request parsing) and a leaner footprint.
+
+**Added:** HTTP/1.1 with Keep-Alive and chunked transfer encoding; Parmlib-based configuration; SMF recording with configurable levels; the server module system with URL prefix and file extension routing; automatic chunked fallback for modules that do not set `Content-Length`; request parsing hardened per RFC 7230.
+
+**Changed:** static file serving is UFS-only, provided by UFSD; the old in-memory statistics were replaced by SMF type 243 records.
+
+**Removed:** the embedded FTP daemon (replaced by the standalone [FTPD](https://github.com/mvslovers/ftpd)); MQTT telemetry; the Lua configuration engine (replaced by Parmlib); the DD-based document root.
+
+The notes of every release since 4.0.0 are on the [releases page](https://github.com/mvslovers/httpd/releases).
 
 ## For Developers
 
-Build instructions, the architecture overview and the ASCII/EBCDIC translation system are documented in [internals/development.md](internals/development.md); how to write your own server modules is in [docs/server-modules.md](docs/server-modules.md).
+Build instructions, the architecture overview and the ASCII/EBCDIC translation system are documented in [internals/development.md](internals/development.md); how to write your own server modules is in the _HTTPD User's Guide_ and the _HTTPD Reference_ (see [docs/server-modules.md](docs/server-modules.md)).
 
 ## Credits
 
