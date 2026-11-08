@@ -57,7 +57,9 @@ SYSMOD (FMID `THTP451`) carries `DELETE(THTP450)`, so SMP deletes the 4.5.0
 modules from
 `HTTPD.LINKLIB` and copies the new ones into it during the same APPLY, and
 ownership of each module moves with them. You stop the server (step 5), skip
-step 4 because the libraries are already there, and submit the install job.
+step 4 because the libraries are already there, and submit the install job. It
+ends after the APPLY: the accept job, which you submit when you have tried the
+new level, is a job of its own ([step 10a](#10a-accept-the-sysmod)).
 
 **Coming from an older release, go through each release in turn.** This
 release deletes `THTP450` and nothing else. On a 4.4.0 system the modules still
@@ -118,8 +120,9 @@ somebody filled one by hand. Read
 | `README.md` | this guide |
 | `httpd-<version>-load.xmit` | the five load modules, as a TSO RECEIVE-ready XMIT |
 | `httpd-<version>-samplib.xmit` | the sample library: STC procedure and configuration pattern |
-| `httpd-<version>-alloc.jcl` | allocates the datasets SMP installs into — **run once** |
-| `httpd-<version>-inst.jcl` | receives everything and installs it — repeatable |
+| `httpd-<version>-alloc.jcl` | job `HTTPDALC`: allocates the datasets SMP installs into — **run once**, for a first installation only |
+| `httpd-<version>-inst.jcl` | job `HTTPDINS`: receives everything and applies it. **It ends after the APPLY** — the function is applied and not accepted ([step 6](#6-install)) |
+| `httpd-<version>-accept.jcl` | job `HTTPDACC`: accepts the function and scratches the staging library. You submit it when you have tried the product ([step 10a](#10a-accept-the-sysmod)) |
 | `httpd-webroot.img` | the document root as a UFS370 disk image — outside SMP, see [step 9](#9-the-webroot-disk) |
 
 The load library holds five modules:
@@ -160,7 +163,7 @@ Where everything ends up:
 ```
 HTTPD.LINKLIB     the load modules -- point STEPLIB here
 HTTPD.SAMPLIB     the patterns you copy from in step 7
-HTTPD.AHTTPLOD    SMP's distribution library, the base a RESTORE returns to
+HTTPD.AHTTPLOD    SMP's distribution library, filled by the accept job
 HTTPD.WEBROOT.UFS the document root, if you upload the shipped one (step 9)
 ```
 
@@ -186,7 +189,7 @@ that an `APPLY` must never touch. Step 9 is where it comes from.
 - A way to upload a **binary** file to the host — see step 3.
 - Roughly 15 cylinders of DASD: 10 for the two libraries the allocation job
   creates, the rest for the two TSO RECEIVE targets. One of those, the staging
-  library, is scratched again by the last step of the install job.
+  library, is scratched again by the last step of the accept job.
 
 ### UFSD is optional, and what it costs you is static files
 
@@ -508,19 +511,60 @@ webroot image; the same emulator handling applies here.
 
 ## 4. Allocate the product datasets
 
-Submit `httpd-<version>-alloc.jcl` unchanged, unless you want a specific unit or
-volume — the `UNIT=SYSDA` and the space on each DD are the only things worth
-editing.
+Submit `httpd-<version>-alloc.jcl` once, for a first installation, after you
+have named the volumes.
 
 It creates `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` and nothing else.
 The libraries the next step receives into are deliberately **not** allocated
 here: TSO RECEIVE creates its own target and refuses to merge into an existing
 dataset.
 
-Expect `COND CODE 0000`.
+**Name the volumes.** Every library is allocated on a volume you name, never on
+whatever `SYSDA` happens to pick. The job is a procedure, `SMPALLOC`, with two
+parameters:
+
+| Parameter | Volume of | Default |
+|-----------|-----------|---------|
+| `TGTVOL` | `HTTPD.LINKLIB`, the target library SMP installs into | `MVSRES` |
+| `DLBVOL` | `HTTPD.AHTTPLOD`, the distribution library the accept job fills | `SMP000` |
+
+The defaults are the volumes of an MVS/CE system (so the header of the job says;
+that was not run here). **On TK5 write `TGTVOL=TK5RES` and `DLBVOL=TK5DLB`**,
+on the `EXEC ALLOC` statement at the end of the job:
+
+```
+//ALLOC   EXEC SMPALLOC,TGTVOL=TK5RES,DLBVOL=TK5DLB,COND=(0,NE,CHECK)
+```
+
+Leave the `COND` as it is. On any other system use the volumes you want the
+libraries on. A volume that is not mounted does not fail the job, it holds it:
+the console shows `IEF238D … REPLY DEVICE NAME OR 'CANCEL'`. Reply `CANCEL`,
+correct the volume and submit the job again (the header of the job says so;
+that case was not run here). If the system already has an `IEAAPF00` entry for
+`HTTPD.LINKLIB`, set `TGTVOL` to the volume that entry names, as
+[Authorisation](#authorisation) explains.
+
+The job runs two steps:
+
+| Step | What it does |
+|------|--------------|
+| `CHECK` | looks in the catalog for both libraries. It ends RC 0 when neither exists and RC 8 when either does |
+| `ALLOC` | allocates the two libraries. Runs only when `CHECK` ended RC 0 |
+
+**A good run.** On a system without HTTPD libraries `CHECK` prints
+`IDC3012I ENTRY HTTPD.LINKLIB NOT FOUND` and the same for `HTTPD.AHTTPLOD`:
+that is the answer the job wants, and the step ends `COND CODE 0000`. `ALLOC`
+ends `COND CODE 0000` too, and its `IEF285I` lines show both libraries
+`CATALOGED`, on the volumes you named (`TK5RES` and `TK5DLB` in the run on TK5).
+
+**A second run does nothing.** When either library is already catalogued,
+`CHECK` lists it and ends `COND CODE 0008`, `ALLOC` is skipped
+(`IEF202I … STEP WAS NOT RUN BECAUSE OF CONDITION CODES`) and nothing is
+allocated. The job ends with RC 8, which is the correct answer on a system
+that has the libraries; see the upgrade note below.
 
 > **Run this once.** There is no DELETE step in it, on purpose. After the
-> install, `HTTPD.AHTTPLOD` holds SMP's accepted copy of the modules; a
+> accept job, `HTTPD.AHTTPLOD` holds SMP's accepted copy of the modules; a
 > re-run that scratched it would leave the SMP inventory reporting an install
 > that is no longer on the system, and nothing would say so. To start over, cut
 > the FMID out of the inventory first — see
@@ -530,8 +574,8 @@ Expect `COND CODE 0000`.
 > **Skip this step entirely when upgrading from 4.1.0 or later.** The names no
 > longer change between releases, so `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` are
 > already allocated and already hold the previous release — which is exactly
-> what the APPLY expects to find and replace. A failure here saying the dataset
-> exists is that situation, not an error to work around.
+> what the APPLY expects to find and replace. The `CHECK` step ending RC 8 is
+> that situation, not an error to work around.
 >
 > **Coming from 4.0.x**, install 4.1.0 first, following
 > [section 12a](#12a-upgrading-from-40x) — that is where this step runs. Then
@@ -539,7 +583,7 @@ Expect `COND CODE 0000`.
 
 ### A library that SMP does not own
 
-The job allocates `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` new, and it cannot do
+The job allocates `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` new, and it does not do
 that over a name that is already catalogued. A system can have such a library
 without an SMP installation behind it:
 
@@ -556,23 +600,16 @@ job created, so the existing one is moved out of the way first and the install
 then runs as on a first installation. The old library stays on the disk until
 the new server has started, which is also your way back.
 
-**Do not read the allocation job's return code as the answer.** Measured on
-TK5, allocating a name that is already catalogued ends the step with
-`COND CODE 0000`, and the only sign is a line in the job log:
-
-```
-IEF287I   HTTPD.LINKLIB                           NOT CATLGD  2
-```
-
-The existing library is untouched, and the new one exists on a volume without a
-catalog entry. If you go on, the install job writes into the old library, SMP
-selects nothing, and every step ends `RC 00` (see the troubleshooting table). If
-you find that line in the output, scratch the stray copy on the volume the
-following `IEF287I` line names (ISPF 3.4 with that volume serial, since it has
-no catalog entry) before you continue. Both libraries carry the same name, so
-scratch only on that volume: the volume of the catalogued old library is left
-alone, and a delete through the catalog would remove the old library, not the
-stray one.
+**The `CHECK` step stops the job when it finds such a library.** It ends
+RC 8, lists the catalogued library and `ALLOC` does not run, so nothing is
+allocated and nothing is half-created. That is the signal to follow the points
+below. (Before the `CHECK` step existed, the job ended `COND CODE 0000` on a
+name that was already catalogued and left an uncatalogued copy of the new
+library on the volume, with only an `IEF287I … NOT CATLGD 2` line in the job
+log. If you ran such a job, scratch that stray copy on the volume the
+following `IEF287I` line names, with ISPF 3.4 and that volume serial, before you
+continue. Both libraries carry the same name, so scratch only on that volume:
+a delete through the catalog would remove the old library, not the stray one.)
 
 1. **Stop the server that uses the library**, whatever its procedure is
    called. A library in use cannot be renamed: the rename
@@ -603,16 +640,18 @@ stray one.
    [Authorisation](#authorisation) says why it matters. An entry is a data set
    name *and a volume*, and it authorises whichever data set carries that name
    on that volume. If there is one, allocate the new library on the volume it
-   names: add `VOL=SER=volume` to the two DDs of the allocation job, beside
-   `UNIT=SYSDA`. Without that the new library may land on another volume, the
-   entry no longer matches it, and HTTPD falls back to SVC 244 (`HTTPD002I`
+   names: put that volume in `TGTVOL` of the allocation job
+   ([step 4](#4-allocate-the-product-datasets)). Without that the new library may
+   land on another volume, the entry no longer matches it, and HTTPD falls back to SVC 244 (`HTTPD002I`
    says which route it got). Moving the entry to the new volume instead costs an
    IPL, because the list is read only then. An entry whose data set no longer
    exists on its volume stays valid for any data set created later under that
    name on that volume, so remove a stale entry at the next IPL.
-5. **Install** as on a first installation: steps 3, 4 and 6. The `DELOLD` step
-   of the install job scratches `HTTPD.HTTPLOAD` and `HTTPD.SAMPLIB`; if you
-   keep something of your own under either name, rename it the same way first.
+5. **Install** as on a first installation: steps 3, 4 and 6, and the accept job
+   ([step 10a](#10a-accept-the-sysmod)) once the new server runs. The `DELOLD`
+   step of the install job scratches `HTTPD.HTTPLOAD` and `HTTPD.SAMPLIB`; if
+   you keep something of your own under either name, rename it the same way
+   first.
 6. **Start the new server and read its banner** (step 10), then deal with what
    was not HTTPD's. A module of another product is best installed again by that
    product's own guide; `IEBCOPY` from `HTTPD.OLD.LINKLIB` will do if all you
@@ -679,8 +718,8 @@ nothing where it would have found one anyway. For the load library:
 
 Submit it.
 
-The job runs eight steps, each conditional on the one before, so it stops at
-the first failure rather than building on it:
+**The install job ends after the APPLY.** It runs six steps, each conditional on
+the one before, so it stops at the first failure rather than building on it:
 
 | Step | What it does |
 |------|--------------|
@@ -690,10 +729,14 @@ the first failure rather than building on it:
 | `RECV` | receives the SYSMOD into the SMP inventory |
 | `APPLYCHK` | dry run — `APPLY` only proceeds if this ends RC 0 |
 | `APPLY` | deletes the previous release's modules from `HTTPD.LINKLIB`, then copies the five new ones in |
-| `ACCEPT` | makes this level the base a later `RESTORE` returns to, and deletes the previous level from the distribution zone |
-| `CLEANUP` | scratches the staging library, which is now spent |
 
 The SYSMOD travels inline in the job — there is no third file to upload.
+
+The step that makes this level the one SMP keeps, the ACCEPT, is **not** in
+this job. It is `httpd-<version>-accept.jcl`, a job of its own that you submit
+when you have tried the product ([step 10a](#10a-accept-the-sysmod)). Until then
+the function is applied and not accepted, and the staging library
+`HTTPD.HTTPLOAD` is still on the disk.
 
 **What a good run looks like.** Every step `COND CODE 0000`, and in the SMP
 output:
@@ -708,16 +751,32 @@ There is one `HMA2380` line **per module** — five of them, each on a single
 line. A run that copies fewer has lost one, and the `APPLY` still ends
 successfully, so count them. The `HMA2240` lines (also one per module) appear
 only when a previous release was there to delete; on a first install there are
-none. The `ACCEPT` step writes lines of the same two kinds against the
-distribution library, `AHTTPLOD`: `HMA2380 COPY SUCCESSFUL - MOD=HTTPD -
-LMOD=HTTPD - LIBRARY=AHTTPLOD - …`, and on an upgrade `HMA2240 SUCCESSFULLY
-DELETED MODULE HTTPD ON AHTTPLOD LIBRARY`.
+none.
 
 > **On an upgrade the `APPLY` ends `COND CODE 0004`, and that is correct.** The
 > deleted level has no `SMPSCDS` backup entry and never will, so SMP reports
 > `HMA2461 … NOT FOUND ON SMPSCDS LIBRARY` *after* `HMA2270 … SUCCESSFULLY
-> COMPLETED`. The `ACCEPT` step is gated `COND=(4,LT,APPLY.HMASMP)` for exactly
-> this, so it still runs. A first install ends RC 00 throughout.
+> COMPLETED`. The install job ends there, and the accept job's `GUARD` does not
+> look at the return code, so it is unaffected ([step 10a](#10a-accept-the-sysmod)).
+> A first install ends RC 00 throughout.
+
+**What the system looks like between the two jobs.** The function is `REC APP`:
+received and applied, not accepted.
+
+| | After the install job | After the accept job |
+|---|---|---|
+| `HTTPD.LINKLIB` | the five new modules | the same |
+| `HTTPD.AHTTPLOD` | empty on a first installation; on an upgrade it still holds the **previous** release | the new release's modules |
+| `HTTPD.HTTPLOAD` (staging) | there | scratched |
+| `HTTPD.SAMPLIB` | there | there |
+| `LIST CDS SYSMOD(THTP451)` | `STATUS = REC APP` | `STATUS = REC APP ACC` |
+| `LIST ACDS SYSMOD(THTP451)` | not found | `STATUS = REC APP ACC RGN` |
+| `RESTORE` | works on a first installation, refused on an upgrade | refused |
+| `REJECT` | do not: it removes the SYSMOD from the SMP library of received SYSMODs and the accept job then fails | refused |
+
+This is the state in which you try the product (steps 7 to 10); what you can and cannot do to take the function out again here is in [section 12](#applied-not-accepted-before-the-accept-job). `HTTPD.SAMPLIB`
+and the procedure you copy from it do not depend on the accept job, and neither
+does a running server.
 
 **Then list the target library, and treat that as the actual result.** It is
 the only check that distinguishes a real install from a silent one: SMP reports
@@ -1534,6 +1593,69 @@ for one by one before the address space ends.
 
 ---
 
+## 10a. Accept the SYSMOD
+
+Until now the function is **applied**, not accepted
+([what the system looks like](#6-install)). Try the product first: start it,
+log in, call the routes you use. When you want to keep this level, submit
+`httpd-<version>-accept.jcl`. Nothing in it needs editing; it names the same
+datasets as the install job.
+
+**Accepting is the step without a way back.** Before it you can still take the
+function out with `RESTORE` (see [section 12](#12-removing-httpd)); after it you
+cannot. That is why it is a job of its own and not the end of the install job:
+the decision is yours, and it comes after you have seen the server run.
+
+The job runs four steps:
+
+| Step | What it does |
+|------|--------------|
+| `GUARD` | `LIST CDS SYSMOD(THTP451)`: looks for the function in the target zone. Ends RC 0 when it is there, RC 4 when it is not |
+| `NOTAPPL` | runs only when `GUARD` ended above RC 0 and ends RC 8, to make the job fail in a place that says why |
+| `ACCEPT` | `ACCEPT S(THTP451) DIS(WRITE)`: copies the modules into `HTTPD.AHTTPLOD`, and on an upgrade deletes the previous release's from it |
+| `CLEANUP` | scratches `HTTPD.HTTPLOAD`, the staging library, now spent. Runs only when `GUARD` and `ACCEPT` both ended RC 0 |
+
+**The gate is the SMP inventory, not the return code of the install job.** `GUARD`
+asks SMP whether `THTP451` is applied. That is why it works after an upgrade,
+where the install job's `APPLY` ends `COND CODE 0004` (see
+[step 6](#6-install)), and why it stops where it should: when the function is not
+applied (the `APPLYCHK` failed, the install job never ran, or a `RESTORE` took
+the function out) the job ends `CC 0008` in `NOTAPPL`, nothing is accepted and
+nothing is scratched.
+
+**A good run.** `GUARD` `COND CODE 0000`, `NOTAPPL` flushed, `ACCEPT` and
+`CLEANUP` `COND CODE 0000`. The `GUARD` listing shows `STATUS = REC APP`; the
+`ACCEPT` writes one `HMA2380` per module against the distribution library,
+`HMA2380 COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=AHTTPLOD - …`, and on
+an upgrade one `HMA2240 SUCCESSFULLY DELETED MODULE HTTPD ON AHTTPLOD LIBRARY`
+before them. `CLEANUP` prints `IDC0550I ENTRY (A) HTTPD.HTTPLOAD DELETED`. If the
+`ACCEPT` fails, `CLEANUP` does not run and the staging library stays: fix the
+cause and submit the job again.
+
+Then check the result the way the install job's was checked: `LIST CDS
+SYSMOD(THTP451)` now says `STATUS = REC APP ACC`, and `LIST ACDS
+SYSMOD(THTP451)` finds the function, `STATUS = REC APP ACC RGN`, with the five
+modules.
+
+**Submitting the accept job a second time ends in a JCL error, and that is
+right.** The staging library is gone, `GUARD` finds the function (it is still
+applied) and ends RC 0, and the `ACCEPT` step cannot allocate its `HTTPLOAD`
+DD: `IEF212I … HTTPLOAD - DATA SET NOT FOUND`, `IEF453I … JOB FAILED - JCL
+ERROR`, and `ACCEPT` and `CLEANUP` are flushed. Nothing was accepted again,
+nothing changed. The accept job runs once per release.
+
+> **Which package this was measured with.** No package built by the CI with the
+> separate accept job exists yet. The accept job, its `GUARD`, the second run and
+> the two states in the table of step 6 were measured on a throwaway TK5
+> container (SMP4 `HMASMP LVL 04.48`) with packages built by mbt 3.0.1 from the
+> source of this release and given the ids `THTP450` and `THTP451`, `THTP451`
+> deleting `THTP450`. HTTPD was not started between the two jobs in that run, so
+> the start and the first requests (steps 7 to 10) were not measured in the state
+> "applied, not accepted". The volume defaults of step 4 for MVS/CE are as the
+> job's header states them; they were not run on MVS/CE either.
+
+---
+
 ## 11. What HTTPD serves
 
 Two kinds of route, both declared in the configuration member, both carrying the
@@ -1562,12 +1684,19 @@ writing your own module is
 
 ## 12. Removing HTTPD
 
-Because the installation is SMP-managed, there is a defined way back — but it is
-**not** the `RESTORE` followed by `REJECT` that SMP documentation leads you to
-expect. The install job accepts the FMID in the same run as the APPLY, and an
+Because the installation is SMP-managed, there is a defined way back — but once
+the accept job ([step 10a](#10a-accept-the-sysmod)) has run it is **not** the
+`RESTORE` followed by `REJECT` that SMP documentation leads you to expect. An
 accepted function SYSMOD refuses both: `RESTORE` because it was accepted,
 `REJECT` because accepting removed from `SYS1.SMPPTS` the control statements it
-works from. The route that does work is a `UCLIN` job.
+works from. The route that does work, in every state, is a `UCLIN` job. Where
+you stand decides what else is possible:
+
+| You have run | `RESTORE` | The `UCLIN` job of this section |
+|---|---|---|
+| the install job and the accept job | refused | works |
+| the install job only, as a first installation | works; see [Applied, not accepted](#applied-not-accepted-before-the-accept-job) | works |
+| the install job only, as an upgrade | refused (`HMA2452`) | works |
 
 What this release put on the system:
 
@@ -1968,13 +2097,19 @@ unconditionally means the list needs no judgement about which releases this
 system has seen, and getting that judgement wrong is exactly the failure it
 prevents. Each release adds its own id here.
 
-**4. Scratch the libraries.** `UCLIN` edits the inventory only; both datasets are
-still there, and a re-install's allocation job would fail on them:
+**4. Scratch the libraries.** `UCLIN` edits the inventory only; the datasets are
+still there, and a re-install's allocation job would stop at its `CHECK` step
+on them (RC 8, nothing allocated):
 
 ```
   DELETE HTTPD.LINKLIB  NONVSAM SCRATCH PURGE
   DELETE HTTPD.AHTTPLOD NONVSAM SCRATCH PURGE
 ```
+
+If you never submitted the accept job, `HTTPD.HTTPLOAD`, the staging library,
+is still there too; scratch it the same way (`DELETE HTTPD.HTTPLOAD NONVSAM
+SCRATCH PURGE`). The accept job scratches it, so after that job there is nothing
+to do.
 
 > **List the members before you scratch the LINKLIB.** It is a library, not a
 > file, and it holds whatever was put there — HTTPD ships five modules, but a
@@ -1994,10 +2129,80 @@ configuration member you copied in step 7, your RAKF definitions, and the
 webroot disk `HTTPD.WEBROOT.UFS` with the `MOUNT` statement that names it.
 Those are yours to delete — unmount the disk before you scratch it.
 
-> The `RESTORE`/`REJECT` behaviour above was measured on 2026-08-14 against an
-> accepted FMID from a package built by this same generator, on an MVS/CE system
+### Applied, not accepted: before the accept job
+
+Between the install job and the accept job the function is applied and not
+accepted, and SMP still offers more than `UCLIN` there, with a catch each way.
+Everything below was measured on a throwaway TK5 container with packages built
+by mbt 3.0.1 (see the note in [step 10a](#10a-accept-the-sysmod)), `HMASMP LVL
+04.48`.
+
+**`RESTORE` works on a first installation.** With the install job's `APPLY`
+behind you and the accept job not run:
+
+```
+//HTTPDRST JOB (SYS),'HTTPD RESTORE',
+//             CLASS=A,MSGCLASS=H,MSGLEVEL=(1,1),
+//             REGION=4096K
+//RESTORE EXEC SMPAPP
+//HMASMP.LINKLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
+//HMASMP.HTTPLOAD DD  DISP=SHR,DSN=HTTPD.HTTPLOAD
+//HMASMP.AHTTPLOD DD  DISP=SHR,DSN=HTTPD.AHTTPLOD
+//SMPCNTL  DD  *
+ RESTORE S(THTP451) DIS(WRITE) .
+/*
+```
+
+It ends RC 0 with five `HMA2240 SUCCESSFULLY DELETED LMOD … ON LINKLIB LIBRARY`
+and `HMA2270 RESTORE PROCESSING SUCCESSFULLY COMPLETED FOR SYSMOD THTP451`. The
+function is gone from the CDS and the five modules from `HTTPD.LINKLIB`. It is
+gone from the SMP library of received SYSMODs too, so a `REJECT` afterwards has
+nothing to do (`HMA2462 … NOT FOUND ON SMPPTS LIBRARY`, RC 12), and you do not
+need one. The libraries `HTTPD.LINKLIB` and `HTTPD.AHTTPLOD` and the staging
+library stay; the install job can be submitted again as it is, and its `DELOLD`
+step scratches the staging library and the sample library first. An accept job
+submitted after the `RESTORE` stops in its `GUARD`: RC 4, `NOTAPPL` ends RC 8,
+nothing is accepted.
+
+**`RESTORE` is refused on an upgrade.** With the previous release already
+accepted, the same job ends RC 12 and changes nothing:
+
+```
+HMA2452 ** SYSMOD THTP451 SELECTED FOR RESTORE DELETES SYSMODS
+HMA3703 ** RESTORE PROCESSING TERMINATED BECAUSE FUNCTION SYSMOD THTP451 FAILED
+```
+
+So the new level cannot be taken out through SMP and the old one put back. The
+way out is the removal job of this section, and then an installation of the
+release you want.
+
+**Do not `REJECT` between the two jobs.** It is not refused. `REJECT S(THTP451)`
+ends RC 4 with `HMA4081 SYSMOD THTP451 NOT APPLIED OR NOT ACCEPTED`, and it
+deletes the SYSMOD from the SMP library of received SYSMODs while the CDS still
+holds it applied. The accept job then fails: `GUARD` ends RC 0, `ACCEPT` ends RC 12
+with `HMA4012 ** SYSMOD THTP451 SELECTED FOR ACCEPT NOT FOUND ON SMPPTS
+LIBRARY`, and `CLEANUP` does not run. A second `REJECT` answers `HMA2462`, RC 12.
+The way out is the removal job below and a fresh install job; that exact
+sequence was not run.
+
+**The removal job works in this state, too.** The 49-statement job of step 2 was
+run on a TK5 system that held `THTP451` applied over an accepted `THTP450`: the
+`UCLIN` step ended RC 08 (30 statements `HMA2550`, 14 `HMA2532`, five `HMA3572`
+for the `THTP450` blocks of the CDS, where `THTP450` is a tombstone, and no
+`HMA2293`), the `LIST` step RC 04, and all 14 answers of step 3 said not found.
+Then scratch the libraries as step 4 says, **including `HTTPD.HTTPLOAD`**, which
+the accept job would have scratched.
+
+> The `RESTORE`/`REJECT` behaviour of an accepted function was measured on
+> 2026-08-14 against an accepted FMID from a package built by this same generator, on an MVS/CE system
 > running SMP 4 level 04.48. It is a property of SMP 4 and of accepting a
-> function SYSMOD, not of any one product. The `UCLIN` job above, in its
+> function SYSMOD, not of any one product. It was measured again on
+> 2026-11-08 on a TK5 container, with the accept job of the 4.5.1 test package
+> behind it: `RESTORE S(THTP451)` ended RC 12 with `HMA2452 ** SYSMOD THTP451
+> SELECTED FOR RESTORE HAS BEEN ACCEPTED` and `HMA3703`, and `REJECT S(THTP451)`
+> ended RC 12 with `HMA2462`. A `RESTORE` job that still names the `HTTPLOAD`
+> DD ends in a JCL error before SMP starts, because the accept job scratched
+> that library; leave the DD out. The `UCLIN` job above, in its
 > 33-statement form, was run end to end on TK5 with SMP 4 (`HMASMP LVL 04.48`)
 > on a system holding `THTP430` and the tombstone `THTP420`; the 37-statement
 > form was run on a TK5 system holding `THTP450`, `THTP440`, `THTP430` and
@@ -2074,7 +2279,10 @@ TK5 system.
 
 **Why the leftover matters.** With the development build in place, the install
 job of the HTTPD 4.4.0 package receives the SYSMOD (`RECV` ends RC 00), but `APPLYCHK` and `ACCEPT` both end
-RC 12, and nothing is installed:
+RC 12, and nothing is installed. (That package still had the `ACCEPT` inside the
+install job, as every package up to 4.5.1 has; with the accept job of this release
+the `ACCEPT` is the accept job's step, and the `APPLYCHK` stops the install job
+as before.)
 
 ```
 HMA3792 ** SYSMOD THTP440 SELECTED FOR APPLY IS DELETED
@@ -2177,9 +2385,12 @@ were not run after a development build.
 
 **Installing the release afterwards.** Measured with the HTTPD 4.4.0 package on
 TK5 and MVS/CE, on the systems the changed job had cleaned, without the
-allocation job. The package is the one of the 4.4.0 release. Every step of the install job ends `CC 0000`, `APPLY`
-included. `APPLY` reports ten `HMA2380` lines, one for each of the five modules
-in `HTTPD.LINKLIB` and in `HTTPD.AHTTPLOD`:
+allocation job. The package is the one of the 4.4.0 release, **a one-job
+package**: its install job accepted as well. Every step of that job ends
+`CC 0000`, and it reports ten `HMA2380` lines, one for each of the five modules
+in `HTTPD.LINKLIB` and in `HTTPD.AHTTPLOD`. With the package of this release
+the install job reports the five of `LINKLIB` and the accept job the five of
+`AHTTPLOD`:
 
 ```
 HMA2380    COPY SUCCESSFUL - MOD=HTTPD - LMOD=HTTPD - LIBRARY=LINKLIB - SYSMOD=THTP440 - RETURN CODE=00
@@ -2242,7 +2453,10 @@ were installed from the SMP package and not deployed with `mbt deploy`.
 > Download 4.1.0 from the releases page, follow the steps below with it, and
 > confirm the 4.1.0 banner. Then upgrade to 4.2.0, 4.3.0, 4.4.0, 4.5.0 and this
 > release the ordinary way, one after the other: stop, install, start, with no
-> allocation step.
+> allocation step. The packages of 4.1.0 to 4.5.1 are one-job packages: their
+> install job has eight steps and accepts the function itself, so there is no
+> accept job to submit for them. The separate accept job
+> ([step 10a](#10a-accept-the-sysmod)) belongs to this release's package.
 
 Those releases put their datasets in `HTTPD.V4R0M0.*`, `HTTPD.V4R0M1.*` or
 `HTTPD.V4R0M2.*`, so nothing of 4.1.0 lands on top of them. That makes
@@ -2284,7 +2498,7 @@ it is simply the old build.
 3. **Steps 3 and 6, with the 4.1.0 files** — upload and install; the SMP
    output names `THTP410`, not the id step 6 shows. Expect the `APPLY` to end
    `COND CODE 0004` on `HMA2461`; that is the deleted level having no `SMPSCDS`
-   backup entry, and the `ACCEPT` still runs.
+   backup entry, and the accept job does not look at it.
 4. **Re-point `STEPLIB`** in your `HTTPD` procedure to `HTTPD.LINKLIB`.
 5. **Replace the APF entry — do not add one.** If you took the APF route rather
    than RAKF, `SYS1.PARMLIB(IEAAPF00)` names the old library. **Remove that
@@ -2338,11 +2552,16 @@ nothing above touches it.
 
 | Symptom | Likely cause |
 |---------|--------------|
-| Allocation job fails, or ends `COND CODE 0000` with `IEF287I … NOT CATLGD 2`, dataset already exists | Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it. If this is a TK5 or hand-filled system and HTTPD was never installed from SMP, the library is one SMP does not own: [rename it first](#a-library-that-smp-does-not-own) |
+| Allocation job ends `CC 0008`, step `CHECK` RC 8, `ALLOC` not run | The libraries exist, so `CHECK` stopped the job before anything was allocated (see step 4). Either it was already run, or you are upgrading from 4.1.0 or later, where the libraries are already there and the APPLY replaces their contents. Skip step 4 — do not force it. If this is a TK5 or hand-filled system and HTTPD was never installed from SMP, the library is one SMP does not own: [rename it first](#a-library-that-smp-does-not-own) |
+| Allocation job ends `COND CODE 0000` with `IEF287I … NOT CATLGD 2` | The allocation job of a release before this one, run on a name that was already catalogued: it left an uncatalogued copy on the volume. Scratch it as [described here](#a-library-that-smp-does-not-own) |
+| Allocation job holds, console `IEF238D … REPLY DEVICE NAME OR 'CANCEL'` | `TGTVOL` or `DLBVOL` names a volume that is not mounted. Reply `CANCEL`, correct the volume in the `EXEC ALLOC` statement and submit again — step 4 |
 | `RECV1`/`RECV2` fails on MVS/CE, no volume to allocate on | Add `VOLUME('PUB000')` (or a volume of yours) to both `RECEIVE` commands — step 6 |
 | `RECV1`/`RECV2` fails, target exists | A previous release's `HTTPD.HTTPLOAD`/`HTTPD.SAMPLIB`, or something else allocated it. RECEIVE refuses to merge; scratch it and re-run |
 | `APPLY` RC 00, no `HMA2380` at all, library unchanged | The modules still belong to an FMID that this SYSMOD does not delete. Usually a release was skipped: see "Coming from an older release" above. `LIST CDS MOD(HTTPD)` names the owner in `FMID`/`RMID`. `NOT SEL` in the element summary is no sign either way, because a good upgrade prints it too. If the owner is the previous release, the SYSMOD's `++VER` is missing its `DELETE` — a packaging fault, not an operator one; report it |
-| `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The `ACCEPT` is gated `(4,LT,…)` and still runs |
+| `APPLY` ends `COND CODE 0004`, `HMA2461 … NOT FOUND ON SMPSCDS` | Normal on an upgrade: the deleted level has no backup entry. The install job ends there, and the accept job's `GUARD` asks the SMP inventory, not this return code |
+| Accept job ends `CC 0008`, `GUARD` RC 4, `NOTAPPL` RC 8, `ACCEPT` and `CLEANUP` not run | `THTP451` is not applied: the install job did not get as far as the `APPLY`, it never ran, or a `RESTORE` took the function out. Nothing was accepted and nothing scratched. Run the install job first ([step 10a](#10a-accept-the-sysmod)) |
+| Accept job ends `JOB FAILED - JCL ERROR`, `IEF212I … HTTPLOAD - DATA SET NOT FOUND` | The accept job was run before, and the staging library is gone. The function is accepted already; there is nothing to repeat |
+| Accept job: `GUARD` RC 0, `ACCEPT` RC 12, `HMA4012 … NOT FOUND ON SMPPTS LIBRARY` | A `REJECT` removed the SYSMOD between the two jobs. See [Applied, not accepted](#applied-not-accepted-before-the-accept-job) |
 | `APPLYCHK` ends non-zero, `APPLY` skipped | Read the SMP output — the check exists to stop before anything is written. A missing DD is the usual cause |
 | `APPLY` RC 00 but fewer than five `HMA2380` lines | A module was lost. Count them, then look in the library itself |
 | SMP reports success, but a module is not where you expected | A ddname says nothing about the dataset behind it. Check the JCL, then look at the library itself |

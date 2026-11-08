@@ -10,8 +10,10 @@ HTTPD 3.x. The release that 4.5.1 replaces in one step is 4.5.0. A system at an
 older release goes to 4.5.0 first (@ug-upgrade-hops). A system without HTTPD needs @ug-install, and a system that should
 lose HTTPD needs @ug-remove.
 
-The upgrade is the same install job as in @ug-install, with a different
-effect. Each release names its predecessor in the SYSMOD. When SMP applies the
+The upgrade is the same two jobs as in @ug-install, with a different
+effect: the install job, which ends after the APPLY, and the accept job, which
+you submit when you have tried the new level. Each release names its
+predecessor in the SYSMOD. When SMP applies the
 new release, it deletes the load modules of the old one from
 #cmd("HTTPD.LINKLIB") and copies the new ones in. This is what an upgrade does:
 
@@ -19,22 +21,38 @@ new release, it deletes the load modules of the old one from
   carry no version, so the #cmd("STEPLIB") of the procedure and the APF entry
   stay as they are.
 - It does not run the allocation job. The libraries exist already.
+- It has two jobs. The install job receives and applies the new level and
+  deletes the load modules of the old one from #cmd("HTTPD.LINKLIB"). The
+  accept job does the same in #cmd("HTTPD.AHTTPLOD"), and it records the new
+  level as accepted (@ug-upgrade-accept).
 - It does not touch the document root disk.
 - It does not touch your procedure, your Parmlib member or your RAKF
   definitions. SMP never writes to #cmd("PARMLIB") or to a procedure library.
   What changed in the sample members is yours to compare and to carry over
   (@ug-upgrade-review).
-- It leaves no way back. The install job accepts the new level, and the old
-  FMID is deleted. SMP cannot restore the old modules.
+- It leaves no way back. The old FMID is deleted, and SMP cannot restore the
+  old modules. After the install job, #cmd("RESTORE") of the new level is
+  refused already (#cmd("HMA2452"), @ug-remove-applied), and after the accept job
+  nothing in SMP takes the new level out.
 
 The captures in this chapter come from the upgrade from 4.5.0 to 4.5.1 on a
 TK5 system. Every step of the install job ended with return code 0000 except
 the APPLY, which ended with return code 0004 and
-#cmd("HMA2461 SYSMOD THTP450 NOT FOUND ON SMPSCDS LIBRARY"). The package of
-4.5.1 was built from the source of 4.5.1 before the release was published. The
-build stamp in the start-up banner is therefore not the one of the published
-package (@ug-upgrade-verify). The file names in your package carry the number of your
-release.
+#cmd("HMA2461 SYSMOD THTP450 NOT FOUND ON SMPSCDS LIBRARY"). Every step of the
+accept job ended with 0000, except #cmd("NOTAPPL"), which did not run.
+
+The package was a test build of the 4.5.1 source by mbt 3.0.1 on a workstation
+(FMID #cmd("THTP451") deleting #cmd("THTP450")), run on a throwaway TK5
+container on 2026-11-08. It is not the package that the CI builds for the
+release, because that one did not exist yet. The job log of the install job,
+the accept job and the SMP lists were measured with it. The captures of the
+RECEIVE, APPLYCHK and APPLY steps were compared with this run and differ from
+it only in time stamps, in the data set names of the RECEIVE and in the count of
+free tracks. The stop, the upload, the IEHLIST listings, the list before the
+upgrade and the start come from an earlier upgrade with the one-job package that
+had the ACCEPT in the install job. The build stamp in the start-up banner is
+not the one of the published package (@ug-upgrade-verify). The file names in
+your package carry the number of your release.
 
 == One Release at a Time <ug-upgrade-hops>
 
@@ -83,9 +101,13 @@ Each id is spent once. The inventory of the skipped install is not a state you
 can repeat. This book does not show a measured repair for it. Check the level
 first (@ug-upgrade-before), so that the case does not arise.
 
-The accepted copy has its own zone, the ACDS, and the ACCEPT step deletes
-there on its own. An upgrade is complete when both zones have moved
-(@ug-upgrade-verify).
+The accepted copy has its own zone, the ACDS, and the accept job deletes there
+on its own. An upgrade is complete when both jobs have run and both zones have
+moved (@ug-upgrade-accept). The accept job asks SMP only whether the new SYSMOD
+is applied, so it does not notice a skipped release either: look for the
+#cmd("HMA2240") and #cmd("HMA2380") lines before you submit it. Accept each
+release before you install the next. A hop over a release that is applied and
+not accepted was not run for this book.
 
 A system at 4.0.x needs the packages of 4.1.0, 4.2.0, 4.3.0, 4.4.0 and 4.5.0
 before the package of 4.5.1. The hop from 4.0.x to 4.1.0 is different from the
@@ -201,22 +223,20 @@ else. The listing is the difference between the original and the edited job:
 
 #screen(raw(read("../ex/ug-upgrade/inst-jcl-edit.txt")))
 
-Submit the job as in @ug-install. The job takes about a minute.
+Submit the job as in @ug-install. The job takes about a minute, and it ends
+after the #cmd("APPLY"). The accept job is a later step (@ug-upgrade-accept).
 
 == Reading the Result <ug-upgrade-result>
 
 #idx("return code")
-Goal: know whether the upgrade did its work. The console shows that the job
-started and that it ended. It does not show the steps:
-
-#screen(raw(read("../ex/ug-upgrade/inst-console.txt")))
-
-The step table is in the job log, with the time of each step:
+Goal: know whether the install job did its work. The step table is in the job
+log, with the time of each step:
 
 #screen(raw(read("../ex/ug-upgrade/inst-joblog.txt")))
 
-The step #cmd("APPLY") ends with 0004. That is the normal result of an
-upgrade. The next paragraphs say why. Every other step ends with 0000.
+The job has six steps. The step #cmd("APPLY") ends with 0004. That is the normal
+result of an upgrade. The next paragraphs say why. Every other step ends with
+0000.
 
 *DELOLD.* The step makes the two RECEIVE targets absent. Both are data sets of
 the previous run, so the capture looks different from the installation:
@@ -286,43 +306,52 @@ The marker #cmd("R") after each member name is the replace option: the new
 module replaces the member of the same name. A load module with the attribute
 AC(1) keeps it, because SMP copies the module and does not link it again.
 
-*ACCEPT.* The step runs although the APPLY ended with 0004. The install job
-lets it run for a code of 4 or less. The step does the same work on the
-distribution library:
-
-#screen(raw(read("../ex/ug-upgrade/inst-smp-accept.txt")))
-
-Five #cmd("HMA2240") lines delete the old modules from #cmd("AHTTPLOD"), and
-five #cmd("HMA2380") lines copy the new ones in. The step ends with 00.
-The gate in the job lets the #cmd("ACCEPT") run for an #cmd("APPLY") code of 4
-or less. A code of 8 or more stops it.
-
-*CLEANUP.* The last step scratches the staging library:
-
-#screen(raw(read("../ex/ug-upgrade/inst-cleanup.txt")))
-
 The return codes mean what they meant in @ug-install. The one difference is
 the 0004 of the #cmd("APPLY"). A 0004 in another step, or in a job that has no
 delete, needs a look at the messages. And a return code of 0 in every step does
 not show that the work happened. Count the #cmd("HMA2240") and #cmd("HMA2380")
 lines, and then verify (@ug-upgrade-verify).
 
+*The 0004 and the accept job.* The accept job does not look at the return code
+of the install job: it asks SMP (@ug-upgrade-accept). A 0004 therefore stops
+nothing. When the function is not applied, for whatever reason, the accept job
+ends in its #cmd("NOTAPPL") step with 8 (@ug-install-accept).
+
 == Verifying the Upgrade <ug-upgrade-verify>
 
 #idx("verify")
-Goal: the inventory and the library both show the new level.
+Goal: after the install job, the target zone and the library show the new
+level, and the server runs on it. The distribution zone still shows the old
+one. That is right: the accept job moves it.
 
-*The SMP record.* Run the list job again. The control statements are the same
-as before the upgrade. The output:
+*The SMP record.* Run the list job again, with the statements for both zones:
 
-#screen(raw(read("../ex/ug-upgrade/after-smp-list.txt")))
+#screen(```
+//LISTCDS  EXEC SMPAPP
+//SMPCNTL  DD  *
+ RESETRC .
+ LIST CDS SYSMOD(THTP451) .
+ LIST CDS LMOD(HTTPD) .
+ LIST ACDS SYSMOD(THTP451) .
+ LIST ACDS MOD(HTTPD) .
+ LIST CDS SYSMOD(THTP450) .
+ LIST ACDS SYSMOD(THTP450) .
+/*
+```)
 
-Four facts changed. The old SYSMOD #cmd("THTP450") has lost its status, and it
-shows only the line #cmd("DELBY = THTP451"): the FMID that deleted it. The new
-SYSMOD #cmd("THTP451") has the status #cmd("REC  APP  ACC"), the line
-#cmd("DELETE VER(001) = THTP450") and the five modules. And the load module
-#cmd("HTTPD") has #cmd("LASTUPD = THTP451"). The old FMID stays in the
-inventory as a mark and is never used again.
+The output, for the state after the install job:
+
+#screen(raw(read("../ex/ug-upgrade/applied-smp-list.txt")))
+
+Read the two zones apart. In the target zone (#cmd("LIST CDS")) the new SYSMOD
+#cmd("THTP451") has the status #cmd("REC  APP"), the line
+#cmd("DELETE VER(001) = THTP450") and the five modules. The old SYSMOD
+#cmd("THTP450") has lost its status, and it shows only the line
+#cmd("DELBY = THTP451"): the FMID that deleted it. And the load module
+#cmd("HTTPD") has #cmd("LASTUPD = THTP451"). In the distribution zone
+(#cmd("LIST ACDS")) nothing has moved: #cmd("THTP451") is not found (the answer
+with the return code 04 is the one you want here), the module #cmd("HTTPD") has
+#cmd("LASTUPD = THTP450"), and #cmd("THTP450") is still #cmd("REC  APP  ACC").
 
 *The library.* The IEHLIST listing after the upgrade:
 
@@ -330,7 +359,8 @@ inventory as a mark and is never used again.
 
 Compare it with the listing before. The five names are the same. The
 #cmd("TTRC") and the user data of each member are not. The members are new
-copies. If the listing is the same as before, the copy did not happen.
+copies. If the listing is the same as before, the copy did not happen. The
+listing is of an upgrade with the one-job package, after its accept.
 
 *The start.* Start the server with the old procedure and the old Parmlib
 member:
@@ -341,7 +371,8 @@ The message #cmd("HTTPD000I") carries the version of the build, and
 #cmd("HTTPD001I") says that the server is ready. The three #cmd("HTTPD036I")
 lines are the routes of the member. If the version is not the one you
 installed, look at the #cmd("STEPLIB") (@ug-upgrade-before). Send a request to
-the server, as in @ug-first.
+the server, as in @ug-first. A start between the install job and the accept job
+was not run with the two-job package; the capture is of the older package.
 
 Two things in the capture are new in 4.5.1. The stamp in #cmd("HTTPD000I") is
 shown as #cmd("nnnnnnn"): the package of the capture was built from the source
@@ -352,6 +383,62 @@ comes from the test of the security system at the start. It is expected on TK5
 line #cmd("HTTPD042W") appears instead, the upgrade did not cause it: look at
 the tables of RAKF (@ug-security-open).
 
+== Accepting the Upgrade <ug-upgrade-accept>
+
+#idx("accept job")
+#idx("ACCEPT")
+Goal: SMP has accepted the new level in the distribution zone, the old modules
+are gone from #cmd("HTTPD.AHTTPLOD"), and the staging library is scratched. Do
+this when you have tried the new level (@ug-upgrade-verify). The accept job is
+the same job as in @ug-install-accept, and it is the point without a way back,
+so it is a job of its own.
+
+Nothing in the job needs editing. Submit it as you submitted the install job.
+Its four steps are #cmd("GUARD"), #cmd("NOTAPPL"), #cmd("ACCEPT") and
+#cmd("CLEANUP"). The job log of the upgrade:
+
+#screen(raw(read("../ex/ug-upgrade/accept-joblog.txt")))
+
+*The gate.* The #cmd("GUARD") step is a #cmd("LIST CDS SYSMOD(THTP451)"). It
+ends with 0 when the new function is in the target zone and with 4 when it is
+not. It does not look at the return code of the install job, and that is why the
+0004 of the #cmd("APPLY") does not matter here. With 4, the #cmd("NOTAPPL") step
+runs and ends the job with 8, and #cmd("ACCEPT") and #cmd("CLEANUP") do not run.
+With 0, #cmd("NOTAPPL") is flushed, as in the capture. The output of the
+step:
+
+#screen(raw(read("../ex/ug-upgrade/accept-guard.txt")))
+
+The status of the function is #cmd("REC  APP"): applied, not accepted.
+
+*ACCEPT.* The step does the same work on the distribution library as the
+#cmd("APPLY") did on the target library:
+
+#screen(raw(read("../ex/ug-upgrade/accept-smp.txt")))
+
+Five #cmd("HMA2240") lines delete the old modules from #cmd("AHTTPLOD"), and
+five #cmd("HMA2380") lines copy the new ones in. The step ends with 00.
+
+*CLEANUP.* The last step scratches the staging library. It runs only when
+#cmd("GUARD") and #cmd("ACCEPT") both ended with 0:
+
+#screen(raw(read("../ex/ug-upgrade/accept-cleanup.txt")))
+
+*A second run.* The staging library is gone, so a second submission of the job
+ends in a JCL error at the #cmd("ACCEPT") step, and nothing is accepted twice.
+@ug-install-accept shows the capture. The accept job runs once per release.
+
+*The SMP record after the accept job.* Run the list job of
+@ug-upgrade-verify again. Both zones have moved:
+
+#screen(raw(read("../ex/ug-upgrade/after-smp-list.txt")))
+
+The new SYSMOD #cmd("THTP451") has the status #cmd("REC  APP  ACC") in the
+target zone and #cmd("REC  APP  ACC  RGN") in the distribution zone. The old
+SYSMOD #cmd("THTP450") shows only #cmd("DELBY = THTP451") in both zones, and
+#cmd("HTTPD") has #cmd("LASTUPD = THTP451") in both. The old FMID stays in the
+inventory as a mark and is never used again.
+
 == What the SMP Upgrade Deletes <ug-upgrade-deletes>
 
 #idx("predecessor")
@@ -360,13 +447,13 @@ The delete covers the load modules of the predecessor and nothing more.
 - *In the target library.* The five load modules #cmd("HTTPD"),
   #cmd("HTTPDSRV"), #cmd("HTTPDM"), #cmd("HTTPDMTT") and #cmd("ABEND0C1"),
   from #cmd("HTTPD.LINKLIB"), then the new ones are copied in (the
-  #cmd("HMA2240") and #cmd("HMA2380") lines of the APPLY).
+  #cmd("HMA2240") and #cmd("HMA2380") lines of the APPLY, in the install job).
 - *In the distribution library.* The same five, from #cmd("HTTPD.AHTTPLOD")
-  (the same messages in the ACCEPT).
+  (the same messages in the ACCEPT, in the accept job).
 - *In the inventory.* The predecessor #cmd("THTP450") becomes a mark with the
-  line #cmd("DELBY"). The listing shows it for the CDS, and the summary of the
-  ACCEPT shows the same for the ACDS. The load module entries move to the new
-  FMID.
+  line #cmd("DELBY"). The listing shows it for the CDS after the install job,
+  and for the ACDS after the accept job. The load module entries move to the new
+  FMID in the same two steps.
 
 The upgrade does not delete the procedure, the Parmlib member, the webroot
 disk, the RAKF entries and the mounts of UFSD. The sample library is not
@@ -384,7 +471,8 @@ predecessor from the version, and the project file of 4.5.1 names
 #cmd("++FUNCTION(THTP451)") and #cmd("++VER(Z038) DELETE(THTP450)"). The other
 rows of the table in @ug-upgrade-hops come from the project file and from the
 measured installs of the releases. The step output in this chapter is from the
-upgrade 4.5.0 to 4.5.1, where #cmd("THTP451") deleted #cmd("THTP450"):
+upgrade 4.5.0 to 4.5.1 (the package is named at the start of the chapter),
+where #cmd("THTP451") deleted #cmd("THTP450"):
 #cmd("THTP451") is a #cmd("FUNCTION") with the line
 #cmd("DELETE VER(001) = THTP450"), #cmd("THTP450") shows
 #cmd("DELBY = THTP451") and no modules, and #cmd("HTTPD.LINKLIB") and
@@ -408,9 +496,10 @@ hop that needs the allocation job. Every hop after it does not.
 + Send the XMIT files, edit the install job and submit it, as in
   @ug-upgrade-hop. The #cmd("APPLY") step deletes #cmd("THTP400") from the
   new, empty library without a complaint, copies the five modules in, and ends
-  with 0004. The #cmd("ACCEPT") step ends with 0000.
-+ Install 4.2.0, 4.3.0, 4.4.0, 4.5.0 and 4.5.1 in turn, each as in
-  @ug-upgrade-hop. These hops skip the allocation job.
+  with 0004. Then submit the accept job (@ug-upgrade-accept).
++ Install 4.2.0, 4.3.0, 4.4.0, 4.5.0 and 4.5.1 in turn, each with its install
+  job and its accept job, as in @ug-upgrade-hop and @ug-upgrade-accept. These
+  hops skip the allocation job.
 
 The install of 4.1.0 leaves the old libraries as they were. After the
 crossing, check these points:
@@ -600,9 +689,24 @@ upgrade.
 #tab(caption: [Problems at upgrade])[
   #table(columns: (1.9in, 1fr),
     [What you see], [What it is and what to do],
-    [The #cmd("APPLY") step ends with 0004 and the #cmd("ACCEPT") ran.], [The
-      normal result. The deleted FMID has no backup entry
-      (#cmd("HMA2461")).],
+    [The #cmd("APPLY") step ends with 0004.], [The normal result. The deleted
+      FMID has no backup entry (#cmd("HMA2461")). The accept job does not look
+      at it (@ug-upgrade-accept).],
+    [The accept job: #cmd("GUARD") ends with 4 and #cmd("NOTAPPL") with 8.], [The
+      new level is not applied: the install job did not run, or its
+      #cmd("APPLY") failed. Nothing was accepted and nothing was scratched. List
+      the level (@ug-upgrade-verify) and run the install job first.],
+    [The accept job ends in a JCL error at the #cmd("ACCEPT") step, with
+      #cmd("HTTPD.HTTPLOAD") not found.], [The job ran before: the staging
+      library is gone. Nothing was accepted twice. Check the list
+      (@ug-upgrade-accept).],
+    [The accept job: #cmd("ACCEPT") ends with 12 and #cmd("HMA4012 ... NOT FOUND
+      ON SMPPTS LIBRARY").], [A #cmd("REJECT") of the new level ran between the
+      two jobs. #cmd("REJECT") is not refused there, and it deletes the received
+      SYSMOD (@ug-remove-applied). Do not submit it.],
+    [#cmd("RESTORE") of the new level ends with 12 and #cmd("HMA2452").], [SMP
+      refuses it, because the new level deletes the old one. There is no way
+      back through SMP (@ug-remove-applied).],
     [Every step ends with 0000, but the #cmd("APPLY") has no #cmd("HMA2240") and
       no #cmd("HMA2380").], [A release was skipped. The SYSMOD does not own
       the modules and copied nothing. The library still holds the old modules.
