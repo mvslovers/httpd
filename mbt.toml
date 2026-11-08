@@ -28,6 +28,16 @@ kind = "application"
 # changes how MVCK/MVCP/MVCS assemble.  Both are drop-ins, and 1.6.3 is what
 # the release is built and tested with.
 #
+# libc370 2.29.2: racf_login() hands back no ACEE that ASXBSENV points at, and
+# does not release it (mvslovers/libc370#778); the result is NULL with racf_rc
+# 8, for a user of NULL as well.  HTTPD logs users on in cred_login() and
+# cred_session(), which test the return value and the name in the ACEE, so a
+# login as the account the server itself runs under can no longer hand a
+# credential the address space's own ACEE -- the one cred_free() would release.
+# stc_identity() reads the old ACEE with racf_get_acee() and logs the STC user
+# on with a user of its own, and sec_probe() expects a refusal, so neither is
+# affected.  A pin below 2.29.2 still builds; it lacks the guard.
+#
 # libc370 2.26.0: abendrpt() takes ABRPT_QUIET_TERM (mvslovers/libc370#712), and
 # __linkds() and __linkdsx() use it themselves (#714).  The three
 # abendrpt(ESTAE_CREATE, ...) calls in httpd.c set it, so cancelling a busy
@@ -98,7 +108,7 @@ kind = "application"
 # that way, so the server's streams lock as before.
 mbt = "3.0"
 cc370 = "1.6.3"
-libc370 = "2.26.0"
+libc370 = "2.29.2"
 
 [build]
 # include/ is on the include path by convention; this adds the credentials
@@ -446,6 +456,12 @@ host = false                     # crent370 SVCs are MVS-only -> test-mvs
 [test.TSTSESS]
 rent = false          # mbtcheck.h keeps file-static counters
 host = false                     # blowfish_* + RACF SVCs are MVS-only -> test-mvs
+
+# A login leaves the address space's own ACEE (ASXBSENV) alone (issue #494,
+# libc370#778).  MVS-only (RACF SVCs, needs APF like TSTGUID).
+[test.TSTASXB]
+rent = false          # mbtcheck.h keeps file-static counters
+host = false                     # RACF SVCs are MVS-only -> test-mvs
 
 # http_new_env() / httpnenv() env-block allocation + layout (guards the M9
 # offsetof sizing).  Needs the HTTPV struct via httpd.h, so MVS-only; httpnenv
