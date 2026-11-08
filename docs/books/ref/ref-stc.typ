@@ -791,8 +791,9 @@ install then copies nothing while every condition code reads success. The
 FMID from the target library and copies the new ones in.
 
 The deleted FMID has no backup entry in the SMP data set. For this reason the
-APPLY of an upgrade ends with return code 4, and the install job lets the ACCEPT
-run for a code of 4 or less. A return code does not show that the work was
+APPLY of an upgrade ends with return code 4, and the install job accepts that
+code. The accept job does not read it: its first step asks the target zone
+whether the SYSMOD is applied. A return code does not show that the work was
 done. List the members of #cmd("HTTPD.LINKLIB") after an install, and look for
 the message #cmd("HMA2380") (copy successful).
 
@@ -812,7 +813,10 @@ release, for example #cmd("4.4.0-dev") for a development build.
     [#cmd("httpd-version-samplib.xmit")], [The sample library, as an XMIT file.],
     [#cmd("httpd-version-alloc.jcl")], [The job that allocates the data sets of
       SMP.],
-    [#cmd("httpd-version-inst.jcl")], [The job that installs the SYSMOD.],
+    [#cmd("httpd-version-inst.jcl")], [The job that installs the SYSMOD. It
+      ends after the APPLY.],
+    [#cmd("httpd-version-accept.jcl")], [The job that accepts the SYSMOD. You
+      submit it when you have tried the product, and it runs once per release.],
     [#cmd("httpd-webroot.img")], [The document root as a UFS370 image. SMP does
       not know it.],
   )
@@ -838,11 +842,11 @@ operator changes in it.
       SMP, with BLKSIZE 15040. The STEPLIB of the procedure names it. Only the
       install job writes to it. The allocation job creates it.],
     [#cmd("HTTPD.AHTTPLOD")], [PO], [U], [CYL (5,2,20)], [The distribution
-      library of SMP, with BLKSIZE 15040. The ACCEPT fills it. A RESTORE
+      library of SMP, with BLKSIZE 15040. The accept job fills it. A RESTORE
       returns to it. The allocation job creates it.],
     [#cmd("HTTPD.HTTPLOAD")], [PO], [by RECEIVE], [by RECEIVE], [The staging
-      library. The install job receives the load XMIT into it and deletes it at
-      the end.],
+      library. The install job receives the load XMIT into it, and the accept
+      job deletes it at the end.],
     [#cmd("HTTPD.SAMPLIB")], [PO], [by RECEIVE], [by RECEIVE], [The sample
       library, created by TSO RECEIVE. SMP does not own it.],
     [#cmd("HTTPD.WEBROOT.UFS")], [PS], [U], [4096-byte blocks (256)], [The disk
@@ -860,8 +864,13 @@ the distribution library holds the accepted copy of every element. A job that
 scratched it again would leave the SMP inventory reporting "accepted" with an
 empty library behind it. The space is in cylinders, because a space in tracks
 reaches the limit of 16 extents long before the volume is full. The job uses
-#cmd("UNIT=SYSDA"). Change the unit and the volume in the job if you want
-others.
+#cmd("UNIT=SYSDA"). The volumes are the symbols #cmd("TGTVOL") (the target
+library) and #cmd("DLBVOL") (the distribution library) of the procedure in the
+job. Their defaults are #cmd("MVSRES") and #cmd("SMP000"), and the job of a TK5
+package names #cmd("TK5RES") and #cmd("TK5DLB") on its #cmd("EXEC") statement.
+A first step, #cmd("CHECK"), lists the two libraries and ends with 8 when either
+exists, and the allocation does not run then ("Allocating the Product Data Sets" in
+the _HTTPD User's Guide_).
 
 The install job runs these steps in this order.
 
@@ -880,12 +889,33 @@ The install job runs these steps in this order.
       nothing. The next step runs only if this step ends with code 0.],
     [#cmd("APPLY")], [SMP APPLY. It copies the modules into
       #cmd("HTTPD.LINKLIB").],
-    [#cmd("ACCEPT")], [SMP ACCEPT. It runs when the APPLY ended with a code of 4
-      or less. It makes this level the base of a later RESTORE.],
-    [#cmd("CLEANUP")], [IDCAMS deletes #cmd("HTTPD.HTTPLOAD"). It runs only when
-      the ACCEPT ended with code 0. Comment the step out to keep the library.],
   )
 ]
+
+The install job ends after the #cmd("APPLY"). Between it and the accept job
+the function is applied and not accepted, and the staging library stays. The
+accept job is a job of its own. It has four steps.
+
+#tab(caption: [The steps of the accept job])[
+  #table(columns: (0.9in, 1fr),
+    [Step], [Action],
+    [#cmd("GUARD")], [SMP LIST of the function in the target zone. It ends with
+      0 when the function is there and with 4 when it is not.],
+    [#cmd("NOTAPPL")], [Runs only when #cmd("GUARD") ended with a code above 0,
+      and ends the job with 8.],
+    [#cmd("ACCEPT")], [SMP ACCEPT. It runs when #cmd("GUARD") ended with 0. It
+      fills #cmd("HTTPD.AHTTPLOD") and records the function as accepted. After
+      it SMP refuses RESTORE and REJECT of the function.],
+    [#cmd("CLEANUP")], [IDCAMS deletes #cmd("HTTPD.HTTPLOAD"). It runs only when
+      #cmd("GUARD") and #cmd("ACCEPT") ended with code 0. Comment the step out
+      to keep the library.],
+  )
+]
+
+The gate of the accept job is the SMP inventory, not the return code of the
+install job, so the 0004 of the #cmd("APPLY") on an upgrade does not stop it.
+A second run ends in a JCL error, because the staging library is gone
+("Accepting the SYSMOD" in the _HTTPD User's Guide_).
 
 The JCLIN of the SYSMOD copies the members with IEBCOPY from
 #cmd("HTTPD.AHTTPLOD") to #cmd("HTTPD.LINKLIB") and lists five modules. SMP does

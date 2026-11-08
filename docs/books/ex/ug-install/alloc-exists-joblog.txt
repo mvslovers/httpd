@@ -1,0 +1,8 @@
+                                                J E S 2   J O B   L O G
+19.29.32 JOB   nn  $HASP373 HTTPDALC STARTED - INIT  1 - CLASS A - SYS TK5R
+19.29.32 JOB   nn  IEF403I HTTPDALC - STARTED - TIME=19.29.32
+19.29.32 JOB   nn  IEFACTRT - Stepname  Procstep  Program   Retcode
+19.29.32 JOB   nn  HTTPDALC   CHECK               IDCAMS    RC= 0008
+19.29.32 JOB   nn  HTTPDALC   ALLOC     ALLOC     IEFBR14   *FLUSH*
+19.29.32 JOB   nn  IEF404I HTTPDALC - ENDED - TIME=19.29.32
+19.29.32 JOB   nn  $HASP395 HTTPDALC ENDED

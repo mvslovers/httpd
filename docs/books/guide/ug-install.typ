@@ -10,14 +10,28 @@ record of what was installed. So there is a defined way to replace it with the
 next release (@ug-upgrade) and a defined way to take it out (@ug-remove).
 
 The captures in this chapter come from a first install of release 4.5.1 on a
-TK5 system, with one exception that the text names: the RAKF captures come
-from MVS/CE. The package was built from the source of 4.5.1 before the release was
-published. The build stamp in the start-up banner is therefore not the one of
-the published package (@ug-install-start). Every step of the install job ended with return code
-0000, #cmd("HTTPD.LINKLIB") and #cmd("HTTPD.AHTTPLOD") each held the five load
-modules, and the SMP record showed the FMID #cmd("THTP451"). The file names in
-your package carry the number of your release. The steps do not change from one
-release to the next.
+TK5 system, with exceptions that the text names. The package was built from the
+source of 4.5.1 before the release was published, so the build stamp in the
+start-up banner is not the one of the published package
+(@ug-install-start).
+
+The captures of the allocation job, the install job, the accept job and the SMP
+lists were taken on 2026-11-08 on a throwaway TK5 container (SMP 4,
+#cmd("HMASMP LVL 04.48")). The package was a test build of the 4.5.1 source by
+mbt 3.0.1 on a workstation, with the FMID #cmd("THTP451") deleting
+#cmd("THTP450"). It was not the package that the CI builds for the release,
+which did not exist yet. In that run every step of the install job and of the
+accept job ended with return code 0000, the APPLY and the ACCEPT each copied
+five modules, and the SMP record showed the FMID #cmd("THTP451") as applied and
+then as accepted. The captures of the single steps DELOLD, RECV1, RECV2, RECV,
+APPLYCHK and APPLY, of the upload, of the stop, of the IEHLIST and of the start
+are older. They come from a first install with the one-job package of 4.5.1;
+a comparison with the new run found the same messages, and the differences
+that the text names (times, the names of the XMIT data sets, one line of
+DELOLD). The RAKF captures come from MVS/CE.
+
+The file names in your package carry the number of your release. The steps do
+not change from one release to the next.
 
 Report a problem as an issue at https://github.com/mvslovers/httpd/issues.
 Add the two build stamps that HTTPD writes at the start (#cmd("HTTPD000I") and
@@ -29,8 +43,9 @@ The names of the data sets carry no version. #cmd("HTTPD.LINKLIB") is the same
 name in every release. The #cmd("STEPLIB") of the procedure and an APF entry
 are written once. The price is that two releases cannot be installed side by
 side. An upgrade replaces what is there, and there is no way back to the
-previous release: the install job accepts the new level, and SMP refuses a
-#cmd("RESTORE") of an accepted function.
+previous release once the accept job has run: it accepts the new level, and SMP
+refuses a #cmd("RESTORE") of an accepted function. Until then the new level is
+applied and not accepted, and that is the time to try it.
 
 The installation is a sequence of tasks. Each one has a goal, what you type,
 what comes back and what can go wrong:
@@ -46,6 +61,8 @@ what comes back and what can go wrong:
 + Define the user and the profiles in RAKF (@ug-install-rakfsetup).
 + Put the webroot disk on the system and mount it (@ug-install-webroot).
 + Start HTTPD (@ug-install-start).
++ When you have tried it, accept the SYSMOD with the accept job
+  (@ug-install-accept).
 
 If this system already runs an older HTTPD, do not use this chapter. Use
 @ug-upgrade. The FMID of this release, #cmd("THTP451"), deletes #cmd("THTP450")
@@ -55,7 +72,7 @@ and nothing else (@ug-upgrade-hops).
 
 #idx("package", "contents")
 The package is the archive #cmd("httpd-4.5.1-dist.zip") (or
-#cmd("httpd-4.5.1-dist.tar.gz")). It has six files. In their names, 4.5.1 is
+#cmd("httpd-4.5.1-dist.tar.gz")). It has seven files. In their names, 4.5.1 is
 the release. The webroot image has no version in its name.
 
 #tab(caption: [The files of the installation package])[
@@ -68,9 +85,12 @@ the release. The webroot image has no version in its name.
       the started task, a Parmlib member and the job that allocates the
       webroot disk. About 22,000 bytes.],
     [#cmd("httpd-4.5.1-alloc.jcl")], [Allocates the two libraries that SMP
-      installs into. Run it once.],
+      installs into. Run it once, on a system that has no HTTPD.],
     [#cmd("httpd-4.5.1-inst.jcl")], [The install job: TSO RECEIVE of both
-      XMIT files, then SMP RECEIVE, APPLY and ACCEPT.],
+      XMIT files, then SMP RECEIVE and APPLY. It ends after the APPLY.],
+    [#cmd("httpd-4.5.1-accept.jcl")], [The accept job: SMP ACCEPT, then it
+      scratches the staging library. You submit it when you have tried the
+      product (@ug-install-accept).],
     [#cmd("httpd-webroot.img")], [The webroot disk: a 1 MB file system image
       with the welcome page. It is not part of the SMP installation
       (@ug-install-webroot).],
@@ -123,10 +143,11 @@ release:
       #cmd("STEPLIB") of the procedure names it, and it can be on the APF
       list. Allocated by the allocation job.],
     [#cmd("HTTPD.AHTTPLOD")], [The distribution library: the copy that SMP
-      keeps for the accepted level. Allocated by the allocation job.],
+      keeps for the accepted level. Allocated by the allocation job, and filled
+      by the accept job.],
     [#cmd("HTTPD.HTTPLOAD")], [The staging library. TSO RECEIVE creates it,
-      SMP reads the modules from it, and the last step of the install job
-      scratches it.],
+      SMP reads the modules from it, and the last step of the accept job
+      scratches it. Until you submit the accept job it stays on the disk.],
     [#cmd("HTTPD.SAMPLIB")], [The sample library. TSO RECEIVE creates it. It
       is a plain library that SMP does not own.],
     [#cmd("HTTPD.WEBROOT.UFS")], [The webroot disk. The job #cmd("HTTPWEBR")
@@ -149,7 +170,7 @@ release:
 - A way to send a file to the host in binary (@ug-install-upload).
 - Disk space for the four data sets of SMP and TSO RECEIVE. The allocation job
   asks for 5 cylinders for each of the two libraries. The staging library is
-  about the size of the load XMIT and goes away again at the end of the install
+  about the size of the load XMIT and goes away again at the end of the accept
   job.
 
 === UFSD Is Optional <ug-install-ufsd>
@@ -246,17 +267,16 @@ HTTPD002I AUTHORIZED BY SVC (MODULE KEY 8)
 The capture of @ug-install-start is this second case.
 
 An APF entry on MVS 3.8j names the data set and the volume. The entry does
-not only permit a volume, it dictates one. The allocation job says
-#cmd("UNIT=SYSDA") and no volume, so it puts the library wherever
-#cmd("SYSDA") picks, and the next section shows a second run that put both
-libraries on other volumes than the first. If the volume is not the one in the
-entry, you get a library that exists, holds the right module and is not
-authorized. Pin the volume on the #cmd("LINKLIB") statement of the allocation
-job:
+not only permit a volume, it dictates one. The allocation job puts
+#cmd("HTTPD.LINKLIB") on the volume that its parameter #cmd("TGTVOL") names
+(@ug-install-alloc). If that is not the volume of the entry, you get a library
+that exists, holds the right module and is not authorized. Set #cmd("TGTVOL")
+to the volume of the entry, on the #cmd("EXEC") statement at the end of the
+allocation job:
 
 #screen(```
-//LINKLIB  DD  DSN=HTTPD.LINKLIB,DISP=(NEW,CATLG,DELETE),
-//            UNIT=SYSDA,VOL=SER=your-apf-volume,
+//ALLOC   EXEC SMPALLOC,TGTVOL=your-apf-volume,DLBVOL=your-other-volume,
+//             COND=(0,NE,CHECK)
 ```)
 
 Nothing reports the mismatch, because HTTPD recovers from it: it falls back to
@@ -321,10 +341,9 @@ into a data set that does not yet exist.
 Goal: nothing has HTTPD's libraries open. Skip this task on a first
 installation.
 
-The allocation job creates #cmd("HTTPD.LINKLIB"), which a running HTTPD has
-open through its #cmd("STEPLIB"). The install job writes into it. A job that
-cannot get the library waits. The console shows the wait, the stop and the
-end of the wait:
+A running HTTPD has #cmd("HTTPD.LINKLIB") open through its #cmd("STEPLIB"),
+and the install job writes into it. A job that cannot get the library waits.
+The console shows the wait, the stop and the end of the wait:
 
 #screen(raw(read("../ex/ug-install/alloc-exists-console.txt")))
 
@@ -341,9 +360,11 @@ is gone. Wait for it before you go on. There is no
 #cmd("F HTTPD,SHUTDOWN"), although the comments in the procedure still list it
 ("Console Commands" in the _HTTPD Reference_).
 
-The capture is of a second run of the allocation job on a system that already
-had the libraries. It ends with a good-looking return code, and the next
-section explains why that is not good.
+The capture is older than the two-job package. It shows the allocation job of
+the one-job package of 4.5.1, run a second time on a system that already had
+the libraries. The two-job package was not run against a running HTTPD, so
+where exactly its jobs wait was not measured. Wait for #cmd("$HASP395 HTTPD
+ENDED") before you submit the install job in any case.
 
 == Allocating the Product Data Sets <ug-install-alloc>
 
@@ -356,49 +377,90 @@ HTTPD yet. It allocates a program library with undefined records
 and 20 directory blocks. These two libraries are the data sets of this chapter
 that SMP owns.
 
-The job has no #cmd("DELETE") step on purpose. After the SYSMOD is accepted,
-the distribution library holds the accepted copy of every module. A rerun that
-scratched it would leave the SMP records saying "accepted" with an empty
-library behind them, and nothing would tell you. The comment in the job gives
-the rule: if you must start over, cut the FMID out with UCLIN (@ug-remove), and
-then delete the data sets by hand. An accepted function cannot be rejected or
-restored.
+*Name the volumes.* The job allocates on the volumes that you name, never on
+whatever #cmd("SYSDA") happens to pick. It is a procedure, #cmd("SMPALLOC"),
+with two parameters:
 
-Edit #cmd("UNIT") and #cmd("VOL=SER") if #cmd("SYSDA") is not what you want.
-Pin the volume if you use the APF list (@ug-install-auth). Submit the job. The
-console shows that the job started and that it ended:
+#tab(caption: [The volume parameters of the allocation job])[
+  #table(columns: (1.1in, 1fr, 1in),
+    [Parameter], [Volume of], [Default],
+    [#cmd("TGTVOL")], [#cmd("HTTPD.LINKLIB"), the library SMP installs into],
+      [#cmd("MVSRES")],
+    [#cmd("DLBVOL")], [#cmd("HTTPD.AHTTPLOD"), the distribution library that
+      the accept job fills], [#cmd("SMP000")],
+  )
+]
 
-#screen(raw(read("../ex/ug-install/alloc-console.txt")))
+The defaults are the volumes of an MVS/CE system, as the header of the job
+says; that was not run here. *On TK5 write #cmd("TGTVOL=TK5RES") and
+#cmd("DLBVOL=TK5DLB")*, on the #cmd("EXEC") statement at the end of the job:
 
-The last line, #cmd("IKJ144I"), comes from the job card, which has
-#cmd("NOTIFY=DUMMY"). The user DUMMY does not exist. The message does not
-change the result of the job. The step and its return code are in the job log:
+#screen(```
+//ALLOC   EXEC SMPALLOC,TGTVOL=TK5RES,DLBVOL=TK5DLB,COND=(0,NE,CHECK)
+```)
+
+Leave the #cmd("COND") as it is. On another system write the volumes that you
+want the libraries on. If the library is to be on the APF list, #cmd("TGTVOL")
+is the volume of the entry (@ug-install-auth). A volume that is not mounted
+does not fail the job, it holds it: the console shows #cmd("IEF238D ... REPLY
+DEVICE NAME OR 'CANCEL'"). Reply #cmd("CANCEL"), correct the volume and submit
+the job again. The header of the job says so; that case was not run here.
+
+The job has two steps:
+
+#tab(caption: [The steps of the allocation job])[
+  #table(columns: (1.1in, 1fr),
+    [Step], [What it does],
+    [#cmd("CHECK")], [Looks in the catalog for both libraries. It ends with 0
+      when neither exists, and with 8 when either does.],
+    [#cmd("ALLOC")], [Allocates the two libraries. It runs only when
+      #cmd("CHECK") ended with 0.],
+  )
+]
+
+Submit the job. The step and its return code are in the job log:
 
 #screen(raw(read("../ex/ug-install/alloc-joblog.txt")))
 
-The step is #cmd("IEFBR14") and the return code is #cmd("0000"). The system
-messages of the job say where the data sets went:
+Both steps ended with #cmd("RC= 0000"). On a system without HTTPD libraries
+the output of #cmd("CHECK") says that neither is in the catalog. That is the
+answer the job wants:
+
+#screen(raw(read("../ex/ug-install/alloc-check.txt")))
+
+The system messages of the step #cmd("ALLOC") say where the data sets went:
 
 #screen(raw(read("../ex/ug-install/alloc-sysmsg.txt")))
 
 Read #cmd("IEF285I"). Both data sets are #cmd("CATALOGED"), and
-#cmd("VOL SER NOS=") names the volumes. Write down the volume of
+#cmd("VOL SER NOS=") names the volumes you asked for. Write down the volume of
 #cmd("HTTPD.LINKLIB") if you use the APF list.
 
-*What can go wrong: the data set exists.* Run the job on a system that has
-the names already, and it also ends with condition code 0000. The system
-messages show the difference:
+*What can go wrong: the data set exists.* Run the job on a system that has the
+names already, and #cmd("CHECK") finds them:
+
+#screen(raw(read("../ex/ug-install/alloc-exists-check.txt")))
+
+The step ends with 8, #cmd("ALLOC") is skipped, and nothing is allocated. The
+job log and the system messages show it:
+
+#screen(raw(read("../ex/ug-install/alloc-exists-joblog.txt")))
 
 #screen(raw(read("../ex/ug-install/alloc-exists-sysmsg.txt")))
 
-#cmd("IEF287I") with #cmd("NOT CATLGD 2") says that the new data set was
-created and could not be cataloged, because the name is taken. Note the
-volumes: the new copies are on the other volumes than in the first run. They are
-not the libraries that the system uses. A return code of 0000 says that the
-job ran. It does not say that the work happened. Look at #cmd("IEF285I") and
-#cmd("IEF287I") every time, and delete the uncataloged copies by hand.
+The job ends with return code 8. That is the right answer on a system that has
+the libraries, and it is why an upgrade skips this task. If you never installed
+HTTPD by SMP and the names exist, somebody else owns them (TK5 ships HTTPD 3.3
+in #cmd("HTTPD.LINKLIB")). SMP cannot replace what it does not own. The
+installation guide in the package, the file #cmd("README.md"), has the steps
+for moving such a library out of the way.
 
-*What can go wrong: a running HTTPD.* The job waits (@ug-install-stop).
+The job has no #cmd("DELETE") step on purpose. After the accept job the
+distribution library holds the accepted copy of every module. A rerun that
+scratched it would leave the SMP records saying "accepted" with an empty
+library behind them, and nothing would tell you. If you must start over, cut
+the FMID out with UCLIN (@ug-remove), and then delete the data sets by hand.
+An accepted function cannot be rejected or restored.
 
 *What can go wrong: SB37.* The space is in cylinders on purpose. A primary
 in tracks reaches the 16-extent limit long before the volume is full, and the
@@ -415,7 +477,7 @@ difference between the shipped job and the edited one:
 
 #screen(raw(read("../ex/ug-install/inst-jcl-edit.txt")))
 
-Keep the rest. The job has eight steps:
+Keep the rest. The job has six steps and ends after the APPLY:
 
 #tab(caption: [The steps of the install job])[
   #table(columns: (1.1in, 1fr),
@@ -434,20 +496,18 @@ Keep the rest. The job has eight steps:
       nothing.],
     [#cmd("APPLY")], [SMP APPLY: copies the five modules into
       #cmd("HTTPD.LINKLIB").],
-    [#cmd("ACCEPT")], [SMP ACCEPT: copies them into
-      #cmd("HTTPD.AHTTPLOD") and makes this level the one a
-      #cmd("RESTORE") would return to.],
-    [#cmd("CLEANUP")], [Scratches the staging library
-      #cmd("HTTPD.HTTPLOAD").],
   )
 ]
+
+The ACCEPT is not in this job. It is the accept job, which you submit when you
+have tried the product (@ug-install-accept). Until then the function is
+applied and not accepted, and the staging library #cmd("HTTPD.HTTPLOAD") stays
+on the disk.
 
 The steps depend on each other through condition codes. The step #cmd("RECV")
 runs if #cmd("RECV2") ended with 0. #cmd("APPLYCHK") runs if #cmd("RECV")
 ended with 0, and #cmd("APPLY") runs if #cmd("APPLYCHK") ended with 0. So the
-apply does not start when the dry run found a problem. #cmd("ACCEPT") runs if
-#cmd("APPLY") ended with 4 or lower, and #cmd("CLEANUP") only if
-#cmd("ACCEPT") ended with 0.
+apply does not start when the dry run found a problem.
 
 The SYSMOD is part of the job as an inline data set, in a
 #cmd("DD DATA,DLM=@@") statement. It is plain text, so there is no third file
@@ -455,9 +515,9 @@ to send and no third data set to allocate. The terminator is #cmd("@@") and
 not the usual #cmd("/*"), because the SYSMOD contains statements that start
 with #cmd("//") and a copy statement that ends with #cmd("/*").
 
-The steps #cmd("APPLYCHK"), #cmd("APPLY") and #cmd("ACCEPT") carry a note in
-the job: the DDs that override one of the procedure #cmd("SMPAPP") must come
-before the DDs that the step adds. In the wrong order, SMP quietly uses the
+The job carries a note at the step #cmd("APPLYCHK"), and it holds for the
+#cmd("APPLY") and for the accept job as well: the DDs that override one of the
+procedure #cmd("SMPAPP") must come before the DDs that the step adds. In the wrong order, SMP quietly uses the
 data set of the procedure, and the messages still name the one you wanted. Do
 not reorder those statements.
 
@@ -474,13 +534,9 @@ Under a minute later the job is done.
 == Reading the Result <ug-install-result>
 
 #idx("return code")
-Goal: know whether the install job did its work. The console shows that the
-job started and that it ended. It does not show the steps:
-
-#screen(raw(read("../ex/ug-install/inst-console.txt")))
-
-The step table is in the job log, with the time of each step. Every step ends
-with #cmd("RC= 0000"):
+Goal: know whether the install job did its work. The step table is in the job
+log, with the time of each step. The job ends after the APPLY, so there are six
+steps, and on a first installation every one ends with #cmd("RC= 0000"):
 
 #screen(raw(read("../ex/ug-install/inst-joblog.txt")))
 
@@ -493,7 +549,13 @@ The return codes mean this:
 - *0008 or higher.* The step failed. The conditions stop the later steps, so
   the first step with a high code is the one to read.
 
-The messages of every step are in the job output. The steps in order:
+The messages of every step are in the job output. The steps in order. The
+captures of the steps are from the one-job package of 4.5.1 (see the start of
+this chapter). In the run with the two-job package the messages were the same;
+the times, the names of the XMIT data sets and, in #cmd("DELOLD"), the second
+delete differ. That run had no old #cmd("HTTPD.SAMPLIB") to delete, so the
+second delete also ended #cmd("NOT DELETED") with condition code 8, and the
+step still ended with 0.
 
 *DELOLD.* The step ends with 0000, although the capture looks like a failure:
 
@@ -541,23 +603,39 @@ how many tracks and directory blocks of the library are still unused:
 
 #screen(raw(read("../ex/ug-install/inst-apply-iebcopy.txt")))
 
-*ACCEPT.* The same copy, into the distribution library
-#cmd("HTTPD.AHTTPLOD"). The output has five #cmd("HMA2380") lines with
-#cmd("LIBRARY=AHTTPLOD"), and it ends with #cmd("HMA2270 ACCEPT PROCESSING
-SUCCESSFULLY COMPLETED"):
-
-#screen(raw(read("../ex/ug-install/inst-smp-accept.txt")))
-
-*CLEANUP.* The staging library goes away:
-
-#screen(raw(read("../ex/ug-install/inst-cleanup.txt")))
+The job stops here. There is no #cmd("ACCEPT") and no #cmd("CLEANUP") in it.
 
 The system of these captures had never had #cmd("THTP450"). The reports say
 #cmd("THTP450 DELETED") all the same: SMP lists the FMID that the statement
 #cmd("++VER DELETE") names, whether or not the system holds it. When the
-install is done, both zones of SMP hold #cmd("THTP450") as a mark with the
-line #cmd("DELBY = THTP451") (@ug-install-verify). The return codes are the
-same as on a system that had it.
+install job is done, the target zone of SMP holds #cmd("THTP450") as a mark with
+the line #cmd("DELBY = THTP451") (@ug-install-verify). The distribution zone
+gets its mark from the accept job. The return codes are the same as on a
+system that had it.
+
+*Between the two jobs.* The function is received and applied, and not
+accepted. This is the state in which you try the product:
+
+#tab(caption: [The system after the install job and after the accept job])[
+  #table(columns: (1.9in, 1fr, 1fr),
+    [], [After the install job], [After the accept job],
+    [#cmd("HTTPD.LINKLIB")], [The five new modules.], [The same.],
+    [#cmd("HTTPD.AHTTPLOD")], [Empty on a first installation. On an upgrade
+      it still holds the previous release.], [The modules of this release.],
+    [#cmd("HTTPD.HTTPLOAD")], [There.], [Scratched.],
+    [#cmd("HTTPD.SAMPLIB")], [There.], [There.],
+    [#cmd("LIST CDS SYSMOD(THTP451)")], [#cmd("STATUS = REC  APP")],
+      [#cmd("STATUS = REC  APP  ACC")],
+    [#cmd("LIST ACDS SYSMOD(THTP451)")], [Not found.],
+      [#cmd("STATUS = REC  APP  ACC  RGN")],
+    [#cmd("RESTORE")], [Works on a first installation. Refused on an upgrade
+      (#cmd("HMA2452")).], [Refused.],
+    [#cmd("REJECT")], [Do not: it removes the SYSMOD from the SMP library of
+      received SYSMODs, and the accept job then fails.], [Refused.],
+  )
+]
+
+@ug-remove says what each of them does, with the captures of the messages.
 
 == Verifying the Install <ug-install-verify>
 
@@ -585,21 +663,25 @@ the procedure #cmd("SMPAPP") with these control statements:
  RESETRC .
  LIST CDS SYSMOD(THTP451) .
  LIST CDS LMOD(HTTPD) .
+ LIST ACDS SYSMOD(THTP451) .
 /*
 ```)
 
-The output:
+The output, for the state after the install job:
 
 #screen(raw(read("../ex/ug-install/verify-smp-list.txt")))
 
-Read the capture for four facts. The status is #cmd("REC  APP  ACC"): the
-SYSMOD is received, applied and accepted. The line #cmd("DELETE VER(001)")
+Read the capture for five facts. The status is #cmd("REC  APP"): the SYSMOD
+is received and applied, and not accepted yet. The line #cmd("DELETE VER(001)")
 names the predecessor that the SYSMOD replaces. The line #cmd("MOD =") lists
 the five modules. And #cmd("LASTUPD = THTP451") for the load module
 #cmd("HTTPD"), with #cmd("SYSTEM LIBRARY = LINKLIB"), says that the module in
-the load library comes from this level.
+the load library comes from this level. The last list asks the distribution
+zone, and the entry is not there: the list ends with return code 4 and names
+#cmd("THTP451") among the entries that were not found. That is right until the
+accept job has run (@ug-install-accept).
 
-If the member list is short, or the status lacks #cmd("ACC"), the install did
+If the member list is short, or the status lacks #cmd("APP"), the install did
 not do its work, whatever the return codes said.
 
 *The predecessor.* The SYSMOD names #cmd("THTP450") as the FMID it deletes, so
@@ -607,8 +689,9 @@ SMP keeps a mark for it, also on a system that never had it. A list of
 #cmd("SYSMOD(THTP450)") shows the type #cmd("FUNCTION") and the line
 #cmd("DELBY = THTP451"), with no status and no modules. Ask for it in the CDS
 with #cmd("LIST CDS SYSMOD(THTP450)") and in the ACDS with
-#cmd("LIST ACDS SYSMOD(THTP450)"): both zones have the mark. The mark is not a
-sign of an old release on the system.
+#cmd("LIST ACDS SYSMOD(THTP450)"). After the install job the CDS has the mark
+and the ACDS has not (not found, return code 4). After the accept job both
+zones have it. The mark is not a sign of an old release on the system.
 
 == The Procedure and the Parmlib Member <ug-install-proc>
 
@@ -1093,6 +1176,97 @@ A start that overlaps the end of the old task finds the port taken
 server, how to change a setting without a restart, and what every command
 prints.
 
+== Accepting the SYSMOD <ug-install-accept>
+
+#idx("ACCEPT")
+#idx("accept job")
+Goal: SMP has accepted the function, and the staging library is gone. Do this
+when you have tried the product: the server is started (@ug-install-start),
+you logged in and called the routes you use. Until now the function is applied
+and not accepted (@ug-install-result).
+
+*Accepting is the step without a way back.* Before it, SMP can still take the
+function out with #cmd("RESTORE") (@ug-remove). After it, it cannot. That is
+why the accept is a job of its own, #cmd("httpd-4.5.1-accept.jcl"), and not the
+end of the install job: the decision is yours, and it comes after you have seen
+the server run. Nothing in the job needs editing. It names the same data sets
+as the install job.
+
+The job has four steps:
+
+#tab(caption: [The steps of the accept job])[
+  #table(columns: (1.1in, 1fr),
+    [Step], [What it does],
+    [#cmd("GUARD")], [#cmd("LIST CDS SYSMOD(THTP451)"): looks for the function
+      in the target zone. It ends with 0 when the function is there and with 4
+      when it is not.],
+    [#cmd("NOTAPPL")], [Runs only when #cmd("GUARD") ended with a code above 0.
+      It ends with 8, so that the job fails in a place that says why.],
+    [#cmd("ACCEPT")], [#cmd("ACCEPT S(THTP451) DIS(WRITE)"): copies the
+      modules into #cmd("HTTPD.AHTTPLOD"). On an upgrade it deletes the modules
+      of the previous release from it first.],
+    [#cmd("CLEANUP")], [Scratches the staging library #cmd("HTTPD.HTTPLOAD").
+      It runs only when #cmd("GUARD") and #cmd("ACCEPT") both ended with 0.],
+  )
+]
+
+*The gate is the SMP record, not the return code of the install job.* The
+#cmd("GUARD") asks SMP whether #cmd("THTP451") is applied. That is why the job
+also works after an upgrade, where the #cmd("APPLY") of the install job ends
+with 0004 (@ug-upgrade), and why it stops where it should: when the function is
+not applied, the job ends with 8 in #cmd("NOTAPPL"), nothing is accepted and
+nothing is scratched. Submit the job as you submitted the install job
+(@ug-install-job). The job log of a good run:
+
+#screen(raw(read("../ex/ug-install/accept-joblog.txt")))
+
+#cmd("GUARD") ended with 0000. #cmd("NOTAPPL") shows #cmd("*FLUSH*"): it did not
+run, and that is right. #cmd("ACCEPT") and #cmd("CLEANUP") ended with 0000. The
+output of #cmd("GUARD") shows the status that it looked at:
+
+#screen(raw(read("../ex/ug-install/accept-guard.txt")))
+
+The output of #cmd("ACCEPT") has five #cmd("HMA2380") lines with
+#cmd("LIBRARY=AHTTPLOD"), and it ends with #cmd("HMA2270 ACCEPT PROCESSING
+SUCCESSFULLY COMPLETED"):
+
+#screen(raw(read("../ex/ug-install/accept-smp.txt")))
+
+The staging library goes away:
+
+#screen(raw(read("../ex/ug-install/accept-cleanup.txt")))
+
+If the #cmd("ACCEPT") fails, #cmd("CLEANUP") does not run, and the staging
+library stays. Fix the cause and submit the job again.
+
+*Check the result.* Run the list of @ug-install-verify again. The status is now
+#cmd("REC  APP  ACC") in the target zone, and the distribution zone has the
+entry, with the five modules:
+
+#screen(raw(read("../ex/ug-install/accept-smp-list.txt")))
+
+*What can go wrong: the function is not applied.* When the install job never
+ran, its #cmd("APPLYCHK") failed, or a #cmd("RESTORE") took the function out,
+#cmd("GUARD") ends with 4 and #cmd("NOTAPPL") with 8. The capture is of a job
+after a #cmd("RESTORE") (@ug-remove):
+
+#screen(raw(read("../ex/ug-install/accept-notappl.txt")))
+
+*What can go wrong: a second run.* The staging library is gone, #cmd("GUARD")
+finds the function, because it is still applied, and ends with 0, and the
+#cmd("ACCEPT") step cannot allocate its #cmd("HTTPLOAD"). The job ends with a
+JCL error, and that is right. Nothing is accepted a second time, and nothing
+changes. The accept job runs once per release.
+
+#screen(raw(read("../ex/ug-install/accept-second.txt")))
+
+*Which package this was measured with.* The accept job, its #cmd("GUARD"), the
+second run and the two states of @ug-install-result were measured on a throwaway
+TK5 container with a test package built by mbt 3.0.1 from the source of this
+release (@ug-install). The package that the CI builds for the release did not
+exist yet. HTTPD was not started between the two jobs in that run, so the start
+and the first requests were not measured in the state "applied, not accepted".
+
 == What HTTPD Serves After the Install <ug-install-serves>
 
 #idx("routes", "shipped")
@@ -1122,11 +1296,18 @@ The display modules are not reachable. Nothing names them until you add a
 #tab(caption: [Problems of the installation])[
   #table(columns: (2.2in, 1fr),
     [What you see], [What it means and what to do],
-    [The allocation job waits with #cmd("IEF099I")], [A running HTTPD has the
-      library. Stop it with #cmd("P HTTPD") (@ug-install-stop).],
-    [#cmd("IEF287I ... NOT CATLGD 2") in the allocation job], [The names
-      exist. The new copies are not the libraries in use. Delete them by hand
-      (@ug-install-alloc).],
+    [A job waits with #cmd("IEF099I")], [A running HTTPD has the library. Stop
+      it with #cmd("P HTTPD") (@ug-install-stop).],
+    [The allocation job ends with 8 and #cmd("ALLOC") did not run], [The
+      names exist. Nothing was allocated (@ug-install-alloc).],
+    [The allocation job holds with #cmd("IEF238D")], [A volume is not mounted.
+      Reply #cmd("CANCEL"), correct #cmd("TGTVOL") or #cmd("DLBVOL") and submit
+      again (@ug-install-alloc).],
+    [The accept job ends with 8 in #cmd("NOTAPPL")], [The SYSMOD is not applied
+      (@ug-install-accept).],
+    [The accept job ends with a JCL error, #cmd("HTTPLOAD - DATA SET NOT
+      FOUND")], [The accept job has run before. Nothing is left to accept
+      (@ug-install-accept).],
     [The RECEIVE step ends with a return code that is not zero], [The XMIT
       file was sent in text mode, or its record format is not FB 80
       (@ug-install-upload).],

@@ -14,6 +14,22 @@ If you want a newer release, you are in the wrong chapter. A release deletes
 its predecessor when it is installed (@ug-upgrade). Running this chapter first
 would scratch the libraries that the new release installs into.
 
+SMP has its own commands for taking a function out, #cmd("RESTORE") and
+#cmd("REJECT"), and they do not do what the SMP manuals lead you to expect
+here. The route that works in every state is the #cmd("UCLIN") job of
+@ug-remove-uclin. Where you stand decides what else is possible:
+
+#tab(caption: [What SMP offers, by the jobs you have run])[
+  #table(columns: (1.9in, 1.1in, 1fr),
+    [You have run], [#cmd("RESTORE")], [The #cmd("UCLIN") job],
+    [The install job and the accept job], [Refused], [Works],
+    [The install job only, as a first installation], [Works
+      (@ug-remove-applied)], [Works],
+    [The install job only, as an upgrade], [Refused (#cmd("HMA2452"))],
+    [Works],
+  )
+]
+
 #note[*Which release the sessions come from.* The sessions in this chapter were
 measured on release 4.4.0 (the FMID #cmd("THTP440")) on a TK5 system. The FMID
 of a release is #cmd("THTP") and the three digits of its version. HTTPD 4.5.0 is
@@ -23,7 +39,13 @@ Reference_, in "The Started Task and the Package", section "The FMID". The job
 in this chapter is the 4.4.0 job. @ug-remove-45 tells what changes for 4.5.0,
 and what the 4.5.0 form of the job did on a TK5 system. @ug-remove-451 tells
 what changes for 4.5.1, and what the 4.5.1 form of the job did on an MVS/CE
-system that held 4.5.0 and on a TK5 system that held 4.5.1. If you installed a development build of HTTPD, read @ug-remove-dev too.]
+system that held 4.5.0 and on a TK5 system that held 4.5.1. If you installed a development build of HTTPD, read @ug-remove-dev too.
+
+The sessions of @ug-remove-applied, and the counts for a system that holds
+#cmd("THTP451") applied and not accepted, were measured on 2026-11-08 on a
+throwaway TK5 container with a test package of 4.5.1 that mbt 3.0.1 built on a
+workstation (FMID #cmd("THTP451") deleting #cmd("THTP450")). It is not the
+package that the CI builds for the release, because that one did not exist yet.]
 
 == What HTTPD Put on the System <ug-remove-what>
 
@@ -42,9 +64,10 @@ system that held 4.5.0 and on a TK5 system that held 4.5.1. If you installed a d
 
 The names of the data sets carry no version, so there is one HTTPD
 installation on a system, whichever release put it there. The staging library
-#cmd("HTTPD.HTTPLOAD") is not on the list. The last step of the install job
-scratches it, but only if the ACCEPT ended with return code 0. If a failed
-install left it, scratch it as well.
+#cmd("HTTPD.HTTPLOAD") is not on the list. The last step of the accept job
+scratches it, but only if the #cmd("ACCEPT") ended with return code 0. Until
+you submit the accept job it is there, and a failed accept job leaves it. Step 4
+scratches it then.
 
 *Earlier releases left their FMIDs behind.* One release has one FMID, and an
 id is spent once. Each release deletes its predecessor, and SMP keeps the id of
@@ -205,6 +228,13 @@ The return code says that the job ran. IDCAMS says what it did.
 #cmd("HTTPD.SAMPLIB") is not in this job. The next install scratches it by
 itself (the step #cmd("DELOLD") of the install job). Scratch it too if you want
 a clean system, once you have copied what you want out of it.
+
+If you never submitted the accept job, or it failed, the staging library
+#cmd("HTTPD.HTTPLOAD") is still there. Scratch it the same way:
+
+#screen(```
+  DELETE HTTPD.HTTPLOAD NONVSAM SCRATCH PURGE
+```)
 
 If you put the library into the APF list (the entry in
 #cmd("SYS1.PARMLIB(IEAAPF00)")), remove the entry for #cmd("HTTPD.LINKLIB")
@@ -372,8 +402,99 @@ mark again.
 #cmd("MOD") block names, and whether the #cmd("DEL MOD") and
 #cmd("DEL SYSMOD") statements remove them cleanly is not known.
 
-The next section is about the case where a system holds an FMID that the job
-does not name, because a development build put it there.
+The next section is about #cmd("RESTORE") and #cmd("REJECT"). The one after it
+is about the case where a system holds an FMID that the job does not name,
+because a development build put it there.
+
+== RESTORE and REJECT <ug-remove-restore>
+
+#idx("RESTORE")
+#idx("REJECT")
+Once the accept job has run, SMP refuses both commands. This was measured on
+a TK5 system after the accept job of the 4.5.1 package. The job names no
+#cmd("HTTPLOAD") statement, because the accept job scratched that library, and
+a statement that names it ends the job in a JCL error before SMP starts.
+
+#screen(```
+//HTTPDRST JOB (SYS),'HTTPD RESTORE',
+//             CLASS=A,MSGCLASS=H,MSGLEVEL=(1,1),
+//             REGION=4096K
+//RESTORE EXEC SMPAPP
+//HMASMP.LINKLIB  DD  DISP=SHR,DSN=HTTPD.LINKLIB
+//HMASMP.AHTTPLOD DD  DISP=SHR,DSN=HTTPD.AHTTPLOD
+//SMPCNTL  DD  *
+ RESTORE S(THTP451) DIS(WRITE) .
+/*
+```)
+
+#screen(raw(read("../ex/ug-remove/restore-accepted.txt")))
+
+The return code is 12, and #cmd("HMA2452") says why: the function was accepted.
+Nothing is changed. A #cmd("REJECT") is refused as well, with
+#cmd("HMA2462"): accepting removed the SYSMOD from the SMP library of received
+SYSMODs, which #cmd("REJECT") works from.
+
+#screen(raw(read("../ex/ug-remove/reject-twice.txt")))
+
+=== Between the install job and the accept job <ug-remove-applied>
+
+#idx("applied, not accepted")
+After the install job and before the accept job the function is applied and
+not accepted, and SMP still offers more than #cmd("UCLIN"), with a catch each
+way.
+
+*#cmd("RESTORE") works on a first installation.* With the job above, plus the
+statement #cmd("//HMASMP.HTTPLOAD DD DISP=SHR,DSN=HTTPD.HTTPLOAD") (the staging
+library exists), it ends with 0 and takes the five modules out of
+#cmd("HTTPD.LINKLIB"):
+
+#screen(raw(read("../ex/ug-remove/restore-applied-first.txt")))
+
+The function is gone from the target zone and from the SMP library of received
+SYSMODs, so a #cmd("REJECT") afterwards has nothing to do and you need none.
+The libraries stay. The install job can be submitted again as it is, and its
+#cmd("DELOLD") step scratches the staging library and the sample library first.
+An accept job submitted after the #cmd("RESTORE") stops in its #cmd("GUARD"):
+the step ends with 4, #cmd("NOTAPPL") ends the job with 8, and nothing is
+accepted (@ug-install-accept).
+
+*#cmd("RESTORE") is refused on an upgrade.* With the previous release already
+accepted, the same job ends with 12 and changes nothing:
+
+#screen(raw(read("../ex/ug-remove/restore-applied-upgrade.txt")))
+
+The new level deletes the old one, and SMP will not undo that. The new level
+cannot be taken out through SMP with the old one put back. The way out is the
+#cmd("UCLIN") job of this chapter, and then an installation of the release you
+want.
+
+*Do not #cmd("REJECT") between the two jobs.* It is not refused. It ends with 4
+and #cmd("HMA4081 SYSMOD THTP451 NOT APPLIED OR NOT ACCEPTED"), and it deletes
+the SYSMOD from the SMP library of received SYSMODs while the target zone
+still holds it as applied:
+
+#screen(raw(read("../ex/ug-remove/reject-applied.txt")))
+
+The accept job then fails. #cmd("GUARD") still ends with 0, because the
+function is applied, and #cmd("ACCEPT") ends with 12, because SMP cannot find
+the SYSMOD any more. #cmd("CLEANUP") does not run.
+
+#screen(raw(read("../ex/ug-remove/accept-after-reject.txt")))
+
+A second #cmd("REJECT") answers with #cmd("HMA2462"), as in the capture above.
+The way out is the #cmd("UCLIN") job and a fresh install job. That exact
+sequence was not run.
+
+*The #cmd("UCLIN") job works in this state, too.* The 4.5.1 form of the job
+ran on a TK5 system that held #cmd("THTP451") applied over an accepted
+#cmd("THTP450"). The #cmd("UCLIN") step ended with return code 8: 30 statements
+ended with #cmd("HMA2550"), 14 with #cmd("HMA2532"), and five with
+#cmd("HMA3572"): the five #cmd("DEL SYSMOD(THTP450) MOD(...)") blocks of the
+target zone, where #cmd("THTP450") is only a mark. The distribution zone still
+held #cmd("THTP450") with its modules, so its blocks worked. There was no
+#cmd("HMA2293"). The #cmd("LIST") step ended with return code 4. Then scratch
+the libraries as step 4 says, including #cmd("HTTPD.HTTPLOAD"), which the
+accept job would have scratched.
 
 == A Development Build with a Later FMID <ug-remove-dev>
 
