@@ -20,7 +20,7 @@ The server's primary role is hosting CGI modules (especially mvsMF) that provide
 | change response framing, keep-alive, or look for where something lives | `internals/architecture.md` (4.0.0 decisions, HTTP/1.1 design, source file map) |
 | inspect a live server with `/.dsrv`, `/.dm`, `/.dmtt` | `internals/display-modules.md`, and `~/repos/mvs/.workspace/context/httpd-debug.md` |
 | write or change a server module | the "Server Module Interface" chapter of the Reference (`docs/books/ref/ref-api.typ`), `internals/development.md` |
-| cut a release or touch `[smp]` | `~/repos/mvs/.workspace/context/smp.md` (the httpd FMID row and burned ids) |
+| cut a release or touch `[smp]` | `internals/releasing.md` (the package the acceptance runs on), then `~/repos/mvs/.workspace/context/smp.md` (the httpd FMID row and burned ids) |
 
 ## Open Items
 
